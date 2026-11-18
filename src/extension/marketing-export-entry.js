@@ -39,7 +39,6 @@ import {
   giftUsersStorageKey,
   eventDomStorageKey,
   giftSubAppHistoryStorageKey,
-  commentsStorageKey,
   watchSnapshotStorageKey,
   broadcasterProfileStorageKey,
   KEY_ANONYMOUS_IDENTICON_ENABLED,
@@ -73,15 +72,15 @@ import { createObjectUrlRevokeQueue } from '../lib/objectUrlRevokeQueue.js';
 import { pickCommentsForExport } from '../lib/pickCommentsForExport.js';
 import { SUPPORTER_PAGE_URL, checkMarketingAccess, saveSupporterCode } from '../lib/supporterAccess.js';
 import { isCommentDbAvailable, openCommentDb, countCommentsForLive, readAllCommentsForLive as readAllCommentsFromDb } from '../lib/commentDb.js';
-import { readChunkedComments } from '../lib/commentChunkStore.js';
 import { readStorageBagWithRetry, normalizeUserCommentProfileMap } from '../lib/userCommentProfileCache.js';
-import { tailStorageKey } from '../lib/commentTailBuffer.js';
 import { isAnonymousStyleNicoUserId } from '../lib/supportGrowthTileSrc.js';
 import { anonymousIdenticonDataUrl } from '../lib/anonymousIdenticon.js';
 import { exportWaitLinesForKind, resolveHtmlReportBuildTimeoutMs } from '../lib/exportWaitNarration.js';
-import { mergeTailRowsIntoDisplay } from '../lib/mergeTailRowsIntoDisplay.js';
-import { normalizeTailRowsForDisplay } from '../lib/readAllCommentsForLive.js';
+import { EXPORT_COMMENT_READ_TIMEOUT_MS, readCommentsForExport } from '../lib/readAllCommentsForLive.js';
+import { isYtPseudoLvShape } from '../lib/youtube/ytPseudoLv.js';
+import { readStoredExportComments } from '../lib/youtube/exportStoredComments.js';
 import { MARKETING_EXPORT_STATE_PARAM, withMarketingExportState } from '../lib/marketingExportTabState.js';
+import { followerSamplesStorageKey, readStoredFollowerSamples } from '../lib/platform/followerSampleStore.js';
 
 /**
  * @typedef {{
@@ -171,45 +170,18 @@ async function readAllCommentsFromCommentDb(lv) {
  * @returns {Promise<import('../lib/commentRecord.js').StoredComment[]>}
  */
 async function readAllCommentsForLive(lv) {
-  const fromDb = await readAllCommentsFromCommentDb(lv);
-  const mainKey = commentsStorageKey(lv);
-  /** @type {import('../lib/commentRecord.js').StoredComment[]} */
-  let rows = [];
-  if (Array.isArray(fromDb) && fromDb.length) {
-    rows = fromDb;
-  } else {
-    try {
-      const res = await readChunkedComments(lv, mainKey, (keys) =>
+  return /** @type {import('../lib/commentRecord.js').StoredComment[]} */ (
+    await readCommentsForExport(lv, {
+      readAllFromCommentDb: readAllCommentsFromCommentDb,
+      getMany: (keys) =>
         readStorageBagWithRetry(() => chrome.storage.local.get(keys), {
-          attempts: 3,
-          delaysMs: [0, 80, 200],
-          perAttemptTimeoutMs: 1200
-        })
-      );
-      rows = Array.isArray(res.rows) ? res.rows : [];
-    } catch {
-      rows = [];
-    }
-  }
-  // 未保存の末尾も、この放送の番号を付けて本体と同じ行として数える。
-  // 本体が IDB にあっても末尾は別なので、ここで必ず足す。
-  try {
-    const tKey = tailStorageKey(lv);
-    const tailBag = await readStorageBagWithRetry(() => chrome.storage.local.get([tKey]), {
-      attempts: 2,
-      delaysMs: [0, 120],
-      perAttemptTimeoutMs: 900
-    });
-    const tail = normalizeTailRowsForDisplay(
-      /** @type {Record<string, unknown>} */ (tailBag)[tKey],
-      lv,
-      Date.now()
-    );
-    if (tail.length) rows = mergeTailRowsIntoDisplay(rows, tail, { liveId: lv });
-  } catch {
-    /* テールは任意 */
-  }
-  return rows;
+          attempts: 2,
+          delaysMs: [0, 200],
+          perAttemptTimeoutMs: EXPORT_COMMENT_READ_TIMEOUT_MS
+        }),
+      nowMs: Date.now()
+    })
+  );
 }
 
 /**
@@ -556,6 +528,38 @@ function showLockStage(lid) {
 
 // ── stage 4: メイン処理(既存パイプラインを呼び出し順序・引数不変で実行) ──
 
+/**
+ * 保存済みの人数の標本を読む。通信はしない。配信要約の全件も読まない。
+ * 小さい鍵の読みは時間で空にしない（保存済みなら書き出しに出す）。
+ * 鍵が空のときだけ、その配信の標本をサービスワーカーのメモリに聞く。
+ * @param {string} lid
+ * @param {Record<string, any> | null | undefined} snapshot
+ */
+async function followerSamplesForExport(lid, snapshot) {
+  /** @type {Record<string, unknown> | null} */
+  let bag = null;
+  try {
+    bag = /** @type {Record<string, unknown>} */ (await chrome.storage.local.get(followerSamplesStorageKey(lid)));
+  } catch {
+    bag = null;
+  }
+  const stored = readStoredFollowerSamples(lid, snapshot, bag);
+  if (stored.length) return stored;
+  try {
+    const res = await withTimeout(
+      chrome.runtime.sendMessage({ type: 'YT_GET_FOLLOWER_SAMPLES', liveId: lid }),
+      2500,
+      'follower_samples_timeout'
+    );
+    const samples = res && Array.isArray(/** @type {{ samples?: unknown }} */ (res).samples)
+      ? /** @type {{ samples: unknown[] }} */ (res).samples
+      : [];
+    return samples;
+  } catch {
+    return [];
+  }
+}
+
 /** @param {string} lid */
 async function runExport(lid) {
   if (!lid) {
@@ -596,16 +600,36 @@ async function runExport(lid) {
     const giftSubKey = giftSubAppHistoryStorageKey(lid);
     // v0.1.1673: 広告の「気づいた時刻」(拡張が配信中に記録・読むだけ。無ければレポートに章が出ないだけ)。
     const adObsKey = adObservationStorageKey(lid);
-    const [commentsRaw, data] = /** @type {[unknown, Record<string, any>]} */ (
-      await withTimeout(
-        Promise.all([
-          resolveCommentsForHtmlExport(lid),
-          chrome.storage.local.get([gKey, giftEventsKey, giftThrowsKey, giftSubKey, adObsKey])
-        ]),
+    // ギフトの鍵はコメントと別の待ち。こちらが遅くても、コメントが読めていれば報告は出す。
+    // 人数の取得はこの待ちに入れない（followerSamplesForExport が短い時間で空に戻す）。
+    // 疑似 lv（Twitch など）は、視聴タブが開いていても画面用の組み立てを待たない。
+    // その組み立てはコメントが多いと30秒の打ち切りに届かず、報告ごと消える。
+    // 保存層の行をそのまま写す。登録が無い・空でない失敗のときだけ、従来の30秒読みに戻す。
+    let commentsRaw = null;
+    if (isYtPseudoLvShape(lid)) {
+      const stored = await readStoredExportComments(lid);
+      if (Array.isArray(stored)) commentsRaw = stored;
+    }
+    if (!Array.isArray(commentsRaw)) {
+      commentsRaw = await withTimeout(
+        resolveCommentsForHtmlExport(lid),
         30_000,
         'marketing_storage_timeout'
-      )
-    );
+      );
+    }
+    /** @type {Record<string, any>} */
+    let data = {};
+    try {
+      data = /** @type {Record<string, any>} */ (
+        await withTimeout(
+          chrome.storage.local.get([gKey, giftEventsKey, giftThrowsKey, giftSubKey, adObsKey]),
+          4_000,
+          'gift_storage_timeout'
+        )
+      );
+    } catch {
+      data = {};
+    }
     const comments = /** @type {import('../lib/commentRecord.js').StoredComment[]} */ (
       Array.isArray(commentsRaw) ? commentsRaw : []
     );
@@ -741,6 +765,7 @@ async function runExport(lid) {
     //   応援者の名前は、分析レポートと同じ「共有用に伏せる」設定に従う。
     setWaitStageText('メディアキットをまとめています…', 85);
     let mediaKitHtml = '';
+    const followerSamples = await followerSamplesForExport(lid, snapshot);
     try {
       const kit = await withTimeout(
         buildMediaKitDocument({
@@ -755,7 +780,9 @@ async function runExport(lid) {
           omitVisitorTotal: marketingView ? marketingView.visitorCard !== true : false,
           // v0.1.1857: 記録は見た配信全部なので、この配信の配信者の配信だけで集計する(他の配信者の数字を混ぜない)。
           broadcasterUserId: String(snapshot?.broadcasterUserId || '').trim(),
-          currentLiveId: lid
+          currentLiveId: lid,
+          followerSamples,
+          platformId: marketingView ? marketingView.id : 'niconico'
         }),
         60_000,
         'media_kit_build_timeout'
@@ -795,6 +822,7 @@ async function runExport(lid) {
       mediaKitHtml,
       htmlReportHtml,
       programStartAtMs: Number(snapshot?.programStartAtMs || snapshot?.startAtMs) || undefined,
+      followerSamples,
       maskShareLabels: maskShareLabels,
       anonymousIdenticonResolver: getCachedAnonymousIdenticonDataUrl,
       broadcasterUserId: String(snapshot?.broadcasterUserId || '').trim(),

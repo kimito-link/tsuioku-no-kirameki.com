@@ -36,6 +36,7 @@ import {
   kickSubsLeaderboardUrl,
   kickEmoteCatalogUrl,
 } from '../../src/lib/kick/kickApi.js';
+import { followerSampleFromDom, followerSampleFromKickChannel, followerSampleFromKickEvent } from '../../src/lib/platform/followerCountSample.js';
 import { kickEmotesFromCatalog, kickEmotesFromDom } from '../../src/lib/platform/streamEmotes.js';
 import { runBackfillLoop } from '../../src/lib/platform/historyBackfill.js';
 import { buildKickStreamKey } from '../../src/lib/platform/streamPlatform.js';
@@ -213,8 +214,12 @@ async function getJson(url) {
 /** @param {string} slug */
 async function fetchChannel(slug) {
   try {
-    const info = parseKickChannel(await getJson(kickChannelApiUrl(slug)));
-    if (info) return info;
+    const json = await getJson(kickChannelApiUrl(slug));
+    const info = parseKickChannel(json);
+    if (info) {
+      const sample = followerSampleFromKickChannel(json) || followerSampleFromDom(document, 'kick');
+      return sample ? { ...info, followerSample: sample } : info;
+    }
   } catch {
     /* 下で数える */
   }
@@ -337,6 +342,8 @@ function lookupIcons(slugs) {
 
 // ---- 1配信ぶんの読み取り ----
 let current = /** @type {null | { slug: string, key: string, stop: () => void }} */ (null);
+/** @type {null | { count: number, rounded: boolean, source: string, noun?: string }} */
+let lastKickFollow = null;
 
 /**
  * @param {string} slug
@@ -392,6 +399,11 @@ function startReader(slug, key, ids) {
   const onEvent = (f, opts = {}) => {
     const evName = f.event.replace(/^App\\Events\\/, '').slice(0, 60);
     diag.events[evName] = (diag.events[evName] || 0) + 1;
+    const follow = followerSampleFromKickEvent(evName, f.data);
+    if (follow) {
+      lastKickFollow = follow;
+      safeSendMessage({ type: 'YT_STREAM_META', payload: { videoId: key, followerSample: { ...follow, at: Date.now() } } });
+    }
     if (evName === 'KicksLeaderboardUpdated') return sendBoard(parseKickKicksLeaderboard(f.data), 'socket');
     if (evName === 'GiftsLeaderboardUpdated') return sendSubBoard(parseKickSubsLeaderboard(f.data), 'socket');
     const del = parseKickDeleted(f);
@@ -737,7 +749,14 @@ async function check() {
         const endedKey = current.key;
         current.stop();
         current = null;
-        safeSendMessage({ type: 'YT_STREAM_META', payload: { videoId: endedKey, endedAt: Date.now() } });
+        safeSendMessage({
+          type: 'YT_STREAM_META',
+          payload: {
+            videoId: endedKey,
+            endedAt: Date.now(),
+            ...(lastKickFollow ? { followerSample: { ...lastKickFollow, at: Date.now(), force: true } } : {}),
+          },
+        });
       }
       diag.streamKey = '';
       saveDiagSoon();
@@ -762,8 +781,10 @@ async function check() {
         broadcasterIconUrl: info.iconUrl || '',
         concurrentViewers: typeof info.viewers === 'number' ? info.viewers : undefined,
         ...(info.startedAtMs ? { startedAt: info.startedAtMs, startedAtApprox: false } : {}),
+        ...(info.followerSample ? { followerSample: { ...info.followerSample, at: Date.now() } } : {}),
       },
     });
+    if (info.followerSample) lastKickFollow = info.followerSample;
     saveDiagSoon();
   } finally {
     checking = false;

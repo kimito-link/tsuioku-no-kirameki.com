@@ -5,6 +5,9 @@ import {
   safeTwImageUrl,
   buildTwUsersIconQuery,
   buildTwStreamInfoQuery,
+  buildTwFollowerCountQuery,
+  parseTwFollowerCount,
+  twitchClientIdFromText,
   buildTwLiveVodQuery,
   parseTwLiveVod,
   buildTwVodCommentsQuery,
@@ -40,6 +43,24 @@ describe('twGql', () => {
   it('問い合わせ文は login を英数字に限る(差し込み防止)', () => {
     expect(buildTwStreamInfoQuery('a"){x}').query).toContain('user(login:"ax")');
     expect(buildTwUsersIconQuery(['AAA', 'aaa', 'b"c', 'ok_1']).logins).toEqual(['aaa', 'ok_1']);
+  });
+  it('フォロワー合計は ChannelPage_ChannelFollowerCount の totalCount だけ', () => {
+    const q = buildTwFollowerCountQuery('Twitch');
+    expect(q?.operationName).toBe('ChannelPage_ChannelFollowerCount');
+    expect(q?.variables).toEqual({ login: 'twitch' });
+    expect(q?.query).toContain('followers{totalCount}');
+    expect(JSON.stringify(q)).not.toMatch(/authorization/i);
+    expect(buildTwFollowerCountQuery('a"){x}')?.variables).toEqual({ login: 'ax' });
+    const live = {
+      data: { user: { followers: { totalCount: 2499322 } } },
+      extensions: { operationName: 'ChannelPage_ChannelFollowerCount' },
+    };
+    expect(parseTwFollowerCount(live)).toBe(2499322);
+    expect(parseTwFollowerCount([live])).toBe(2499322);
+    expect(parseTwFollowerCount({ errors: [{ message: 'PersistedQueryNotFound' }] })).toBeNull();
+    expect(parseTwFollowerCount({ data: { user: { stream: { viewersCount: 10 } } } })).toBeNull();
+    expect(twitchClientIdFromText('{"clientId":"kimne78kx3ncx6brgo4mv6wki5h1ko"}')).toBe('kimne78kx3ncx6brgo4mv6wki5h1ko');
+    expect(twitchClientIdFromText('Authorization: Bearer secret-token-value')).toBe('');
   });
 });
 

@@ -34,6 +34,7 @@ import {
 } from '../../src/lib/abema/abCommentPanel.js';
 import { makeDiagTabToken, shouldSkipDiagWrite } from '../../src/lib/platform/diagTabShare.js';
 import { findPageButton, isOwnExtensionUi } from '../../src/lib/platform/pageControlPick.js';
+import { followerSampleFromDom } from '../../src/lib/platform/followerCountSample.js';
 
 const OUT = 'nl-ab-iso';
 const IN = 'nl-ab-main';
@@ -92,6 +93,8 @@ function saveDiagSoon() {
 
 let pageLogin = '';
 let streamKey = '';
+/** @type {null | { count: number, rounded: boolean, source: string, noun?: string, raw?: string }} */
+let lastAbFollow = null;
 let chatId = '';
 let sawPayload = false;
 let denied = false;
@@ -281,7 +284,12 @@ function endStream() {
   diag.streamKey = '';
   safeSendMessage({
     type: 'YT_STREAM_META',
-    payload: { videoId: ended, endedAt: Date.now(), claimActive: claimActiveNow(ended) },
+    payload: {
+      videoId: ended,
+      endedAt: Date.now(),
+      claimActive: claimActiveNow(ended),
+      ...(lastAbFollow ? { followerSample: { ...lastAbFollow, at: Date.now(), force: true } } : {}),
+    },
   });
 }
 
@@ -315,6 +323,11 @@ function sendMeta(forceClaim) {
   if (program.startedAtMs) {
     payload.startedAt = program.startedAtMs;
     payload.startedAtApprox = false;
+  }
+  const abFollow = followerSampleFromDom(document, 'abema');
+  if (abFollow) {
+    lastAbFollow = abFollow;
+    payload.followerSample = { ...abFollow, at: Date.now() };
   }
   safeSendMessage({ type: 'YT_STREAM_META', payload });
   metaAt = Date.now();

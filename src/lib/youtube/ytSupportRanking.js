@@ -176,6 +176,7 @@ export function applyYtSupportRankingDelta(accumulator, newItems) {
   for (const item of newItems) {
     if (!item || typeof item !== 'object') continue;
     const kind = String(item.kind || '');
+    if (kind === 'follow' || item.commentType === 'followNotice') continue;
     const isSupportKind =
       kind === 'superchat' ||
       kind === 'sticker' ||

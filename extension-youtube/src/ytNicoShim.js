@@ -18,6 +18,7 @@ import { setYtLvMetaResolver } from '../../src/lib/youtube/ytLvKeyBridge.js';
 import { marketingViewFor } from '../../src/lib/platform/marketingPlatformPlan.js';
 import { makeYtDefaultIconJudge, YT_DEFAULT_ICON_STORE_KEY } from './ytDefaultIcon.js';
 import { countYtStreamComments, getYtStreamCommentsByVideoId, getYtStreamCommentsSince } from './ytIdbStore.js';
+import { exportCommentsFromStoredRows, setStoredExportCommentReader } from '../../src/lib/youtube/exportStoredComments.js';
 import { buildCommentSummary, summaryStorageKey } from '../../src/lib/commentSummary.js';
 import { videoIdFromSummaryStorageKey } from '../../src/lib/youtube/ytSplitPersist.js';
 import { startPageStallWatch } from '../../src/lib/stallTrace.js';
@@ -37,8 +38,9 @@ import { ytLocalAssetUrlFor } from './ytLocalAssetUrls.js';
 import { buildZeroPtSenderLabels, isZeroPtCountText } from '../../src/lib/youtube/ytZeroPtGiftLabel.js';
 import { YT_LAST_STREAM_URL_KEY } from './pfLastStreamUrl.js';
 import { readYtPanelStreamKey, readYtPanelSite } from '../../src/lib/youtube/ytPanelRoute.js';
+import { recordingKeyForPanelStream, streamKeyMatchesPanel } from '../../src/lib/youtube/ytPanelExportTarget.js';
 import { noWatchHintFor } from '../../src/lib/platform/noWatchHint.js';
-import { rewriteForeignWording } from '../../src/lib/platform/platformMetrics.js';
+import { mediaKitWordingPlatformId, rewriteForeignWording } from '../../src/lib/platform/platformMetrics.js';
 import { callerNameFromStack, createPanelStreamDiag, panelStreamDiagContext, serviceOfStreamKey, YT_PANEL_STREAM_DIAG_KEY_PREFIX } from '../../src/lib/youtube/ytPanelStreamDiag.js';
 import { createStaleFrameHold } from '../../src/lib/youtube/ytStaleFrameHold.js';
 import { ytFullRefreshIntervalMs } from '../../src/lib/youtube/ytFullRefreshInterval.js';
@@ -218,6 +220,8 @@ function mapTab(tab) {
     panelDiag.unmappedWatchTab(url); // 計器: 配信のページなのに写せない(記録の無い部屋など)
     return tab;
   }
+  // 横の欄は一つの配信を焼いて開く。別のサービスのタブをニコ生の視聴タブに見せると、書き出しがそちらになる。
+  if (PANEL_STREAM_KEY && !streamKeyMatchesPanel(PANEL_STREAM_KEY, vid)) return tab;
   const lv = pseudoLvForVideoId(vid);
   return { ...tab, url: `https://live.nicovideo.jp/watch/${lv}`, pendingUrl: undefined, __ytUrl: url };
 }
@@ -442,6 +446,8 @@ export function ytRecordToNicoEntry(r, i, lv, personKey, stableNo) {
       : {}),
     ...(Number(r?.postedAtMs) > 0 ? { ytPostedAtSource: 'service' } : {}),
     ...(backfilled ? { skipVoice: true } : {}),
+    ...(r?.isSystem === true ? { isSystem: true } : {}),
+    ...(r?.commentType === 'followNotice' ? { commentType: 'followNotice' } : {}),
     // 絵文字の名前→画像。落とすと吹き出しは名前の文字だけになる（一覧を覚える前の1回目）。
     ...(emotes.length ? { emotes } : {}),
   };
@@ -548,6 +554,9 @@ export function ytSummaryToNicoSnapshot(sum, videoId, tabTitle, all) {
     officialViewerStale: Number.isFinite(viewers) && viewers > 0 && sum?.viewersStale === true,
     officialViewerReadAt: Number(sum?.viewersReadAt || 0) || null,
     officialStatsUpdatedAt: Number(sum?.updatedAt || 0) || Date.now(),
+    // ページの開始時刻が目安(「3時間前」など)のときは、レポートの「開始から」を出さない。
+    ...(startedAt > 0 && sum?.startedAtApprox !== true ? { programStartAtMs: startedAt } : {}),
+    ...(Array.isArray(sum?.followerSamples) && sum.followerSamples.length ? { followerSamples: sum.followerSamples } : {}),
     // アーカイブ(チャットのリプレイで記録した配信)は今も配信中ではないので、開始からの経過は出さない(2週間前の配信が「372時間」になる)
     //   配信が終わっていたら(endedAt)、終わった時刻までで止める
     streamAgeMin:
@@ -1370,6 +1379,15 @@ if (real && real.storage && real.storage.local && (real.tabs || YT_SHIM_IN_PAGE)
       knownSummariesLoaded = true;
       schedulePlatformChrome();
     });
+  // 書き出しは、視聴タブが開いていても画面用の組み立て(人物・アイコン)を待たない。
+  // 保存した行をそのまま写す。組み立てはコメントが多いと30秒で打ち切られ、報告が出なかった。
+  setStoredExportCommentReader(async (lv) => {
+    await knownVideosReady;
+    const vid = videoIdForPseudoLv(lv);
+    if (!vid) return null;
+    const raw = await getYtStreamCommentsByVideoId(vid);
+    return exportCommentsFromStoredRows(Array.isArray(raw) ? raw : [], String(lv || ''));
+  });
   /**
    * 配信のまとめの一覧を { yt_stream_summaries: {...} } の形で返す。
    * 0.1.2057: 裏方は一覧を丸ごと書かなくなった(配信ごとの小さい鍵 ytm:sum:v1:<id> と IndexedDB)。
@@ -1395,6 +1413,13 @@ if (real && real.storage && real.storage.local && (real.tabs || YT_SHIM_IN_PAGE)
   };
   const lastWatchUrl = async () => {
     await knownVideosReady;
+    // 焼いた配信がある欄は、その記録だけ。最後に更新された別のサービスや、閉じたあとの全局の「最後に見た配信」は使わない。
+    if (PANEL_STREAM_KEY) {
+      const vid = recordingKeyForPanelStream(PANEL_STREAM_KEY, knownSummaries);
+      const pinnedLv = vid ? pseudoLvForVideoId(vid) : '';
+      panelDiag.lastWatch(vid ? 'panel' : 'none', pinnedLv);
+      return pinnedLv ? `https://live.nicovideo.jp/watch/${pinnedLv}` : '';
+    }
     const lv = lvOfLastStream(lastStreamValue);
     if (lv) {
       panelDiag.lastWatch('page', lv);
@@ -2265,9 +2290,42 @@ function screenPlatform() {
   const p = screenPlatformBase();
   return p && platformBoardPeriod ? { ...p, boardPeriod: platformBoardPeriod } : p;
 }
+
+/** 分析レポートの URL に焼かれた lv。最後にコメントを読んだ別の配信は使わない。 */
+function marketingExportLv() {
+  try {
+    return new URLSearchParams(String(location.search || '')).get('lv') || '';
+  } catch {
+    return '';
+  }
+}
+
+/**
+ * 分析レポートの言葉。書き出す配信のサービスだけ。
+ * hold は、配信キーがまだ無いので別サービスの名前へ直さない印。
+ * @returns {{ hold: true } | { hold: false, id: string, platform: (typeof STREAM_PLATFORMS)[keyof typeof STREAM_PLATFORMS] | null }}
+ */
+function marketingWordingPick() {
+  const id = mediaKitWordingPlatformId({
+    exportLv: marketingExportLv(),
+    videoIdForLv: (lv) => videoIdForPseudoLv(lv),
+    platformOfKey: (key) => platformOfStreamKey(key),
+  });
+  if (!id) return { hold: true };
+  if (id === 'youtube' || id === 'niconico') return { hold: false, id, platform: null };
+  if (Object.prototype.hasOwnProperty.call(STREAM_PLATFORMS, id)) {
+    return { hold: false, id, platform: STREAM_PLATFORMS[/** @type {keyof typeof STREAM_PLATFORMS} */ (id)] };
+  }
+  return { hold: true };
+}
+
 /** いま画面に出ている配信のサービス(Twitch/Kick・YouTube なら null。視聴ページの中ならそのページのサービス) */
 function screenPlatformBase() {
   if (YT_SHIM_IN_PAGE) return platformOfHostname(location.hostname);
+  if (IS_MARKETING_PAGE) {
+    const picked = marketingWordingPick();
+    return picked.hold ? null : picked.platform;
+  }
   if (lastAskedLv) {
     const vid = videoIdForPseudoLv(lastAskedLv);
     // 0.1.2103: 聞いてきた配信が分からない(記録の無い配信)ときは、外枠が焼いたタブのサービス。
@@ -2360,6 +2418,15 @@ function inRecordedText(node) {
 
 /** 画面の決まった文言の置き換え。Twitch/Kick の配信なら、YouTube の言葉にした所だけをさらにそのサービスの言葉に @param {string} t @param {{ rewrite?: boolean }} [opt] */
 function screenWording(t, opt) {
+  // 分析レポートは、書き出す配信のサービスだけ。最後に読んだ別の配信の名前へ直さない。
+  if (IS_MARKETING_PAGE) {
+    const picked = marketingWordingPick();
+    if (picked.hold || picked.id === 'niconico') return t;
+    const p = picked.platform;
+    if (!p) return ytWording(t, { topFans: false });
+    const w = ytWording(t, { topFans: false });
+    return w !== t ? ytWordingForPlatform(w, p) : ytWordingPlatformFixed(w, p);
+  }
   // Twitch にはトップファンの順位表が無い=ランキング欄は最初から「合計の順位」の言葉で描く
   const p = screenPlatform();
   let out;

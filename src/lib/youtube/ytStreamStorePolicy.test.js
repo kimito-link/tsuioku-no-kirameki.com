@@ -108,6 +108,27 @@ describe('mergeYtStreamSummary', () => {
     expect(counted.viewersReadAt).toBe(t0);
     expect(counted.viewersStale).toBeUndefined();
   });
+
+  it('フォロワー数は空のときは欄を足さず、3分おきと増えた瞬間だけ残す', () => {
+    const t0 = 1_700_000_000_000;
+    const bare = mergeYtStreamSummary(null, { videoId: 'vid-1', title: 't' }, t0);
+    expect(bare.followerSamples).toBeUndefined();
+    const first = mergeYtStreamSummary(bare, {
+      videoId: 'vid-1',
+      followerSample: { at: t0, count: 10, rounded: false, source: 'page-count', noun: 'フォロワー' },
+    }, t0);
+    expect(first.followerSamples).toEqual([{ at: t0, count: 10, rounded: false, source: 'page-count', noun: 'フォロワー' }]);
+    const soon = mergeYtStreamSummary(first, {
+      videoId: 'vid-1',
+      followerSample: { at: t0 + 10_000, count: 99, rounded: false, source: 'page-count' },
+    }, t0 + 10_000);
+    expect(soon.followerSamples).toHaveLength(1);
+    const jump = mergeYtStreamSummary(soon, {
+      videoId: 'vid-1',
+      followerSample: { at: t0 + 20_000, count: 11, rounded: false, source: 'exact-event' },
+    }, t0 + 20_000);
+    expect(jump.followerSamples?.map((s) => s.count)).toEqual([10, 11]);
+  });
 });
 
 describe('prepareYtCommentsForIdb', () => {
@@ -257,6 +278,21 @@ describe('applyYtStreamIncrementalItems（1万件配信対応の差分更新）'
     expect(resDelta.addedByLane.rinku.map((x) => x.id)).toEqual(['msg-10003']);
     expect(state.laneDisplay.tanunee[0].id).toBe('msg-10001');
     expect(state.laneDisplay.tanunee).toHaveLength(YT_SIDE_PANEL_DISPLAY_LIMIT);
+  });
+});
+
+describe('フォロー通知はコメント件数に入れない', () => {
+  it('記録の印は進めるが、レーンと合計には足さない', () => {
+    const state = createYtStreamIncrementalState('tt.room');
+    const applied = applyYtStreamIncrementalItems(state, [
+      { id: 'c1', pk: 'tt.room::c1', videoId: 'tt.room', channelId: 'tt:1', name: 'A', text: 'こんにちは', kind: 'text', recordedAt: 100 },
+      { id: 'f1', pk: 'tt.room::f1', videoId: 'tt.room', channelId: 'tt:2', name: 'B', text: 'フォローしました', kind: 'follow', commentType: 'followNotice', recordedAt: 200 },
+    ]);
+    expect(applied.totalCount).toBe(1);
+    expect(applied.addedCount).toBe(1);
+    expect(state.laneCounts.rinku + state.laneCounts.konta + state.laneCounts.tanunee).toBe(1);
+    expect(state.lastRecordedAt).toBe(200);
+    expect(applied.ranking.commenters.find((c) => c.name === 'B')).toBeUndefined();
   });
 });
 

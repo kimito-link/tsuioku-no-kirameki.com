@@ -166,6 +166,22 @@ describe('formatCommentRecordBreakdownLine', () => {
     ).toBe('内訳: 通常 596 / 配信者 25');
   });
 
+  it('フォロー通知は通常コメントにもシステムにも入れない', () => {
+    const r = summarizeCommentRecordBreakdown([
+      { text: 'こんにちは' },
+      { text: 'フォローしました', ytKind: 'follow', isSystem: true, commentType: 'followNotice' },
+      { text: 'お知らせ', isSystem: true, commentType: 'generalSystemMessage' },
+    ]);
+    expect(r).toEqual({
+      total: 3,
+      normal: 1,
+      interestArrival: 0,
+      followNotice: 1,
+      otherSystem: 1,
+    });
+    expect(formatCommentRecordBreakdownLine(r)).toBe('内訳: 通常 1 / フォロー通知 1 / システム 1');
+  });
+
   it('broadcasterCount=0 のとき「配信者」を表示しない', () => {
     expect(
       formatCommentRecordBreakdownLine(

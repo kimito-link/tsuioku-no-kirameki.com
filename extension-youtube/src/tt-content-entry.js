@@ -17,6 +17,7 @@ import {
   parseTtPushFrame,
   parseTtResponse,
   parseTtChat,
+  parseTtSocialFollow,
   ttChatDropReason,
   parseTtGift,
   parseTtGiftList,
@@ -42,6 +43,7 @@ try {
 import { createInfoPollGate } from '../../src/lib/platform/infoPollGate.js';
 import { makeDiagTabToken, shouldSkipDiagWrite } from '../../src/lib/platform/diagTabShare.js';
 import { platformFetchTimeoutSignal } from '../../src/lib/platform/fetchTimeout.js';
+import { followerSampleFromDom, followerSampleFromTikTokRoom } from '../../src/lib/platform/followerCountSample.js';
 
 const META_EVERY_MS = 30_000;
 const BOARD_EVERY_MS = 60_000;
@@ -73,6 +75,8 @@ const diag = {
   /** @type {Record<string, number>} 型ごとの数(知らない型に気づくため) */
   types: {},
   comments: 0,
+  /** ページが「フォローしました」と出した分。コメント件数には入れない */
+  follows: 0,
   gifts: 0,
   giftCoin: 0,
   /** 連打の終わりの印が来ずに、待ってから数えた数 */
@@ -166,6 +170,8 @@ let early = [];
  * @typedef {{ uniqueId: string, roomId: string, key: string, startedAt: number, onFrame: (buf: ArrayBuffer, socketRoomId: string) => void, stop: () => void }} Reader
  */
 let current = /** @type {null | Reader} */ (null);
+/** @type {null | { count: number, rounded: boolean, source: string, noun?: string, raw?: string }} */
+let lastTtFollow = null;
 /** ソケットから来た視聴数(次の配信情報の送信で使う) */
 let latestViewers = /** @type {number | null} */ (null);
 
@@ -201,7 +207,8 @@ function startReader(uniqueId, roomId, key) {
     if (!r || seen.has(r.id)) return;
     seen.add(r.id);
     if (seen.size > MAX_SEEN) seen.delete(/** @type {string} */ (seen.values().next().value));
-    if (r.giftName) {
+    if (r.kind === 'follow') diag.follows += 1;
+    else if (r.giftName) {
       diag.gifts += 1;
       diag.giftCoin += r.amount;
       if (r.giftName === 'ギフト' || /^[\x20-\x7e]+$/.test(r.giftName)) diag.unknownGiftNames += 1;
@@ -226,6 +233,9 @@ function startReader(uniqueId, roomId, key) {
         const why = `chat:${ttChatDropReason(m.payload, m.msgId)}`;
         diag.dropReasons[why] = (diag.dropReasons[why] || 0) + 1;
       }
+    } else if (m.type === 'WebcastSocialMessage') {
+      const r = parseTtSocialFollow(m.payload, { msgId: m.msgId, uniqueId, nowMs: now });
+      if (r) add(r);
     } else if (m.type === 'WebcastGiftMessage') {
       const g = parseTtGift(m.payload, { gifts: giftInfo, nowMs: now });
       if (g) addGifts(combo.push(g, now));
@@ -439,7 +449,8 @@ async function check() {
   if (!infoGate.due(uniqueId, Date.now())) return checkLogin();
   checking = true;
   try {
-    const info = parseTtRoomInfo(await tryJson(ttRoomInfoUrl(uniqueId)));
+    const roomJson = await tryJson(ttRoomInfoUrl(uniqueId));
+    const info = parseTtRoomInfo(roomJson);
     infoGate.done(uniqueId, !info ? 'fail' : info.isLive ? 'live' : 'idle', Date.now());
     diag.uniqueId = uniqueId;
     if (!info) return saveDiagSoon();
@@ -450,7 +461,10 @@ async function check() {
         const endedKey = current.key;
         current.stop();
         current = null;
-        safeSendMessage({ type: 'YT_STREAM_META', payload: { videoId: endedKey, endedAt: Date.now() } });
+        safeSendMessage({
+          type: 'YT_STREAM_META',
+          payload: { videoId: endedKey, endedAt: Date.now(), ...(lastTtFollow ? { followerSample: { ...lastTtFollow, at: Date.now(), force: true } } : {}) },
+        });
       }
       diag.streamKey = '';
       setLoginNote(false);
@@ -472,6 +486,8 @@ async function check() {
       for (const e of list) current.onFrame(e.buf, e.roomId);
     }
     const viewers = latestViewers ?? info.viewers;
+    const ttFollow = followerSampleFromTikTokRoom(roomJson) || followerSampleFromDom(document, 'tiktok');
+    if (ttFollow) lastTtFollow = ttFollow;
     safeSendMessage({
       type: 'YT_STREAM_META',
       payload: {
@@ -484,6 +500,7 @@ async function check() {
         broadcasterIconUrl: info.iconUrl || '',
         concurrentViewers: viewers != null && viewers >= 0 ? viewers : undefined,
         ...(info.startedAtMs ? { startedAt: info.startedAtMs, startedAtApprox: false } : {}),
+        ...(ttFollow ? { followerSample: { ...ttFollow, at: Date.now() } } : {}),
       },
     });
     checkLogin();
@@ -577,4 +594,9 @@ setInterval(() => {
   }
   void check();
 }, 1000);
-window.addEventListener('pagehide', () => current?.stop());
+window.addEventListener('pagehide', () => {
+  if (current?.key && lastTtFollow) {
+    safeSendMessage({ type: 'YT_STREAM_META', payload: { videoId: current.key, followerSample: { ...lastTtFollow, at: Date.now(), force: true } } });
+  }
+  current?.stop();
+});

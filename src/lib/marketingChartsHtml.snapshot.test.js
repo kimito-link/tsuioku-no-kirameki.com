@@ -112,6 +112,7 @@ describe('マーケ HTML のスナップショット', () => {
 
   it('ニコ生（platform なし）の HTML を固定する', async () => {
     const html = nicoFixture();
+    expect(html).not.toContain('id="mkt-support-arrival"');
     expect(html).toContain('公式来場者数');
     expect(html).toContain('ニコ既定アイコン');
     expect(html).toContain('好きな人が来場しました');
@@ -130,6 +131,12 @@ describe('マーケ HTML のスナップショット', () => {
     expect(html).toContain('同時視聴者数');
     expect(html).toContain('推定');
     expect(html).toContain('USD');
+    expect(html.indexOf('id="mkt-support-arrival"')).toBeGreaterThan(-1);
+    expect(html.indexOf('id="mkt-support-arrival"')).toBeLessThan(html.indexOf('aria-label="目次"'));
+    const tocStart = html.indexOf('aria-label="目次"');
+    const toc = html.slice(tocStart, html.indexOf('</nav>', tocStart));
+    expect(toc.startsWith('aria-label="目次"')).toBe(true);
+    expect(toc.indexOf('応援が届いた瞬間')).toBeLessThan(toc.indexOf('href="#mkt-participation-lead"'));
     await expect(html).toMatchFileSnapshot(join(HERE, '__snapshots__/marketing-youtube-baseline.html'));
   });
 
@@ -166,6 +173,7 @@ describe('マーケ HTML のスナップショット', () => {
     expect(html).not.toContain('ギフト投げ履歴');
     expect(html).toContain('視聴数');
     expect(html).toContain('1200');
+    expect(html).not.toContain('id="mkt-support-arrival"');
     await expect(html).toMatchFileSnapshot(join(HERE, '__snapshots__/marketing-abema-baseline.html'));
   });
 });

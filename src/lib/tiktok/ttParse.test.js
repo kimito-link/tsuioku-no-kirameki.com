@@ -6,6 +6,7 @@ import {
   parseTtPushFrame,
   parseTtResponse,
   parseTtChat,
+  parseTtSocialFollow,
   parseTtGift,
   parseTtGiftList,
   ttGiftRow,
@@ -237,6 +238,48 @@ describe('ギフト', () => {
   it('人・giftId が欠けていれば捨てる', () => {
     expect(parseTtGift(new Uint8Array([...fv(2, 5655), ...fv(5, 1)]))).toBe(null);
     expect(parseTtGift(new Uint8Array([...fb(7, user(9, 'a', 'aa')), ...fv(5, 1)]))).toBe(null);
+  });
+});
+
+describe('WebcastSocialMessage のフォロー', () => {
+  const now = 1762640001234;
+  const social = (phrase, nick = 'ふぉろわ') => new Uint8Array([
+    ...common(now),
+    ...fb(2, user(6900000000000000001n, nick, 'fan.1')),
+    ...fb(8, phrase),
+  ]);
+  it('ページが「フォローしました」と出したときだけ記録する', () => {
+    const row = parseTtSocialFollow(social('フォローしました'), { msgId: '7571000000000000001', uniqueId: 'host', nowMs: now });
+    expect(row).toMatchObject({
+      id: 'tt-f-7571000000000000001',
+      channelId: 'tt:6900000000000000001',
+      name: 'ふぉろわ',
+      text: 'フォローしました',
+      kind: 'follow',
+      amount: 0,
+      isSystem: true,
+      commentType: 'followNotice',
+      skipVoice: true,
+      postedAtMs: now,
+    });
+  });
+  it('名前の中だけ・別の文言・人や番号が無いときは記録しない', () => {
+    expect(parseTtSocialFollow(social('', 'フォローしました'), { msgId: '7571000000000000002', nowMs: now })).toBe(null);
+    expect(parseTtSocialFollow(social('シェアしました'), { msgId: '7571000000000000003', nowMs: now })).toBe(null);
+    expect(parseTtSocialFollow(new Uint8Array([...common(now), ...fb(2, user(6900000000000000001n, 'ふぉろわ', 'fan.1'))]), { msgId: '7571000000000000004', nowMs: now })).toBe(null);
+    expect(parseTtSocialFollow(social('フォローしました'), { msgId: '', nowMs: now })).toBe(null);
+    expect(parseTtSocialFollow(social('フォローしました'), { msgId: '0', nowMs: now })).toBe(null);
+  });
+  it('チャット本文の同じ言葉はフォローにしない', () => {
+    const chat = new Uint8Array([...common(now), ...fb(2, user(6900000000000000001n, 'ふぉろわ', 'fan.1')), ...fb(3, 'フォローしました')]);
+    expect(parseTtChat(chat, { msgId: '7571000000000000005', nowMs: now })?.kind).toBe('text');
+  });
+  it('共通フィールドだけの文言ではフォローにしない', () => {
+    const onlyCommon = new Uint8Array([
+      ...fb(1, [...fv(4, now), ...fb(8, 'フォローしました')]),
+      ...fb(2, user(6900000000000000001n, 'ふぉろわ', 'fan.1')),
+    ]);
+    expect(parseTtSocialFollow(onlyCommon, { msgId: '7571000000000000006', nowMs: now })).toBe(null);
   });
 });
 

@@ -13,6 +13,7 @@
 import {
   parseSrRoomKeyFromUrl,
   srRoomStatusUrl,
+  srRoomProfileUrl,
   srLiveApiUrl,
   parseSrRoomStatus,
   parseSrLiveInfo,
@@ -41,6 +42,8 @@ import { createInfoPollGate } from '../../src/lib/platform/infoPollGate.js';
 import { srEventAndSupportUrl, parseSrEventStats, parseSrEventBoard } from '../../src/lib/platform/platformStats.js';
 import { makeDiagTabToken, shouldSkipDiagWrite } from '../../src/lib/platform/diagTabShare.js';
 import { platformFetchTimeoutSignal } from '../../src/lib/platform/fetchTimeout.js';
+import { followerSampleFromDom, followerSampleFromShowroom } from '../../src/lib/platform/followerCountSample.js';
+import { createSlowFollowerFetch } from '../../src/lib/platform/slowFollowerFetch.js';
 
 const META_EVERY_MS = 30_000;
 const BOARD_EVERY_MS = 60_000;
@@ -137,6 +140,84 @@ async function tryJson(url) {
 
 // ---- 1配信ぶんの読み取り ----
 let current = /** @type {null | { roomKey: string, key: string, stop: () => void }} */ (null);
+/** @type {null | { count: number, rounded: boolean, source: string, noun?: string, raw?: string }} */
+const slowSrFollow = createSlowFollowerFetch();
+
+/**
+ * /api/room/profile の follower_num を1回。ログインのクッキーは付けない。view_num は使わない。
+ * @param {string} roomId
+ * @param {string} videoKey
+ * @param {{ force?: boolean }} [opts]
+ */
+function requestSrFollowers(roomId, videoKey, opts = {}) {
+  const ticket = slowSrFollow.claim(videoKey, { hidden: document.hidden, force: opts.force === true });
+  if (!ticket) {
+    if (opts.force === true) slowSrFollow.whenIdle(() => requestSrFollowers(roomId, videoKey, opts));
+    return;
+  }
+  const url = srRoomProfileUrl(roomId);
+  if (!url) {
+    slowSrFollow.finish(ticket, false);
+    return;
+  }
+  void (async () => {
+    let ok = false;
+    try {
+      const res = await fetch(url, {
+        credentials: 'omit',
+        headers: { Accept: 'application/json' },
+        keepalive: true,
+        signal: platformFetchTimeoutSignal(),
+      });
+      if (!res.ok) throw new Error(`sr_profile_${res.status}`);
+      const sample = followerSampleFromShowroom(await res.json());
+      if (sample && slowSrFollow.currentKey() === videoKey) {
+        ok = true;
+        safeSendMessage({
+          type: 'YT_STREAM_META',
+          payload: { videoId: videoKey, followerSample: { ...sample, at: Date.now(), ...(opts.force ? { force: true } : {}) } },
+        });
+      }
+    } catch {
+      ok = false;
+    } finally {
+      slowSrFollow.finish(ticket, ok);
+    }
+  })();
+}
+
+/** 終わりの人数は裏方が読む。ページが閉じる fetch は移動で消える。 */
+let srEndArmKey = '';
+let srEndArmAt = 0;
+/** @type {null | { platform: 'showroom', videoKey: string, roomKey: string, roomId: string }} */
+let srLeavePayload = null;
+/** @param {string} roomId @param {string} roomKey @param {string} videoKey */
+function armSrFollowerEnd(roomId, roomKey, videoKey) {
+  if (!videoKey || !roomId || !roomKey) return;
+  srLeavePayload = { platform: 'showroom', videoKey, roomKey, roomId };
+  const now = Date.now();
+  if (srEndArmKey === videoKey && now - srEndArmAt < 60_000) return;
+  srEndArmKey = videoKey;
+  srEndArmAt = now;
+  safeSendMessage({ type: 'YT_FOLLOWER_END_ARM', ...srLeavePayload });
+}
+/** 閉じる・about:blank へ移る。URL が見えなくても、部屋番号を知らせて裏方に読ませる。 */
+function leaveSrFollowerEnd() {
+  if (!srLeavePayload) return;
+  safeSendMessage({ type: 'YT_FOLLOWER_END_LEAVE', ...srLeavePayload });
+}
+/** @param {string} roomId @param {string} roomKey @param {string} videoKey */
+function askSrFollowerEnd(roomId, roomKey, videoKey) {
+  srEndArmAt = 0;
+  armSrFollowerEnd(roomId, roomKey, videoKey);
+  safeSendMessage({
+    type: 'YT_FOLLOWER_END_NOW',
+    platform: 'showroom',
+    videoKey,
+    roomKey,
+    roomId,
+  });
+}
 /** いまの配信のイベントの数字(読めたあとだけ YT_STREAM_META に付ける) */
 let srStats = /** @type {null | { key: string, stats: Record<string, any> | null }} */ (null);
 
@@ -342,10 +423,15 @@ let endHintAt = 0;
 let checking = false;
 
 async function check() {
+  if (current?.key && diag.roomId) {
+    armSrFollowerEnd(diag.roomId, current.roomKey, current.key);
+    requestSrFollowers(diag.roomId, current.key);
+  }
   if (checking) return;
   const roomKey = parseSrRoomKeyFromUrl(location.href);
   if (!roomKey) {
     if (current) {
+      askSrFollowerEnd(diag.roomId, current.roomKey, current.key);
       current.stop();
       current = null;
     }
@@ -357,7 +443,8 @@ async function check() {
   if (!infoGate.due(roomKey, Date.now(), endSoon)) return;
   checking = true;
   try {
-    const st = parseSrRoomStatus(await tryJson(srRoomStatusUrl(roomKey)));
+    const statusJson = await tryJson(srRoomStatusUrl(roomKey));
+    const st = parseSrRoomStatus(statusJson);
     infoGate.done(roomKey, !st ? 'fail' : st.isLive ? 'live' : 'idle', Date.now());
     diag.roomKey = roomKey;
     if (!st) return saveDiagSoon();
@@ -366,27 +453,36 @@ async function check() {
     if (!st.isLive) {
       if (current) {
         const endedKey = current.key;
+        askSrFollowerEnd(st.roomId, current.roomKey, endedKey);
         current.stop();
         current = null;
-        safeSendMessage({ type: 'YT_STREAM_META', payload: { videoId: endedKey, endedAt: Date.now() } });
+        safeSendMessage({
+          type: 'YT_STREAM_META',
+          payload: { videoId: endedKey, endedAt: Date.now() },
+        });
       }
       diag.streamKey = '';
       return saveDiagSoon();
     }
     // ソケットのつなぎ先は live_info を正にし、無ければ room/status の broadcast_*
-    const li = parseSrLiveInfo(await tryJson(srLiveApiUrl('live_info', st.roomId)));
+    const liveJson = await tryJson(srLiveApiUrl('live_info', st.roomId));
+    const li = parseSrLiveInfo(liveJson);
     const liveId = li?.liveId || st.liveId;
     const key = buildSrStreamKey(roomKey, { liveId });
     if (!key) return saveDiagSoon();
     if (!current || current.key !== key) {
+      if (current?.key && current.key !== key) askSrFollowerEnd(diag.roomId, current.roomKey, current.key);
       current?.stop();
       const bc = li ? { bcsvrHost: li.bcsvrHost, bcsvrKey: li.bcsvrKey } : { bcsvrHost: st.bcsvrHost, bcsvrKey: st.bcsvrKey };
       current = { roomKey, key, stop: startReader(st.roomId, key, bc) };
       diag.streamKey = key;
     }
+    armSrFollowerEnd(st.roomId, roomKey, key);
     // 視聴数は polling の online_user_num
     const poll = await tryJson(srLiveApiUrl('polling', st.roomId));
     const viewers = Number(poll?.online_user_num);
+    const srFollow = followerSampleFromShowroom(statusJson) || followerSampleFromShowroom(liveJson) || followerSampleFromShowroom(poll) || followerSampleFromDom(document, 'showroom');
+    requestSrFollowers(st.roomId, key);
     safeSendMessage({
       type: 'YT_STREAM_META',
       payload: {
@@ -399,6 +495,7 @@ async function check() {
         concurrentViewers: Number.isFinite(viewers) && viewers >= 0 ? viewers : undefined,
         ...(st.startedAtMs ? { startedAt: st.startedAtMs, startedAtApprox: false } : {}),
         ...(srStats && srStats.key === key ? { platformStats: srStats.stats } : {}),
+        ...(srFollow ? { followerSample: { ...srFollow, at: Date.now() } } : {}),
       },
     });
     saveDiagSoon();
@@ -498,4 +595,7 @@ setInterval(() => {
   }
   void check();
 }, 1000);
-window.addEventListener('pagehide', () => current?.stop());
+window.addEventListener('pagehide', () => {
+  current?.stop();
+  leaveSrFollowerEnd();
+});

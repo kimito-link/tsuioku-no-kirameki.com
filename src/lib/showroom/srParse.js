@@ -41,6 +41,11 @@ export function parseSrRoomKeyFromUrl(url) {
 export function srRoomStatusUrl(key) {
   return isSrRoomKey(key) ? `${SR_ORIGIN}/api/room/status?room_url_key=${encodeURIComponent(key)}` : '';
 }
+/** 部屋のプロフィール（follower_num）。room_id の数字だけ。 @param {unknown} roomId */
+export function srRoomProfileUrl(roomId) {
+  const id = String(roomId || '');
+  return /^\d{1,20}$/.test(id) ? `${SR_ORIGIN}/api/room/profile?room_id=${id}` : '';
+}
 /** @param {'live_info' | 'comment_log' | 'gift_log' | 'gift_list' | 'stage_user_list' | 'summary_ranking' | 'polling'} what @param {string} roomId */
 export function srLiveApiUrl(what, roomId) {
   return /^\d{1,20}$/.test(String(roomId)) ? `${SR_ORIGIN}/api/live/${what}?room_id=${roomId}` : '';

@@ -44,6 +44,7 @@ try {
 } catch { /* 計器 */ }
 import { createInfoPollGate } from '../../src/lib/platform/infoPollGate.js';
 import { parseMxLiveStats } from '../../src/lib/platform/platformStats.js';
+import { followerSampleFromMixch } from '../../src/lib/platform/followerCountSample.js';
 import { makeDiagTabToken, shouldSkipDiagWrite } from '../../src/lib/platform/diagTabShare.js';
 import { platformFetchTimeoutSignal } from '../../src/lib/platform/fetchTimeout.js';
 import { findPageButton, queryPageControl } from '../../src/lib/platform/pageControlPick.js';
@@ -184,6 +185,8 @@ async function tryJson(url) {
 
 // ---- 1配信ぶんの読み取り ----
 let current = /** @type {null | { userId: string, key: string, stop: () => void }} */ (null);
+/** @type {null | { count: number, rounded: boolean, source: string, noun?: string }} */
+let lastMxFollow = null;
 
 /**
  * @param {string} userId
@@ -569,7 +572,10 @@ async function check() {
         const endedKey = current.key;
         current.stop();
         current = null;
-        safeSendMessage({ type: 'YT_STREAM_META', payload: { videoId: endedKey, endedAt: Date.now() } });
+        safeSendMessage({
+          type: 'YT_STREAM_META',
+          payload: { videoId: endedKey, endedAt: Date.now(), ...(lastMxFollow ? { followerSample: { ...lastMxFollow, at: Date.now(), force: true } } : {}) },
+        });
       }
       diag.streamKey = '';
       return saveDiagSoon();
@@ -587,6 +593,8 @@ async function check() {
       loginNoted = false;
     }
     const viewers = latestViewers ?? info.viewers;
+    const mxFan = followerSampleFromMixch(liveJson);
+    if (mxFan) lastMxFollow = mxFan;
     safeSendMessage({
       type: 'YT_STREAM_META',
       payload: {
@@ -600,6 +608,7 @@ async function check() {
         ...(info.startedAtMs ? { startedAt: info.startedAtMs, startedAtApprox: false } : {}),
         // 名前の下のレベル・ファン・スーパーファン・ライバーランク(と、出ているときのイベント順位・pt)。同じ応答の値そのまま
         platformStats: parseMxLiveStats(liveJson),
+        ...(mxFan ? { followerSample: { ...mxFan, at: Date.now() } } : {}),
       },
     });
     saveDiagSoon();
@@ -703,4 +712,9 @@ setInterval(() => {
   }
   void check();
 }, 1000);
-window.addEventListener('pagehide', () => current?.stop());
+window.addEventListener('pagehide', () => {
+  if (current?.key && lastMxFollow) {
+    safeSendMessage({ type: 'YT_STREAM_META', payload: { videoId: current.key, followerSample: { ...lastMxFollow, at: Date.now(), force: true } } });
+  }
+  current?.stop();
+});
