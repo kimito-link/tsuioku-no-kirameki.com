@@ -679,7 +679,7 @@ test.describe('lp-preview', () => {
     expect(noOverflow).toBe(true);
   });
 
-  test('マーケ方針: #marketing-pricing-plan に無料の核と有料候補の切り分けがある', async ({
+  test('マーケ方針: #marketing-pricing-plan に無料と有料(サポーター)の切り分けがある', async ({
     page
   }) => {
     await page.setViewportSize({ width: 390, height: 844 });
@@ -688,13 +688,39 @@ test.describe('lp-preview', () => {
     const block = page.locator('#marketing-pricing-plan');
     await expect(block).toBeVisible();
     await expect(block).toHaveAttribute('data-lp-feature', 'marketing-pricing-plan');
-    await expect(block).toContainText(/基本で残しやすい核/);
-    await expect(block).toContainText(/有料候補にしやすい層/);
+    await expect(block).toContainText(/無料で使える基本の記録・機能/);
+    await expect(block).toContainText(/有料の範囲（サポーター：マーケ HTML）/);
     await expect(block).toContainText(/誰が来てくれたか/);
 
     await block.scrollIntoViewIfNeeded();
     const noOverflow = await block.evaluate((el) => el.scrollWidth <= el.clientWidth + 2);
     expect(noOverflow).toBe(true);
+  });
+
+  test('対応10サービス・信頼・料金: #supported-platforms / #trust-privacy / #supporter-pricing が390幅ではみ出さずタブが切り替わる', async ({ page }) => {
+    await page.setViewportSize({ width: 390, height: 844 });
+    await page.goto(`${lpHref}#supported-platforms`, { waitUntil: 'domcontentloaded' });
+
+    const pf = page.locator('#supported-platforms');
+    await expect(pf).toBeVisible();
+    await expect(pf.locator('[data-pf-tab]')).toHaveCount(10);
+    await pf.locator('[data-pf-tab="abema"]').click();
+    await expect(pf.locator('#pf-panel-abema')).toBeVisible();
+    await expect(pf.locator('#pf-panel-abema')).toContainText(/視聴数/);
+    await expect(pf.locator('#pf-panel-niconico')).toBeHidden();
+    await expect(pf.locator('.lp-unreleased-box')).toContainText(/未公開/);
+    expect(await pf.evaluate((el) => el.scrollWidth <= el.clientWidth + 2)).toBe(true);
+
+    const trust = page.locator('#trust-privacy');
+    await trust.scrollIntoViewIfNeeded();
+    await expect(trust).toContainText(/株式会社ベストトラスト/);
+    expect(await trust.evaluate((el) => el.scrollWidth <= el.clientWidth + 2)).toBe(true);
+
+    const pricing = page.locator('#supporter-pricing');
+    await pricing.scrollIntoViewIfNeeded();
+    await expect(pricing).toContainText(/月額 980 円/);
+    await expect(pricing).toContainText(/14 日間/);
+    expect(await pricing.evaluate((el) => el.scrollWidth <= el.clientWidth + 2)).toBe(true);
   });
 
   test('マーケ読み方: #marketing-what-you-can-do に3人の吹き出し・390幅ではみ出しなし', async ({ page }) => {

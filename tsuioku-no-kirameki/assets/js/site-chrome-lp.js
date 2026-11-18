@@ -32,7 +32,17 @@
   // ★LP のナビと【同じ順・同じ文言】。1 か所だけ直せば全ページに効く。
   var NAV = [
     ['#worldview', 'はじめに'],
+    ['#supported-platforms', '対応10サービス'],
+    ['#marketing-features', 'マーケ分析'],
+    ['#marketing-what-you-can-do', '分析の読み方'],
+    ['#extension-visual', '拡張の見え方'],
+    ['#venue', '会場モード'],
+    ['#comeview', 'コメビュ'],
+    ['#voice-reading', '読み上げ'],
+    ['#trust-privacy', '保存と信頼'],
     ['#smartphone', 'スマホアプリ'],
+    ['#supporter-pricing', '料金（サポーター）'],
+    ['#record-cta', '導入・試用', 'cta', 'cta'],
     ['#record-foundation', '記録安定'],
     ['#record-results', '改善実績'],
     ['#record-transparency', '透明性'],
@@ -40,13 +50,10 @@
     ['#voices', 'タイムライン'],
     ['#context-scale', '背景の数字'],
     ['#multi-live', '同時視聴'],
-    ['#extension-visual', '拡張の見え方'],
     ['#lp-comment-compose-guide', 'コメント送信'],
     ['#lp-voice-comment', '音声コメント'],
     ['#lp-anonymous-identicon', '匿名 Identicon'],
     ['#html-save', 'HTML保存'],
-    ['#marketing-features', 'マーケ分析'],
-    ['#marketing-what-you-can-do', '分析の読み方'],
     ['#problem', '問題'],
     ['#impact', '反応の階段'],
     ['#comments', '配信コメント'],
@@ -55,8 +62,7 @@
     ['#solution', '解決の方向'],
     ['#product-policy', '提供の考え方'],
     ['live/', '追憶のきらめき ランキング', 'live'],
-    ['articles/', '技術記事', 'articles'],
-    ['#record-cta', '導入・試用', 'cta', 'cta']
+    ['articles/', '技術記事', 'articles']
   ];
   function href(h) {
     // "#x" → base + "#x"(LP 自身なら "#x" のまま) / "live/" → base + "live/"
@@ -89,7 +95,7 @@
       nav,
       '        </nav>',
       '      <p class="topbar__drawer-intro">',
-      '        <strong>君斗りんくの追憶のきらめき</strong> — 応援が流れてしまう現実と、「なかったことにしたくない」気持ちに寄り添うページです。Web・iOS・Android と Chrome 拡張を前提に整理しています。見え方や仕組みは、上のリンクから章ごとにたどれます。今後、<strong>YouTube</strong> をはじめとした<strong>他の配信プラットフォーム</strong>への対応も視野に入れています。',
+      '        <strong>君斗りんくの追憶のきらめき</strong> — 応援が流れてしまう現実と、「なかったことにしたくない」気持ちに寄り添うページです。<strong>ニコニコ生放送・YouTube・Twitch・Kick・SHOWROOM・ふわっち・ミクチャ・TikTok LIVE・ツイキャス・ABEMA の10サービス</strong>に対応しています。見え方や仕組みは、上のリンクから章ごとにたどれます。',
       '      </p>',
       '    </div>'
     ].join('\n');
