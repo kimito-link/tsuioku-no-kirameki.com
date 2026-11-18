@@ -24,6 +24,15 @@
 /** @type {ChangelogEntry[]} */
 const ARCHIVE_ENTRIES = [
   Object.freeze({
+    version: '0.1.2149',
+    date: '2026-11-17',
+    summary: '絵文字の名前を吹き出しに残さない',
+    items: Object.freeze([
+      'Kick と Twitch の会場では、絵文字の印が付いた語は画像にします。画像のアドレスが無いときは、その語を吹き出しにも読み上げにも残しません。',
+      '会場の詳しい状況では、ニコニコ生放送以外に「user 英数字」の注記を出さないようにしました。',
+    ])
+  }),
+  Object.freeze({
     version: '0.1.2148',
     date: '2026-11-17',
     summary: '空の順位表と絵文字コードを出さない',

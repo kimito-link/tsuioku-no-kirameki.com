@@ -18,6 +18,14 @@
 /** @type {readonly ChangelogEntry[]} */
 export const EXTENSION_CHANGELOG = Object.freeze([
   Object.freeze({
+    version: '0.1.2169',
+    date: '2026-11-18',
+    summary: '引き継ぎノートの公開版表記を最新に',
+    items: Object.freeze([
+      '開発用の引き継ぎノートにある公開中・審査中の版を、0.1.2139・0.1.2167 に直しました。拡張の動きは変わりません。',
+    ])
+  }),
+  Object.freeze({
     version: '0.1.2168',
     date: '2026-11-18',
     summary: 'ストア提出記録の版表記を最新に',
@@ -185,15 +193,6 @@ export const EXTENSION_CHANGELOG = Object.freeze([
     items: Object.freeze([
       '来場の通知に、届いた時刻を記録します。同じ文面でも時間が違えば、それぞれ数えます。',
       '公式と画面から約2秒以内に届いた同じ通知だけ、1回に数えます。横の内訳と分析レポートは、未保存の末尾も含めて同じ行を数えます。',
-    ])
-  }),
-  Object.freeze({
-    version: '0.1.2149',
-    date: '2026-11-17',
-    summary: '絵文字の名前を吹き出しに残さない',
-    items: Object.freeze([
-      'Kick と Twitch の会場では、絵文字の印が付いた語は画像にします。画像のアドレスが無いときは、その語を吹き出しにも読み上げにも残しません。',
-      '会場の詳しい状況では、ニコニコ生放送以外に「user 英数字」の注記を出さないようにしました。',
     ])
   })
 ]);
