@@ -26,6 +26,7 @@ import { readTcPageInfo, parseTcSupporterDoc, tcSupporterUrl, tcMovieCommentUrl,
 import { createInfoPollGate } from '../../src/lib/platform/infoPollGate.js';
 import { makeDiagTabToken, shouldSkipDiagWrite } from '../../src/lib/platform/diagTabShare.js';
 import { platformFetchTimeoutSignal } from '../../src/lib/platform/fetchTimeout.js';
+import { followerSampleFromTcDocument } from '../../src/lib/platform/followerCountSample.js';
 
 const META_EVERY_MS = 30_000;
 const FLUSH_MS = 200;
@@ -384,8 +385,12 @@ let metaKey = '';
 let metaAt = 0;
 
 /** 配信の情報(名前・題・開始時刻・ページに出ている数)を送る @param {string} user @param {string} key */
+/** @type {null | { count: number, rounded: boolean, source: string, noun?: string }} */
+let lastTcFollow = null;
 function sendMeta(user, key) {
   const page = readTcPageInfo(document, user);
+  const supporters = followerSampleFromTcDocument(document);
+  if (supporters) lastTcFollow = supporters;
   diag.pageStats = Object.keys(page.stats || {});
   safeSendMessage({
     type: 'YT_STREAM_META',
@@ -399,6 +404,7 @@ function sendMeta(user, key) {
       concurrentViewers: page.viewers != null ? page.viewers : undefined,
       ...(page.startedAtMs ? { startedAt: page.startedAtMs, startedAtApprox: false } : {}),
       ...(Object.keys(page.stats || {}).length ? { platformStats: page.stats } : {}),
+      ...(supporters ? { followerSample: { ...supporters, at: Date.now() } } : {}),
     },
   });
   metaKey = key;
@@ -424,7 +430,7 @@ async function check() {
     current = null;
     diag.live = false;
     diag.streamKey = '';
-    safeSendMessage({ type: 'YT_STREAM_META', payload: { videoId: endedKey, endedAt: Date.now() } });
+    safeSendMessage({ type: 'YT_STREAM_META', payload: { videoId: endedKey, endedAt: Date.now(), ...(lastTcFollow ? { followerSample: { ...lastTcFollow, at: Date.now(), force: true } } : {}) } });
     saveDiagSoon();
   }
   if (!infoGate.due(user, Date.now())) {
@@ -446,7 +452,7 @@ async function check() {
         const endedKey = current.key;
         current.stop();
         current = null;
-        safeSendMessage({ type: 'YT_STREAM_META', payload: { videoId: endedKey, endedAt: Date.now() } });
+        safeSendMessage({ type: 'YT_STREAM_META', payload: { videoId: endedKey, endedAt: Date.now(), ...(lastTcFollow ? { followerSample: { ...lastTcFollow, at: Date.now(), force: true } } : {}) } });
       }
       diag.streamKey = '';
       return saveDiagSoon();
@@ -577,4 +583,9 @@ const mainTimer = setInterval(() => {
   }
   void check();
 }, 1000);
-window.addEventListener('pagehide', () => current?.stop());
+window.addEventListener('pagehide', () => {
+  if (current?.key && lastTcFollow) {
+    safeSendMessage({ type: 'YT_STREAM_META', payload: { videoId: current.key, followerSample: { ...lastTcFollow, at: Date.now(), force: true } } });
+  }
+  current?.stop();
+});

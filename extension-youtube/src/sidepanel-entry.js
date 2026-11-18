@@ -610,7 +610,9 @@ function renderSupportTimeline() {
             ? 'スーパーステッカー'
             : r.kind === 'membership_gift'
               ? 'メンバーシップギフト'
-              : 'メンバー加入';
+              : r.kind === 'follow'
+                ? 'フォロー'
+                : 'メンバー加入';
       row.appendChild(item);
       if (Number(r.amount || 0) > 0) {
         const pt = document.createElement('span');

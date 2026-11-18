@@ -2,6 +2,7 @@ import { describe, it, expect } from 'vitest';
 import {
   parseSrRoomKeyFromUrl,
   srRoomStatusUrl,
+  srRoomProfileUrl,
   srLiveApiUrl,
   parseSrRoomStatus,
   parseSrLiveInfo,
@@ -37,6 +38,8 @@ describe('URL と口', () => {
   });
   it('API の URL', () => {
     expect(srRoomStatusUrl('abc')).toBe('https://www.showroom-live.com/api/room/status?room_url_key=abc');
+    expect(srRoomProfileUrl('61576')).toBe('https://www.showroom-live.com/api/room/profile?room_id=61576');
+    expect(srRoomProfileUrl('abc')).toBe('');
     expect(srLiveApiUrl('comment_log', '123')).toBe('https://www.showroom-live.com/api/live/comment_log?room_id=123');
     expect(srLiveApiUrl('comment_log', 'x')).toBe('');
     expect(srSocketUrl('online.showroom-live.com')).toBe('wss://online.showroom-live.com/');

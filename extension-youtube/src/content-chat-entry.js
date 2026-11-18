@@ -15,6 +15,7 @@ import {
 } from '../../src/lib/youtube/ytPageMeta.js';
 import { ytVideoIdFromChatFrameUrl } from '../../src/lib/youtube/ytChatContinuationVideoId.js';
 import { relativeStreamStartedAtMs, startMsFromTimestampBlob } from '../../src/lib/youtube/ytStreamStart.js';
+import { followerSampleFromDom } from '../../src/lib/platform/followerCountSample.js';
 import { startPageStallWatch } from '../../src/lib/stallTrace.js';
 try {
   const stallRoot = /** @type {any} */ (globalThis);
@@ -644,6 +645,8 @@ function setupWatchPageMetaObserver() {
     }
 
     const viewers = readConcurrentViewers();
+    const ended = endedAtFields(videoId);
+    const sub = followerSampleFromDom(document, 'youtube');
     safeSendMessage({
       type: 'YT_STREAM_META',
       payload: {
@@ -657,13 +660,20 @@ function setupWatchPageMetaObserver() {
         ...(viewers === null ? { viewersRead: false } : {}),
         sourceUrl: String(location.href || ''),
         ...startedAtFields(videoId, viewers !== null),
-        ...endedAtFields(videoId),
+        ...ended,
+        ...(sub ? { followerSample: { ...sub, at: Date.now(), ...(ended.endedAt ? { force: true } : {}) } } : {}),
       },
     });
     if (viewers === null) saveViewerProbe();
   };
 
   sendMeta();
+  window.addEventListener('pagehide', () => {
+    const videoId = resolveCurrentVideoId();
+    const sub = followerSampleFromDom(document, 'youtube');
+    if (!videoId || !sub) return;
+    safeSendMessage({ type: 'YT_STREAM_META', payload: { videoId, followerSample: { ...sub, at: Date.now(), force: true } } });
+  });
   setTimeout(sendMeta, 1500);
   setTimeout(sendMeta, 4000);
   setInterval(sendMeta, 5000);

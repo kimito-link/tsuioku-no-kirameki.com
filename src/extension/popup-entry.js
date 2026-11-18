@@ -512,7 +512,11 @@ import { mergeProgramStatsWatchIntoWatchMetaSnapshot } from '../lib/mergeProgram
 import { buildWatchMetaCardAudienceViewModel } from '../lib/buildWatchMetaCardAudienceViewModel.js';
 import { createAppliedEntriesMemo } from '../lib/appliedEntriesMemo.js';
 import { mergeTailRowsIntoDisplay } from '../lib/mergeTailRowsIntoDisplay.js';
-import { normalizeTailRowsForDisplay as normalizeTailRowsForDisplayShared } from '../lib/readAllCommentsForLive.js';
+import {
+  EXPORT_COMMENT_READ_TIMEOUT_MS,
+  normalizeTailRowsForDisplay as normalizeTailRowsForDisplayShared,
+  readCommentsForExport
+} from '../lib/readAllCommentsForLive.js';
 import {
   formatAiShareDiagnosticsMarkdown,
   romiDebugDataChecklist
@@ -8346,7 +8350,17 @@ async function readAllCommentsFromCommentDb(lv) {
  */
 async function resolveCommentsForHtmlExport(liveId) {
   const lid = String(liveId || '').trim().toLowerCase();
-  const full = await readAllCommentsForLive(liveId);
+  // 表示の見回りは短い時間切れのまま。書き出しだけ、保存した全件が返るまで待つ。
+  const full = await readCommentsForExport(liveId, {
+    readAllFromCommentDb: readAllCommentsFromCommentDb,
+    getMany: (keys) =>
+      readStorageBagWithRetry(() => chrome.storage.local.get(keys), {
+        attempts: 2,
+        delaysMs: [0, 200],
+        perAttemptTimeoutMs: EXPORT_COMMENT_READ_TIMEOUT_MS
+      }),
+    nowMs: Date.now()
+  });
   const memLive = String(STORY_SOURCE_STATE.liveId || '').trim().toLowerCase();
   const memEntries = Array.isArray(STORY_SOURCE_STATE.entries) ? STORY_SOURCE_STATE.entries : [];
   return /** @type {PopupCommentEntry[]} */ (pickCommentsForExport(full, memEntries, memLive === lid));
@@ -15293,8 +15307,11 @@ async function refresh() {
   if (treatAsNoActiveWatch) {
     if (!isFreshRefresh()) return;
     resetPerBroadcastPopupCachesIfLiveIdChanged('');
-    if (liveEl) liveEl.textContent = '（ニコ生watchを開いてください）';
+    const pinnedStream = new URLSearchParams(location.search).get('stream') || '';
+    if (liveEl) liveEl.textContent = pinnedStream ? 'この配信の記録がありません' : '（ニコ生watchを開いてください）';
+    if (pinnedStream) { const trend = $('devMonitorExportTrendStatus'); if (trend) trend.textContent = 'この配信の記録がありません'; }
     setCountDisplay('（この配信は未取得）');
+    exportBtn.dataset.liveId = '';
     renderCommentTicker([]);
     exportBtn.disabled = true;
     exportBtn.dataset.watchUrl = '';

@@ -155,6 +155,10 @@ const SN = process.env.SAMBANOVA_API_KEY;
 // 月次クォータ枯渇時の挙動（429で止まるか課金に移るか）がAPI側から判別できないため、
 // 採用エントリには liveProbe 必須。
 const MI = process.env.MISTRAL_API_KEY;
+// さくらのAI Engine（OpenAI互換・Bearer "<UUID>:<シークレット>"）。2026-11-18追加: 基盤モデル無償プランは
+// 月3,000回で、超えると課金ではなく 429 で止まる（manual.sakura.ad.jp/cloud/ai-engine/02-howto.html）。
+// "preview/" のモデルは予告なく変わる・終わるため、採用エントリには liveProbe を付ける。
+const SK = process.env.SAKURA_AI_ENGINE_TOKEN;
 // Cloudflare Workers AI（OpenAI互換）。トークン1つ＋アカウントID(公開情報)で叩ける無料枠。
 // 2026-06-27 実機確認: glm-5.2 / nemotron-3-120b / kimi-k2.7-code が 200＋本文で返ることを裏取り済み。
 // ★2026-09-16: Workers AI は **CF_WORKERS_AI_TOKEN を優先**する。
@@ -338,6 +342,7 @@ const NV = 'https://integrate.api.nvidia.com/v1/chat/completions';
 const OR = 'https://openrouter.ai/api/v1/chat/completions';
 const SNV = 'https://api.sambanova.ai/v1/chat/completions';
 const MIS = 'https://api.mistral.ai/v1/chat/completions';
+const SAK = 'https://api.ai.sakura.ad.jp/v1/chat/completions';
 // Cloudflare Workers AI の OpenAI 互換エンドポイント（アカウントIDをパスに含む）。
 const CF_URL = CF_ACC ? `https://api.cloudflare.com/client/v4/accounts/${CF_ACC}/ai/v1/chat/completions` : '';
 // rawId = プロバイダ側の実モデルID（起動時ライブ実在チェックで /models と突き合わせる用。任意）。
@@ -368,7 +373,7 @@ const push = (label, kind, run, rawId = '', provider = '') => {
 // ENV_FLAGS は略号→「キーの値」、council-lineup.mjs の ENV_NAMES は略号→「env名」。
 // 役割が違うので両方あってよいが、**キーの集合は必ず一致していなければならない**
 // （片方に足し忘れると該当メンバーが無言で消える。下の欠落ログはそれを可視化する）。
-const ENV_FLAGS = { G, N, O, E, CF, CF_ACC, SN, MI };
+const ENV_FLAGS = { G, N, O, E, CF, CF_ACC, SN, MI, SK };
 const PROVIDER_RUN = {
   groq: (entry) => (p, s, o) => openaiChat(GROQ, G, entry.apiModel, p, s, outOpts(entry.opts, o), entry.timeoutMs || undefined),
   gemini: (entry) => (p, s) => geminiChat(entry.apiModel, p, s, entry.timeoutMs || undefined),
@@ -377,6 +382,7 @@ const PROVIDER_RUN = {
   openrouter: (entry) => (p, s, o) => openaiChat(OR, O, entry.apiModel, p, s, outOpts(entry.opts, o), entry.timeoutMs || undefined),
   sambanova: (entry) => (p, s, o) => openaiChat(SNV, SN, entry.apiModel, p, s, outOpts(entry.opts, o), entry.timeoutMs || undefined),
   mistral: (entry) => (p, s, o) => openaiChat(MIS, MI, entry.apiModel, p, s, outOpts(entry.opts, o), entry.timeoutMs || undefined),
+  sakura: (entry) => (p, s, o) => openaiChat(SAK, SK, entry.apiModel, p, s, outOpts(entry.opts, o), entry.timeoutMs || undefined),
 };
 // openaiChat/geminiChat の timeoutMs 既定引数を上書きしないよう、未指定時は
 // 呼び出し側の既定値に委ねる（下の runFor が entry.timeoutMs 未設定なら省略する）。
@@ -385,9 +391,9 @@ function runFor(entry) {
   if (!build) throw new Error(`unknown provider in council-lineup: ${entry.provider}`);
   if (!entry.timeoutMs) {
     // xxxChat の既定タイムアウトを使わせるため、明示引数を渡さない薄いラッパーにする。
-    if (entry.provider === 'groq' || entry.provider === 'nvidia' || entry.provider === 'cloudflare' || entry.provider === 'openrouter' || entry.provider === 'sambanova' || entry.provider === 'mistral') {
-      const url = { groq: GROQ, nvidia: NV, cloudflare: CF_URL, openrouter: OR, sambanova: SNV, mistral: MIS }[entry.provider];
-      const key = { groq: G, nvidia: N, cloudflare: CF, openrouter: O, sambanova: SN, mistral: MI }[entry.provider];
+    if (entry.provider === 'groq' || entry.provider === 'nvidia' || entry.provider === 'cloudflare' || entry.provider === 'openrouter' || entry.provider === 'sambanova' || entry.provider === 'mistral' || entry.provider === 'sakura') {
+      const url = { groq: GROQ, nvidia: NV, cloudflare: CF_URL, openrouter: OR, sambanova: SNV, mistral: MIS, sakura: SAK }[entry.provider];
+      const key = { groq: G, nvidia: N, cloudflare: CF, openrouter: O, sambanova: SN, mistral: MI, sakura: SK }[entry.provider];
       return (p, s, o) => openaiChat(url, key, entry.apiModel, p, s, outOpts(entry.opts, o));
     }
     if (entry.provider === 'gemini') return (p, s) => geminiChat(entry.apiModel, p, s);

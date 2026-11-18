@@ -4,6 +4,8 @@
  */
 
 import { isGenericComeviewName } from './comeviewRows.js';
+import { followerKpiLabels, followerKpiTexts, getFollowerSeries } from './platform/followerCountSample.js';
+import { followerSeriesForPlatform } from './platform/followerSampleStore.js';
 
 const DAY_MS = 24 * 60 * 60 * 1000;
 
@@ -160,13 +162,17 @@ function giftEventsForLive(giftEventsByLive, liveId) {
  *   profileSnapshots?: MediaKitProfileSnapshot[],
  *   giftEventsByLive?: Record<string, unknown[]>|Map<string, unknown[]>,
  *   nowMs?: number,
- *   windowsDays?: number[]
+ *   windowsDays?: number[],
+ *   followerSamples?: unknown[],
+ *   platformId?: string
  * }} input
  * @returns {{
  *   windows: Array<{
  *     days: number,
  *     followers: number|null,
  *     followersGained: number|null,
+ *     followersText?: string,
+ *     followersGainedText?: string,
  *     avgConcurrent: number|null,
  *     maxConcurrent: number|null,
  *     visitors: { total: number, average: number }|null,
@@ -178,7 +184,8 @@ function giftEventsForLive(giftEventsByLive, liveId) {
  *     broadcastsPerWeek: number|null,
  *     liveCount: number
  *   }>,
- *   broadcaster: { name: string, userId: string, iconUrl: string }
+ *   broadcaster: { name: string, userId: string, iconUrl: string },
+ *   followerLabels: { countLabel: string, gainLabel: string } | null
  * }}
  */
 export function buildMediaKitStats(input = {}) {
@@ -196,6 +203,8 @@ export function buildMediaKitStats(input = {}) {
     .map((value) => Math.floor(Number(value)))
     .filter((value, index, all) => value > 0 && all.indexOf(value) === index);
   const grouped = groupSummaryRows(summaryRows);
+  const liveSeries = followerSeriesForPlatform(String(input.platformId || 'niconico'), input.followerSamples);
+  const liveTexts = liveSeries ? followerKpiTexts(liveSeries) : null;
 
   const windows = windowsDays.map((days) => {
     const fromMs = nowMs - days * DAY_MS;
@@ -219,14 +228,12 @@ export function buildMediaKitStats(input = {}) {
       )
       .sort((a, b) => /** @type {number} */ (a.capturedAt) - /** @type {number} */ (b.capturedAt));
 
-    const latestFollowers = profiles.length
-      ? /** @type {number} */ (profiles[profiles.length - 1].followerCount)
-      : null;
-    const followersGained =
-      profiles.length >= 2
-        ? /** @type {number} */ (profiles[profiles.length - 1].followerCount) -
-          /** @type {number} */ (profiles[0].followerCount)
-        : null;
+    const profileSeries = getFollowerSeries(
+      profiles.map((item) => ({ at: item.capturedAt, count: item.followerCount, rounded: false })),
+      { notation: 'exact' }
+    );
+    const latestFollowers = profileSeries ? profileSeries.end.count : null;
+    const followersGained = profileSeries ? profileSeries.delta : null;
 
     /** @type {number[]} */
     const liveConcurrentAverages = [];
@@ -295,6 +302,9 @@ export function buildMediaKitStats(input = {}) {
       days,
       followers: latestFollowers,
       followersGained,
+      ...(liveTexts
+        ? { followersText: liveTexts.countText, followersGainedText: liveTexts.gainedText }
+        : {}),
       avgConcurrent: average(liveConcurrentAverages),
       maxConcurrent: concurrentSamples.length ? Math.max(...concurrentSamples) : null,
       visitors:
@@ -319,7 +329,8 @@ export function buildMediaKitStats(input = {}) {
 
   return {
     windows,
-    broadcaster: resolveBroadcaster(summaryRows, profileSnapshots)
+    broadcaster: resolveBroadcaster(summaryRows, profileSnapshots),
+    followerLabels: liveSeries ? followerKpiLabels(liveSeries.noun) : null
   };
 }
 

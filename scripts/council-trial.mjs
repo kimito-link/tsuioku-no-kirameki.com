@@ -33,6 +33,7 @@ const K = {
   groq: env.GROQ_API_KEY, nvidia: env.NVIDIA_API_KEY, openrouter: env.OPENROUTER_API_KEY,
   gemini: env.GEMINI_API_KEY, cf: env.CF_WORKERS_AI_TOKEN || env.CLOUDFLARE_API_TOKEN,
   cfAcc: env.CLOUDFLARE_ACCOUNT_ID, sambanova: env.SAMBANOVA_API_KEY, mistral: env.MISTRAL_API_KEY,
+  sakura: env.SAKURA_AI_ENGINE_TOKEN,
 };
 const redact = (s) => { let t = String(s); for (const v of Object.values(K)) if (v && v.length > 6) t = t.split(v).join('***'); return t; };
 
@@ -99,8 +100,9 @@ const ENDPOINT = {
   cloudflare: () => `https://api.cloudflare.com/client/v4/accounts/${K.cfAcc}/ai/v1/chat/completions`,
   sambanova: 'https://api.sambanova.ai/v1/chat/completions',
   mistral: 'https://api.mistral.ai/v1/chat/completions',
+  sakura: 'https://api.ai.sakura.ad.jp/v1/chat/completions',
 };
-const KEYOF = { groq: 'groq', nvidia: 'nvidia', openrouter: 'openrouter', cloudflare: 'cf', sambanova: 'sambanova', mistral: 'mistral' };
+const KEYOF = { groq: 'groq', nvidia: 'nvidia', openrouter: 'openrouter', cloudflare: 'cf', sambanova: 'sambanova', mistral: 'mistral', sakura: 'sakura' };
 
 async function probe(provider, model, extra = {}) {
   const t0 = Date.now();

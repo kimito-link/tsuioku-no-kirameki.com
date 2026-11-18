@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest';
 import {
   concurrentViewersFromPageHtml,
   concurrentViewersFromUpdatedMetadata,
+  subscriberCountTextInInnertube,
 } from './ytConcurrentViewers.js';
 
 const VID = 'abcdefghijk';
@@ -31,6 +32,33 @@ const initial = {
     },
   },
 };
+
+describe('subscriberCountTextInInnertube', () => {
+  it('画面に出ている概数の文を取る', () => {
+    const data = {
+      contents: {
+        twoColumnWatchNextResults: {
+          results: {
+            results: {
+              contents: [
+                {
+                  videoSecondaryInfoRenderer: {
+                    owner: {
+                      videoOwnerRenderer: {
+                        subscriberCountText: { simpleText: 'チャンネル登録者数 13.9万人' },
+                      },
+                    },
+                  },
+                },
+              ],
+            },
+          },
+        },
+      },
+    };
+    expect(subscriberCountTextInInnertube(data)).toBe('チャンネル登録者数 13.9万人');
+  });
+});
 
 describe('concurrentViewersFromPageHtml', () => {
   it('画面の文字が無く、ytInitialData の中だけに数があるページから同時視聴者数を取る', () => {
