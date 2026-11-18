@@ -9,7 +9,7 @@
  *
  * スキーマ:
  *   label:     会議での表示名（例: 'groq/gpt-oss-120b'）
- *   provider:  'groq' | 'gemini' | 'nvidia' | 'cloudflare' | 'openrouter' | 'sambanova' | 'mistral' | 'anthropic'
+ *   provider:  'groq' | 'gemini' | 'nvidia' | 'cloudflare' | 'openrouter' | 'sambanova' | 'mistral' | 'sakura' | 'anthropic'
  *              実在チェック(verifyLiveModels)の対象グループは 'groq'|'gemini' のみ。
  *   rawId:     プロバイダ側の実モデルID（起動時ライブ実在チェックで /models と突合する用。
  *              空文字なら実在チェック対象外＝素通し）。
@@ -17,7 +17,7 @@
  *              例: groq/compound は rawId も apiModel も 'groq/compound' で同一）。
  *   opts:      openaiChat/geminiChat への追加パラメータ（reasoning_effort 等）。
  *   timeoutMs: 個別タイムアウト（省略時は各 xxxChat の既定値）。
- *   requires:  このエントリを有効化するのに必要な env キー名の配列（'G'|'N'|'O'|'E'|'CF'|'CF_ACC'|'SN'|'MI'）。
+ *   requires:  このエントリを有効化するのに必要な env キー名の配列（'G'|'N'|'O'|'E'|'CF'|'CF_ACC'|'SN'|'MI'|'SK'）。
  *              meeting.mjs 側で解決済みの真偽フラグと突き合わせて if 判定する。
  *   liveProbe: true なら council-scout が毎日実疎通(chat/completions 1発)を確認する
  *              （2026-07-31追加）。カタログ照合(rawId)では「一覧に存在するが実際は呼べない」
@@ -877,6 +877,23 @@ export const LINEUP = [
   //  撤去条件: 402/403（課金の要求）か、Gemini の一覧から消えたとき。503 だけなら容量の混雑なので撤去しない（ただし日報に記録する）。
   { label: 'gemini-4-hydrogen', provider: 'gemini', rawId: 'gemini-4-hydrogen', apiModel: 'gemini-4-hydrogen', opts: {}, timeoutMs: 150000, requires: ['E'] },
 
+  // ★2026-11-18 追加（2席とも予備 weight3）: さくらのAI Engine（https://api.ai.sakura.ad.jp/v1・OpenAI互換）。
+  //  無償プランは月3,000回で、超えると 429 で止まる（課金なし。manual.sakura.ad.jp/cloud/ai-engine/02-howto.html）。
+  //  "preview/" のモデルは予告なく変わる・終わる → liveProbe を付けて毎日疎通を見る（恒久ルール4。/models の照合はしていない）。
+  //  役割は恒久ルール5に合わせて1役割1席: deepseek=critic・glm=generalist（新しいプロバイダなので重ね積みにならない）。
+  //  実測（りんくのPC・11/18。scripts/council-trial.mjs = max_tokens 1600・temperature 0.6・400〜800字の本番の問い）:
+  //   - DeepSeek-V4.1-Flash: 200・11.2秒・本文553字・推論3,073字・stop → そのまま採用（opts なし）。
+  //   - GLM-5.3-Flash: 1600 では推論2,846字で上限・本文429字で途中切れ（length）。max_tokens 3200 で 200・17.7秒・本文757字・
+  //     推論4,860字・stop → max_tokens 3200 で採用。推論は message.reasoning に分かれて返り、本文に混ざらない。
+  //   - 短い問い（結論・理由3つ・懸念1つ・400字以内）では3モデルとも 1600 で本文あり・4〜10秒・function calling も可。
+  //  昇格条件: 7日以上空けた実会議2回で FAILED ゼロ。撤去条件: 一覧から消えた・402/403（課金の要求）。429 は月の上限なので撤去しない。
+  //  ★見送り: preview/Kimi-K2.7-Code（implement 予備の候補）。本番の問いでは推論が止まらず本文が出ない:
+  //   1600=本文737字で途中切れ / 3200=推論7,266字・本文0 / reasoning_effort low+3200=推論8,900字・本文0 /
+  //   thinking disabled=推論4,310字・本文0（効かない） / chat_template_kwargs.enable_thinking=false=英語の独白が本文に漏れる。
+  //   続けて叩くと 429（rate limit exceeded・月の上限ではない）が2回出た。再試験は別の日に max_tokens 6000 前後で。
+  { label: 'sakura/deepseek-v4.1-flash', provider: 'sakura', rawId: 'preview/DeepSeek-V4.1-Flash-1017', apiModel: 'preview/DeepSeek-V4.1-Flash-1017', opts: {}, requires: ['SK'], liveProbe: true },
+  { label: 'sakura/glm-5.3-flash', provider: 'sakura', rawId: 'preview/GLM-5.3-Flash', apiModel: 'preview/GLM-5.3-Flash', opts: { max_tokens: 3200 }, requires: ['SK'], liveProbe: true },
+
   // 2026-06-?? 追加 → 2026-07-31 撤去（openrouter/gpt-oss-120b）:
   //   本改修でrawIdを空('')から'openai/gpt-oss-120b:free'に埋めた直後の初回実行で
   //   カタログ不在を検知（adoptedHealthにmissingStreak=1として記録）。実機で直接叩いて
@@ -972,4 +989,6 @@ export const ENV_NAMES = {
   CF_ACC: 'CLOUDFLARE_ACCOUNT_ID',
   SN: 'SAMBANOVA_API_KEY',
   MI: 'MISTRAL_API_KEY',
+  // 2026-11-18 追加: さくらのAI Engine（"<UUID>:<シークレット>" を Bearer で送る）。
+  SK: 'SAKURA_AI_ENGINE_TOKEN',
 };
