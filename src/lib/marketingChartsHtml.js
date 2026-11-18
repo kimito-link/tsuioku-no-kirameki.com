@@ -3982,8 +3982,8 @@ function sectionKpi(r, gap, followerSeries) {
   if (followerSeries) {
     const texts = followerKpiTexts(followerSeries);
     cards.push(
-      { label: 'フォロワー数', value: texts.countText, icon: '👤' },
-      { label: '獲得フォロワー数', value: texts.gainedText, icon: '📈' }
+      { label: texts.countLabel, value: texts.countText, icon: '👤' },
+      { label: texts.gainLabel, value: texts.gainedText, icon: '📈' }
     );
   }
   if (participation && participation.totalVisitors > 0) {

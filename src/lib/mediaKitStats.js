@@ -4,7 +4,7 @@
  */
 
 import { isGenericComeviewName } from './comeviewRows.js';
-import { followerKpiTexts, getFollowerSeries } from './platform/followerCountSample.js';
+import { followerKpiLabels, followerKpiTexts, getFollowerSeries } from './platform/followerCountSample.js';
 import { followerSeriesForPlatform } from './platform/followerSampleStore.js';
 
 const DAY_MS = 24 * 60 * 60 * 1000;
@@ -184,7 +184,8 @@ function giftEventsForLive(giftEventsByLive, liveId) {
  *     broadcastsPerWeek: number|null,
  *     liveCount: number
  *   }>,
- *   broadcaster: { name: string, userId: string, iconUrl: string }
+ *   broadcaster: { name: string, userId: string, iconUrl: string },
+ *   followerLabels: { countLabel: string, gainLabel: string } | null
  * }}
  */
 export function buildMediaKitStats(input = {}) {
@@ -328,7 +329,8 @@ export function buildMediaKitStats(input = {}) {
 
   return {
     windows,
-    broadcaster: resolveBroadcaster(summaryRows, profileSnapshots)
+    broadcaster: resolveBroadcaster(summaryRows, profileSnapshots),
+    followerLabels: liveSeries ? followerKpiLabels(liveSeries.noun) : null
   };
 }
 

@@ -89,6 +89,10 @@ describe('人数の知らせから書き出しまで', () => {
     expect(html).toContain('（概数）');
     expect(html).not.toContain('139K');
     expect(html).not.toContain('139人');
+    expect(html).toContain('mkt-kpi__label">チャンネル登録者数');
+    expect(html).toContain('mkt-kpi__label">登録者の増加');
+    expect(html).not.toContain('mkt-kpi__label">フォロワー数');
+    expect(html).not.toContain('mkt-kpi__label">獲得フォロワー数');
   });
 
   it('保存した人数はフォロワー数の欄に出る', () => {

@@ -65,8 +65,10 @@ import { computePseudoLvForVideoId } from '../../src/lib/youtube/ytPseudoLv.js';
 import { followerSamplesExportEntry } from '../../src/lib/platform/followerSampleStore.js';
 import {
   fetchFollowerEndSample,
+  followerEndEventFromTabChange,
   followerEndReadForEvent,
   normalizeFollowerEndArm,
+  stillOnFollowerLive,
 } from '../../src/lib/platform/followerEndRead.js';
 import { swStaleDecision } from '../../src/lib/swStaleCheck.js';
 /** @type {Map<string, string>} 配信 → 最後に書いた公式ランキングの指紋(0.1.1959) */
@@ -1086,13 +1088,41 @@ async function persistFollowerEndWatch() {
   }
 }
 
+/** ページを離れた知らせのあと、更新で同じ配信に戻ったかを見るまでの待ち */
+const FOLLOWER_END_LEAVE_RECHECK_MS = 700;
+
 /**
- * @param {{ type: 'removed' | 'url' | 'stream-end', tabId?: number, url?: string, videoKey?: string }} event
+ * URL が見えるあいだは、まだその配信のページにいるか。見えない(about:blank)・タブが無いときは離れた。
+ * @param {import('../../src/lib/platform/followerEndRead.js').FollowerEndArm} arm
+ */
+async function tabStillOnFollowerLive(arm) {
+  try {
+    const tab = await chrome.tabs.get(arm.tabId);
+    const url = tab && typeof tab.url === 'string' ? tab.url : '';
+    if (!url) return false;
+    return stillOnFollowerLive(arm, url);
+  } catch {
+    return false;
+  }
+}
+
+/**
+ * @param {{ type: 'removed' | 'url' | 'stream-end' | 'leave' | 'unseen-url', tabId?: number, url?: string, videoKey?: string, arm?: import('../../src/lib/platform/followerEndRead.js').FollowerEndArm | null }} event
  */
 async function onFollowerEndTabEvent(event) {
   await loadFollowerEndWatch();
-  const arm = followerEndReadForEvent([...followerEndArms.values()], followerEndDone, event);
+  const pick = () => followerEndReadForEvent([...followerEndArms.values()], followerEndDone, event);
+  let arm = pick();
   if (!arm) return;
+  // 配信ページのままの読み込み(URL が欠けるだけの変化・更新の途中)では、1回の枠を使わない。
+  if (event.type === 'leave' || event.type === 'unseen-url') {
+    if (await tabStillOnFollowerLive(arm)) {
+      if (event.type !== 'leave') return;
+      await new Promise((resolve) => setTimeout(resolve, FOLLOWER_END_LEAVE_RECHECK_MS));
+      arm = pick();
+      if (!arm || (await tabStillOnFollowerLive(arm))) return;
+    }
+  }
   followerEndDone.add(arm.videoKey);
   if (event.type !== 'stream-end') followerEndArms.delete(arm.tabId);
   const sample = await fetchFollowerEndSample(arm, { fetch: globalThis.fetch.bind(globalThis), now: () => Date.now() });
@@ -1951,7 +1981,7 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
     return true;
   }
 
-  if (message.type === 'YT_FOLLOWER_END_ARM' || message.type === 'YT_FOLLOWER_END_NOW') {
+  if (message.type === 'YT_FOLLOWER_END_ARM' || message.type === 'YT_FOLLOWER_END_NOW' || message.type === 'YT_FOLLOWER_END_LEAVE') {
     const arm = normalizeFollowerEndArm(message, sender?.tab?.id);
     if (!arm) {
       sendResponse({ ok: false });
@@ -1962,6 +1992,9 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
       followerEndArms.set(arm.tabId, arm);
       if (message.type === 'YT_FOLLOWER_END_NOW') {
         await onFollowerEndTabEvent({ type: 'stream-end', tabId: arm.tabId, videoKey: arm.videoKey });
+      } else if (message.type === 'YT_FOLLOWER_END_LEAVE') {
+        // ページが閉じる瞬間。登録が消えていても、知らせ自身の部屋番号で1回読む。
+        await onFollowerEndTabEvent({ type: 'leave', tabId: arm.tabId, videoKey: arm.videoKey, arm });
       } else {
         await persistFollowerEndWatch();
       }
@@ -1977,6 +2010,7 @@ chrome.tabs.onRemoved.addListener((tabId) => {
   void onFollowerEndTabEvent({ type: 'removed', tabId });
 });
 chrome.tabs.onUpdated.addListener((tabId, info) => {
-  if (typeof info.url !== 'string' || !info.url) return;
-  void onFollowerEndTabEvent({ type: 'url', tabId, url: info.url });
+  const ev = followerEndEventFromTabChange(info);
+  if (!ev) return;
+  void onFollowerEndTabEvent(ev.type === 'url' ? { type: 'url', tabId, url: ev.url } : { type: 'unseen-url', tabId });
 });

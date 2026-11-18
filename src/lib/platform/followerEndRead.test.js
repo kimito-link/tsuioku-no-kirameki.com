@@ -2,6 +2,7 @@ import { readFileSync } from 'node:fs';
 import { describe, expect, it } from 'vitest';
 import {
   fetchFollowerEndSample,
+  followerEndEventFromTabChange,
   followerEndReadForEvent,
   normalizeFollowerEndArm,
 } from './followerEndRead.js';
@@ -34,6 +35,33 @@ describe('記録の終わりの人数', () => {
     expect(followerEndReadForEvent(arms, done, { type: 'removed', tabId: 9 })).toBe(null);
   });
 
+  it('about:blank と、URL の見えない移動と、登録が消えたあとの閉じる知らせで1回読む', () => {
+    expect(followerEndEventFromTabChange({ url: 'about:blank' })).toEqual({ type: 'url', url: 'about:blank' });
+    expect(followerEndEventFromTabChange({ status: 'loading' })).toEqual({ type: 'unseen-url' });
+    expect(followerEndEventFromTabChange({ title: '部屋' })).toBe(null);
+    const arms = [sr].filter(Boolean);
+    const done = new Set();
+    const blank = followerEndReadForEvent(arms, done, { type: 'url', tabId: 8, url: 'about:blank' });
+    expect(blank?.videoKey).toBe('sr.551215.904');
+    const unseen = followerEndReadForEvent(arms, done, { type: 'unseen-url', tabId: 8 });
+    expect(unseen?.videoKey).toBe('sr.551215.904');
+    const same = followerEndReadForEvent(arms, done, { type: 'url', tabId: 8, url: 'https://www.showroom-live.com/r/551215' });
+    expect(same).toBe(null);
+    done.add('sr.551215.904');
+    expect(followerEndReadForEvent(arms, done, { type: 'url', tabId: 8, url: 'about:blank' })).toBe(null);
+    const leave = followerEndReadForEvent([], new Set(), {
+      type: 'leave',
+      tabId: 8,
+      arm: sr,
+    });
+    expect(leave?.roomId).toBe('61576');
+    expect(followerEndReadForEvent([], new Set(['sr.551215.904']), { type: 'leave', tabId: 8, arm: sr })).toBe(null);
+    expect(normalizeFollowerEndArm(
+      { platform: 'twitch', videoKey: 'tw.sasatikk.1711', login: 'sasatikk' },
+      7,
+    )).toBe(null);
+  });
+
   it('SHOWROOM の終わりは、応答を読み終えた時刻。時間切れの合図を付ける', async () => {
     let t = 1_700_000_000_000;
     /** @type {{ signal?: AbortSignal, credentials?: string } | undefined} */
@@ -62,6 +90,8 @@ describe('記録の終わりの人数', () => {
     expect(bg).not.toContain('gql.twitch.tv');
     expect(bg).toContain('chrome.tabs.onRemoved');
     expect(bg).toContain('chrome.tabs.onUpdated');
+    expect(bg).toContain('followerEndEventFromTabChange');
+    expect(bg).toContain('YT_FOLLOWER_END_LEAVE');
     const tw = readFileSync(new URL('../../../extension-youtube/src/tw-content-entry.js', import.meta.url), 'utf8');
     expect(tw).not.toContain('YT_FOLLOWER_END_');
     const hideAt = tw.indexOf("addEventListener('pagehide'");
@@ -73,6 +103,8 @@ describe('記録の終わりの人数', () => {
       const src = readFileSync(new URL(`../../../extension-youtube/src/${file}`, import.meta.url), 'utf8');
       expect(src).toContain('YT_FOLLOWER_END_ARM');
       expect(src).toContain('YT_FOLLOWER_END_NOW');
+      expect(src).toContain('YT_FOLLOWER_END_LEAVE');
+      expect(src.slice(src.indexOf("addEventListener('pagehide'"), src.indexOf("addEventListener('pagehide'") + 160)).toMatch(/leave(Sr|Ww)FollowerEnd/);
       const hide = src.indexOf("addEventListener('pagehide'");
       expect(src.slice(hide, hide + 180)).not.toMatch(/request(Sr|Ww)Followers/);
     }

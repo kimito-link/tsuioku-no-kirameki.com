@@ -69,10 +69,25 @@ export function stillOnFollowerLive(arm, url) {
 }
 
 /**
+ * タブの URL 変化から、終わりの読みの出来事を決める。
+ * `tabs` 権限があっても about:blank は url が欠けることがある。読み込み開始だけが届いたら、
+ * 覚えてある記録を「URL が見えない移動」として扱う。タイトルだけの変化では読まない。
+ * @param {unknown} info chrome.tabs.onUpdated の changeInfo
+ * @returns {{ type: 'url', url: string } | { type: 'unseen-url' } | null}
+ */
+export function followerEndEventFromTabChange(info) {
+  const row = info && typeof info === 'object' ? /** @type {Record<string, unknown>} */ (info) : {};
+  if (typeof row.url === 'string' && row.url) return { type: 'url', url: row.url };
+  if (row.status === 'loading') return { type: 'unseen-url' };
+  return null;
+}
+
+/**
  * この出来事で読む記録。同じ記録は done に入ったあとは読まない。配信ページのままの URL 変化では読まない。
+ * leave はページが閉じる知らせ自身が記録を持ってよい(裏方が覚えている登録が消えていても読む)。
  * @param {readonly FollowerEndArm[]} arms
  * @param {ReadonlySet<string>} done
- * @param {{ type: 'removed' | 'url' | 'stream-end', tabId?: number, url?: string, videoKey?: string }} event
+ * @param {{ type: 'removed' | 'url' | 'stream-end' | 'leave' | 'unseen-url', tabId?: number, url?: string, videoKey?: string, arm?: FollowerEndArm | null }} event
  * @returns {FollowerEndArm | null}
  */
 export function followerEndReadForEvent(arms, done, event) {
@@ -81,6 +96,9 @@ export function followerEndReadForEvent(arms, done, event) {
   let arm = null;
   if (event.type === 'stream-end') {
     arm = list.find((a) => a.videoKey === event.videoKey) || null;
+  } else if (event.type === 'leave' || event.type === 'unseen-url') {
+    const embedded = event.arm && event.arm.videoKey ? event.arm : null;
+    arm = embedded || list.find((a) => a.tabId === event.tabId) || null;
   } else if (event.type === 'removed' || event.type === 'url') {
     arm = list.find((a) => a.tabId === event.tabId) || null;
     if (arm && event.type === 'url' && stillOnFollowerLive(arm, event.url)) return null;

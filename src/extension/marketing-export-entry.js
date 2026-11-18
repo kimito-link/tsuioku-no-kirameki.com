@@ -39,7 +39,6 @@ import {
   giftUsersStorageKey,
   eventDomStorageKey,
   giftSubAppHistoryStorageKey,
-  commentsStorageKey,
   watchSnapshotStorageKey,
   broadcasterProfileStorageKey,
   KEY_ANONYMOUS_IDENTICON_ENABLED,
@@ -73,14 +72,11 @@ import { createObjectUrlRevokeQueue } from '../lib/objectUrlRevokeQueue.js';
 import { pickCommentsForExport } from '../lib/pickCommentsForExport.js';
 import { SUPPORTER_PAGE_URL, checkMarketingAccess, saveSupporterCode } from '../lib/supporterAccess.js';
 import { isCommentDbAvailable, openCommentDb, countCommentsForLive, readAllCommentsForLive as readAllCommentsFromDb } from '../lib/commentDb.js';
-import { readChunkedComments } from '../lib/commentChunkStore.js';
 import { readStorageBagWithRetry, normalizeUserCommentProfileMap } from '../lib/userCommentProfileCache.js';
-import { tailStorageKey } from '../lib/commentTailBuffer.js';
 import { isAnonymousStyleNicoUserId } from '../lib/supportGrowthTileSrc.js';
 import { anonymousIdenticonDataUrl } from '../lib/anonymousIdenticon.js';
 import { exportWaitLinesForKind, resolveHtmlReportBuildTimeoutMs } from '../lib/exportWaitNarration.js';
-import { mergeTailRowsIntoDisplay } from '../lib/mergeTailRowsIntoDisplay.js';
-import { normalizeTailRowsForDisplay } from '../lib/readAllCommentsForLive.js';
+import { EXPORT_COMMENT_READ_TIMEOUT_MS, readCommentsForExport } from '../lib/readAllCommentsForLive.js';
 import { MARKETING_EXPORT_STATE_PARAM, withMarketingExportState } from '../lib/marketingExportTabState.js';
 import { followerSamplesStorageKey, readStoredFollowerSamples } from '../lib/platform/followerSampleStore.js';
 
@@ -172,45 +168,18 @@ async function readAllCommentsFromCommentDb(lv) {
  * @returns {Promise<import('../lib/commentRecord.js').StoredComment[]>}
  */
 async function readAllCommentsForLive(lv) {
-  const fromDb = await readAllCommentsFromCommentDb(lv);
-  const mainKey = commentsStorageKey(lv);
-  /** @type {import('../lib/commentRecord.js').StoredComment[]} */
-  let rows = [];
-  if (Array.isArray(fromDb) && fromDb.length) {
-    rows = fromDb;
-  } else {
-    try {
-      const res = await readChunkedComments(lv, mainKey, (keys) =>
+  return /** @type {import('../lib/commentRecord.js').StoredComment[]} */ (
+    await readCommentsForExport(lv, {
+      readAllFromCommentDb: readAllCommentsFromCommentDb,
+      getMany: (keys) =>
         readStorageBagWithRetry(() => chrome.storage.local.get(keys), {
-          attempts: 3,
-          delaysMs: [0, 80, 200],
-          perAttemptTimeoutMs: 1200
-        })
-      );
-      rows = Array.isArray(res.rows) ? res.rows : [];
-    } catch {
-      rows = [];
-    }
-  }
-  // 未保存の末尾も、この放送の番号を付けて本体と同じ行として数える。
-  // 本体が IDB にあっても末尾は別なので、ここで必ず足す。
-  try {
-    const tKey = tailStorageKey(lv);
-    const tailBag = await readStorageBagWithRetry(() => chrome.storage.local.get([tKey]), {
-      attempts: 2,
-      delaysMs: [0, 120],
-      perAttemptTimeoutMs: 900
-    });
-    const tail = normalizeTailRowsForDisplay(
-      /** @type {Record<string, unknown>} */ (tailBag)[tKey],
-      lv,
-      Date.now()
-    );
-    if (tail.length) rows = mergeTailRowsIntoDisplay(rows, tail, { liveId: lv });
-  } catch {
-    /* テールは任意 */
-  }
-  return rows;
+          attempts: 2,
+          delaysMs: [0, 200],
+          perAttemptTimeoutMs: EXPORT_COMMENT_READ_TIMEOUT_MS
+        }),
+      nowMs: Date.now()
+    })
+  );
 }
 
 /**

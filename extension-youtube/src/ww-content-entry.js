@@ -192,19 +192,22 @@ function requestWwFollowers(userId, videoKey, opts = {}) {
 /** 終わりの人数は裏方が読む。ページが閉じる fetch は移動で消える。 */
 let wwEndArmKey = '';
 let wwEndArmAt = 0;
+/** @type {null | { platform: 'whowatch', videoKey: string, userId: string, livePageId: string }} */
+let wwLeavePayload = null;
 /** @param {string} userId @param {string} videoKey @param {string} livePageId */
 function armWwFollowerEnd(userId, videoKey, livePageId) {
+  if (!videoKey || !userId || !livePageId) return;
+  wwLeavePayload = { platform: 'whowatch', videoKey, userId, livePageId };
   const now = Date.now();
-  if (!videoKey || !userId || !livePageId || (wwEndArmKey === videoKey && now - wwEndArmAt < 60_000)) return;
+  if (wwEndArmKey === videoKey && now - wwEndArmAt < 60_000) return;
   wwEndArmKey = videoKey;
   wwEndArmAt = now;
-  safeSendMessage({
-    type: 'YT_FOLLOWER_END_ARM',
-    platform: 'whowatch',
-    videoKey,
-    userId,
-    livePageId,
-  });
+  safeSendMessage({ type: 'YT_FOLLOWER_END_ARM', ...wwLeavePayload });
+}
+/** 閉じる・about:blank へ移る。URL が見えなくても、利用者番号を知らせて裏方に読ませる。 */
+function leaveWwFollowerEnd() {
+  if (!wwLeavePayload) return;
+  safeSendMessage({ type: 'YT_FOLLOWER_END_LEAVE', ...wwLeavePayload });
 }
 /** @param {string} userId @param {string} videoKey @param {string} livePageId */
 function askWwFollowerEnd(userId, videoKey, livePageId) {
@@ -514,4 +517,5 @@ setInterval(check, 1000);
 check();
 window.addEventListener('pagehide', () => {
   current?.stop();
+  leaveWwFollowerEnd();
 });

@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest';
 import { readFileSync } from 'node:fs';
 import { buildMediaKitHtml } from '../mediaKitHtml.js';
 import { buildMediaKitStats } from '../mediaKitStats.js';
-import { followerKpiTexts } from './followerCountSample.js';
+import { FOLLOWER_NOUN, followerKpiLabels, followerKpiTexts } from './followerCountSample.js';
 import { followerSeriesForPlatform } from './followerSampleStore.js';
 import { sectionSupportArrivalHtml } from './marketingPlatformChapters.js';
 import { FOLLOWER_NOTATION, PLATFORM_METRIC_IDS, followerNotationOf } from './platformMetrics.js';
@@ -57,7 +57,20 @@ describe('人数の正本は能力表の一つ', () => {
       }
       const series = followerSeriesForPlatform(platformId, samples);
       expect(series, platformId).not.toBeNull();
+      const noun = /** @type {Record<string, string>} */ (FOLLOWER_NOUN)[platformId];
+      const labels = followerKpiLabels(noun);
+      expect(series.noun, platformId).toBe(noun);
       const texts = followerKpiTexts(/** @type {NonNullable<typeof series>} */ (series));
+      expect(texts.countLabel, platformId).toBe(labels.countLabel);
+      expect(texts.gainLabel, platformId).toBe(labels.gainLabel);
+      expect(chapter, platformId).toContain(noun);
+      expect(kit, platformId).toContain(`${labels.countLabel}</th>`);
+      expect(kit, platformId).toContain(`${labels.gainLabel}</th>`);
+      if (platformId === 'youtube') {
+        expect(labels.countLabel).toBe('チャンネル登録者数');
+        expect(labels.gainLabel).toBe('登録者の増加');
+        expect(kit, platformId).not.toContain('フォロワー数</th>');
+      }
       expect(chapter, platformId).toContain(series.start.text);
       expect(chapter, platformId).toContain(series.end.text);
       expect(kit, platformId).toContain(texts.countText);

@@ -309,10 +309,14 @@ export function buildMediaKitHtml(stats, options = {}) {
   const sourceLiveLimitReached = options.sourceLiveLimitReached === true;
   const omitVisitorTotal = options.omitVisitorTotal === true;
 
+  const followerLabels =
+    stats && typeof stats === 'object' && /** @type {{ followerLabels?: { countLabel?: string, gainLabel?: string } }} */ (stats).followerLabels;
+  const countLabel = String(followerLabels?.countLabel || 'フォロワー数');
+  const gainLabel = String(followerLabels?.gainLabel || '獲得フォロワー数');
   /** @type {Array<[string, (window: Record<string, unknown>) => string]>} */
   const metricSpecs = [
-    ['フォロワー数', (window) => textOr(window.followersText, formatInteger(window.followers))],
-    ['獲得フォロワー数', (window) => textOr(window.followersGainedText, formatSignedInteger(window.followersGained))],
+    [countLabel, (window) => textOr(window.followersText, formatInteger(window.followers))],
+    [gainLabel, (window) => textOr(window.followersGainedText, formatSignedInteger(window.followersGained))],
     ['平均同時視聴者数', (window) => formatDecimal(window.avgConcurrent)],
     ['最大同時視聴者数', (window) => formatInteger(window.maxConcurrent)],
     ...(omitVisitorTotal

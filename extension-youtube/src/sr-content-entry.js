@@ -189,19 +189,22 @@ function requestSrFollowers(roomId, videoKey, opts = {}) {
 /** 終わりの人数は裏方が読む。ページが閉じる fetch は移動で消える。 */
 let srEndArmKey = '';
 let srEndArmAt = 0;
+/** @type {null | { platform: 'showroom', videoKey: string, roomKey: string, roomId: string }} */
+let srLeavePayload = null;
 /** @param {string} roomId @param {string} roomKey @param {string} videoKey */
 function armSrFollowerEnd(roomId, roomKey, videoKey) {
+  if (!videoKey || !roomId || !roomKey) return;
+  srLeavePayload = { platform: 'showroom', videoKey, roomKey, roomId };
   const now = Date.now();
-  if (!videoKey || !roomId || (srEndArmKey === videoKey && now - srEndArmAt < 60_000)) return;
+  if (srEndArmKey === videoKey && now - srEndArmAt < 60_000) return;
   srEndArmKey = videoKey;
   srEndArmAt = now;
-  safeSendMessage({
-    type: 'YT_FOLLOWER_END_ARM',
-    platform: 'showroom',
-    videoKey,
-    roomKey,
-    roomId,
-  });
+  safeSendMessage({ type: 'YT_FOLLOWER_END_ARM', ...srLeavePayload });
+}
+/** 閉じる・about:blank へ移る。URL が見えなくても、部屋番号を知らせて裏方に読ませる。 */
+function leaveSrFollowerEnd() {
+  if (!srLeavePayload) return;
+  safeSendMessage({ type: 'YT_FOLLOWER_END_LEAVE', ...srLeavePayload });
 }
 /** @param {string} roomId @param {string} roomKey @param {string} videoKey */
 function askSrFollowerEnd(roomId, roomKey, videoKey) {
@@ -594,4 +597,5 @@ setInterval(() => {
 }, 1000);
 window.addEventListener('pagehide', () => {
   current?.stop();
+  leaveSrFollowerEnd();
 });

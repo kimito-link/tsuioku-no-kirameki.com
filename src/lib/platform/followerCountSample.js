@@ -14,7 +14,7 @@ export const FOLLOWER_SAMPLE_CAP = 160;
 const FORCE_GAP_MS = 15 * 1000;
 const COUNT_MAX = 2_000_000_000;
 
-/** 画面の言葉。サービスが使っている呼び方だけ。 */
+/** 画面の言葉。サービスが使っている呼び方だけ。KPI の見出しと章は、この語から作る。 */
 export const FOLLOWER_NOUN = Object.freeze({
   niconico: 'フォロワー',
   youtube: 'チャンネル登録者',
@@ -27,6 +27,24 @@ export const FOLLOWER_NOUN = Object.freeze({
   mixch: 'ファン',
   abema: 'フォロワー',
 });
+
+/** 増えた人数の見出し。能力表の語から外れた言い方は、ここにだけ置く。 */
+const FOLLOWER_GAIN_LABEL = Object.freeze({
+  チャンネル登録者: '登録者の増加',
+  サポーター: 'サポーターの増加',
+  ファン: 'ファンの増加',
+});
+
+/**
+ * KPI の見出し。人数の欄と増えた欄は、能力表の同じ語から作る。
+ * @param {unknown} noun
+ * @returns {{ countLabel: string, gainLabel: string }}
+ */
+export function followerKpiLabels(noun) {
+  const n = String(noun || '').trim() || 'フォロワー';
+  const gain = /** @type {Record<string, string>} */ (FOLLOWER_GAIN_LABEL)[n] || `獲得${n}数`;
+  return { countLabel: `${n}数`, gainLabel: gain };
+}
 
 /**
  * 1件の標本。
@@ -577,7 +595,8 @@ export function getFollowerSeries(samples, opts = {}) {
   const start = rows[0];
   const end = rows[rows.length - 1];
   const growth = analyzeFollowerGrowth(samples, opts);
-  const noun = rows.find((s) => s.noun)?.noun || opts.noun || 'フォロワー';
+  const fromSample = rows.find((s) => s.noun)?.noun;
+  const noun = (opts.noun && String(opts.noun).trim()) || fromSample || 'フォロワー';
   const textOf = (/** @type {typeof start} */ row) => formatFollowerSampleText(row, useRounded ? notation : 'exact');
   return {
     start: { count: start.count, at: start.at, text: textOf(start) },
@@ -591,7 +610,7 @@ export function getFollowerSeries(samples, opts = {}) {
 }
 
 /**
- * KPI の「フォロワー数」「獲得フォロワー数」と、章の人数の行。同じ文字列を使う。
+ * KPI の人数と、章の人数の行。見出しは能力表の語(followerKpiLabels)。同じ文字列を使う。
  * 終わりの人数には、実際に読んだ時刻を付ける。
  * @param {NonNullable<ReturnType<typeof getFollowerSeries>>} series
  */
@@ -607,5 +626,6 @@ export function followerKpiTexts(series) {
   else if (series.delta > 0) gainedText = `＋${series.delta.toLocaleString('ja-JP')}人`;
   else if (series.delta < 0) gainedText = `${Math.abs(series.delta).toLocaleString('ja-JP')}人減`;
   else gainedText = '増減なし';
-  return { countText, gainedText };
+  const labels = followerKpiLabels(series.noun);
+  return { countText, gainedText, countLabel: labels.countLabel, gainLabel: labels.gainLabel };
 }
