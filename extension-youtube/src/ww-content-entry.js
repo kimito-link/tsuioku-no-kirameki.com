@@ -10,6 +10,7 @@
 
 import { parseWwLiveIdFromUrl, wwLiveApiUrl, parseWwLive, parseWwComment, buildWwStreamKey } from '../../src/lib/whowatch/wwParse.js';
 import { wwEventInfoUrl, parseWwEventInfo, parseWwLiveStats, mergePlatformStats } from '../../src/lib/platform/platformStats.js';
+import { followerSampleFromDom, followerSampleFromWhowatch } from '../../src/lib/platform/followerCountSample.js';
 import { startPageStallWatch } from '../../src/lib/stallTrace.js';
 import { isOwnExtensionUi } from '../../src/lib/platform/pageControlPick.js';
 try {
@@ -137,6 +138,9 @@ async function getJson(url) {
 
 // ---- 1配信ぶんの読み取り ----
 let current = /** @type {null | { liveId: string, stop: () => void }} */ (null);
+/** @type {null | { count: number, rounded: boolean, source: string, noun?: string }} */
+let lastWwFollow = null;
+let lastWwKey = '';
 /** 終わったと分かった配信(同じページにいる間は読み直さない) */
 const endedLives = new Set();
 
@@ -170,8 +174,8 @@ function startReader(liveId) {
     }
   };
 
-  /** @param {NonNullable<ReturnType<typeof parseWwLive>>} info */
-  const sendMeta = (info) => {
+  /** @param {NonNullable<ReturnType<typeof parseWwLive>>} info @param {object | null} sample */
+  const sendMeta = (info, sample) => {
     if (!key) return;
     metaAt = Date.now();
     const u = info.user;
@@ -188,8 +192,13 @@ function startReader(liveId) {
         concurrentViewers: typeof info.viewers === 'number' ? info.viewers : undefined,
         ...(info.startedAtMs ? { startedAt: info.startedAtMs, startedAtApprox: false } : {}),
         ...(statsRead ? { platformStats: mergePlatformStats(liveStats, eventStats) } : {}),
+        ...(sample ? { followerSample: { ...sample, at: Date.now() } } : {}),
       },
     });
+    if (sample) {
+      lastWwFollow = sample;
+      lastWwKey = key;
+    }
   };
 
   const poll = async () => {
@@ -234,7 +243,8 @@ function startReader(liveId) {
       key = buildWwStreamKey(liveId, { userId: info.user?.id });
       diag.streamKey = key;
     }
-    if (Date.now() - metaAt >= META_EVERY_MS) sendMeta(info);
+    const wwFollow = followerSampleFromWhowatch(json) || followerSampleFromDom(document, 'whowatch');
+    if (Date.now() - metaAt >= META_EVERY_MS) sendMeta(info, wwFollow);
 
     // コメント(新しい順らしい=古い順に並べ直して送る)
     const raw = info.comments;
@@ -291,7 +301,12 @@ function startReader(liveId) {
         return;
       }
       endedLives.add(liveId);
-      if (key) safeSendMessage({ type: 'YT_STREAM_META', payload: { videoId: key, endedAt: Date.now() } });
+      if (key) {
+        safeSendMessage({
+          type: 'YT_STREAM_META',
+          payload: { videoId: key, endedAt: Date.now(), ...(lastWwFollow ? { followerSample: { ...lastWwFollow, at: Date.now(), force: true } } : {}) },
+        });
+      }
       stopped = true;
       return;
     }
@@ -414,4 +429,9 @@ try {
 // ふわっちも1枚のページの中で URL だけ変わるかもしれないので、URL を見張る
 setInterval(check, 1000);
 check();
-window.addEventListener('pagehide', () => current?.stop());
+window.addEventListener('pagehide', () => {
+  if (lastWwKey && lastWwFollow) {
+    safeSendMessage({ type: 'YT_STREAM_META', payload: { videoId: lastWwKey, followerSample: { ...lastWwFollow, at: Date.now(), force: true } } });
+  }
+  current?.stop();
+});

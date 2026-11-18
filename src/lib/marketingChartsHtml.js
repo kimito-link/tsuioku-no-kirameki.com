@@ -3033,6 +3033,7 @@ function buildSectionRevealScriptHtml() {
  *   mediaKitHtml?: string,
  *   htmlReportHtml?: string,
  *   programStartAtMs?: number,
+ *   followerSamples?: unknown[],
  *   slimForHeavyExport?: boolean,
  *   platform?: string,
  *   pageCount?: number,
@@ -3487,7 +3488,8 @@ export function buildMarketingDashboardHtml(r, opts = {}) {
     comments: commentsRaw,
     giftEvents: view ? [] : giftEventsForAnalytics,
     startedAtMs: typeof opts.programStartAtMs === 'number' ? opts.programStartAtMs : undefined,
-    maskShare
+    maskShare,
+    ...(Array.isArray(opts.followerSamples) && opts.followerSamples.length ? { followerSamples: opts.followerSamples } : {}),
   });
   const bodyHtml = `${supportArrivalHtml ? `${supportArrivalHtml}\n` : ''}__NL_TOC_PLACEHOLDER__
 ${sectionHeroCard(r, broadcastNarrative?.summaryLine || '', maskShare, view ? null : audienceGap) + (view ? sectionSupportFlowHtml(commentsRaw, view) + sectionPlatformDedicatedHtml(commentsRaw, view, pageCount, pageFacts) + sectionStreamerMomentsHtml(commentsRaw, view, sessionSummaryRows, pageCount) : '')}

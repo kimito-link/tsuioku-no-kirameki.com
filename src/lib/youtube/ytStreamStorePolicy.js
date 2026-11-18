@@ -4,6 +4,7 @@
 import { assignYtCommentLane } from './ytLaneAssign.js';
 import { ytHandleLivePath } from './ytPageMeta.js';
 import { normalizePlatformStats } from '../platform/platformStats.js';
+import { appendFollowerSample } from '../platform/followerCountSample.js';
 import {
   createYtSupportRankingAccumulator,
   applyYtSupportRankingDelta,
@@ -47,7 +48,8 @@ export function buildYtCommentPrimaryKey(videoId, commentId) {
  *   startedAt?: number | null,
  *   startedAtApprox?: boolean,
  *   endedAt?: number | null,
- *   platformStats?: Record<string, any> | null
+ *   platformStats?: Record<string, any> | null,
+ *   followerSample?: { at?: number, count?: number, rounded?: boolean, source?: string, noun?: string, raw?: string, force?: boolean } | null
  * }} patch
  * @param {number} [nowMs]
  * @returns {{
@@ -168,6 +170,9 @@ export function mergeYtStreamSummary(existing, patch, nowMs = Date.now()) {
       ? prev.createdAt
       : nowMs;
 
+  // ページがすでに出しているフォロワー数。空のときは欄を足さない（要約全体の一致テストを崩さない）。
+  const followerSamples = appendFollowerSample(prev.followerSamples, patch?.followerSample, nowMs);
+
   return {
     videoId,
     title,
@@ -188,6 +193,7 @@ export function mergeYtStreamSummary(existing, patch, nowMs = Date.now()) {
     startedAt,
     ...(startedAtApprox ? { startedAtApprox: true } : {}),
     ...(endedAt ? { endedAt } : {}),
+    ...(followerSamples.length ? { followerSamples } : {}),
     createdAt,
     updatedAt: nowMs,
   };

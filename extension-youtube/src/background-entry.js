@@ -1221,6 +1221,7 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
               : undefined,
           startedAtApprox: payload.startedAtApprox === true,
           endedAt: typeof payload.endedAt === 'number' ? payload.endedAt : undefined,
+          ...(payload.followerSample && typeof payload.followerSample === 'object' ? { followerSample: payload.followerSample } : {}),
         },
         Date.now(),
       );

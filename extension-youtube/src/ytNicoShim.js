@@ -552,6 +552,7 @@ export function ytSummaryToNicoSnapshot(sum, videoId, tabTitle, all) {
     officialStatsUpdatedAt: Number(sum?.updatedAt || 0) || Date.now(),
     // ページの開始時刻が目安(「3時間前」など)のときは、レポートの「開始から」を出さない。
     ...(startedAt > 0 && sum?.startedAtApprox !== true ? { programStartAtMs: startedAt } : {}),
+    ...(Array.isArray(sum?.followerSamples) && sum.followerSamples.length ? { followerSamples: sum.followerSamples } : {}),
     // アーカイブ(チャットのリプレイで記録した配信)は今も配信中ではないので、開始からの経過は出さない(2週間前の配信が「372時間」になる)
     //   配信が終わっていたら(endedAt)、終わった時刻までで止める
     streamAgeMin:

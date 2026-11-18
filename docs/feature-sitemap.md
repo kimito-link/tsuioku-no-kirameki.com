@@ -219,7 +219,7 @@
 
 - **応援レーン集約(誰が候補か)** — 保存コメント行を userId 単位に畳み込みレーン候補を作る唯一の集約正本(popup/venue 共通)
   - `src/lib/userLaneCandidatesFromStorage.js`
-<details><summary>🗂 このカテゴリの全担当ファイル(自動分類) 106</summary>
+<details><summary>🗂 このカテゴリの全担当ファイル(自動分類) 108</summary>
 
 - `scripts/council-trial.mjs` — 会議メンバー候補を「本番と同じ条件」で一斉に試す使い捨て計器。
 - `scripts/perf-ab/trace-summary.mjs` — Chrome のトレース(CDP Tracing)を取って、メインスレッドごとに「自分の時間(self time)」を名前別に集計する。
@@ -297,6 +297,8 @@
 - `src/lib/officialDomRankingRowsToStripRooms.js` — 公式イベント DOM バンドルの貢献度／広告ランキング行を、
 - `src/lib/personProfiles.js` — 人物プロファイル畳み込み（person-tile-unify 第1コミット・2026-06-17）。
 - `src/lib/pickBroadcasterNameForReputation.js` — 評判チェック用に「配信者名」を解決する純関数 (PR R4)
+- `src/lib/platform/followerCountSample.js` — 【層】L0 判定層(純粋関数・I/O禁止)
+- `src/lib/platform/followerSampleStore.js` — ニコ生の配信者プロフィール（すでに取っている nvapi）と、そのフォロワー数の標本を一緒に書く。
 - `src/lib/platform/platformSubBoard.js` — 各サービスの「2つめの公式ランキング」(Twitch・Kick のギフトサブの順位など)を、
 - `src/lib/popupConcurrentEstimateGate.js` — ポップアップ「推定同時接続」カードでローディングを解除するかどうか。
 - `src/lib/popupWatchMetaConcurrentGate.js` — popup の同時視聴者数推定を「出してよいか」判定するゲート(DOM/公式値/直近アクティブから)。
@@ -1576,14 +1578,14 @@
 - `v0.1.2143` 2026-11-17 — 配信の山が来た時刻を出す
 - `v0.1.2142` 2026-11-17 — 各サービスの記録を章に出す
 
-### 🔊 読み上げ (5版)
+### 🔊 読み上げ (4版)
 - `v0.1.2149` 2026-11-17 — 絵文字の名前を吹き出しに残さない
 - `v0.1.2148` 2026-11-17 — 空の順位表と絵文字コードを出さない
 - `v0.1.2139` 2026-11-16 — 読み足した過去コメントを吹き出しに出さない
 - `v0.1.2138` 2026-11-16 — Kick・ABEMA・Twitch等で開始からの過去コメントも記録
-- `v0.1.2136` 2026-11-16 — 使わない権限を拡張から外した
 
-### その他 (4版)
+### その他 (5版)
+- `v0.1.2156` 2026-11-18 — フォロワーの増えた時刻を出す
 - `v0.1.2151` 2026-11-17 — 記録テストは絵文字の名前を見ない
 - `v0.1.2147` 2026-11-17 — 配信を探す案内の読み込みを直す
 - `v0.1.2140` 2026-11-17 — 分析レポートの見た目は今までどおり

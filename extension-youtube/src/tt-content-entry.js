@@ -43,6 +43,7 @@ try {
 import { createInfoPollGate } from '../../src/lib/platform/infoPollGate.js';
 import { makeDiagTabToken, shouldSkipDiagWrite } from '../../src/lib/platform/diagTabShare.js';
 import { platformFetchTimeoutSignal } from '../../src/lib/platform/fetchTimeout.js';
+import { followerSampleFromDom, followerSampleFromTikTokRoom } from '../../src/lib/platform/followerCountSample.js';
 
 const META_EVERY_MS = 30_000;
 const BOARD_EVERY_MS = 60_000;
@@ -169,6 +170,8 @@ let early = [];
  * @typedef {{ uniqueId: string, roomId: string, key: string, startedAt: number, onFrame: (buf: ArrayBuffer, socketRoomId: string) => void, stop: () => void }} Reader
  */
 let current = /** @type {null | Reader} */ (null);
+/** @type {null | { count: number, rounded: boolean, source: string, noun?: string, raw?: string }} */
+let lastTtFollow = null;
 /** ソケットから来た視聴数(次の配信情報の送信で使う) */
 let latestViewers = /** @type {number | null} */ (null);
 
@@ -446,7 +449,8 @@ async function check() {
   if (!infoGate.due(uniqueId, Date.now())) return checkLogin();
   checking = true;
   try {
-    const info = parseTtRoomInfo(await tryJson(ttRoomInfoUrl(uniqueId)));
+    const roomJson = await tryJson(ttRoomInfoUrl(uniqueId));
+    const info = parseTtRoomInfo(roomJson);
     infoGate.done(uniqueId, !info ? 'fail' : info.isLive ? 'live' : 'idle', Date.now());
     diag.uniqueId = uniqueId;
     if (!info) return saveDiagSoon();
@@ -457,7 +461,10 @@ async function check() {
         const endedKey = current.key;
         current.stop();
         current = null;
-        safeSendMessage({ type: 'YT_STREAM_META', payload: { videoId: endedKey, endedAt: Date.now() } });
+        safeSendMessage({
+          type: 'YT_STREAM_META',
+          payload: { videoId: endedKey, endedAt: Date.now(), ...(lastTtFollow ? { followerSample: { ...lastTtFollow, at: Date.now(), force: true } } : {}) },
+        });
       }
       diag.streamKey = '';
       setLoginNote(false);
@@ -479,6 +486,8 @@ async function check() {
       for (const e of list) current.onFrame(e.buf, e.roomId);
     }
     const viewers = latestViewers ?? info.viewers;
+    const ttFollow = followerSampleFromTikTokRoom(roomJson) || followerSampleFromDom(document, 'tiktok');
+    if (ttFollow) lastTtFollow = ttFollow;
     safeSendMessage({
       type: 'YT_STREAM_META',
       payload: {
@@ -491,6 +500,7 @@ async function check() {
         broadcasterIconUrl: info.iconUrl || '',
         concurrentViewers: viewers != null && viewers >= 0 ? viewers : undefined,
         ...(info.startedAtMs ? { startedAt: info.startedAtMs, startedAtApprox: false } : {}),
+        ...(ttFollow ? { followerSample: { ...ttFollow, at: Date.now() } } : {}),
       },
     });
     checkLogin();
@@ -584,4 +594,9 @@ setInterval(() => {
   }
   void check();
 }, 1000);
-window.addEventListener('pagehide', () => current?.stop());
+window.addEventListener('pagehide', () => {
+  if (current?.key && lastTtFollow) {
+    safeSendMessage({ type: 'YT_STREAM_META', payload: { videoId: current.key, followerSample: { ...lastTtFollow, at: Date.now(), force: true } } });
+  }
+  current?.stop();
+});

@@ -24,6 +24,14 @@
 /** @type {ChangelogEntry[]} */
 const ARCHIVE_ENTRIES = [
   Object.freeze({
+    version: '0.1.2136',
+    date: '2026-11-16',
+    summary: '使わない権限を拡張から外した',
+    items: Object.freeze([
+      '準備していた「ローカル補助アプリ」との連携をやめ、そのための追加の権限(nativeMessaging)を拡張から外しました。本物の VOICEVOX で試したところ、補助アプリを使っても読み上げは速くならなかったためです。読み上げの動きは今までどおりです。',
+    ])
+  }),
+  Object.freeze({
     version: '0.1.2135',
     date: '2026-11-16',
     summary: 'ツイキャスで開く前のコメントも記録',

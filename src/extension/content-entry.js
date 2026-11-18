@@ -62,7 +62,6 @@ import {
   backfillResumeStorageKey,
   eventDomStorageKey,
   giftSubAppHistoryStorageKey,
-  broadcasterProfileStorageKey,
   commenterFollowLiveStorageKey,
   isRecordingEnabled,
   isDeepHarvestQuietUiEnabled,
@@ -71,6 +70,7 @@ import {
   normalizeInlineFloatingAnchor,
   KEY_PROFILE_RESOLVE_STATE
 } from '../lib/storageKeys.js';
+import { saveBroadcasterProfileAndFollowerSample } from '../lib/platform/followerSampleStore.js';
 import {
   pickLargestVisibleVideo,
   captureVideoToPngDataUrl
@@ -15656,19 +15656,7 @@ function maybeFetchBroadcasterProfileMirrorOnce() {
       if (curLid !== lid) return; // 応答到着までに別 lv へ遷移していたら stale 書込しない
       const model = normalizeBroadcasterProfileModel(merged);
       if (!model) return;
-      try {
-        chrome.storage.local
-          .set({
-            [broadcasterProfileStorageKey(lid)]: { ...model, capturedAt: Date.now() }
-          })
-          .catch((err) => {
-            if (!isContextInvalidatedError(err)) {
-              /* best-effort */
-            }
-          });
-      } catch {
-        /* no-op */
-      }
+      void saveBroadcasterProfileAndFollowerSample(chrome.storage.local, lid, model, isContextInvalidatedError);
     };
 
     // nvapi /v1/users/<id>（LV/プレミアム/フォロー/フォロワー/アイコン/表示名）。

@@ -53,6 +53,7 @@ import {
 } from '../../src/lib/twitch/twHermes.js';
 import { createEmoteSaver } from './pfEmoteStore.js';
 import { platformFetchTimeoutSignal } from '../../src/lib/platform/fetchTimeout.js';
+import { followerSampleFromDom } from '../../src/lib/platform/followerCountSample.js';
 
 const IRC_URL = 'wss://irc-ws.chat.twitch.tv:443';
 const META_EVERY_MS = 30_000;
@@ -233,6 +234,8 @@ async function lookupIcons(logins) {
 
 // ---- 1配信ぶんの読み取り ----
 let current = /** @type {null | { login: string, key: string, stop: () => void }} */ (null);
+/** @type {null | { count: number, rounded: boolean, source: string, noun?: string, raw?: string }} */
+let lastTwFollow = null;
 /** 配信者の表示名(GQL で分かったもの・ハイプトレイン等の行の名前) */
 let lastBroadcasterName = '';
 const broadcasterName = () => lastBroadcasterName;
@@ -654,7 +657,10 @@ async function check() {
         const endedKey = current.key;
         current.stop();
         current = null;
-        safeSendMessage({ type: 'YT_STREAM_META', payload: { videoId: endedKey, endedAt: Date.now() } });
+        safeSendMessage({
+          type: 'YT_STREAM_META',
+          payload: { videoId: endedKey, endedAt: Date.now(), ...(lastTwFollow ? { followerSample: { ...lastTwFollow, at: Date.now(), force: true } } : {}) },
+        });
       }
       diag.streamKey = '';
       saveDiagSoon();
@@ -668,6 +674,8 @@ async function check() {
       current = { login, key, stop: startReader(login, key, info?.userId || '', { streamId: info?.streamId, startedAtMs: info?.startedAtMs }) };
       diag.streamKey = key;
     }
+    const twFollow = followerSampleFromDom(document, 'twitch');
+    if (twFollow) lastTwFollow = twFollow;
     safeSendMessage({
       type: 'YT_STREAM_META',
       payload: {
@@ -680,6 +688,7 @@ async function check() {
         // ページに数が出ていればそれを使う。GQL の数はページより古いことがある(30秒おきにページに無い数へ跳んだ・2026-11-11 PC 計測)
         concurrentViewers: readTwPageViewers() ?? (typeof info?.viewers === 'number' ? info.viewers : undefined),
         ...(info?.startedAtMs ? { startedAt: info.startedAtMs, startedAtApprox: false } : {}),
+        ...(twFollow ? { followerSample: { ...twFollow, at: Date.now() } } : {}),
       },
     });
     if (info?.userId && (lastBoardKey !== key || Date.now() - lastBoardAt >= BOARD_EVERY_MS)) void sendTwBoard(login, info.userId, key);
@@ -797,7 +806,12 @@ setInterval(() => {
   }
   void check();
 }, 1000);
-window.addEventListener('pagehide', () => current?.stop());
+window.addEventListener('pagehide', () => {
+  if (current?.key && lastTwFollow) {
+    safeSendMessage({ type: 'YT_STREAM_META', payload: { videoId: current.key, followerSample: { ...lastTwFollow, at: Date.now(), force: true } } });
+  }
+  current?.stop();
+});
 
 // ---- 視聴者数はページに出ている数を10秒おきに写す(保存の書き込みを増やしすぎないよう10秒・変わったときだけ) ----
 // 配信の情報(GQL)は30秒おきなので、ページの数が 10,533→10,583 と動いても欄が古い数のままだった(2026-11-11 PC 計測)。

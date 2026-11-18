@@ -82,6 +82,8 @@ import { exportWaitLinesForKind, resolveHtmlReportBuildTimeoutMs } from '../lib/
 import { mergeTailRowsIntoDisplay } from '../lib/mergeTailRowsIntoDisplay.js';
 import { normalizeTailRowsForDisplay } from '../lib/readAllCommentsForLive.js';
 import { MARKETING_EXPORT_STATE_PARAM, withMarketingExportState } from '../lib/marketingExportTabState.js';
+import { computePseudoLvForVideoId } from '../lib/youtube/ytPseudoLv.js';
+import { followerSamplesStorageKey } from '../lib/platform/followerSampleStore.js';
 
 /**
  * @typedef {{
@@ -556,6 +558,30 @@ function showLockStage(lid) {
 
 // ── stage 4: メイン処理(既存パイプラインを呼び出し順序・引数不変で実行) ──
 
+/**
+ * スナップショット、ニコ生の標本キー、YouTube 系の配信要約の順に人数の標本を探す。
+ * @param {string} lid
+ * @param {Record<string, any> | null | undefined} snapshot
+ */
+async function followerSamplesForExport(lid, snapshot) {
+  if (Array.isArray(snapshot?.followerSamples) && snapshot.followerSamples.length) return snapshot.followerSamples;
+  try {
+    const key = followerSamplesStorageKey(lid);
+    const bag = await chrome.storage.local.get([key, 'yt_stream_summaries']);
+    if (Array.isArray(bag?.[key]) && bag[key].length) return bag[key];
+    const sums = bag?.yt_stream_summaries;
+    if (!sums || typeof sums !== 'object') return [];
+    for (const [vid, sum] of Object.entries(sums)) {
+      if (computePseudoLvForVideoId(vid) !== lid) continue;
+      const samples = /** @type {{ followerSamples?: unknown }} */ (sum)?.followerSamples;
+      if (Array.isArray(samples) && samples.length) return samples;
+    }
+  } catch {
+    /* 標本が読めなくてもレポート本体は出す */
+  }
+  return [];
+}
+
 /** @param {string} lid */
 async function runExport(lid) {
   if (!lid) {
@@ -795,6 +821,7 @@ async function runExport(lid) {
       mediaKitHtml,
       htmlReportHtml,
       programStartAtMs: Number(snapshot?.programStartAtMs || snapshot?.startAtMs) || undefined,
+      followerSamples: await followerSamplesForExport(lid, snapshot),
       maskShareLabels: maskShareLabels,
       anonymousIdenticonResolver: getCachedAnonymousIdenticonDataUrl,
       broadcasterUserId: String(snapshot?.broadcasterUserId || '').trim(),
