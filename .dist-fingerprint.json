@@ -1,7 +1,7 @@
 {
   "schema": 1,
   "mode": "default",
-  "fingerprint": "057841655b6755117426e2fe90826318e210614de4166b3622317274a43fe6c6",
+  "fingerprint": "6686b902844a1b2fdadadfa97a0b56afdedb7b5cb830e010fc652337a5d0e725",
   "inputs": [
     "app/app.js",
     "app/live-view-block.js",

@@ -37,7 +37,14 @@ export const PLATFORM_METRIC_IDS = Object.freeze(['niconico', 'youtube', 'twitch
  * }} SupportArrivalSpec
  */
 
-/** @param {readonly string[]} kinds @param {string} label @param {SupportArrivalSpec['amount']} amount @param {{ currency?: string, subEvent?: string }} [extra] @returns {SupportArrivalSpec} */
+/**
+ * @param {string} id
+ * @param {readonly string[]} kinds
+ * @param {string} label
+ * @param {SupportArrivalSpec['amount']} amount
+ * @param {{ currency?: string, subEvent?: string }} [extra]
+ * @returns {SupportArrivalSpec}
+ */
 function arrivalSpec(id, kinds, label, amount, extra) {
   return Object.freeze({
     id,
