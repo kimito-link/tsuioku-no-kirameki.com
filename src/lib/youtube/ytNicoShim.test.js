@@ -124,6 +124,15 @@ describe('さかのぼって読み足した過去分(skipVoice)', () => {
     expect(e.capturedAt).toBe(posted);
     expect(e.skipVoice).toBe(true);
   });
+  it('絵文字の名前と画像は会場の行に残す', () => {
+    const url = 'https://files.kick.com/emotes/6/fullsize';
+    const e = ytRecordToNicoEntry({
+      id: 'm', channelId: 'kk:1', name: 'A', text: 'collectiblesLMAO', recordedAt: 1,
+      emotes: [{ name: 'collectiblesLMAO', url }, { name: 'nope', url: 'javascript:alert(1)' }],
+    }, 0, 'lv900000000001', 'kk:1');
+    expect(e.emotes).toEqual([{ name: 'collectiblesLMAO', url }]);
+    expect(e.text).toBe('collectiblesLMAO');
+  });
   it('ふつうの新着は今まで通り受け取った時刻で、skipVoice は付かない', () => {
     const now = Date.now();
     const e = ytRecordToNicoEntry({ id: 'b', channelId: 'tw:1', name: 'A', text: 'x', recordedAt: now, postedAtMs: now - 2000 }, 0, 'lv900000000001', 'tw:1');

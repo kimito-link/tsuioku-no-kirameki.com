@@ -1,8 +1,13 @@
 import { describe, expect, it } from 'vitest';
 import {
+  bootPlatformId,
+  bootSubBoardIds,
+  foreignPageNoun,
+  foreignPanelCopy,
   panelExtraChips,
   platformSectionPlan,
   resolvePlatformId,
+  rewriteForeignWording,
   tallySupportItems,
   venueItemsForPlatform,
 } from './platformMetrics.js';
@@ -233,5 +238,121 @@ describe('venueItemsForPlatform', () => {
   it('ほかのサービスの欄の数は、能力表に無いサービスには出さない', () => {
     expect(panelExtraChips('youtube', { official: { eventRank: 1, level: 3 } })).toEqual([]);
     expect(panelExtraChips('niconico', { official: { eventRank: 1 } })).toEqual([]);
+  });
+
+  it('ABEMA は同時接続や経過 0分で視聴数を埋めない', () => {
+    const items = venueItemsForPlatform('abema', {
+      records: { text: '3', isPlaceholder: false },
+      concurrent: { text: '40', isPlaceholder: false },
+      streamAge: { text: '0分', isPlaceholder: false },
+      facts: { viewers: 40 },
+    });
+    expect(items.find((i) => i.key === 'concurrent').text).toBe('読み込み中');
+    expect(items.find((i) => i.key === 'concurrent').unit).toBe('');
+    expect(items.find((i) => i.key === 'streamAge').text).toBe('読み込み中');
+  });
+
+  it('公式の開始時刻があるときの 0分は残す', () => {
+    const items = venueItemsForPlatform('showroom', {
+      records: { text: '1', isPlaceholder: false },
+      concurrent: { text: '4', isPlaceholder: false },
+      streamAge: { text: '0分', isPlaceholder: false },
+      facts: { viewers: 4, streamAgeProvenance: 'official' },
+    });
+    expect(items.find((i) => i.key === 'streamAge').text).toBe('0分');
+  });
+});
+
+describe('bootPlatformId', () => {
+  it('stream と site と記録キーからサービスを決める', () => {
+    expect(bootPlatformId('yt:abcdefghijk', '')).toBe('youtube');
+    expect(bootPlatformId('twitch:demo', '')).toBe('twitch');
+    expect(bootPlatformId('sr.roomkey.00000', '')).toBe('showroom');
+    expect(bootPlatformId('', 'tiktok')).toBe('tiktok');
+    expect(bootPlatformId('', 'abema')).toBe('abema');
+    expect(bootPlatformId('', '')).toBe('');
+    expect(bootSubBoardIds()).toEqual(['twitch', 'kick', 'showroom']);
+  });
+});
+
+describe('他サービスの欄の見出し', () => {
+  it('公式の順位表があるときはその名前、無いときは合計順', () => {
+    expect(platformSectionPlan('showroom').sections.contributionRanking.label).toBe('ギフトの合計順');
+    expect(platformSectionPlan('showroom', { officialBoard: true }).sections.contributionRanking.label).toBe('貢献ランキング');
+    expect(platformSectionPlan('mixch', { officialBoard: true }).sections.contributionRanking.label).toBe('今月のファンランキング');
+    expect(platformSectionPlan('tiktok', { officialBoard: true }).sections.contributionRanking.label).toBe('視聴者ランキング');
+    expect(platformSectionPlan('twitcasting', { officialBoard: true }).sections.contributionRanking.label).toBe('サポーターランキング');
+    expect(platformSectionPlan('whowatch').sections.giftHistory.label).toBe('アイテム');
+    expect(platformSectionPlan('niconico').sections).toEqual({});
+  });
+
+  it('なふだはニコ生だけ。コメント欄は送信できるサービスに残す', () => {
+    expect(platformSectionPlan('niconico').nameplate).toBe(true);
+    expect(platformSectionPlan('niconico').commentPost).toBe(true);
+    for (const id of ['youtube', 'twitch', 'kick', 'abema', 'showroom', 'mixch', 'whowatch', 'tiktok', 'twitcasting']) {
+      const p = platformSectionPlan(id);
+      expect(p.nameplate, id).toBe(false);
+      expect(p.commentPost, id).toBe(true);
+    }
+    expect(platformSectionPlan('other').commentPost).toBe(false);
+    expect(platformSectionPlan('other').nameplate).toBe(false);
+  });
+
+  it('下の折りたたみは能力表の言葉。広告と a: はニコ生だけ', () => {
+    expect(foreignPanelCopy('niconico')).toBeNull();
+    const showroom = foreignPanelCopy('showroom');
+    expect(showroom.giftUsersLabel).toBe('ギフトユーザー（簡易）');
+    expect(showroom.giftUsersLabel).not.toContain('広告');
+    expect(showroom.timelineLabel).toBe('応援タイムライン（コメント＋ギフト）');
+    expect(showroom.showGiftUsers).toBe(true);
+    const abema = foreignPanelCopy('abema');
+    expect(abema.showGiftUsers).toBe(false);
+    expect(abema.timelineLabel).toBe('応援タイムライン（コメント）');
+    expect(foreignPanelCopy('whowatch').timelineLabel).toContain('アイテム');
+    expect(foreignPanelCopy('youtube').giftUsersLabel).toContain('スーパーチャット');
+    expect(foreignPanelCopy('youtube').giftUsersLabel).not.toContain('広告');
+  });
+});
+
+describe('rewriteForeignWording', () => {
+  const services = ['youtube', 'twitch', 'kick', 'abema', 'showroom', 'mixch', 'whowatch', 'tiktok', 'twitcasting'];
+
+  it('ニコ生以外のページの呼び方は能力表の pageNoun', () => {
+    for (const id of services) {
+      expect(foreignPageNoun(id), id).toBe('配信ページ');
+    }
+    expect(foreignPageNoun('niconico')).toBe('');
+  });
+
+  it('watch は配信ページ。ニコ生の文と 184・プレミアムはそのまま', () => {
+    const samples = [
+      ['watch を再読み込み', '配信ページを再読み込み'],
+      ['ページ内パネルの位置・幅（watch）', 'ページ内パネルの位置・幅（配信ページ）'],
+      ['watchページを再読み込み', '配信ページを再読み込み'],
+      ['対象のwatchタブ', '対象の配信タブ'],
+      ['定期サムネは watch\nページの表示', '定期サムネは配信ページの表示'],
+      ['次に手前のタブで watch を開いたとき', '次に手前のタブで配信ページを開いたとき'],
+      ['開発識別子として nicolivelog が含まれることがあります。', '開発識別子として 開発用の名前 が含まれることがあります。'],
+      ['Downloads/nicolivelog-mcp/ に保存します', 'ダウンロードフォルダ に保存します'],
+      ['別々の生放送を同時に見ても使えます', '別々の配信を同時に見ても使えます'],
+    ];
+    for (const id of services) {
+      for (const [from, to] of samples) {
+        expect(rewriteForeignWording(from, id), `${id} ${from}`).toBe(to);
+        expect(rewriteForeignWording(to, id), id).toBe(to);
+      }
+    }
+    const keep = [
+      'watch を再読み込み',
+      'ニコニコ公式のギフト貢献度ランキング（上位）を表示します。',
+      'プレミアム会員（184）',
+      'watchConcurrent',
+      '本家コメ',
+    ];
+    for (const s of keep) expect(rewriteForeignWording(s, 'niconico')).toBe(s);
+    expect(rewriteForeignWording('ニコニコ公式のギフト貢献度ランキング（上位）を表示します。', 'youtube')).toBe('ニコニコ公式のギフト貢献度ランキング（上位）を表示します。');
+    expect(rewriteForeignWording('プレミアム会員（184）', 'abema')).toBe('プレミアム会員（184）');
+    expect(rewriteForeignWording('watchConcurrent', 'twitch')).toBe('watchConcurrent');
+    expect(rewriteForeignWording('本家コメ', 'showroom')).toBe('本家コメ');
   });
 });

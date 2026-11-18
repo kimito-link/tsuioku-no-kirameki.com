@@ -132,6 +132,12 @@ describe('prepareYtCommentsForIdb', () => {
     expect(records[0].videoId).toBe('stream-xyz');
     expect(records[1599].pk).toBe('stream-xyz::msg-1600');
   });
+
+  it('絵文字の配列は保存に残さず、会場へ先に届けるときだけ残す', () => {
+    const raw = [{ id: 'm1', text: 'KEKW', emotes: [{ name: 'KEKW', url: 'https://files.kick.com/emotes/1/fullsize' }] }];
+    expect(prepareYtCommentsForIdb('kk.westcol.1', raw, 1)[0].emotes).toBeUndefined();
+    expect(prepareYtCommentsForIdb('kk.westcol.1', raw, 1, { keepEmotes: true })[0].emotes).toHaveLength(1);
+  });
 });
 
 describe('selectYtNewestCommentsForDisplay', () => {

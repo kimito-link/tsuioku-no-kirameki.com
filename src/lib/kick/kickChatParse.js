@@ -5,7 +5,7 @@
 //   形が違う・欠けている1件は null を返して捨てる(AGENTS.md §3.6)。
 //   出す形は twIrcParse.js と同じ: { id, channelId:'kk:<user id>', name, login(slug), iconUrl:'', text, kind, amount, currency,
 //   badges, ts:'', postedAtMs, channel(chatroom id), color, subMonths?, giftCount?, subTier? }
-import { kickEmotesFromContent } from '../platform/streamEmotes.js';
+import { kickEmotesFromNodes } from '../platform/streamEmotes.js';
 
 /** チャンネル名(URL の slug)として正しいか @param {unknown} s */
 export function isKickSlug(s) {
@@ -58,15 +58,30 @@ export function parseKickChannelFromUrl(url) {
   return isKickSlug(seg[0]) ? seg[0] : '';
 }
 
-/** @param {unknown} content */
-function emotesOf(content) {
-  const emotes = kickEmotesFromContent(content);
+/** 本文タグと、メッセージ横の emotes 配列から画像の対応を取る @param {unknown} content @param {unknown} data */
+function emotesOf(content, data) {
+  const d = obj(data);
+  /** @type {unknown[]} */
+  const nodes = [];
+  if (d && Array.isArray(d.emotes)) nodes.push(...d.emotes);
+  const meta = obj(d?.metadata);
+  if (meta && Array.isArray(meta.emotes)) nodes.push(...meta.emotes);
+  const emotes = kickEmotesFromNodes(content, nodes);
   return emotes.length ? { emotes } : {};
 }
 
-/** 本文の絵文字 [emote:123:KEKW] → KEKW(読み上げ・表示で数字を出さない) @param {unknown} text */
+/**
+ * 本文の絵文字。画像にできる [emote:id:name] は名前だけ残す（画面が画像にする）。
+ * id が無い [emoji:name] や、名前にできない印は文字に残さない。
+ * @param {unknown} text
+ */
 export function stripKickEmotes(text) {
-  return String(text ?? '').replace(/\[emote:\d+:([^\]\s]{1,64})\]/g, '$1').replace(/\[emoji:([^\]\s]{1,64})\]/g, '$1');
+  return String(text ?? '')
+    .replace(/\[emote:\d+:([A-Za-z0-9_-]{2,64})(?::[^\]]{0,40})?\]/g, ' $1 ')
+    .replace(/\[emote:[^\]]{0,80}\]/g, ' ')
+    .replace(/\[emoji:[^\]]{0,80}\]/g, ' ')
+    .replace(/[ \t]{2,}/g, ' ')
+    .trim();
 }
 
 /** Kick の時刻(ISO・または "2025-01-01 12:00:00" の UTC)→ ms。読めなければ 0 @param {unknown} s */
@@ -192,7 +207,7 @@ export function parseKickEvent(frame, ctx = {}) {
       color: /^#[0-9a-f]{6}$/i.test(String(identity?.color || '')) ? String(identity?.color) : '',
       postedAtMs: parseKickTime(d.created_at) || now,
       // 絵文字の名前 → 画像(本文は名前のまま・画面だけ画像にする)
-      ...emotesOf(d.content),
+      ...emotesOf(d.content, d),
     };
   }
 

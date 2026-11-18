@@ -1378,7 +1378,8 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
       const vidNow = String(p0.videoId || extractVideoIdFromSender(sender) || '').trim();
       if (typeof tabId === 'number' && vidNow && Array.isArray(p0.items) && p0.items.length) {
         // 別の配信の記録に入っていると分かっているコメントは、保存より先に会場へ届けない(保存の側でも入れない)
-        const recs = prepareYtCommentsForIdb(vidNow, p0.items).filter((r) => {
+        // 保存には絵文字の配列を残さない。会場へ先に届ける行だけ残し、名前を文字で出さない。
+        const recs = prepareYtCommentsForIdb(vidNow, p0.items, Date.now(), { keepEmotes: true }).filter((r) => {
           const owner = ytCommentOwnerById.get(String(r?.id || ''));
           return !owner || owner === vidNow;
         });

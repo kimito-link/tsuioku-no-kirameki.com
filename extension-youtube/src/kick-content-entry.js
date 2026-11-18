@@ -1,5 +1,5 @@
 // kick-content-entry.js — Kick の視聴ページ(kick.com/<チャンネル>)で、チャットを読んで記録に渡す入口。
-/* global chrome, crypto, WebSocket, location, setTimeout, clearTimeout, setInterval, clearInterval, window, fetch, document, HTMLTextAreaElement, Event, KeyboardEvent */
+/* global chrome, crypto, WebSocket, location, setTimeout, clearTimeout, setInterval, clearInterval, window, fetch, document, HTMLTextAreaElement, Event, KeyboardEvent, MutationObserver */
 //
 // ★設計(council/kick-support-PLAN.md・Twitch の tw-content-entry.js と同じ形)
 //   - 読むのは Kick のページ自身が使うリアルタイムの接続(ログイン無しで購読できる)。DOM より壊れにくい。
@@ -34,7 +34,9 @@ import {
   kickKicksLeaderboardUrl,
   parseKickSubsLeaderboard,
   kickSubsLeaderboardUrl,
+  kickEmoteCatalogUrl,
 } from '../../src/lib/kick/kickApi.js';
+import { kickEmotesFromCatalog, kickEmotesFromDom } from '../../src/lib/platform/streamEmotes.js';
 import { runBackfillLoop } from '../../src/lib/platform/historyBackfill.js';
 import { buildKickStreamKey } from '../../src/lib/platform/streamPlatform.js';
 import {
@@ -132,6 +134,41 @@ function safeSendMessage(/** @type {any} */ msg) {
 let diagTimer = 0;
 /** 絵文字の名前 → 画像(画面で本文を画像にする・pfEmoteStore.js) */
 const emoteSaver = createEmoteSaver('yt_kk_emotes');
+/** @param {{ name: string, url: string }[]} list */
+function learnEmotes(list) {
+  if (!list.length) return;
+  emoteSaver.takeFrom([{ emotes: list }]);
+}
+/** 公開の絵文字一覧（チャンネル＋Global＋Emoji）。失敗しても印と画面の画像で覚える @param {string} slug */
+async function fetchEmoteCatalog(slug) {
+  const url = kickEmoteCatalogUrl(slug);
+  if (!url) return;
+  try {
+    learnEmotes(kickEmotesFromCatalog(await getJson(url)));
+  } catch {
+    /* 一覧が無くてもチャットは読む */
+  }
+}
+/**
+ * 画面に出ている絵文字は img の alt を本文にしない。data-emote-id と src から名前→画像を覚える。
+ * 新しいノードが来たときだけ見る（タイマーで全件を走査しない）。
+ */
+function startKickDomEmotes() {
+  if (startKickDomEmotes.started || typeof document === 'undefined' || typeof MutationObserver !== 'function') return;
+  startKickDomEmotes.started = true;
+  /** @param {Node} node */
+  const harvest = (node) => {
+    if (!node || node.nodeType !== 1) return;
+    const el = /** @type {Element} */ (node);
+    if (typeof el.matches === 'function' && el.matches('[data-emote-id]')) learnEmotes(kickEmotesFromDom(el));
+    else if (typeof el.querySelector === 'function' && el.querySelector('[data-emote-id]')) learnEmotes(kickEmotesFromDom(el));
+  };
+  harvest(document.documentElement);
+  new MutationObserver((muts) => {
+    for (const m of muts) for (const n of m.addedNodes) harvest(n);
+  }).observe(document.documentElement, { childList: true, subtree: true });
+}
+startKickDomEmotes.started = false;
 function saveDiagSoon() {
   if (diagTimer) return;
   diagTimer = setTimeout(() => {
@@ -307,6 +344,8 @@ let current = /** @type {null | { slug: string, key: string, stop: () => void }}
  * @param {{ chatroomId: string, channelId: string, userId?: string, startedAtMs?: number }} ids
  */
 function startReader(slug, key, ids) {
+  void fetchEmoteCatalog(slug);
+  startKickDomEmotes();
   let stopped = false;
   /** @type {WebSocket | null} */
   let ws = null;

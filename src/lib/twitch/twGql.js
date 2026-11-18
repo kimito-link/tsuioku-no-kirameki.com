@@ -5,6 +5,8 @@
 //   gql.twitch.tv の応答から読む(BetterTTV・7TV など広く使われている拡張と同じ入口)。
 //   非公式なので、AGENTS.md §3.6 のとおり形を必ず確かめ、取れなければ null を返す(記録は止めない)。
 
+import { isEmoteName, twEmoteUrl } from '../platform/streamEmotes.js';
+
 /** twitch.tv の Web が使う公開の Client-ID(ページの中に平文で書かれている・秘密ではない) */
 export const TW_WEB_CLIENT_ID = 'kimne78kx3ncx6brgo4mv6wki5h1ko';
 export const TW_GQL_URL = 'https://gql.twitch.tv/gql';
@@ -221,6 +223,17 @@ export function parseTwVodComments(json, channelLogin) {
     const fragments = Array.isArray(node.message?.fragments) ? node.message.fragments : [];
     const text = fragments.map((/** @type {any} */ f) => String(f?.text || '')).join('').trim();
     if (!id || !text) continue;
+    // fragment.text が絵文字の名前で、emote.emoteID が画像の id。ここを捨てると名前だけが文字で残る。
+    /** @type {Map<string, string>} */
+    const emoteMap = new Map();
+    for (const f of fragments) {
+      const em = f?.emote;
+      if (!em || typeof em !== 'object') continue;
+      const url = twEmoteUrl(String(em.emoteID || '').trim());
+      const name = String(f?.text || '').trim();
+      if (url && isEmoteName(name) && !emoteMap.has(name)) emoteMap.set(name, url);
+    }
+    const emotes = [...emoteMap].map(([name, url]) => ({ name, url }));
     const c = node.commenter && typeof node.commenter === 'object' ? node.commenter : null;
     const uLogin = String(c?.login || '').toLowerCase();
     const uid = String(c?.id || '').trim();
@@ -246,6 +259,7 @@ export function parseTwVodComments(json, channelLogin) {
       amount: 0,
       currency: '',
       skipVoice: true,
+      ...(emotes.length ? { emotes } : {}),
     });
   }
   return {

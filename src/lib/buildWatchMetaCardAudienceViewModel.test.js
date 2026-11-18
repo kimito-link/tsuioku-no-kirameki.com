@@ -209,6 +209,40 @@ describe('buildWatchMetaCardAudienceViewModel', () => {
       { nowMs, prevForReactions: { viewerCount: null, concurrentEstimated: null } }
     );
     expect(vm.concurrent.estText).toBe('16,000');
+    expect(vm.concurrent.subText).toBe('');
+  });
+
+  it('ABEMA は同時接続があってもページの視聴数を出す', () => {
+    const vm = buildWatchMetaCardAudienceViewModel(
+      {
+        liveId: 'lv1',
+        platform: 'abema',
+        viewerCountFromDom: null,
+        recentActiveUsers: 0,
+        officialViewerCount: 40,
+        officialViewersOnly: true,
+        platformFacts: { viewCount: 16000 }
+      },
+      { nowMs, prevForReactions: { viewerCount: null, concurrentEstimated: null } }
+    );
+    expect(vm.concurrent.estText).toBe('16,000');
+    expect(vm.concurrent.subText).toBe('');
+  });
+
+  it('ABEMA は視聴数が無いあいだ同時接続を視聴数にしない', () => {
+    const vm = buildWatchMetaCardAudienceViewModel(
+      {
+        liveId: 'lv1',
+        platform: 'abema',
+        viewerCountFromDom: null,
+        recentActiveUsers: 0,
+        officialViewerCount: 40,
+        officialViewersOnly: true,
+        platformFacts: {}
+      },
+      { nowMs, prevForReactions: { viewerCount: null, concurrentEstimated: null } }
+    );
+    expect(vm.concurrent.estText).toBe('読み込み中');
   });
 
   it('公式同接が新鮮なら直接値（~ なし）・sub は直接値', () => {

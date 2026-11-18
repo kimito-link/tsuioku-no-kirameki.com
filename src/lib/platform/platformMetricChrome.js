@@ -6,7 +6,7 @@
  * DOM は引数の root だけを触る。src/lib 直下の純粋性検査の対象外(platform/)。
  */
 
-import { panelExtraChips, platformSectionPlan, streamAgeTitle, LOADING } from './platformMetrics.js';
+import { panelExtraChips, platformSectionPlan, foreignPanelCopy, rewriteForeignWording, streamAgeTitle, LOADING, PLATFORM_CAPABILITIES } from './platformMetrics.js';
 
 /** 数でない値の札。ニコ生の「（接続中…）」「（取得不可）」「推定中」「計測中…」や最初の「—」は、ほかのサービスでは「読み込み中」にする。 */
 const NOT_A_COUNT = /^(?:—|-|（接続中…）|（取得不可）|（数字非公開）|推定中|計測中…|)$/u;
@@ -86,32 +86,68 @@ function setLaneSub(root, lane, text) {
  * @param {{ platform?: string, facts?: any }} state
  */
 const FOREIGN_STYLE_ID = 'nl-platform-capability-style';
-const FOREIGN_STYLE = [
-  'html.nl-cap-foreign .nl-live-stat-card--visitors{display:none!important;}',
-  'html.nl-cap-foreign .nl-official-nico-stats__chip:has(#officialStatNicoViewers),',
-  'html.nl-cap-foreign .nl-official-nico-stats__chip:has(#officialStatNicoComments),',
-  'html.nl-cap-foreign .nl-official-nico-stats__chip:has(#officialStatNicoAdPts),',
-  'html.nl-cap-foreign .nl-official-nico-stats__chip:has(#officialStatNicoGiftPts),',
-  'html.nl-cap-foreign .nl-official-nico-stats__chip:has(#officialStatNicoCommentsRate){display:none!important;}',
-  // 「広告ランキング」の欄は、2つめの公式ランキングがあるサービス(nl-cap-subboard)では使う。ニコ生だけの「watch の広告pt」の行は出さない
-  'html.nl-cap-foreign [data-lane="adRanking"] .nl-north-star-ad-stats__row:first-child{display:none!important;}',
-  'html.nl-cap-foreign:not(.nl-cap-subboard) [data-lane="adRanking"],html.nl-cap-foreign [data-lane="programPoints"],',
-  'html.nl-cap-foreign [data-lane="eventRank"],html.nl-cap-foreign [data-lane="eventScore"],',
-  'html.nl-cap-foreign [data-lane="eventVotingSupporters"],html.nl-cap-foreign #giftRankingFetchPrompt,',
-  'html.nl-cap-foreign #watchOfficialEventBannerCard,html.nl-cap-foreign #watchOfficialNdgrCard,',
-  'html.nl-cap-foreign #giftHistoryProgramPt{display:none!important;}',
-  // ギフト欄の点線の枠: 中のギフト履歴が出ていない時は枠ごと出さない(番組累計ptは上で常に隠れる)
-  'html.nl-cap-foreign .nl-north-star-gift-stack:not(:has(> [data-lane="giftHistory"]:not([hidden]))){display:none!important;}',
-  'html.nl-cap-foreign:not([data-nl-gift-has="1"]) .nl-north-star-gift-stack{display:none!important;}',
-  'html.nl-cap-youtube #watchConcurrentCard .nl-live-stat-label,html.nl-cap-twitch #watchConcurrentCard .nl-live-stat-label,',
-  'html.nl-cap-kick #watchConcurrentCard .nl-live-stat-label,html.nl-cap-abema #watchConcurrentCard .nl-live-stat-label{font-size:0!important;line-height:1.2!important;overflow:visible!important;color:transparent!important;}',
-  'html.nl-cap-youtube #watchConcurrentCard .nl-live-stat-label::after{content:"同時視聴者数";font-size:10.5px;font-weight:700;line-height:1.2;color:var(--nl-muted,#8b8494);}',
-  'html.nl-cap-twitch #watchConcurrentCard .nl-live-stat-label::after,html.nl-cap-kick #watchConcurrentCard .nl-live-stat-label::after{content:"視聴者数";font-size:10.5px;font-weight:700;line-height:1.2;color:var(--nl-muted,#8b8494);}',
-  'html.nl-cap-abema #watchConcurrentCard .nl-live-stat-label::after{content:"視聴数";font-size:10.5px;font-weight:700;line-height:1.2;color:var(--nl-muted,#8b8494);}',
-].join('');
 
-/** @param {ParentNode} root @param {string} platformId @param {boolean} [subBoard] 二つめの公式ランキングの欄を使うサービス */
-function markCapability(root, platformId, subBoard) {
+/**
+ * 開いた瞬間用と、描画のあとの両方で同じ見た目にする。見出しは能力表の言葉。
+ * 2つめの公式ランキングがあるサービス（nl-cap-subboard）の欄は隠さない。
+ * @returns {string}
+ */
+export function buildForeignCapabilityCss() {
+  const ids = Object.keys(PLATFORM_CAPABILITIES).filter((id) => {
+    const cap = PLATFORM_CAPABILITIES[/** @type {keyof typeof PLATFORM_CAPABILITIES} */ (id)];
+    return cap.native !== true;
+  });
+  const labelSel = ids.map((id) => `html.nl-cap-${id} #watchConcurrentCard .nl-live-stat-label`).join(',');
+  const afters = ids.map((id) => {
+    const cap = PLATFORM_CAPABILITIES[/** @type {keyof typeof PLATFORM_CAPABILITIES} */ (id)];
+    const label = String(cap.concurrentLabel || '視聴者数').replace(/\\/g, '\\\\').replace(/"/g, '\\"');
+    return `html.nl-cap-${id} #watchConcurrentCard .nl-live-stat-label::after{content:"${label}";font-size:10.5px;font-weight:700;line-height:1.2;color:var(--nl-muted,#8b8494);}`;
+  }).join('');
+  return [
+    'html.nl-cap-foreign .nl-live-stat-card--visitors{display:none!important;}',
+    'html.nl-cap-foreign .nl-official-nico-stats__chip:has(#officialStatNicoViewers),',
+    'html.nl-cap-foreign .nl-official-nico-stats__chip:has(#officialStatNicoComments),',
+    'html.nl-cap-foreign .nl-official-nico-stats__chip:has(#officialStatNicoAdPts),',
+    'html.nl-cap-foreign .nl-official-nico-stats__chip:has(#officialStatNicoGiftPts),',
+    'html.nl-cap-foreign .nl-official-nico-stats__chip:has(#officialStatNicoCommentsRate){display:none!important;}',
+    // ニコ生だけの「watch の広告pt」の行は出さない。欄そのものは 2つめの公式ランキングがあるときだけ残す
+    'html.nl-cap-foreign [data-lane="adRanking"] .nl-north-star-ad-stats__row:first-child{display:none!important;}',
+    'html.nl-cap-foreign:not(.nl-cap-subboard) [data-lane="adRanking"],html.nl-cap-foreign [data-lane="programPoints"],',
+    'html.nl-cap-foreign [data-lane="eventRank"],html.nl-cap-foreign [data-lane="eventScore"],',
+    'html.nl-cap-foreign [data-lane="eventVotingSupporters"],html.nl-cap-foreign #giftRankingFetchPrompt,',
+    'html.nl-cap-foreign #watchOfficialEventBannerCard,html.nl-cap-foreign #watchOfficialNdgrCard,',
+    'html.nl-cap-foreign #giftHistoryProgramPt{display:none!important;}',
+    'html.nl-cap-foreign .nl-north-star-gift-stack:not(:has(> [data-lane="giftHistory"]:not([hidden]))){display:none!important;}',
+    'html.nl-cap-foreign:not([data-nl-gift-has="1"]) .nl-north-star-gift-stack{display:none!important;}',
+    'html.nl-cap-foreign:not([data-nl-platform-ready]) #noWatchRankingHint{visibility:hidden;}',
+    `${labelSel}{font-size:0!important;line-height:1.2!important;overflow:visible!important;color:transparent!important;}`,
+    afters,
+    // 数が来る前の「人」「直接値」を出さない（YouTube だけだった隠しを全サービスへ）
+    'html.nl-cap-foreign.nl-count-loading #watchConcurrentSub{font-size:0!important;color:transparent!important;}',
+    // なふだはニコ生の公式設定。他のサービスでは説明もボタンも出さない。
+    'html.nl-cap-foreign .nl-nameplate-inline{display:none!important;}',
+    'html.nl-cap-foreign .nl-record-sub:has(#nameplateOnBtn){display:none!important;}',
+    // 中身のレーンが全部隠れた「公式の数字」の枠は出さない。レーンが開いたときだけ出す。
+    'html.nl-cap-foreign #northStarLanes:not(:has([data-lane]:not([hidden]))){display:none!important;}',
+    // 行の無いトップファン（見出しと「このPCの記録です。」だけ）は出さない。行が付いたら出す。
+    // どのサービスも、順位の行が1つも無い「公式の数字」は枠ごと出さない。
+    'html.nl-cap-foreign [data-lane="contributionRanking"]:not(:has([role="listitem"])){display:none!important;}',
+    'html.nl-cap-foreign #northStarLanes:not(:has([role="listitem"])){display:none!important;}',
+    // 送信口が能力表に無いサービスだけ、コメントを書く欄を出さない。
+    'html.nl-cap-no-post .nl-comment-compose{display:none!important;}',
+    // ギフトサイドバー履歴と a: の匿名（184）はニコ生だけ。広告を投げた人の段も出さない。
+    'html.nl-cap-foreign details:has(#giftSubAppHistorySummary){display:none!important;}',
+    'html.nl-cap-foreign .nl-anonymous-identicon-opt,html.nl-cap-foreign #anonymousIdenticonHint,html.nl-cap-foreign #foldAnonymousInRankStripHint{display:none!important;}',
+    'html.nl-cap-foreign #sceneStoryUserLaneAdWrap{display:none!important;}',
+    'html.nl-cap-foreign #devMonitorForceRefetchCommenterFollowBtn{display:none!important;}',
+    // ギフトが無いサービス（ABEMA）は、ギフトのユーザー欄とギフトの段を出さない。
+    'html.nl-cap-no-paid details:has(#giftQuickStatsMount){display:none!important;}',
+    'html.nl-cap-no-paid #sceneStoryUserLaneGiftWrap{display:none!important;}',
+  ].join('');
+}
+
+/** @param {ParentNode} root @param {string} platformId @param {boolean} [subBoard] 二つめの公式ランキングの欄を使うサービス @param {boolean} [commentPost] コメントを書けるサービス @param {boolean} [noPaid] ギフトの無いサービス */
+function markCapability(root, platformId, subBoard, commentPost, noPaid) {
   const doc = root.ownerDocument || (root.nodeType === 9 ? /** @type {Document} */ (root) : null);
   const html = doc && doc.documentElement;
   if (!html || !html.classList) return;
@@ -119,13 +155,170 @@ function markCapability(root, platformId, subBoard) {
   const cl = html.classList;
   if (!cl.contains('nl-cap-foreign')) cl.add('nl-cap-foreign');
   if (cl.contains('nl-cap-subboard') !== (subBoard === true)) cl.toggle('nl-cap-subboard', subBoard === true);
+  const noPost = commentPost === false;
+  if (cl.contains('nl-cap-no-post') !== noPost) cl.toggle('nl-cap-no-post', noPost);
+  const unpaid = noPaid === true;
+  if (cl.contains('nl-cap-no-paid') !== unpaid) cl.toggle('nl-cap-no-paid', unpaid);
   const id = String(platformId || '');
   if (id && !cl.contains(`nl-cap-${id}`)) cl.add(`nl-cap-${id}`);
-  if (doc.getElementById(FOREIGN_STYLE_ID)) return;
-  const style = doc.createElement('style');
-  style.id = FOREIGN_STYLE_ID;
-  style.textContent = FOREIGN_STYLE;
-  (doc.head || html).appendChild(style);
+  const css = buildForeignCapabilityCss();
+  let style = doc.getElementById(FOREIGN_STYLE_ID);
+  if (!style) {
+    style = doc.createElement('style');
+    style.id = FOREIGN_STYLE_ID;
+    (doc.head || html).appendChild(style);
+  }
+  if (style.textContent !== css) style.textContent = css;
+}
+
+/** 詳細設定の見出しなどから、ニコ生だけの「なふだ」を外す。 @param {string} text */
+function dropNafuda(text) {
+  return String(text || '').replace(/・なふだ/g, '').replace(/なふだ・/g, '');
+}
+
+/** 最初の文の節だけ差し替える（中のヒントは残す）。 @param {Element|null|undefined} el @param {string} text */
+function setLeadText(el, text) {
+  if (!el) return;
+  let textNode = null;
+  for (const n of el.childNodes) {
+    if (n.nodeType === 3 && String(n.nodeValue || '').trim()) { textNode = n; break; }
+  }
+  if (!textNode) {
+    el.insertBefore(el.ownerDocument.createTextNode(text), el.firstChild);
+    return;
+  }
+  if (String(textNode.nodeValue || '').trim() !== text) textNode.nodeValue = text;
+}
+
+/** @param {ParentNode} root @param {string} from @param {string} to */
+function replaceText(root, from, to) {
+  if (!root || typeof root.ownerDocument === 'undefined' && !('createTreeWalker' in root)) return;
+  const doc = root.nodeType === 9 ? /** @type {Document} */ (root) : root.ownerDocument;
+  if (!doc || typeof doc.createTreeWalker !== 'function') return;
+  const walker = doc.createTreeWalker(/** @type {Node} */ (root), 4);
+  let n = walker.nextNode();
+  while (n) {
+    if (n.nodeValue && n.nodeValue.includes(from)) n.nodeValue = n.nodeValue.split(from).join(to);
+    n = walker.nextNode();
+  }
+}
+
+/** 最初の1回だけ、画面の文と title / aria-label を能力表の呼び方にする。 @param {ParentNode} root @param {string} platformId */
+function applyForeignWordingOnce(root, platformId) {
+  const doc = root.nodeType === 9 ? /** @type {Document} */ (root) : root.ownerDocument;
+  const html = doc && doc.documentElement;
+  if (!html || html.dataset.nlForeignWording === '1') return;
+  const skip = '#supportTimelineBody,#commentTickerViewport,#commentInput,#userRoomList,#changelogList';
+  const inSkip = (/** @type {Node} */ node) => {
+    const el = node.nodeType === 1 ? /** @type {Element} */ (node) : node.parentElement;
+    return !!(el && typeof el.closest === 'function' && el.closest(skip));
+  };
+  if (doc && typeof doc.createTreeWalker === 'function') {
+    const walker = doc.createTreeWalker(/** @type {Node} */ (root), 4);
+    let n = walker.nextNode();
+    while (n) {
+      const parent = n.parentElement;
+      const tag = parent && parent.tagName;
+      if (n.nodeValue && tag !== 'SCRIPT' && tag !== 'STYLE' && !inSkip(n)) {
+        const next = rewriteForeignWording(n.nodeValue, platformId);
+        if (next !== n.nodeValue) n.nodeValue = next;
+      }
+      n = walker.nextNode();
+    }
+  }
+  const scope = root.nodeType === 9 ? /** @type {Document} */ (root) : root;
+  if (typeof scope.querySelectorAll === 'function') {
+    for (const el of scope.querySelectorAll('[title],[aria-label],[placeholder]')) {
+      if (inSkip(el)) continue;
+      for (const name of ['title', 'aria-label', 'placeholder']) {
+        const cur = el.getAttribute(name);
+        if (!cur) continue;
+        const next = rewriteForeignWording(cur, platformId);
+        if (next !== cur) el.setAttribute(name, next);
+      }
+    }
+  }
+  html.dataset.nlForeignWording = '1';
+}
+
+/**
+ * なふだの説明と、空でも残るニコ生の見出しを、他のサービスでは出さない。
+ * コメントを書く欄は、送信できるサービスでは残す（SHOWROOM は SR_SEND_COMMENT）。
+ * 下の折りたたみも、能力表の言葉に合わせる（広告・サイドバー履歴・a: の匿名は出さない）。
+ * @param {ParentNode} root
+ * @param {ReturnType<typeof foreignPanelCopy>} copy
+ */
+function rewriteForeignPanelWords(root, copy) {
+  const inline = root.querySelector('.nl-nameplate-inline');
+  if (inline) hideEl(/** @type {HTMLElement} */ (inline));
+  const nameBtn = root.querySelector('#nameplateOnBtn');
+  const block = nameBtn && typeof nameBtn.closest === 'function' ? nameBtn.closest('.nl-record-sub') : null;
+  if (block) hideEl(/** @type {HTMLElement} */ (block));
+  const summary = root.querySelector('#nlPopupSettings > summary');
+  if (summary) {
+    const next = dropNafuda(summary.textContent || '');
+    if (summary.textContent !== next) summary.textContent = next;
+  }
+  const hint = root.querySelector('#exportToolbarHint');
+  if (hint) {
+    const next = dropNafuda(hint.textContent || '');
+    if (hint.textContent !== next) hint.textContent = next;
+  }
+  const venue = root.querySelector('#venueButtonVisibleToggle');
+  const venueHint = venue && venue.parentElement ? venue.parentElement.querySelector('.nl-record-sub__hint') : null;
+  if (venueHint && String(venueHint.textContent || '').includes('ニコ生')) {
+    venueHint.textContent = '視聴ページの右下に出る「会場モード」ボタンです。使わない場合はオフにすると出なくなります（反映には視聴ページの再読み込みが必要です）。';
+  }
+  if (!copy) return;
+  const header = root.querySelector('.nl-header .nl-sub');
+  if (header && String(header.textContent || '').includes('ニコ生')) header.textContent = copy.header;
+  const timeline = root.querySelector('.nl-support-timeline__summary-label');
+  if (timeline && timeline.textContent !== copy.timelineLabel) timeline.textContent = copy.timelineLabel;
+  const timelineBody = root.querySelector('#supportTimelineBody');
+  if (timelineBody) setAttrIfDiff(timelineBody, 'aria-label', copy.timelineAria);
+  const usersMount = root.querySelector('#giftQuickStatsMount');
+  const usersDetails = usersMount && typeof usersMount.closest === 'function' ? usersMount.closest('details') : null;
+  if (usersDetails) {
+    if (!copy.showGiftUsers) hideEl(/** @type {HTMLElement} */ (usersDetails));
+    else {
+      const usersSummary = usersDetails.querySelector('summary');
+      if (usersSummary && usersSummary.textContent !== copy.giftUsersLabel) usersSummary.textContent = copy.giftUsersLabel;
+    }
+  }
+  const side = root.querySelector('#giftSubAppHistorySummary');
+  const sideDetails = side && typeof side.closest === 'function' ? side.closest('details') : null;
+  if (sideDetails) hideEl(/** @type {HTMLElement} */ (sideDetails));
+  for (const sel of ['.nl-anonymous-identicon-opt', '#anonymousIdenticonHint', '#foldAnonymousInRankStripHint', '#sceneStoryUserLaneAdWrap', '#devMonitorForceRefetchCommenterFollowBtn']) {
+    const el = root.querySelector(sel);
+    if (el) hideEl(/** @type {HTMLElement} */ (el));
+  }
+  const giftWrap = root.querySelector('#sceneStoryUserLaneGiftWrap');
+  if (giftWrap && !copy.showGiftUsers) hideEl(/** @type {HTMLElement} */ (giftWrap));
+  const giftLane = root.querySelector('#sceneStoryUserLaneGift');
+  if (giftLane && copy.showGiftUsers) setAttrIfDiff(giftLane, 'aria-label', `${copy.paidLabel}を贈った人`);
+  const effect = root.querySelector('label[for="effectSoundToggle"] > span');
+  setLeadText(effect, copy.effectLabel);
+  const effectHint = effect ? effect.querySelector('.nl-record-sub__hint') : null;
+  if (effectHint && effectHint.textContent !== copy.effectHint) effectHint.textContent = copy.effectHint;
+  const calm = root.querySelector('label[for="calmPanelMotion"] > span');
+  if (calm && calm.textContent !== copy.calm) calm.textContent = copy.calm;
+  const concept = root.querySelector('.nl-project-concept-body');
+  if (concept) replaceText(concept, 'ニコ生の', '');
+  const harvest = root.querySelector('#commentHarvestBanner');
+  if (harvest) replaceText(harvest, 'ニコ生の画面改修', '配信ページの画面の変化');
+  const gate = root.querySelector('#usageTermsGate');
+  if (gate) {
+    replaceText(gate, 'ニコニコの利用条件ページの写しではありません', 'その配信サービスの利用条件ページの写しではありません');
+    replaceText(gate, 'ニコニコのサーバーから読み込まれる', 'その配信サービスのサーバーから読み込まれる');
+    const link = gate.querySelector('a[href*="nicovideo.jp"]');
+    const row = link && typeof link.closest === 'function' ? link.closest('tr') : null;
+    if (row) hideEl(/** @type {HTMLElement} */ (row));
+  }
+  const shade = root.querySelector('.nl-init-shade__submsg');
+  if (shade && String(shade.textContent || '').includes('ギフト履歴')) {
+    shade.textContent = 'コメントの記録は、配信ページを開くと取り込めます。';
+  }
+  applyForeignWordingOnce(root, copy.id);
 }
 
 /**
@@ -136,7 +329,9 @@ export function applyPlatformMetricChrome(root, state) {
   if (!root || typeof root.querySelector !== 'function') return;
   const plan = platformSectionPlan(String(state?.platform || ''), { officialBoard: state?.officialBoard === true });
   if (plan.native) return;
-  markCapability(root, plan.id, plan.subBoard === true);
+  const copy = foreignPanelCopy(plan.id);
+  markCapability(root, plan.id, plan.subBoard === true, plan.commentPost === true, copy ? copy.showGiftUsers !== true : false);
+  if (plan.nameplate !== true) rewriteForeignPanelWords(root, copy);
   const facts = state?.facts && typeof state.facts === 'object' ? state.facts : {};
 
   const vis = root.querySelector('.nl-live-stat-card--visitors');
@@ -153,15 +348,20 @@ export function applyPlatformMetricChrome(root, state) {
   }
   // 数が来る前の札(開いた直後の「—」・ニコ生の「（接続中…）」等)を「読み込み中」に。数そのものと「N分前」は触らない。
   const est = root.querySelector('#watchConcurrentEst');
+  const sub = root.querySelector('#watchConcurrentSub');
   if (est) {
     const t = String(est.textContent || '').trim();
-    if (NOT_A_COUNT.test(t) || t.startsWith('~')) {
+    if (NOT_A_COUNT.test(t) || t.startsWith('~') || t === '推定中' || t.includes('接続中')) {
       if (est.textContent !== LOADING) est.textContent = LOADING;
       if (!est.classList.contains('is-placeholder')) est.classList.add('is-placeholder');
       if (est.hasAttribute('title')) est.removeAttribute('title');
-      const sub = root.querySelector('#watchConcurrentSub');
       if (sub && sub.textContent !== '') sub.textContent = '';
     }
+  }
+  if (sub) {
+    const st = String(sub.textContent || '').trim();
+    // ニコ生の同接の説明（直接値・推定）を、他のサービスの人数の横に残さない
+    if (st === '直接値' || st === '材料待ち' || st.includes('推定')) sub.textContent = '';
   }
   const loading = root.querySelector('#watchConcurrentLoading');
   if (loading) setAttrIfDiff(loading, 'aria-label', `${plan.concurrentLabel}を読み込み中`);

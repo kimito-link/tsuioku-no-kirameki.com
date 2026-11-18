@@ -27,7 +27,9 @@ export function createEmoteSaver(storageKey) {
   };
   return {
     /**
-     * 記録の行から絵文字の対応を抜き取る(行そのものには残さない=記録を太らせない)。
+     * 記録の行から絵文字の対応を覚える。行の emotes は残す。
+     * 保存(IndexedDB)では prepareYtCommentsForIdb が emotes を落とす。
+     * 会場へ先に届ける行には残し、吹き出しが名前を文字にしない。
      * @param {any[]} items
      * @returns {number} 覚えている数
      */
@@ -37,7 +39,6 @@ export function createEmoteSaver(storageKey) {
       for (const r of items) {
         if (!Array.isArray(r?.emotes)) continue;
         for (const e of r.emotes) if (dict[e?.name] !== e?.url) fresh.push(e);
-        delete r.emotes;
       }
       if (fresh.length) {
         dict = mergeEmoteDict(dict, fresh);

@@ -200,14 +200,16 @@ export function mergeYtStreamSummary(existing, patch, nowMs = Date.now()) {
  * @param {string} videoId
  * @param {any[]} incomingItems
  * @param {number} [nowMs]
+ * @param {{ keepEmotes?: boolean }} [opts] keepEmotes: 会場へ先に届ける行だけ絵文字の画像を残す。保存には残さない。
  * @returns {any[]}
  */
-export function prepareYtCommentsForIdb(videoId, incomingItems, nowMs = Date.now()) {
+export function prepareYtCommentsForIdb(videoId, incomingItems, nowMs = Date.now(), opts = {}) {
   const vid = String(videoId || '').trim();
   if (!vid || !Array.isArray(incomingItems) || incomingItems.length === 0) {
     return [];
   }
 
+  const keepEmotes = opts?.keepEmotes === true;
   /** @type {Set<string>} */
   const seenPks = new Set();
   /** @type {any[]} */
@@ -221,8 +223,10 @@ export function prepareYtCommentsForIdb(videoId, incomingItems, nowMs = Date.now
     if (!pk || seenPks.has(pk)) continue;
     seenPks.add(pk);
 
+    const { emotes, ...withoutEmotes } = item;
+    const body = keepEmotes && Array.isArray(emotes) && emotes.length ? { ...withoutEmotes, emotes } : withoutEmotes;
     records.push({
-      ...item,
+      ...body,
       id: commentId,
       videoId: vid,
       pk,
