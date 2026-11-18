@@ -240,5 +240,38 @@ describe('応援が届いた瞬間', () => {
     expect(out?.total).toBe(80);
     expect(out?.rows[0].commentCount).toBeGreaterThan(0);
     expect(out?.rows[0].excerpts).toHaveLength(3);
+    expect(out?.rows[0].beforeRecording).toBe(false);
+  });
+
+  it('記録開始前のギフトは0件と書かず、先頭は目立つ10件だけ', () => {
+    const comments = [speech(T + 200_000, '記録開始')];
+    for (let i = 0; i < 12; i += 1) {
+      comments.push({
+        capturedAt: T + i * 1000,
+        ytKind: 'superchat',
+        ytCurrency: 'SRPT',
+        ytAmount: (i + 1) * 10,
+        ytGiftName: '花',
+        nickname: `gift${i}`,
+      });
+    }
+    comments.push({
+      capturedAt: T + 290_000,
+      ytKind: 'superchat',
+      ytCurrency: 'SRPT',
+      ytAmount: 5,
+      nickname: '静かな分',
+    });
+    const out = analyzeSupportArrivals({ platformId: 'showroom', comments });
+    expect(out?.rows.filter((r) => r.beforeRecording)).toHaveLength(12);
+    expect(out?.rows.find((r) => r.who === '静かな分')?.beforeRecording).toBe(false);
+    expect(out?.rows.find((r) => r.who === '静かな分')?.commentCount).toBe(0);
+    const html = sectionSupportArrivalHtml({ platformId: 'showroom', comments });
+    expect(html).toContain('記録開始前のためコメントなし');
+    expect(html).toContain('推定: 直前60秒のコメント 0件');
+    const head = html.split('<details')[0];
+    expect(head.match(/class="mkt-arrival-row"/g)).toHaveLength(10);
+    expect(html).toContain('すべて見る（13件）');
+    expect(head).not.toContain('推定: 直前60秒のコメント 0件');
   });
 });

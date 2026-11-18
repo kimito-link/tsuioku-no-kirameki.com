@@ -82,7 +82,6 @@ import { exportWaitLinesForKind, resolveHtmlReportBuildTimeoutMs } from '../lib/
 import { mergeTailRowsIntoDisplay } from '../lib/mergeTailRowsIntoDisplay.js';
 import { normalizeTailRowsForDisplay } from '../lib/readAllCommentsForLive.js';
 import { MARKETING_EXPORT_STATE_PARAM, withMarketingExportState } from '../lib/marketingExportTabState.js';
-import { computePseudoLvForVideoId } from '../lib/youtube/ytPseudoLv.js';
 import { followerSamplesStorageKey } from '../lib/platform/followerSampleStore.js';
 
 /**
@@ -559,7 +558,8 @@ function showLockStage(lid) {
 // ── stage 4: メイン処理(既存パイプラインを呼び出し順序・引数不変で実行) ──
 
 /**
- * スナップショット、ニコ生の標本キー、YouTube 系の配信要約の順に人数の標本を探す。
+ * 人数の標本は小さい鍵だけを、短い時間だけ読む。通信もしない。配信要約の全件は読まない。
+ * 読めなくてもレポート本体は出す。
  * @param {string} lid
  * @param {Record<string, any> | null | undefined} snapshot
  */
@@ -567,19 +567,12 @@ async function followerSamplesForExport(lid, snapshot) {
   if (Array.isArray(snapshot?.followerSamples) && snapshot.followerSamples.length) return snapshot.followerSamples;
   try {
     const key = followerSamplesStorageKey(lid);
-    const bag = await chrome.storage.local.get([key, 'yt_stream_summaries']);
-    if (Array.isArray(bag?.[key]) && bag[key].length) return bag[key];
-    const sums = bag?.yt_stream_summaries;
-    if (!sums || typeof sums !== 'object') return [];
-    for (const [vid, sum] of Object.entries(sums)) {
-      if (computePseudoLvForVideoId(vid) !== lid) continue;
-      const samples = /** @type {{ followerSamples?: unknown }} */ (sum)?.followerSamples;
-      if (Array.isArray(samples) && samples.length) return samples;
-    }
+    const bag = await withTimeout(chrome.storage.local.get(key), 800, 'follower_samples_timeout');
+    const rows = /** @type {Record<string, unknown>} */ (bag)?.[key];
+    return Array.isArray(rows) ? rows : [];
   } catch {
-    /* 標本が読めなくてもレポート本体は出す */
+    return [];
   }
-  return [];
 }
 
 /** @param {string} lid */
@@ -622,16 +615,26 @@ async function runExport(lid) {
     const giftSubKey = giftSubAppHistoryStorageKey(lid);
     // v0.1.1673: 広告の「気づいた時刻」(拡張が配信中に記録・読むだけ。無ければレポートに章が出ないだけ)。
     const adObsKey = adObservationStorageKey(lid);
-    const [commentsRaw, data] = /** @type {[unknown, Record<string, any>]} */ (
-      await withTimeout(
-        Promise.all([
-          resolveCommentsForHtmlExport(lid),
-          chrome.storage.local.get([gKey, giftEventsKey, giftThrowsKey, giftSubKey, adObsKey])
-        ]),
-        30_000,
-        'marketing_storage_timeout'
-      )
+    // ギフトの鍵はコメントと別の待ち。こちらが遅くても、コメントが読めていれば報告は出す。
+    // 人数の取得はこの待ちに入れない（followerSamplesForExport が短い時間で空に戻す）。
+    const commentsRaw = await withTimeout(
+      resolveCommentsForHtmlExport(lid),
+      30_000,
+      'marketing_storage_timeout'
     );
+    /** @type {Record<string, any>} */
+    let data = {};
+    try {
+      data = /** @type {Record<string, any>} */ (
+        await withTimeout(
+          chrome.storage.local.get([gKey, giftEventsKey, giftThrowsKey, giftSubKey, adObsKey]),
+          4_000,
+          'gift_storage_timeout'
+        )
+      );
+    } catch {
+      data = {};
+    }
     const comments = /** @type {import('../lib/commentRecord.js').StoredComment[]} */ (
       Array.isArray(commentsRaw) ? commentsRaw : []
     );

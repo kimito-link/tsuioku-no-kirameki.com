@@ -82,6 +82,20 @@ function formatInt(n) {
 }
 
 /**
+ * 目立つ順に並べるための数。表示の単位は amountText 側。
+ * @param {object} row
+ * @param {import('./platformMetrics.js').SupportArrivalSpec} spec
+ */
+function amountValue(row, spec) {
+  if (spec.amount === 'pieces') {
+    const pieces = Number(/** @type {{ ytGiftCount?: unknown }} */ (row).ytGiftCount);
+    return Number.isFinite(pieces) && pieces > 0 ? pieces : 0;
+  }
+  const amount = Number(/** @type {{ ytAmount?: unknown }} */ (row).ytAmount);
+  return Number.isFinite(amount) && amount > 0 ? amount : 0;
+}
+
+/**
  * @param {object} row
  * @param {import('./platformMetrics.js').SupportArrivalSpec} spec
  * @returns {string}
@@ -179,6 +193,8 @@ function advanceLeft(times, left, from) {
  *     itemName: string,
  *     who: string,
  *     amountText: string,
+ *     amountValue: number,
+ *     beforeRecording: boolean,
  *     commentCount: number,
  *     excerpts: string[],
  *     contextCount: number,
@@ -269,6 +285,8 @@ export function analyzeSupportArrivals(input) {
 
   const started = Number(input?.startedAtMs);
   const startedOk = Number.isFinite(started) && started > 0 ? started : 0;
+  // 記録の最初のコメントより前の窓には、コメントが無いのではなく、まだ記録していない。
+  const recordedFrom = speechAt.length ? speechAt[0] : 0;
   /** @type {Map<string, { id: string, label: string, count: number }>} */
   const counts = new Map();
   /** @type {Map<number, number>} */
@@ -314,6 +332,8 @@ export function analyzeSupportArrivals(input) {
       itemName: item && item !== ev.spec.label ? item : '',
       who: who || '名前なし',
       amountText: amountText(ev.row, ev.spec),
+      amountValue: amountValue(ev.row, ev.spec),
+      beforeRecording: recordedFrom > 0 && ev.at <= recordedFrom,
       commentCount,
       excerpts,
       contextCount,

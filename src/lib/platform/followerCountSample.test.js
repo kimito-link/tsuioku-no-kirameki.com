@@ -121,6 +121,12 @@ describe('各サービスのページ', () => {
     expect(followerSampleFromDom(document, 'youtube')).toMatchObject({ count: 12000, rounded: true, noun: 'チャンネル登録者', raw: '1.2万' });
     document.body.innerHTML = '<span id="owner-sub-count">1,234人</span>';
     expect(followerSampleFromDom(document, 'youtube')).toMatchObject({ count: 1234, rounded: false, noun: 'チャンネル登録者' });
+    document.body.innerHTML = '<div id="owner"><span class="yt-core-attributed-string">チャンネル登録者数 13.9万人</span></div>';
+    expect(document.getElementById('owner-sub-count')).toBeNull();
+    expect(followerSampleFromDom(document, 'youtube')).toMatchObject({ count: 139000, rounded: true, raw: '13.9万', noun: 'チャンネル登録者' });
+    document.body.innerHTML = '<html data-nl-yt-subscribers="チャンネル登録者数 13.9万人"><body><div id="owner"></div></body></html>';
+    document.documentElement.setAttribute('data-nl-yt-subscribers', 'チャンネル登録者数 13.9万人');
+    expect(followerSampleFromDom(document, 'youtube')).toMatchObject({ count: 139000, rounded: true, raw: '13.9万' });
   });
   it('Twitch の視聴者数とフォローボタンは人数にしない', () => {
     document.body.innerHTML = '<span data-a-target="animated-channel-viewers-count">10533</span><button data-a-target="follow-button">フォロー</button>';
@@ -148,6 +154,7 @@ describe('増えた時間', () => {
       { at: T0 + 180_000, count: 13000, rounded: true, source: 'rounded', raw: '1.3万' },
     ]);
     expect(onlyRounded?.roundedOnly).toBe(true);
+    expect(onlyRounded?.label).toContain('1.2万 → 1.3万');
     expect(onlyRounded?.label).toContain('概数');
     expect(onlyRounded?.label).not.toContain('＋');
   });

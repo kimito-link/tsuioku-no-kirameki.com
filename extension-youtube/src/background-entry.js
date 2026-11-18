@@ -62,6 +62,7 @@ import {
   readAllVoices,
 } from '../../src/lib/youtube/ytSplitPersistStore.js';
 import { computePseudoLvForVideoId } from '../../src/lib/youtube/ytPseudoLv.js';
+import { followerSamplesStorageKey } from '../../src/lib/platform/followerSampleStore.js';
 import { swStaleDecision } from '../../src/lib/swStaleCheck.js';
 /** @type {Map<string, string>} 配信 → 最後に書いた公式ランキングの指紋(0.1.1959) */
 const lastLeaderboardSig = new Map();
@@ -304,6 +305,29 @@ async function persistChangedVoices(assignments) {
   const res = await putVoicePeople(batch);
   if (!verifiedBeforeRetire(res)) return;
   for (const row of changed) voiceSavedJson[row.userKey] = JSON.stringify(row.body);
+}
+
+/** 書き出し用に置いた人数の標本の署名。同じ標本では保存しない。 @type {Map<string, string>} */
+const followerExportSig = new Map();
+
+/**
+ * 人数の標本だけを小さい鍵へ置く。配信要約の IndexedDB 書き込みはしない。
+ * 書き出しが要約の読み込みを待っているとき、人数の取得で待たせない。
+ * @param {string} videoId
+ * @param {any} summary
+ */
+async function rememberFollowerSamplesForExport(videoId, summary) {
+  const samples = summary?.followerSamples;
+  if (!Array.isArray(samples) || samples.length === 0) return;
+  const last = samples[samples.length - 1] || {};
+  const sig = `${samples.length}:${last.at}:${last.count}:${last.rounded ? 1 : 0}:${last.raw || ''}`;
+  if (followerExportSig.get(videoId) === sig) return;
+  followerExportSig.set(videoId, sig);
+  try {
+    await chrome.storage.local.set({ [followerSamplesStorageKey(computePseudoLvForVideoId(videoId))]: samples });
+  } catch {
+    followerExportSig.delete(videoId);
+  }
 }
 
 /** 読み込み中のまとめ(同時に呼ばれても1回だけ読み、全員が同じ入れ物を受け取る) @type {Promise<Record<string, any>> | null} */
@@ -1226,7 +1250,20 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
         Date.now(),
       );
 
+      // 人数だけの知らせは要約の保存を走らせない。書き出しの読み込みを止めない。
+      const followerOnly = !!(
+        payload.followerSample
+        && !payload.title
+        && payload.concurrentViewers == null
+        && payload.endedAt == null
+        && !Object.prototype.hasOwnProperty.call(payload, 'platformStats')
+      );
+      if (followerOnly) {
+        await rememberFollowerSamplesForExport(videoId, summaries[videoId]);
+        return { ok: true, videoId };
+      }
       await publishOneSummary(videoId, summaries[videoId]);
+      await rememberFollowerSamplesForExport(videoId, summaries[videoId]);
       // 裏の ABEMA タブは claimActive:false(#608)。要約は更新し、いま見ている配信は奪わない。
       if (payload.claimActive !== false) await claimActiveVideo(sender, videoId);
       void ytViewerSampler.maybeSample(videoId, payload.concurrentViewers, summaries[videoId]);

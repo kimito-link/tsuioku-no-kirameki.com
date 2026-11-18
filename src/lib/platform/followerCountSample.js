@@ -286,7 +286,48 @@ export function followerSampleFromDom(doc, platformId) {
       return sampleOf(parsed, noun, 'page-count');
     }
   }
+  if (platformId === 'youtube') return youtubeOwnerFollowerSample(doc, noun);
   return null;
+}
+
+/**
+ * いまの視聴ページは #owner-sub-count が無いことがある。
+ * 配信者欄の短い「チャンネル登録者数 13.9万人」と、ページ世界が置いた data 属性だけを見る。
+ * @param {ParentNode | null | undefined} doc
+ * @param {string} noun
+ */
+function youtubeOwnerFollowerSample(doc, noun) {
+  if (!doc || typeof doc.querySelectorAll !== 'function') return null;
+  /** @type {ParentNode[]} */
+  const roots = [];
+  try {
+    for (const el of Array.from(doc.querySelectorAll('#owner, ytd-watch-metadata, ytd-video-owner-renderer')).slice(0, 4)) {
+      roots.push(el);
+      const shadow = /** @type {{ shadowRoot?: ParentNode | null }} */ (el).shadowRoot;
+      if (shadow) roots.push(shadow);
+    }
+  } catch {
+    /* 欄が無くても data 属性は見る */
+  }
+  for (const root of roots) {
+    /** @type {Element[]} */
+    let nodes = [];
+    try {
+      nodes = Array.from(root.querySelectorAll('span, yt-formatted-string, #owner-sub-count')).slice(0, 24);
+    } catch {
+      continue;
+    }
+    for (const el of nodes) {
+      const text = String(el.textContent || '').replace(/\s+/g, ' ').trim();
+      if (!text || text.length > 40 || !/登録者|subscriber/i.test(text)) continue;
+      const parsed = parseFollowerCountText(text);
+      if (parsed) return sampleOf(parsed, noun, 'page-count');
+    }
+  }
+  const rootEl = /** @type {{ documentElement?: Element, getAttribute?: (n: string) => string | null }} */ (doc);
+  const published = String(rootEl.documentElement?.getAttribute?.('data-nl-yt-subscribers') || rootEl.getAttribute?.('data-nl-yt-subscribers') || '');
+  const fromAttr = parseFollowerCountText(published);
+  return fromAttr ? sampleOf(fromAttr, noun, 'page-count') : null;
 }
 
 /**
@@ -335,13 +376,16 @@ export function analyzeFollowerGrowth(samples, opts = {}) {
   const noun = list.find((s) => s.noun)?.noun || opts.noun || 'フォロワー';
   const usable = list.filter((s) => !s.rounded);
   if (usable.length < 2) {
-    const rounded = [...list].reverse().find((s) => s.rounded);
-    if (!rounded) return null;
-    const shown = rounded.raw || rounded.count.toLocaleString('ja-JP');
+    const rounded = list.filter((s) => s.rounded);
+    if (!rounded.length) return null;
+    const shown = (/** @type {typeof rounded[number]} */ s) => s.raw || s.count.toLocaleString('ja-JP');
+    const start = rounded[0];
+    const end = rounded[rounded.length - 1];
+    const span = rounded.length === 1 ? shown(end) : `${shown(start)} → ${shown(end)}`;
     return {
       noun,
       roundedOnly: true,
-      label: `${noun}はページの概数（${shown}）なので、増えた人数は出していません。`,
+      label: `${noun} ${span}（概数）。増えた人数は出していません。`,
       windows: /** @type {{ t0: number, t1: number, delta: number, supportCount: number, commentCount: number }[]} */ ([]),
     };
   }

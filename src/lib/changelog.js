@@ -18,6 +18,16 @@
 /** @type {readonly ChangelogEntry[]} */
 export const EXTENSION_CHANGELOG = Object.freeze([
   Object.freeze({
+    version: '0.1.2159',
+    date: '2026-11-18',
+    summary: '概数の登録者と長い応援一覧を直す',
+    items: Object.freeze([
+      'YouTube のチャンネル登録者が「13.9万」のような概数のときも、始まりと終わりを概数として出します。増えた人数は出しません。',
+      '記録を始める前のギフトは「記録開始前のためコメントなし」と書きます。先頭には目立つ10件だけ出し、残りは「すべて見る」にたたみます。',
+      '応援の書き出しが、人数の読み取りで止まらないようにしました。',
+    ])
+  }),
+  Object.freeze({
     version: '0.1.2158',
     date: '2026-11-18',
     summary: '記録が無いときは応援の章を出さない',
@@ -192,14 +202,6 @@ export const EXTENSION_CHANGELOG = Object.freeze([
     summary: '分析レポートの見た目は今までどおり',
     items: Object.freeze([
       'ニコ生の分析レポートの見た目は、この更新では変えていません。',
-    ])
-  }),
-  Object.freeze({
-    version: '0.1.2139',
-    date: '2026-11-16',
-    summary: '読み足した過去コメントを吹き出しに出さない',
-    items: Object.freeze([
-      'Kick・Twitch などで配信の最初からさかのぼって読み足した過去コメントが、会場の吹き出し(と読み上げ)に「いま来たコメント」として出ていたのを直しました。読み足した分は記録にだけ入れ、吹き出し・読み上げには新しく来たコメントだけを出します。',
     ])
   }),
 ]);

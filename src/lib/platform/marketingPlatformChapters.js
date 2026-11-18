@@ -619,30 +619,50 @@ export function sectionSupportArrivalHtml(input) {
   if (!analysis && !followHtml) return '';
   const mask = input?.maskShare === true;
   const whoOf = (/** @type {string} */ name) => escapeHtml(mask ? maskLabelForShare(name) : name);
+  const renderRow = (/** @type {NonNullable<typeof analysis>['rows'][number]} */ row) => {
+    const when = clock(row.at);
+    const offset = row.offsetMs == null ? '' : `（開始から ${offsetLabel(row.offsetMs)}）`;
+    const kind = row.itemName ? `${row.kindLabel}（${row.itemName}）` : row.kindLabel;
+    const meta = [when ? `${when}${offset}` : offset, kind, row.amountText].filter(Boolean);
+    let trigger = row.beforeRecording
+      ? '記録開始前のためコメントなし'
+      : `推定: 直前60秒のコメント ${row.commentCount.toLocaleString('ja-JP')}件`;
+    if (!row.beforeRecording && !mask && row.excerpts.length) {
+      trigger += row.excerpts.map((t) => `「${t}」`).join('');
+    }
+    if (!row.beforeRecording && row.contextCount > 0) {
+      trigger += `。同じ1分の通知 ${row.contextCount.toLocaleString('ja-JP')}件`;
+      if (!mask && row.contexts.length) trigger += `（${row.contexts.join('、')}）`;
+    }
+    if (!row.beforeRecording && mask && (row.excerpts.length || row.contexts.length)) trigger += '。共有用に本文は出していません';
+    return `<li class="mkt-arrival-row"><p class="mkt-arrival-row__meta">${meta.map((part) => escapeHtml(part)).join('<span class="mkt-arrival-row__dot"> · </span>')} · ${whoOf(row.who)}</p><p class="mkt-arrival-row__trigger">${escapeHtml(trigger)}</p></li>`;
+  };
+  const ranked = (analysis ? analysis.rows : []).map((row, i) => ({ row, i }));
+  ranked.sort((a, b) => (b.row.amountValue || 0) - (a.row.amountValue || 0) || b.row.at - a.row.at || a.i - b.i);
+  const notableIx = new Set(ranked.slice(0, 10).map((x) => x.i));
+  /** @type {NonNullable<typeof analysis>['rows']} */
+  const headRows = [];
+  /** @type {NonNullable<typeof analysis>['rows']} */
+  const restRows = [];
+  (analysis ? analysis.rows : []).forEach((row, i) => (notableIx.has(i) ? headRows : restRows).push(row));
+  headRows.sort((a, b) => b.at - a.at);
+  restRows.sort((a, b) => b.at - a.at);
   const counts = analysis
     ? analysis.counts.map((c) => `${escapeHtml(c.label)} ${c.count.toLocaleString('ja-JP')}件`).join('、')
     : '';
   const windows = analysis
     ? analysis.windows.map((w) => `${escapeHtml(clock(w.startAt) || '—')} からの5分に ${w.count.toLocaleString('ja-JP')}件`).join('、')
     : '';
-  const rows = (analysis ? analysis.rows : []).map((row) => {
-    const when = clock(row.at);
-    const offset = row.offsetMs == null ? '' : `（開始から ${offsetLabel(row.offsetMs)}）`;
-    const kind = row.itemName ? `${row.kindLabel}（${row.itemName}）` : row.kindLabel;
-    const meta = [when ? `${when}${offset}` : offset, kind, row.amountText].filter(Boolean);
-    let trigger = `推定: 直前60秒のコメント ${row.commentCount.toLocaleString('ja-JP')}件`;
-    if (!mask && row.excerpts.length) {
-      trigger += row.excerpts.map((t) => `「${t}」`).join('');
-    }
-    if (row.contextCount > 0) {
-      trigger += `。同じ1分の通知 ${row.contextCount.toLocaleString('ja-JP')}件`;
-      if (!mask && row.contexts.length) trigger += `（${row.contexts.join('、')}）`;
-    }
-    if (mask && (row.excerpts.length || row.contexts.length)) trigger += '。共有用に本文は出していません';
-    return `<li class="mkt-arrival-row"><p class="mkt-arrival-row__meta">${meta.map((part) => escapeHtml(part)).join('<span class="mkt-arrival-row__dot"> · </span>')} · ${whoOf(row.who)}</p><p class="mkt-arrival-row__trigger">${escapeHtml(trigger)}</p></li>`;
-  });
+  const headHtml = headRows.map(renderRow).join('');
+  const restHtml = restRows.map(renderRow).join('');
+  const folded = restHtml && analysis
+    ? `<details class="mkt-arrival-more"><summary>すべて見る（${analysis.total.toLocaleString('ja-JP')}件）</summary><ol class="mkt-arrival-list">${restHtml}</ol></details>`
+    : '';
   const more = analysis && analysis.total > analysis.rows.length
     ? `<p class="mkt-note">表示は ${analysis.rows.length.toLocaleString('ja-JP')} 件まで（記録 ${analysis.total.toLocaleString('ja-JP')} 件）。新しい方から出しています。</p>`
+    : '';
+  const moreCss = folded
+    ? '\n.mkt-arrival-more{margin:.7rem 0 0}.mkt-arrival-more > summary{cursor:pointer;color:#e2e8f0;font-size:.9rem}.mkt-arrival-more > summary:focus-visible{outline:2px solid #93c5fd;outline-offset:2px}'
     : '';
   const note = '推定（同じ時間に起きたこと・原因とは限らない）。';
   for (const word of GIFT_MOMENT_FORBIDDEN_WORDS) {
@@ -655,12 +675,12 @@ export function sectionSupportArrivalHtml(input) {
 .mkt-arrival-row{background:#0f172a;border:1px solid #334155;border-radius:.7rem;padding:.65rem .8rem}
 .mkt-arrival-row__meta{margin:0;color:#e2e8f0;font-size:.9rem;line-height:1.45}
 .mkt-arrival-row__dot{color:#94a3b8}
-.mkt-arrival-row__trigger{margin:.25rem 0 0;color:#fde68a;font-size:.82rem;line-height:1.45}
+.mkt-arrival-row__trigger{margin:.25rem 0 0;color:#fde68a;font-size:.82rem;line-height:1.45}${moreCss}
 </style>
 <h2>応援が届いた瞬間</h2>
 ${counts ? `<p class="mkt-arrival-summary">${counts}</p>\n` : ''}${followHtml ? `${followHtml}\n` : ''}${analysis ? `<p class="mkt-note">5分で多かった時間: ${windows}</p>
-<ol class="mkt-arrival-list">${rows.join('')}</ol>
-${more}
+<ol class="mkt-arrival-list">${headHtml}</ol>
+${folded ? `${folded}\n` : ''}${more}
 <p class="mkt-note">${escapeHtml(note)}</p>` : ''}
 </section>`;
 }

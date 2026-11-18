@@ -24,6 +24,14 @@
 /** @type {ChangelogEntry[]} */
 const ARCHIVE_ENTRIES = [
   Object.freeze({
+    version: '0.1.2139',
+    date: '2026-11-16',
+    summary: '読み足した過去コメントを吹き出しに出さない',
+    items: Object.freeze([
+      'Kick・Twitch などで配信の最初からさかのぼって読み足した過去コメントが、会場の吹き出し(と読み上げ)に「いま来たコメント」として出ていたのを直しました。読み足した分は記録にだけ入れ、吹き出し・読み上げには新しく来たコメントだけを出します。',
+    ])
+  }),
+  Object.freeze({
     version: '0.1.2138',
     date: '2026-11-16',
     summary: 'Kick・ABEMA・Twitch等で開始からの過去コメントも記録',

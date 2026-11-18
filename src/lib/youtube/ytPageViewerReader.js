@@ -6,6 +6,7 @@ import {
   concurrentViewersFromUpdatedMetadata,
   concurrentViewersInInnertube,
   parseYtInitialDataAssignment,
+  subscriberCountTextInInnertube,
   videoIdFromYtInitialData,
 } from './ytConcurrentViewers.js';
 import { parseYtVideoIdFromUrl } from './ytPageMeta.js';
@@ -117,6 +118,8 @@ export function startYtPageViewerReader() {
       return;
     }
     const count = concurrentViewersInInnertube(data, id);
+    const subText = subscriberCountTextInInnertube(data);
+    if (subText) document.documentElement?.setAttribute('data-nl-yt-subscribers', subText);
     if (count != null) publish(id, count);
     else flushPending();
   };
