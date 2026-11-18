@@ -12,6 +12,7 @@ import { parseWwLiveIdFromUrl, wwLiveApiUrl, wwUserProfileUrl, parseWwLive, pars
 import { wwEventInfoUrl, parseWwEventInfo, parseWwLiveStats, mergePlatformStats } from '../../src/lib/platform/platformStats.js';
 import { followerSampleFromDom, followerSampleFromWhowatch, followerSampleFromWhowatchProfile } from '../../src/lib/platform/followerCountSample.js';
 import { createSlowFollowerFetch } from '../../src/lib/platform/slowFollowerFetch.js';
+import { platformFetchTimeoutSignal } from '../../src/lib/platform/fetchTimeout.js';
 import { startPageStallWatch } from '../../src/lib/stallTrace.js';
 import { isOwnExtensionUi } from '../../src/lib/platform/pageControlPick.js';
 try {
@@ -144,8 +145,6 @@ let lastWwFollow = null;
 let lastWwKey = '';
 let lastWwUserId = '';
 const slowWwFollow = createSlowFollowerFetch();
-/** @type {AbortController | null} */
-let slowWwAbort = null;
 
 /**
  * GET /users/<番号>/profile の follower_count を1回。コメントの読み取りは待たない。
@@ -154,7 +153,6 @@ let slowWwAbort = null;
  * @param {{ force?: boolean }} [opts]
  */
 function requestWwFollowers(userId, videoKey, opts = {}) {
-  if (slowWwFollow.currentKey() && slowWwFollow.currentKey() !== videoKey) slowWwAbort?.abort();
   const ticket = slowWwFollow.claim(videoKey, { hidden: document.hidden, force: opts.force === true });
   if (!ticket) return;
   const url = wwUserProfileUrl(userId);
@@ -162,17 +160,13 @@ function requestWwFollowers(userId, videoKey, opts = {}) {
     slowWwFollow.finish(ticket, false);
     return;
   }
-  slowWwAbort?.abort();
-  const mine = new AbortController();
-  slowWwAbort = mine;
-  const timer = setTimeout(() => mine.abort(), 8000);
   void (async () => {
     let ok = false;
     try {
       const res = await fetch(url, {
         credentials: 'omit',
         headers: { Accept: 'application/json' },
-        signal: mine.signal,
+        signal: platformFetchTimeoutSignal(),
       });
       if (!res.ok) throw new Error(`ww_profile_${res.status}`);
       const sample = followerSampleFromWhowatchProfile(await res.json());
@@ -188,8 +182,6 @@ function requestWwFollowers(userId, videoKey, opts = {}) {
     } catch {
       ok = false;
     } finally {
-      clearTimeout(timer);
-      if (slowWwAbort === mine) slowWwAbort = null;
       slowWwFollow.finish(ticket, ok);
     }
   })();

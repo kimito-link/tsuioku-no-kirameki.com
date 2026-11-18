@@ -173,8 +173,7 @@ describe('マーケ HTML のスナップショット', () => {
     expect(html).not.toContain('ギフト投げ履歴');
     expect(html).toContain('視聴数');
     expect(html).toContain('1200');
-    expect(html).toContain('フォロワー数はありません');
-    expect(html).toContain('視聴数カウンターは視聴数');
+    expect(html).not.toContain('id="mkt-support-arrival"');
     await expect(html).toMatchFileSnapshot(join(HERE, '__snapshots__/marketing-abema-baseline.html'));
   });
 });

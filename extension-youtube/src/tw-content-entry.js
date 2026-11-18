@@ -241,8 +241,6 @@ let current = /** @type {null | { login: string, key: string, stop: () => void }
 /** @type {null | { count: number, rounded: boolean, source: string, noun?: string, raw?: string }} */
 let lastTwFollow = null;
 const slowTwFollow = createSlowFollowerFetch();
-/** @type {AbortController | null} */
-let slowTwAbort = null;
 let twPageClientId = '';
 
 /** ページに書いてある公開の Client-ID。無ければ Web の公開 ID。ログインのトークンは送らない。 */
@@ -275,7 +273,6 @@ function twitchPageClientId() {
  * @param {{ force?: boolean }} [opts]
  */
 function requestTwFollowers(login, videoKey, opts = {}) {
-  if (slowTwFollow.currentKey() && slowTwFollow.currentKey() !== videoKey) slowTwAbort?.abort();
   const ticket = slowTwFollow.claim(videoKey, { hidden: document.hidden, force: opts.force === true });
   if (!ticket) return;
   const body = buildTwFollowerCountQuery(login);
@@ -283,10 +280,6 @@ function requestTwFollowers(login, videoKey, opts = {}) {
     slowTwFollow.finish(ticket, false);
     return;
   }
-  slowTwAbort?.abort();
-  const mine = new AbortController();
-  slowTwAbort = mine;
-  const timer = setTimeout(() => mine.abort(), 8000);
   void (async () => {
     let ok = false;
     try {
@@ -295,7 +288,7 @@ function requestTwFollowers(login, videoKey, opts = {}) {
         headers: { 'Client-Id': twitchPageClientId(), 'Content-Type': 'text/plain;charset=UTF-8' },
         body: JSON.stringify(body),
         credentials: 'omit',
-        signal: mine.signal,
+        signal: platformFetchTimeoutSignal(),
       });
       if (!res.ok) throw new Error(`gql_${res.status}`);
       const count = parseTwFollowerCount(await res.json());
@@ -311,8 +304,6 @@ function requestTwFollowers(login, videoKey, opts = {}) {
     } catch {
       ok = false;
     } finally {
-      clearTimeout(timer);
-      if (slowTwAbort === mine) slowTwAbort = null;
       slowTwFollow.finish(ticket, ok);
     }
   })();

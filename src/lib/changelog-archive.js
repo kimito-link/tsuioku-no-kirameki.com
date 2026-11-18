@@ -24,6 +24,15 @@
 /** @type {ChangelogEntry[]} */
 const ARCHIVE_ENTRIES = [
   Object.freeze({
+    version: '0.1.2138',
+    date: '2026-11-16',
+    summary: 'Kick・ABEMA・Twitch等で開始からの過去コメントも記録',
+    items: Object.freeze([
+      'Kick・ABEMA・Twitch(配信中の公開アーカイブがあるとき)で、配信を途中から開いても配信開始からのコメントをさかのぼって記録に読み足すようにしました。',
+      'ふわっち・SHOWROOM・ミクチャでも、開いた直後に取れる上限まで過去分を読み足します。読み足した過去分は読み上げと PICK UP には流しません。',
+    ])
+  }),
+  Object.freeze({
     version: '0.1.2137',
     date: '2026-11-16',
     summary: 'ツイキャスで開く前のコメントをさかのぼって記録',

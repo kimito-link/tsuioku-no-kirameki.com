@@ -615,10 +615,8 @@ export function sectionSupportArrivalHtml(input) {
     commentAts: times.commentAts,
   });
   const followHtml = growth ? followerBlockHtml(growth) : '';
-  const unavailable = !growth && platformId === 'abema'
-    ? '<p class="mkt-arrival-summary">ABEMA の視聴ページにフォロワー数はありません。番組の視聴数（view）と画面の視聴数カウンターは視聴数なので、フォロワーには使いません。</p>'
-    : '';
-  if (!analysis && !followHtml && !unavailable) return '';
+  // 応援が無く、人数の標本（正確な2件、または概数の説明）も無ければ章を出さない。
+  if (!analysis && !followHtml) return '';
   const mask = input?.maskShare === true;
   const whoOf = (/** @type {string} */ name) => escapeHtml(mask ? maskLabelForShare(name) : name);
   const counts = analysis
@@ -648,7 +646,7 @@ export function sectionSupportArrivalHtml(input) {
     : '';
   const note = '推定（同じ時間に起きたこと・原因とは限らない）。';
   for (const word of GIFT_MOMENT_FORBIDDEN_WORDS) {
-    if (note.includes(word) || unavailable.includes(word)) return '';
+    if (note.includes(word)) return '';
   }
   return `<section class="mkt-section" id="mkt-support-arrival">
 <style>
@@ -660,7 +658,7 @@ export function sectionSupportArrivalHtml(input) {
 .mkt-arrival-row__trigger{margin:.25rem 0 0;color:#fde68a;font-size:.82rem;line-height:1.45}
 </style>
 <h2>応援が届いた瞬間</h2>
-${counts ? `<p class="mkt-arrival-summary">${counts}</p>\n` : ''}${followHtml ? `${followHtml}\n` : ''}${unavailable ? `${unavailable}\n` : ''}${analysis ? `<p class="mkt-note">5分で多かった時間: ${windows}</p>
+${counts ? `<p class="mkt-arrival-summary">${counts}</p>\n` : ''}${followHtml ? `${followHtml}\n` : ''}${analysis ? `<p class="mkt-note">5分で多かった時間: ${windows}</p>
 <ol class="mkt-arrival-list">${rows.join('')}</ol>
 ${more}
 <p class="mkt-note">${escapeHtml(note)}</p>` : ''}

@@ -143,8 +143,6 @@ let current = /** @type {null | { roomKey: string, key: string, stop: () => void
 /** @type {null | { count: number, rounded: boolean, source: string, noun?: string, raw?: string }} */
 let lastSrFollow = null;
 const slowSrFollow = createSlowFollowerFetch();
-/** @type {AbortController | null} */
-let slowSrAbort = null;
 
 /**
  * /api/room/profile の follower_num を1回。ログインのクッキーは付けない。view_num は使わない。
@@ -153,7 +151,6 @@ let slowSrAbort = null;
  * @param {{ force?: boolean }} [opts]
  */
 function requestSrFollowers(roomId, videoKey, opts = {}) {
-  if (slowSrFollow.currentKey() && slowSrFollow.currentKey() !== videoKey) slowSrAbort?.abort();
   const ticket = slowSrFollow.claim(videoKey, { hidden: document.hidden, force: opts.force === true });
   if (!ticket) return;
   const url = srRoomProfileUrl(roomId);
@@ -161,17 +158,13 @@ function requestSrFollowers(roomId, videoKey, opts = {}) {
     slowSrFollow.finish(ticket, false);
     return;
   }
-  slowSrAbort?.abort();
-  const mine = new AbortController();
-  slowSrAbort = mine;
-  const timer = setTimeout(() => mine.abort(), 8000);
   void (async () => {
     let ok = false;
     try {
       const res = await fetch(url, {
         credentials: 'omit',
-        signal: mine.signal,
         headers: { Accept: 'application/json' },
+        signal: platformFetchTimeoutSignal(),
       });
       if (!res.ok) throw new Error(`sr_profile_${res.status}`);
       const sample = followerSampleFromShowroom(await res.json());
@@ -186,8 +179,6 @@ function requestSrFollowers(roomId, videoKey, opts = {}) {
     } catch {
       ok = false;
     } finally {
-      clearTimeout(timer);
-      if (slowSrAbort === mine) slowSrAbort = null;
       slowSrFollow.finish(ticket, ok);
     }
   })();

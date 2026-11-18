@@ -18,6 +18,15 @@
 /** @type {readonly ChangelogEntry[]} */
 export const EXTENSION_CHANGELOG = Object.freeze([
   Object.freeze({
+    version: '0.1.2158',
+    date: '2026-11-18',
+    summary: '記録が無いときは応援の章を出さない',
+    items: Object.freeze([
+      '応援の記録も、増減に使える人数の標本も無いときは、「応援が届いた瞬間」の章を出さないようにしました。',
+      'Twitch・SHOWROOM・ふわっちの人数の読み取りは、返事が来ないときに時間切れで打ち切り、次の読み取りに進みます。',
+    ])
+  }),
+  Object.freeze({
     version: '0.1.2157',
     date: '2026-11-18',
     summary: 'Twitchなどの人数を低い頻度で取る',
@@ -191,15 +200,6 @@ export const EXTENSION_CHANGELOG = Object.freeze([
     summary: '読み足した過去コメントを吹き出しに出さない',
     items: Object.freeze([
       'Kick・Twitch などで配信の最初からさかのぼって読み足した過去コメントが、会場の吹き出し(と読み上げ)に「いま来たコメント」として出ていたのを直しました。読み足した分は記録にだけ入れ、吹き出し・読み上げには新しく来たコメントだけを出します。',
-    ])
-  }),
-  Object.freeze({
-    version: '0.1.2138',
-    date: '2026-11-16',
-    summary: 'Kick・ABEMA・Twitch等で開始からの過去コメントも記録',
-    items: Object.freeze([
-      'Kick・ABEMA・Twitch(配信中の公開アーカイブがあるとき)で、配信を途中から開いても配信開始からのコメントをさかのぼって記録に読み足すようにしました。',
-      'ふわっち・SHOWROOM・ミクチャでも、開いた直後に取れる上限まで過去分を読み足します。読み足した過去分は読み上げと PICK UP には流しません。',
     ])
   }),
 ]);

@@ -176,11 +176,12 @@ describe('レポートの先頭', () => {
     expect(html).toContain('応援が届いた瞬間');
     expect(html).not.toContain('増えた時間');
   });
-  it('ABEMA は視聴数をフォロワーにせず、人数が無いと書く', () => {
-    const html = sectionSupportArrivalHtml({ platformId: 'abema', comments: [] });
-    expect(html).toContain('フォロワー数はありません');
-    expect(html).toContain('視聴数カウンターは視聴数');
-    expect(html).not.toContain('＋');
+  it('ABEMA は記録も標本も無いとき章を出さない', () => {
+    expect(sectionSupportArrivalHtml({ platformId: 'abema', comments: [] })).toBe('');
+    expect(sectionSupportArrivalHtml({
+      platformId: 'abema',
+      comments: [{ capturedAt: T0, text: 'こんにちは', ytKind: 'text' }],
+    })).toBe('');
   });
   it('応援が無くても正確な標本が2件あれば章を出す', () => {
     const html = sectionSupportArrivalHtml({
