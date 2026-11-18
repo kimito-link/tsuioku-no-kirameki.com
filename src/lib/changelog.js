@@ -18,6 +18,14 @@
 /** @type {readonly ChangelogEntry[]} */
 export const EXTENSION_CHANGELOG = Object.freeze([
   Object.freeze({
+    version: '0.1.2168',
+    date: '2026-11-18',
+    summary: 'ストア提出記録の版表記を最新に',
+    items: Object.freeze([
+      'ストア提出の記録を、公開中 0.1.2139・審査中 0.1.2167 に直しました。拡張の動きは変わりません。',
+    ])
+  }),
+  Object.freeze({
     version: '0.1.2167',
     date: '2026-11-18',
     summary: '開いたままの書き出しと概数',
@@ -187,16 +195,7 @@ export const EXTENSION_CHANGELOG = Object.freeze([
       'Kick と Twitch の会場では、絵文字の印が付いた語は画像にします。画像のアドレスが無いときは、その語を吹き出しにも読み上げにも残しません。',
       '会場の詳しい状況では、ニコニコ生放送以外に「user 英数字」の注記を出さないようにしました。',
     ])
-  }),
-  Object.freeze({
-    version: '0.1.2148',
-    date: '2026-11-17',
-    summary: '空の順位表と絵文字コードを出さない',
-    items: Object.freeze([
-      'ニコニコ生放送以外の「公式の数字」は、トップファンなどの順位の行が1つも無いときは欄ごと出さないようにしました。行が付くと、また出ます。',
-      'Kick・Twitch・YouTube の会場の吹き出しでは、絵文字だけのコメントをコードのまま出さないようにしました。画像のアドレスがあるときは絵にし、無いときは吹き出しと読み上げから外します。',
-    ])
-  }),
+  })
 ]);
 
 
