@@ -708,7 +708,7 @@ test.describe('lp-preview', () => {
     await expect(pf.locator('#pf-panel-abema')).toBeVisible();
     await expect(pf.locator('#pf-panel-abema')).toContainText(/視聴数/);
     await expect(pf.locator('#pf-panel-niconico')).toBeHidden();
-    await expect(pf.locator('.lp-unreleased-box')).toContainText(/未公開/);
+    await expect(pf.locator('.lp-unreleased-box')).toContainText(/近日公開/);
     expect(await pf.evaluate((el) => el.scrollWidth <= el.clientWidth + 2)).toBe(true);
 
     const trust = page.locator('#trust-privacy');
