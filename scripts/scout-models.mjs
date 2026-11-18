@@ -283,8 +283,10 @@ const PROBE_URL = {
   cloudflare: CF_ACC ? `https://api.cloudflare.com/client/v4/accounts/${CF_ACC}/ai/v1/chat/completions` : '',
   sambanova: 'https://api.sambanova.ai/v1/chat/completions',
   mistral: 'https://api.mistral.ai/v1/chat/completions',
+  // 2026-11-18 追加: さくらのAI Engine（/models の一覧取得は無し＝カタログ照合はせず liveProbe だけで見る）。
+  sakura: 'https://api.ai.sakura.ad.jp/v1/chat/completions',
 };
-const PROBE_KEY = { groq: G, nvidia: N, openrouter: O, cloudflare: CF, sambanova: SN, mistral: MI };
+const PROBE_KEY = { groq: G, nvidia: N, openrouter: O, cloudflare: CF, sambanova: SN, mistral: MI, sakura: process.env.SAKURA_AI_ENGINE_TOKEN };
 
 // ★2026-09-23 追加: 遅いが健全なモデルを「疎通不能」と誤診しないための個別timeout。
 //  実損: 採用当日の nvidia/deepseek-v4.1-flash が「2日連続 The operation was aborted due to

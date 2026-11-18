@@ -50,6 +50,9 @@ export function roleOf(name) {
   if (n.includes("qwen3-32b") || n.includes("qwq")) return "critic";
   // GLM(5.2 等)は reasoning_content を別フィールドで返す強い推論モデル → 批判(critic)。
   // 2026-06-27 Cloudflare Workers AI 経由 glm-5.2 を実機確認の上で追加。
+  // ★2026-11-18: さくらのAI Engine の GLM-5.3-Flash は generalist の予備（critic には同じさくらの deepseek を置く＝
+  //  恒久ルール5で1役割1席）。下の "glm"→critic より前に置くこと。
+  if (n.includes("sakura/glm")) return "generalist";
   if (n.includes("glm")) return "critic";
   // Kimi K2.7 Code 等のコード特化モデル → 実装(implement)。"code" は "coder" に一致しないため別途。
   if (n.includes("coder") || (n.includes("kimi") && n.includes("code"))) return "implement";
@@ -398,6 +401,10 @@ export function weightOf(label) {
     //  2026-10-28: 後継 cloudflare/deepseek-v4.1-flash（1017）に入れ替え。この判定は前方一致なので v4.1 にもそのまま効く。
     if (n.includes("cloudflare/deepseek-v4")) return 4;
     if (n.includes("deepseek-v4")) return 3;
+    // ★2026-11-18: さくらのAI Engine は新しいプロバイダなので全席を予備(3)から（恒久ルール3）。
+    //  無償プランは月3,000回で超えると429で止まる（課金なし）・preview/ は予告なく変わる。
+    //  昇格は7日以上空けた実会議2回でFAILEDゼロ。この行が無いと glm/kimi は既定の 1（主力）に落ちる。
+    if (n.startsWith("sakura/")) return 3;
     // ★2026-09-02 昇格(3→1): magistral-medium を lead 主力にする。
     //  実測(統括プロンプト・3回): magistral-medium 1745/2176/2496ms に対し、
     //  従来主力の nvidia/nemotron-3-ultra-550b は 23754/56588/25015ms＝**10〜25倍遅い**。
