@@ -13,6 +13,7 @@ import {
   followerSampleFromTcDocument,
   followerSampleFromTikTokRoom,
   followerSampleFromWhowatch,
+  followerSampleFromWhowatchProfile,
   parseFollowerCountText,
 } from './followerCountSample.js';
 import { sectionSupportArrivalHtml } from './marketingPlatformChapters.js';
@@ -92,9 +93,25 @@ describe('各サービスの応答', () => {
   it('ミクチャは broadcasterInfo.fan', () => {
     expect(followerSampleFromMixch({ broadcasterInfo: { fan: 123456 }, broadcasterLevel: { level: 3 } })).toMatchObject({ count: 123456, noun: 'ファン' });
   });
-  it('SHOWROOM は follower_num が応答にあるときだけ', () => {
-    expect(followerSampleFromShowroom({ follower_num: 88 })).toMatchObject({ count: 88, noun: 'フォロワー' });
-    expect(followerSampleFromShowroom({ room_id: 1, live_id: 2, is_live: true, online_user_num: 20, room_name: 'a' })).toBeNull();
+  it('ふわっちのプロフィールは follower_count。follow_count はフォローしている側', () => {
+    expect(followerSampleFromWhowatchProfile({
+      user_id: 348122,
+      user_path: 'w:mippeko33',
+      name: 'a',
+      follow_count: 3750,
+      follower_count: 5267,
+    })).toMatchObject({ count: 5267, rounded: false, noun: 'フォロワー' });
+    expect(followerSampleFromWhowatchProfile({ follow_count: 3750, user_id: 1 })).toBeNull();
+  });
+  it('SHOWROOM のプロフィールは follower_num。view_num は入室者数', () => {
+    expect(followerSampleFromShowroom({
+      room_id: 61576,
+      follower_num: 24960,
+      view_num: 120,
+      is_onlive: true,
+      room_name: 'a',
+    })).toMatchObject({ count: 24960, noun: 'フォロワー' });
+    expect(followerSampleFromShowroom({ room_id: 61576, view_num: 120, online_user_num: 30 })).toBeNull();
   });
 });
 
@@ -158,6 +175,12 @@ describe('レポートの先頭', () => {
     });
     expect(html).toContain('応援が届いた瞬間');
     expect(html).not.toContain('増えた時間');
+  });
+  it('ABEMA は視聴数をフォロワーにせず、人数が無いと書く', () => {
+    const html = sectionSupportArrivalHtml({ platformId: 'abema', comments: [] });
+    expect(html).toContain('フォロワー数はありません');
+    expect(html).toContain('視聴数カウンターは視聴数');
+    expect(html).not.toContain('＋');
   });
   it('応援が無くても正確な標本が2件あれば章を出す', () => {
     const html = sectionSupportArrivalHtml({

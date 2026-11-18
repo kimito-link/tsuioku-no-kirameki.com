@@ -208,6 +208,18 @@ export function followerSampleFromWhowatch(json) {
 }
 
 /**
+ * ふわっちの GET /users/<番号>/profile。follower_count だけ。follow_count（自分がフォローしている数）は使わない。
+ * @param {unknown} json
+ */
+export function followerSampleFromWhowatchProfile(json) {
+  const root = asObj(json);
+  if (!root) return null;
+  const n = exactInt(root.follower_count);
+  if (n == null) return null;
+  return sampleOf({ count: n, rounded: false }, FOLLOWER_NOUN.whowatch, 'page-count');
+}
+
+/**
  * ミクチャの /api-web/users/<n>/live の broadcasterInfo.fan（画面のファン数）。
  * @param {unknown} json
  */
@@ -218,8 +230,8 @@ export function followerSampleFromMixch(json) {
 }
 
 /**
- * SHOWROOM の room/status・live_info・polling に follower_num があるときだけ。
- * 2026-11-08 の実測では status にこの項目は無かった。あったときだけ使う。
+ * SHOWROOM の follower_num だけ。view_num（入室者数）はフォロワーにしない。
+ * room/status には無く、/api/room/profile にある（2026-11-18 実測）。
  * @param {unknown} json
  */
 export function followerSampleFromShowroom(json) {

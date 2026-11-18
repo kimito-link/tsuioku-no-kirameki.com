@@ -11,6 +11,49 @@ import { isEmoteName, twEmoteUrl } from '../platform/streamEmotes.js';
 export const TW_WEB_CLIENT_ID = 'kimne78kx3ncx6brgo4mv6wki5h1ko';
 export const TW_GQL_URL = 'https://gql.twitch.tv/gql';
 
+const TW_CLIENT_ID_RE = /(?:clientId|Client-ID)["']?\s*[:=]\s*["']([a-z0-9]{20,40})["']/i;
+
+/**
+ * ページに書いてある公開の Client-ID。ログインのトークンは拾わない。
+ * 見つからなければ ''（呼び出し側が公開の既定値を使う）。
+ * @param {unknown} text
+ */
+export function twitchClientIdFromText(text) {
+  const s = String(text || '');
+  if (!s || s.length > 500_000) return '';
+  const m = TW_CLIENT_ID_RE.exec(s);
+  return m ? m[1] : '';
+}
+
+/**
+ * チャンネルページが使う人数の問い合わせ。followers.totalCount だけ。
+ * 登録済みハッシュは 2026-11-18 に PersistedQueryNotFound だったので、同じ名前の本文を1回送る。
+ * @param {string} login
+ */
+export function buildTwFollowerCountQuery(login) {
+  const l = String(login || '').toLowerCase().replace(/[^a-z0-9_]/g, '');
+  if (!/^[a-z0-9_]{1,25}$/.test(l)) return null;
+  return {
+    operationName: 'ChannelPage_ChannelFollowerCount',
+    variables: { login: l },
+    query: 'query ChannelPage_ChannelFollowerCount($login:String!){user(login:$login){followers{totalCount}}}',
+  };
+}
+
+/**
+ * @param {unknown} json
+ * @returns {number | null}
+ */
+export function parseTwFollowerCount(json) {
+  const one = Array.isArray(json) ? json[0] : json;
+  if (!one || typeof one !== 'object') return null;
+  const row = /** @type {Record<string, any>} */ (one);
+  if (Array.isArray(row.errors) && row.errors.length) return null;
+  const n = Number(row.data?.user?.followers?.totalCount);
+  if (!Number.isInteger(n) || n < 0 || n > 50_000_000) return null;
+  return n;
+}
+
 /** @param {string} login */
 export function buildTwStreamInfoQuery(login) {
   const l = String(login || '').toLowerCase().replace(/[^a-z0-9_]/g, '');

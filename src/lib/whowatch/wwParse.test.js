@@ -4,6 +4,7 @@ import {
   isWwUserPath,
   parseWwLiveIdFromUrl,
   wwLiveApiUrl,
+  wwUserProfileUrl,
   isWwApiUrl,
   wwTimeMs,
   safeWwImageUrl,
@@ -34,6 +35,9 @@ describe('ふわっちの URL', () => {
     expect(wwLiveApiUrl('x')).toBe('');
     expect(isWwApiUrl(wwLiveApiUrl('99', 5))).toBe(true);
     expect(isWwApiUrl(wwLiveApiUrl('99', 0, 500))).toBe(true);
+    expect(wwUserProfileUrl('348122')).toBe('https://api.whowatch.tv/users/348122/profile');
+    expect(wwUserProfileUrl('w:mippeko33')).toBe('');
+    expect(isWwApiUrl(wwUserProfileUrl('348122'))).toBe(true);
     expect(isWwApiUrl('https://api.whowatch.tv/users/1')).toBe(false);
     expect(isWwApiUrl('https://api.whowatch.tv.evil.com/lives/1')).toBe(false);
   });

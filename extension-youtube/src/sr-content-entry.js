@@ -13,6 +13,7 @@
 import {
   parseSrRoomKeyFromUrl,
   srRoomStatusUrl,
+  srRoomProfileUrl,
   srLiveApiUrl,
   parseSrRoomStatus,
   parseSrLiveInfo,
@@ -42,6 +43,7 @@ import { srEventAndSupportUrl, parseSrEventStats, parseSrEventBoard } from '../.
 import { makeDiagTabToken, shouldSkipDiagWrite } from '../../src/lib/platform/diagTabShare.js';
 import { platformFetchTimeoutSignal } from '../../src/lib/platform/fetchTimeout.js';
 import { followerSampleFromDom, followerSampleFromShowroom } from '../../src/lib/platform/followerCountSample.js';
+import { createSlowFollowerFetch } from '../../src/lib/platform/slowFollowerFetch.js';
 
 const META_EVERY_MS = 30_000;
 const BOARD_EVERY_MS = 60_000;
@@ -140,6 +142,56 @@ async function tryJson(url) {
 let current = /** @type {null | { roomKey: string, key: string, stop: () => void }} */ (null);
 /** @type {null | { count: number, rounded: boolean, source: string, noun?: string, raw?: string }} */
 let lastSrFollow = null;
+const slowSrFollow = createSlowFollowerFetch();
+/** @type {AbortController | null} */
+let slowSrAbort = null;
+
+/**
+ * /api/room/profile の follower_num を1回。ログインのクッキーは付けない。view_num は使わない。
+ * @param {string} roomId
+ * @param {string} videoKey
+ * @param {{ force?: boolean }} [opts]
+ */
+function requestSrFollowers(roomId, videoKey, opts = {}) {
+  if (slowSrFollow.currentKey() && slowSrFollow.currentKey() !== videoKey) slowSrAbort?.abort();
+  const ticket = slowSrFollow.claim(videoKey, { hidden: document.hidden, force: opts.force === true });
+  if (!ticket) return;
+  const url = srRoomProfileUrl(roomId);
+  if (!url) {
+    slowSrFollow.finish(ticket, false);
+    return;
+  }
+  slowSrAbort?.abort();
+  const mine = new AbortController();
+  slowSrAbort = mine;
+  const timer = setTimeout(() => mine.abort(), 8000);
+  void (async () => {
+    let ok = false;
+    try {
+      const res = await fetch(url, {
+        credentials: 'omit',
+        signal: mine.signal,
+        headers: { Accept: 'application/json' },
+      });
+      if (!res.ok) throw new Error(`sr_profile_${res.status}`);
+      const sample = followerSampleFromShowroom(await res.json());
+      if (sample && slowSrFollow.currentKey() === videoKey) {
+        lastSrFollow = sample;
+        ok = true;
+        safeSendMessage({
+          type: 'YT_STREAM_META',
+          payload: { videoId: videoKey, followerSample: { ...sample, at: Date.now(), ...(opts.force ? { force: true } : {}) } },
+        });
+      }
+    } catch {
+      ok = false;
+    } finally {
+      clearTimeout(timer);
+      if (slowSrAbort === mine) slowSrAbort = null;
+      slowSrFollow.finish(ticket, ok);
+    }
+  })();
+}
 /** いまの配信のイベントの数字(読めたあとだけ YT_STREAM_META に付ける) */
 let srStats = /** @type {null | { key: string, stats: Record<string, any> | null }} */ (null);
 
@@ -345,6 +397,7 @@ let endHintAt = 0;
 let checking = false;
 
 async function check() {
+  if (current?.key && diag.roomId) requestSrFollowers(diag.roomId, current.key);
   if (checking) return;
   const roomKey = parseSrRoomKeyFromUrl(location.href);
   if (!roomKey) {
@@ -370,6 +423,7 @@ async function check() {
     if (!st.isLive) {
       if (current) {
         const endedKey = current.key;
+        requestSrFollowers(st.roomId, endedKey, { force: true });
         current.stop();
         current = null;
         safeSendMessage({
@@ -397,6 +451,7 @@ async function check() {
     const viewers = Number(poll?.online_user_num);
     const srFollow = followerSampleFromShowroom(statusJson) || followerSampleFromShowroom(liveJson) || followerSampleFromShowroom(poll) || followerSampleFromDom(document, 'showroom');
     if (srFollow) lastSrFollow = srFollow;
+    requestSrFollowers(st.roomId, key);
     safeSendMessage({
       type: 'YT_STREAM_META',
       payload: {
@@ -510,6 +565,7 @@ setInterval(() => {
   void check();
 }, 1000);
 window.addEventListener('pagehide', () => {
+  if (current?.key && diag.roomId) requestSrFollowers(diag.roomId, current.key, { force: true });
   if (current?.key && lastSrFollow) {
     safeSendMessage({ type: 'YT_STREAM_META', payload: { videoId: current.key, followerSample: { ...lastSrFollow, at: Date.now(), force: true } } });
   }

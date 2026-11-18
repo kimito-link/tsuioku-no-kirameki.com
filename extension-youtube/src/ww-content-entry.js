@@ -8,9 +8,10 @@
 //   - 記録は YouTube 版と同じ口(YT_STREAM_META / YT_CHAT_ITEMS)へ送る。配信キーは 'ww.<配信の番号>.<配信者の user id>'。
 //   - 配信が終わったと分かったら(live_status 等)、終わった時刻を送って読むのをやめる。
 
-import { parseWwLiveIdFromUrl, wwLiveApiUrl, parseWwLive, parseWwComment, buildWwStreamKey } from '../../src/lib/whowatch/wwParse.js';
+import { parseWwLiveIdFromUrl, wwLiveApiUrl, wwUserProfileUrl, parseWwLive, parseWwComment, buildWwStreamKey } from '../../src/lib/whowatch/wwParse.js';
 import { wwEventInfoUrl, parseWwEventInfo, parseWwLiveStats, mergePlatformStats } from '../../src/lib/platform/platformStats.js';
-import { followerSampleFromDom, followerSampleFromWhowatch } from '../../src/lib/platform/followerCountSample.js';
+import { followerSampleFromDom, followerSampleFromWhowatch, followerSampleFromWhowatchProfile } from '../../src/lib/platform/followerCountSample.js';
+import { createSlowFollowerFetch } from '../../src/lib/platform/slowFollowerFetch.js';
 import { startPageStallWatch } from '../../src/lib/stallTrace.js';
 import { isOwnExtensionUi } from '../../src/lib/platform/pageControlPick.js';
 try {
@@ -141,6 +142,58 @@ let current = /** @type {null | { liveId: string, stop: () => void }} */ (null);
 /** @type {null | { count: number, rounded: boolean, source: string, noun?: string }} */
 let lastWwFollow = null;
 let lastWwKey = '';
+let lastWwUserId = '';
+const slowWwFollow = createSlowFollowerFetch();
+/** @type {AbortController | null} */
+let slowWwAbort = null;
+
+/**
+ * GET /users/<番号>/profile の follower_count を1回。コメントの読み取りは待たない。
+ * @param {string} userId
+ * @param {string} videoKey
+ * @param {{ force?: boolean }} [opts]
+ */
+function requestWwFollowers(userId, videoKey, opts = {}) {
+  if (slowWwFollow.currentKey() && slowWwFollow.currentKey() !== videoKey) slowWwAbort?.abort();
+  const ticket = slowWwFollow.claim(videoKey, { hidden: document.hidden, force: opts.force === true });
+  if (!ticket) return;
+  const url = wwUserProfileUrl(userId);
+  if (!url) {
+    slowWwFollow.finish(ticket, false);
+    return;
+  }
+  slowWwAbort?.abort();
+  const mine = new AbortController();
+  slowWwAbort = mine;
+  const timer = setTimeout(() => mine.abort(), 8000);
+  void (async () => {
+    let ok = false;
+    try {
+      const res = await fetch(url, {
+        credentials: 'omit',
+        headers: { Accept: 'application/json' },
+        signal: mine.signal,
+      });
+      if (!res.ok) throw new Error(`ww_profile_${res.status}`);
+      const sample = followerSampleFromWhowatchProfile(await res.json());
+      if (sample && slowWwFollow.currentKey() === videoKey) {
+        lastWwFollow = sample;
+        lastWwKey = videoKey;
+        ok = true;
+        safeSendMessage({
+          type: 'YT_STREAM_META',
+          payload: { videoId: videoKey, followerSample: { ...sample, at: Date.now(), ...(opts.force ? { force: true } : {}) } },
+        });
+      }
+    } catch {
+      ok = false;
+    } finally {
+      clearTimeout(timer);
+      if (slowWwAbort === mine) slowWwAbort = null;
+      slowWwFollow.finish(ticket, ok);
+    }
+  })();
+}
 /** 終わったと分かった配信(同じページにいる間は読み直さない) */
 const endedLives = new Set();
 
@@ -244,6 +297,10 @@ function startReader(liveId) {
       diag.streamKey = key;
     }
     const wwFollow = followerSampleFromWhowatch(json) || followerSampleFromDom(document, 'whowatch');
+    if (info.user?.id && key) {
+      lastWwUserId = info.user.id;
+      requestWwFollowers(info.user.id, key);
+    }
     if (Date.now() - metaAt >= META_EVERY_MS) sendMeta(info, wwFollow);
 
     // コメント(新しい順らしい=古い順に並べ直して送る)
@@ -302,6 +359,7 @@ function startReader(liveId) {
       }
       endedLives.add(liveId);
       if (key) {
+        if (info.user?.id) requestWwFollowers(info.user.id, key, { force: true });
         safeSendMessage({
           type: 'YT_STREAM_META',
           payload: { videoId: key, endedAt: Date.now(), ...(lastWwFollow ? { followerSample: { ...lastWwFollow, at: Date.now(), force: true } } : {}) },
@@ -430,6 +488,7 @@ try {
 setInterval(check, 1000);
 check();
 window.addEventListener('pagehide', () => {
+  if (lastWwKey && lastWwUserId) requestWwFollowers(lastWwUserId, lastWwKey, { force: true });
   if (lastWwKey && lastWwFollow) {
     safeSendMessage({ type: 'YT_STREAM_META', payload: { videoId: lastWwKey, followerSample: { ...lastWwFollow, at: Date.now(), force: true } } });
   }

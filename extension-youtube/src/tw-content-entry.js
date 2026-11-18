@@ -27,6 +27,9 @@ import {
   TW_WEB_CLIENT_ID,
   buildTwStreamInfoQuery,
   buildTwStreamInfoMinimalQuery,
+  buildTwFollowerCountQuery,
+  parseTwFollowerCount,
+  twitchClientIdFromText,
   buildTwUsersIconQuery,
   buildTwLeaderboardsQuery,
   buildTwLeaderboardsFallbackQuery,
@@ -54,6 +57,7 @@ import {
 import { createEmoteSaver } from './pfEmoteStore.js';
 import { platformFetchTimeoutSignal } from '../../src/lib/platform/fetchTimeout.js';
 import { followerSampleFromDom } from '../../src/lib/platform/followerCountSample.js';
+import { createSlowFollowerFetch } from '../../src/lib/platform/slowFollowerFetch.js';
 
 const IRC_URL = 'wss://irc-ws.chat.twitch.tv:443';
 const META_EVERY_MS = 30_000;
@@ -236,6 +240,83 @@ async function lookupIcons(logins) {
 let current = /** @type {null | { login: string, key: string, stop: () => void }} */ (null);
 /** @type {null | { count: number, rounded: boolean, source: string, noun?: string, raw?: string }} */
 let lastTwFollow = null;
+const slowTwFollow = createSlowFollowerFetch();
+/** @type {AbortController | null} */
+let slowTwAbort = null;
+let twPageClientId = '';
+
+/** ページに書いてある公開の Client-ID。無ければ Web の公開 ID。ログインのトークンは送らない。 */
+function twitchPageClientId() {
+  if (twPageClientId) return twPageClientId;
+  try {
+    const nodes = document.querySelectorAll('script:not([src])');
+    let n = 0;
+    for (const node of nodes) {
+      if (n >= 24) break;
+      n += 1;
+      const text = node.textContent || '';
+      if (!text || text.length > 200_000 || !/clientId|Client-ID/i.test(text)) continue;
+      const id = twitchClientIdFromText(text);
+      if (id) {
+        twPageClientId = id;
+        return id;
+      }
+    }
+  } catch {
+    /* ページの文が読めなければ公開の既定値 */
+  }
+  return TW_WEB_CLIENT_ID;
+}
+
+/**
+ * フォロワー合計を1回だけ。開始・約5分・終わり。コメントの読み取りは待たない。
+ * @param {string} login
+ * @param {string} videoKey
+ * @param {{ force?: boolean }} [opts]
+ */
+function requestTwFollowers(login, videoKey, opts = {}) {
+  if (slowTwFollow.currentKey() && slowTwFollow.currentKey() !== videoKey) slowTwAbort?.abort();
+  const ticket = slowTwFollow.claim(videoKey, { hidden: document.hidden, force: opts.force === true });
+  if (!ticket) return;
+  const body = buildTwFollowerCountQuery(login);
+  if (!body) {
+    slowTwFollow.finish(ticket, false);
+    return;
+  }
+  slowTwAbort?.abort();
+  const mine = new AbortController();
+  slowTwAbort = mine;
+  const timer = setTimeout(() => mine.abort(), 8000);
+  void (async () => {
+    let ok = false;
+    try {
+      const res = await fetch(TW_GQL_URL, {
+        method: 'POST',
+        headers: { 'Client-Id': twitchPageClientId(), 'Content-Type': 'text/plain;charset=UTF-8' },
+        body: JSON.stringify(body),
+        credentials: 'omit',
+        signal: mine.signal,
+      });
+      if (!res.ok) throw new Error(`gql_${res.status}`);
+      const count = parseTwFollowerCount(await res.json());
+      if (count != null && slowTwFollow.currentKey() === videoKey) {
+        const sample = { count, rounded: false, source: 'page-count', noun: 'フォロワー' };
+        lastTwFollow = sample;
+        ok = true;
+        safeSendMessage({
+          type: 'YT_STREAM_META',
+          payload: { videoId: videoKey, followerSample: { ...sample, at: Date.now(), ...(opts.force ? { force: true } : {}) } },
+        });
+      }
+    } catch {
+      ok = false;
+    } finally {
+      clearTimeout(timer);
+      if (slowTwAbort === mine) slowTwAbort = null;
+      slowTwFollow.finish(ticket, ok);
+    }
+  })();
+}
 /** 配信者の表示名(GQL で分かったもの・ハイプトレイン等の行の名前) */
 let lastBroadcasterName = '';
 const broadcasterName = () => lastBroadcasterName;
@@ -644,7 +725,10 @@ async function check() {
     return;
   }
   const sameChannel = current?.login === login;
-  if (sameChannel && Date.now() - lastInfoAt < META_EVERY_MS) return;
+  if (sameChannel && Date.now() - lastInfoAt < META_EVERY_MS) {
+    if (current?.key) requestTwFollowers(login, current.key);
+    return;
+  }
   checking = true;
   try {
     const info = await fetchStreamInfo(login);
@@ -655,6 +739,7 @@ async function check() {
     if (info && !info.live) {
       if (current) {
         const endedKey = current.key;
+        requestTwFollowers(login, endedKey, { force: true });
         current.stop();
         current = null;
         safeSendMessage({
@@ -676,6 +761,7 @@ async function check() {
     }
     const twFollow = followerSampleFromDom(document, 'twitch');
     if (twFollow) lastTwFollow = twFollow;
+    requestTwFollowers(login, key);
     safeSendMessage({
       type: 'YT_STREAM_META',
       payload: {
@@ -807,8 +893,11 @@ setInterval(() => {
   void check();
 }, 1000);
 window.addEventListener('pagehide', () => {
-  if (current?.key && lastTwFollow) {
-    safeSendMessage({ type: 'YT_STREAM_META', payload: { videoId: current.key, followerSample: { ...lastTwFollow, at: Date.now(), force: true } } });
+  if (current?.key) {
+    requestTwFollowers(current.login, current.key, { force: true });
+    if (lastTwFollow) {
+      safeSendMessage({ type: 'YT_STREAM_META', payload: { videoId: current.key, followerSample: { ...lastTwFollow, at: Date.now(), force: true } } });
+    }
   }
   current?.stop();
 });
