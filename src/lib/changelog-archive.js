@@ -24,6 +24,14 @@
 /** @type {ChangelogEntry[]} */
 const ARCHIVE_ENTRIES = [
   Object.freeze({
+    version: '0.1.2140',
+    date: '2026-11-17',
+    summary: '分析レポートの見た目は今までどおり',
+    items: Object.freeze([
+      'ニコ生の分析レポートの見た目は、この更新では変えていません。',
+    ])
+  }),
+  Object.freeze({
     version: '0.1.2139',
     date: '2026-11-16',
     summary: '読み足した過去コメントを吹き出しに出さない',

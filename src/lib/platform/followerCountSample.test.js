@@ -25,6 +25,9 @@ describe('ページの人数の文字', () => {
     expect(parseFollowerCountText('12,345')).toEqual({ count: 12345, rounded: false });
     expect(parseFollowerCountText('チャンネル登録者数 1.2万人')).toMatchObject({ count: 12000, rounded: true, raw: '1.2万' });
     expect(parseFollowerCountText('1.23K subscribers')).toMatchObject({ count: 1230, rounded: true });
+    expect(parseFollowerCountText('139K')).toMatchObject({ count: 139000, rounded: true, raw: '139K' });
+    expect(parseFollowerCountText('13.9万人')).toMatchObject({ count: 139000, rounded: true, raw: '13.9万' });
+    expect(parseFollowerCountText('1.5億人')).toMatchObject({ count: 150000000, rounded: true, raw: '1.5億' });
     expect(parseFollowerCountText('10,533')).toEqual({ count: 10533, rounded: false });
   });
   it('視聴数の文は人数にしない', () => {
@@ -127,6 +130,12 @@ describe('各サービスのページ', () => {
     document.body.innerHTML = '<html data-nl-yt-subscribers="チャンネル登録者数 13.9万人"><body><div id="owner"></div></body></html>';
     document.documentElement.setAttribute('data-nl-yt-subscribers', 'チャンネル登録者数 13.9万人');
     expect(followerSampleFromDom(document, 'youtube')).toMatchObject({ count: 139000, rounded: true, raw: '13.9万' });
+    document.body.innerHTML = '<div id="owner"><span>チャンネル登録者数 139</span><span>K</span></div>';
+    document.documentElement.removeAttribute('data-nl-yt-subscribers');
+    expect(followerSampleFromDom(document, 'youtube')).toMatchObject({ count: 139000, rounded: true, raw: '139K' });
+    document.body.innerHTML = '<div id="owner"><span>チャンネル登録者数 139</span></div>';
+    document.documentElement.setAttribute('data-nl-yt-subscribers', '13.9万人');
+    expect(followerSampleFromDom(document, 'youtube')).toMatchObject({ count: 139000, rounded: true, raw: '13.9万' });
   });
   it('Twitch の視聴者数とフォローボタンは人数にしない', () => {
     document.body.innerHTML = '<span data-a-target="animated-channel-viewers-count">10533</span><button data-a-target="follow-button">フォロー</button>';
@@ -157,6 +166,19 @@ describe('増えた時間', () => {
     expect(onlyRounded?.label).toContain('1.2万 → 1.3万');
     expect(onlyRounded?.label).toContain('概数');
     expect(onlyRounded?.label).not.toContain('＋');
+    const mixed = analyzeFollowerGrowth([
+      { at: T0, count: 139000, rounded: true, source: 'rounded', raw: '139K', noun: 'チャンネル登録者' },
+      { at: T0 + 180_000, count: 139, rounded: false, source: 'page-count' },
+    ]);
+    expect(mixed?.roundedOnly).toBe(true);
+    expect(mixed?.label).toContain('139K');
+    expect(mixed?.label).toContain('概数');
+    expect(mixed?.label).not.toContain('139人');
+  });
+  it('概数の桁を落とした整数は標本に混ぜない', () => {
+    const prev = [{ at: T0, count: 139000, rounded: true, source: /** @type {const} */ ('rounded'), raw: '139K' }];
+    const next = appendFollowerSample(prev, { at: T0 + 600_000, count: 139, rounded: false, source: 'page-count' });
+    expect(next).toBe(prev);
   });
   it('増えた幅の大きい順に、そのあいだの応援とコメントを数える', () => {
     const samples = [

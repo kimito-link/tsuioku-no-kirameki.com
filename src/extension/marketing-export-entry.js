@@ -82,7 +82,7 @@ import { exportWaitLinesForKind, resolveHtmlReportBuildTimeoutMs } from '../lib/
 import { mergeTailRowsIntoDisplay } from '../lib/mergeTailRowsIntoDisplay.js';
 import { normalizeTailRowsForDisplay } from '../lib/readAllCommentsForLive.js';
 import { MARKETING_EXPORT_STATE_PARAM, withMarketingExportState } from '../lib/marketingExportTabState.js';
-import { followerSamplesStorageKey } from '../lib/platform/followerSampleStore.js';
+import { followerSamplesStorageKey, readStoredFollowerSamples } from '../lib/platform/followerSampleStore.js';
 
 /**
  * @typedef {{
@@ -558,18 +558,32 @@ function showLockStage(lid) {
 // ── stage 4: メイン処理(既存パイプラインを呼び出し順序・引数不変で実行) ──
 
 /**
- * 人数の標本は小さい鍵だけを、短い時間だけ読む。通信もしない。配信要約の全件は読まない。
- * 読めなくてもレポート本体は出す。
+ * 保存済みの人数の標本を読む。通信はしない。配信要約の全件も読まない。
+ * 小さい鍵の読みは時間で空にしない（保存済みなら書き出しに出す）。
+ * 鍵が空のときだけ、その配信の標本をサービスワーカーのメモリに聞く。
  * @param {string} lid
  * @param {Record<string, any> | null | undefined} snapshot
  */
 async function followerSamplesForExport(lid, snapshot) {
-  if (Array.isArray(snapshot?.followerSamples) && snapshot.followerSamples.length) return snapshot.followerSamples;
+  /** @type {Record<string, unknown> | null} */
+  let bag = null;
   try {
-    const key = followerSamplesStorageKey(lid);
-    const bag = await withTimeout(chrome.storage.local.get(key), 800, 'follower_samples_timeout');
-    const rows = /** @type {Record<string, unknown>} */ (bag)?.[key];
-    return Array.isArray(rows) ? rows : [];
+    bag = /** @type {Record<string, unknown>} */ (await chrome.storage.local.get(followerSamplesStorageKey(lid)));
+  } catch {
+    bag = null;
+  }
+  const stored = readStoredFollowerSamples(lid, snapshot, bag);
+  if (stored.length) return stored;
+  try {
+    const res = await withTimeout(
+      chrome.runtime.sendMessage({ type: 'YT_GET_FOLLOWER_SAMPLES', liveId: lid }),
+      2500,
+      'follower_samples_timeout'
+    );
+    const samples = res && Array.isArray(/** @type {{ samples?: unknown }} */ (res).samples)
+      ? /** @type {{ samples: unknown[] }} */ (res).samples
+      : [];
+    return samples;
   } catch {
     return [];
   }

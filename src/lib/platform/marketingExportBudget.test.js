@@ -64,6 +64,7 @@ describe('Twitch の書き出し', () => {
     const src = readFileSync(new URL('../../extension/marketing-export-entry.js', import.meta.url), 'utf8');
     const fn = src.slice(src.indexOf('async function followerSamplesForExport'), src.indexOf('async function runExport'));
     expect(fn).toContain('withTimeout');
+    expect(fn).not.toContain(', 800,');
     expect(fn).not.toContain('yt_stream_summaries');
     expect(fn).not.toContain('fetch(');
     const block = src.slice(src.indexOf('const commentsRaw'), src.indexOf('gift_storage_timeout'));

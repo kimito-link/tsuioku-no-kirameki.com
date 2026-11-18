@@ -62,7 +62,7 @@ import {
   readAllVoices,
 } from '../../src/lib/youtube/ytSplitPersistStore.js';
 import { computePseudoLvForVideoId } from '../../src/lib/youtube/ytPseudoLv.js';
-import { followerSamplesStorageKey } from '../../src/lib/platform/followerSampleStore.js';
+import { followerSamplesExportEntry } from '../../src/lib/platform/followerSampleStore.js';
 import { swStaleDecision } from '../../src/lib/swStaleCheck.js';
 /** @type {Map<string, string>} 配信 → 最後に書いた公式ランキングの指紋(0.1.1959) */
 const lastLeaderboardSig = new Map();
@@ -317,14 +317,24 @@ const followerExportSig = new Map();
  * @param {any} summary
  */
 async function rememberFollowerSamplesForExport(videoId, summary) {
-  const samples = summary?.followerSamples;
-  if (!Array.isArray(samples) || samples.length === 0) return;
-  const last = samples[samples.length - 1] || {};
-  const sig = `${samples.length}:${last.at}:${last.count}:${last.rounded ? 1 : 0}:${last.raw || ''}`;
+  const entry = followerSamplesExportEntry(videoId, summary);
+  if (!entry) return;
+  const last = /** @type {{ at?: number, count?: number, rounded?: boolean, raw?: string }} */ (entry.samples[entry.samples.length - 1] || {});
+  const sig = `${entry.samples.length}:${last.at}:${last.count}:${last.rounded ? 1 : 0}:${last.raw || ''}`;
   if (followerExportSig.get(videoId) === sig) return;
   followerExportSig.set(videoId, sig);
   try {
-    await chrome.storage.local.set({ [followerSamplesStorageKey(computePseudoLvForVideoId(videoId))]: samples });
+    const prevBag = await chrome.storage.local.get(entry.profileKey);
+    const prev = prevBag?.[entry.profileKey];
+    const profile = prev && typeof prev === 'object' ? { ...prev } : {};
+    if (entry.followerCount != null) {
+      profile.followerCount = entry.followerCount;
+      profile.capturedAt = entry.capturedAt;
+    }
+    await chrome.storage.local.set({
+      [entry.key]: entry.samples,
+      [entry.profileKey]: profile,
+    });
   } catch {
     followerExportSig.delete(videoId);
   }
@@ -1034,6 +1044,26 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
     ensureSummaryMem()
       .then((summaries) => sendResponse({ ok: true, summaries }))
       .catch(() => sendResponse({ ok: false, summaries: {} }));
+    return true;
+  }
+
+  if (message.type === 'YT_GET_FOLLOWER_SAMPLES') {
+    if (!sender || sender.id !== chrome.runtime.id) return false;
+    const lv = String(message.liveId || '').trim().toLowerCase();
+    ensureSummaryMem()
+      .then((summaries) => {
+        let samples = /** @type {unknown[]} */ ([]);
+        if (lv && summaries) {
+          for (const [vid, sum] of Object.entries(summaries)) {
+            if (computePseudoLvForVideoId(vid).toLowerCase() !== lv) continue;
+            const rows = /** @type {{ followerSamples?: unknown }} */ (sum)?.followerSamples;
+            if (Array.isArray(rows) && rows.length) samples = rows;
+            break;
+          }
+        }
+        sendResponse({ ok: true, samples });
+      })
+      .catch(() => sendResponse({ ok: false, samples: [] }));
     return true;
   }
 

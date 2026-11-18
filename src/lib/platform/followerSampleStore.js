@@ -3,8 +3,9 @@
  * 新しい通信はしない。標本は nls_follower_samples_<lv>。プロフィールの間隔（5分）のまま。
  */
 
-import { appendFollowerSample } from './followerCountSample.js';
+import { appendFollowerSample, followerCountForDisplay } from './followerCountSample.js';
 import { broadcasterProfileStorageKey } from '../storageKeys.js';
+import { computePseudoLvForVideoId } from '../youtube/ytPseudoLv.js';
 
 const COUNT_MAX = 50_000_000;
 
@@ -13,6 +14,41 @@ const COUNT_MAX = 50_000_000;
  */
 export function followerSamplesStorageKey(liveId) {
   return `nls_follower_samples_${String(liveId || '').trim().toLowerCase()}`;
+}
+
+/**
+ * 人数の知らせを書き出しが読む鍵にする。配信 ID から疑似 lv を作り、同じ鍵を読み出す。
+ * @param {string} videoId
+ * @param {{ followerSamples?: unknown } | null | undefined} summary
+ * @returns {{ liveId: string, key: string, samples: unknown[], profileKey: string, followerCount: number | null, capturedAt: number | null } | null}
+ */
+export function followerSamplesExportEntry(videoId, summary) {
+  const samples = Array.isArray(summary?.followerSamples) ? summary.followerSamples : [];
+  const liveId = computePseudoLvForVideoId(String(videoId || '').trim());
+  if (!liveId || samples.length === 0) return null;
+  const shown = followerCountForDisplay(samples);
+  return {
+    liveId,
+    key: followerSamplesStorageKey(liveId),
+    samples,
+    profileKey: broadcasterProfileStorageKey(liveId),
+    followerCount: shown ? shown.count : null,
+    capturedAt: shown ? shown.at : null,
+  };
+}
+
+/**
+ * 書き出しが人数を読む順。画面の控えより、保存した標本の方が多ければそちら。
+ * @param {string} lid
+ * @param {{ followerSamples?: unknown } | null | undefined} snapshot
+ * @param {Record<string, unknown> | null | undefined} bag
+ */
+export function readStoredFollowerSamples(lid, snapshot, bag) {
+  const snapRows = Array.isArray(snapshot?.followerSamples) ? snapshot.followerSamples : [];
+  const key = followerSamplesStorageKey(lid);
+  const stored = bag && typeof bag === 'object' && Array.isArray(bag[key]) ? bag[key] : [];
+  if (stored.length > snapRows.length) return stored;
+  return snapRows.length ? snapRows : stored;
 }
 
 /**

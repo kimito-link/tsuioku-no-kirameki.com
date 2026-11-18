@@ -18,6 +18,15 @@
 /** @type {readonly ChangelogEntry[]} */
 export const EXTENSION_CHANGELOG = Object.freeze([
   Object.freeze({
+    version: '0.1.2160',
+    date: '2026-11-18',
+    summary: '保存したフォロワー数を書き出しに出す',
+    items: Object.freeze([
+      '配信中に保存したフォロワー数を、書き出しの「応援が届いた瞬間」とフォロワー数の欄に出します。',
+      'YouTube の「13.9万」のような概数は、桁を落とした人数と混ぜません。',
+    ])
+  }),
+  Object.freeze({
     version: '0.1.2159',
     date: '2026-11-18',
     summary: '概数の登録者と長い応援一覧を直す',
@@ -194,14 +203,6 @@ export const EXTENSION_CHANGELOG = Object.freeze([
       'ニコ生以外の分析レポートでは、そのサービスに無い数（広告・来場・184）を出さないようにしました。同時に見ている人数は、そのサービスの呼び方で出します。',
       'レイド・加入のようなシステムの行を、コメントの件数に数えないようにしました。',
       'ミクチャのファン登録を記録するようにしました。円に換算した合計は「推定」と書きます。',
-    ])
-  }),
-  Object.freeze({
-    version: '0.1.2140',
-    date: '2026-11-17',
-    summary: '分析レポートの見た目は今までどおり',
-    items: Object.freeze([
-      'ニコ生の分析レポートの見た目は、この更新では変えていません。',
     ])
   }),
 ]);

@@ -12,7 +12,7 @@
 export const FOLLOWER_SAMPLE_INTERVAL_MS = 3 * 60 * 1000;
 export const FOLLOWER_SAMPLE_CAP = 160;
 const FORCE_GAP_MS = 15 * 1000;
-const COUNT_MAX = 50_000_000;
+const COUNT_MAX = 2_000_000_000;
 
 /** 画面の言葉。サービスが使っている呼び方だけ。 */
 export const FOLLOWER_NOUN = Object.freeze({
@@ -47,7 +47,7 @@ export const FOLLOWER_NOUN = Object.freeze({
 function exactInt(v) {
   let n = NaN;
   if (typeof v === 'number') n = v;
-  else if (typeof v === 'string' && /^\d{1,9}$/.test(v)) n = Number(v);
+  else if (typeof v === 'string' && /^\d{1,10}$/.test(v)) n = Number(v);
   if (!Number.isInteger(n) || n < 0 || n > COUNT_MAX) return null;
   return n;
 }
@@ -73,16 +73,20 @@ function asObj(v) {
  * @returns {{ count: number, rounded: boolean, raw?: string } | null}
  */
 export function parseFollowerCountText(raw) {
-  const text = String(raw ?? '').replace(/\s+/g, ' ').trim();
+  const text = String(raw ?? '')
+    .replace(/[０-９]/g, (ch) => String.fromCharCode(ch.charCodeAt(0) - 0xfee0))
+    .replace(/．/g, '.')
+    .replace(/\s+/g, ' ')
+    .trim();
   if (!text || text.length > 80) return null;
   const viewerish = /視聴|コメント|comment|viewer/i.test(text);
   const followerish = /フォロワー|登録者|ファン|サポーター|follower|subscriber/i.test(text);
   if (viewerish && !followerish) return null;
-  const compact = /([\d]+(?:[.,]\d+)?)\s*(万|千|[kKmM])(?![a-zA-Z])/u.exec(text);
+  const compact = /([\d]+(?:[.,]\d+)?)\s*(億|万|千|[kKmM])(?![a-zA-Z])/u.exec(text);
   if (compact) {
     const n = Number(compact[1].replace(',', '.'));
     const unit = compact[2];
-    const mul = unit === '万' ? 10000 : unit === '千' ? 1000 : unit.toLowerCase() === 'k' ? 1000 : 1000000;
+    const mul = unit === '億' ? 100000000 : unit === '万' ? 10000 : unit === '千' ? 1000 : unit.toLowerCase() === 'k' ? 1000 : 1000000;
     const count = Math.round(n * mul);
     if (!Number.isFinite(n) || count < 0 || count > COUNT_MAX) return null;
     return { count, rounded: true, raw: `${compact[1]}${unit}` };
@@ -92,6 +96,59 @@ export function parseFollowerCountText(raw) {
   const count = exactInt(nums[0].replace(/[,，]/g, ''));
   if (count == null) return null;
   return { count, rounded: false };
+}
+
+/**
+ * 概数の桁と小数を落としただけの整数（139K や 13.9万 を 139 と読んだもの）か。
+ * 正確な人数どうしは比べない。
+ * @param {Array<{ count?: number, rounded?: boolean, raw?: string }>} samples
+ * @param {number} count
+ * @param {boolean} rounded
+ */
+export function isMisparsedExactCount(samples, count, rounded) {
+  if (rounded || !Number.isInteger(count)) return false;
+  for (const sample of samples) {
+    if (!sample || sample.rounded !== true) continue;
+    const roundedCount = Number(sample.count);
+    if (roundedCount >= 1000 && count > 0 && count < roundedCount / 50) return true;
+    const digits = String(sample.raw || '').replace(/\D/g, '');
+    if (digits && Number(digits) === count && count !== roundedCount) return true;
+  }
+  return false;
+}
+
+/**
+ * ノード自身と、その短い親の文から人数を読む。概数があるときは、桁を落とした整数よりそちらを採る。
+ * @param {Element} el
+ * @returns {{ count: number, rounded: boolean, raw?: string } | null}
+ */
+function parseFollowerElement(el) {
+  /** @type {{ count: number, rounded: boolean, raw?: string } | null} */
+  let exact = null;
+  /** @type {string[]} */
+  const bits = [];
+  try {
+    const aria = String(el.getAttribute?.('aria-label') || '');
+    const title = String(el.getAttribute?.('title') || '');
+    if (aria) bits.push(aria);
+    if (title) bits.push(title);
+  } catch {
+    /* 属性が無くても本文は見る */
+  }
+  /** @type {Element | null} */
+  let node = el;
+  for (let depth = 0; depth < 4 && node; depth += 1) {
+    const text = String(node.textContent || '').replace(/\s+/g, ' ').trim();
+    if (text && text.length <= 80) bits.push(text);
+    node = node.parentElement;
+  }
+  for (const bit of bits) {
+    const parsed = parseFollowerCountText(bit);
+    if (!parsed) continue;
+    if (parsed.rounded) return parsed;
+    if (!exact) exact = parsed;
+  }
+  return exact;
 }
 
 /**
@@ -110,6 +167,7 @@ export function appendFollowerSample(existing, sample, nowMs = Date.now()) {
   const at = Number.isFinite(atRaw) && atRaw > 0 ? Math.floor(atRaw) : Math.floor(nowMs);
   if (!(at > 0)) return prev;
   const rounded = row.rounded === true;
+  if (isMisparsedExactCount(prev, count, rounded)) return prev;
   const source = row.source === 'exact-event' ? 'exact-event' : rounded ? 'rounded' : 'page-count';
   const last = prev.length ? prev[prev.length - 1] : null;
   const force = row.force === true;
@@ -281,7 +339,7 @@ export function followerSampleFromDom(doc, platformId) {
       if (!blob || blob.length > 80) continue;
       if (platformId === 'abema' && !/フォロワー|フォロー数|follower/i.test(`${sel} ${blob}`)) continue;
       if (platformId === 'twitch' && !/follower|フォロワー/i.test(`${sel} ${blob}`)) continue;
-      const parsed = parseFollowerCountText(title) || parseFollowerCountText(aria) || parseFollowerCountText(text);
+      const parsed = parseFollowerElement(el);
       if (!parsed) continue;
       return sampleOf(parsed, noun, 'page-count');
     }
@@ -317,11 +375,24 @@ function youtubeOwnerFollowerSample(doc, noun) {
     } catch {
       continue;
     }
+    /** @type {{ count: number, rounded: boolean, raw?: string } | null} */
+    let exact = null;
     for (const el of nodes) {
       const text = String(el.textContent || '').replace(/\s+/g, ' ').trim();
       if (!text || text.length > 40 || !/登録者|subscriber/i.test(text)) continue;
-      const parsed = parseFollowerCountText(text);
-      if (parsed) return sampleOf(parsed, noun, 'page-count');
+      const parsed = parseFollowerElement(el);
+      if (!parsed) continue;
+      if (parsed.rounded) return sampleOf(parsed, noun, 'page-count');
+      if (!exact) exact = parsed;
+    }
+    if (exact) {
+      const rootEl = /** @type {{ documentElement?: Element, getAttribute?: (n: string) => string | null }} */ (doc);
+      const published = String(rootEl.documentElement?.getAttribute?.('data-nl-yt-subscribers') || rootEl.getAttribute?.('data-nl-yt-subscribers') || '');
+      const fromAttr = parseFollowerCountText(published);
+      if (fromAttr?.rounded && isMisparsedExactCount([fromAttr], exact.count, false)) {
+        return sampleOf(fromAttr, noun, 'page-count');
+      }
+      return sampleOf(exact, noun, 'page-count');
     }
   }
   const rootEl = /** @type {{ documentElement?: Element, getAttribute?: (n: string) => string | null }} */ (doc);
@@ -371,7 +442,8 @@ export function analyzeFollowerGrowth(samples, opts = {}) {
       };
     })
     .filter((s) => s.at > 0 && Number.isInteger(s.count) && s.count >= 0 && s.count <= COUNT_MAX)
-    .sort((a, b) => a.at - b.at);
+    .sort((a, b) => a.at - b.at)
+    .filter((s, _i, all) => !isMisparsedExactCount(all, s.count, s.rounded));
   if (!list.length) return null;
   const noun = list.find((s) => s.noun)?.noun || opts.noun || 'フォロワー';
   const usable = list.filter((s) => !s.rounded);
@@ -416,4 +488,28 @@ export function analyzeFollowerGrowth(samples, opts = {}) {
       commentCount: countIn(commentAts, w.t0, w.t1),
     })),
   };
+}
+
+/**
+ * 欄に出す人数。桁を落とした整数は使わず、正確な最後の標本、無ければ概数の最後を返す。
+ * @param {unknown} samples
+ * @returns {{ count: number, at: number, rounded: boolean } | null}
+ */
+export function followerCountForDisplay(samples) {
+  const list = (Array.isArray(samples) ? samples : [])
+    .map((s) => {
+      const o = asObj(s);
+      return {
+        at: Math.floor(Number(o?.at)),
+        count: Math.floor(Number(o?.count)),
+        rounded: o?.rounded === true,
+        raw: typeof o?.raw === 'string' ? o.raw : '',
+      };
+    })
+    .filter((s) => s.at > 0 && Number.isInteger(s.count) && s.count >= 0 && s.count <= COUNT_MAX)
+    .filter((s, _i, all) => !isMisparsedExactCount(all, s.count, s.rounded));
+  if (!list.length) return null;
+  const exact = list.filter((s) => !s.rounded);
+  const pick = exact.length ? exact[exact.length - 1] : list[list.length - 1];
+  return { count: pick.count, at: pick.at, rounded: pick.rounded === true };
 }
