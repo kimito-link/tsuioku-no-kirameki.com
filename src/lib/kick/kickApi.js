@@ -18,6 +18,16 @@ export function kickChannelApiUrl(slug) {
 }
 
 /**
+ * チャンネルの絵文字一覧。認証なしで 200（2026-11-18 実測）。
+ * Global と Emoji も同じ応答に入る。`/emotes` だけ（全体だけ）は 401。
+ * @param {string} slug
+ */
+export function kickEmoteCatalogUrl(slug) {
+  const s = String(slug ?? '').trim().toLowerCase();
+  return isKickSlug(s) ? `https://kick.com/emotes/${s}` : '';
+}
+
+/**
  * /api/v2/channels/<slug> → 配信の情報。形が違えば null。
  * @param {unknown} json
  * @returns {null | {

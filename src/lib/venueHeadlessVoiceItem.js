@@ -18,7 +18,7 @@ export function buildVenueHeadlessVoiceItem(speech, context) {
     userId: speech?.userId,
     nickname: speech?.name,
     key: speech?.key,
-    text: speech?.text,
+    text: typeof speech?.voiceText === 'string' ? speech.voiceText : speech?.text,
     receivedAt: toEpochMs(speech?.capturedAt) || toEpochMs(context?.receivedAt) || Date.now(),
     liveId: String(context?.liveId || ''),
     broadcasterUid: String(context?.broadcasterUid || '')

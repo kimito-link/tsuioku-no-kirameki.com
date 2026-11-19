@@ -1,5 +1,5 @@
 // kick-content-entry.js — Kick の視聴ページ(kick.com/<チャンネル>)で、チャットを読んで記録に渡す入口。
-/* global chrome, crypto, WebSocket, location, setTimeout, clearTimeout, setInterval, clearInterval, window, fetch, document, HTMLTextAreaElement, Event, KeyboardEvent */
+/* global chrome, crypto, WebSocket, location, setTimeout, clearTimeout, setInterval, clearInterval, window, fetch, document, HTMLTextAreaElement, Event, KeyboardEvent, MutationObserver */
 //
 // ★設計(council/kick-support-PLAN.md・Twitch の tw-content-entry.js と同じ形)
 //   - 読むのは Kick のページ自身が使うリアルタイムの接続(ログイン無しで購読できる)。DOM より壊れにくい。
@@ -34,7 +34,10 @@ import {
   kickKicksLeaderboardUrl,
   parseKickSubsLeaderboard,
   kickSubsLeaderboardUrl,
+  kickEmoteCatalogUrl,
 } from '../../src/lib/kick/kickApi.js';
+import { followerSampleFromDom, followerSampleFromKickChannel, followerSampleFromKickEvent } from '../../src/lib/platform/followerCountSample.js';
+import { kickEmotesFromCatalog, kickEmotesFromDom } from '../../src/lib/platform/streamEmotes.js';
 import { runBackfillLoop } from '../../src/lib/platform/historyBackfill.js';
 import { buildKickStreamKey } from '../../src/lib/platform/streamPlatform.js';
 import {
@@ -132,6 +135,41 @@ function safeSendMessage(/** @type {any} */ msg) {
 let diagTimer = 0;
 /** 絵文字の名前 → 画像(画面で本文を画像にする・pfEmoteStore.js) */
 const emoteSaver = createEmoteSaver('yt_kk_emotes');
+/** @param {{ name: string, url: string }[]} list */
+function learnEmotes(list) {
+  if (!list.length) return;
+  emoteSaver.takeFrom([{ emotes: list }]);
+}
+/** 公開の絵文字一覧（チャンネル＋Global＋Emoji）。失敗しても印と画面の画像で覚える @param {string} slug */
+async function fetchEmoteCatalog(slug) {
+  const url = kickEmoteCatalogUrl(slug);
+  if (!url) return;
+  try {
+    learnEmotes(kickEmotesFromCatalog(await getJson(url)));
+  } catch {
+    /* 一覧が無くてもチャットは読む */
+  }
+}
+/**
+ * 画面に出ている絵文字は img の alt を本文にしない。data-emote-id と src から名前→画像を覚える。
+ * 新しいノードが来たときだけ見る（タイマーで全件を走査しない）。
+ */
+function startKickDomEmotes() {
+  if (startKickDomEmotes.started || typeof document === 'undefined' || typeof MutationObserver !== 'function') return;
+  startKickDomEmotes.started = true;
+  /** @param {Node} node */
+  const harvest = (node) => {
+    if (!node || node.nodeType !== 1) return;
+    const el = /** @type {Element} */ (node);
+    if (typeof el.matches === 'function' && el.matches('[data-emote-id]')) learnEmotes(kickEmotesFromDom(el));
+    else if (typeof el.querySelector === 'function' && el.querySelector('[data-emote-id]')) learnEmotes(kickEmotesFromDom(el));
+  };
+  harvest(document.documentElement);
+  new MutationObserver((muts) => {
+    for (const m of muts) for (const n of m.addedNodes) harvest(n);
+  }).observe(document.documentElement, { childList: true, subtree: true });
+}
+startKickDomEmotes.started = false;
 function saveDiagSoon() {
   if (diagTimer) return;
   diagTimer = setTimeout(() => {
@@ -176,8 +214,12 @@ async function getJson(url) {
 /** @param {string} slug */
 async function fetchChannel(slug) {
   try {
-    const info = parseKickChannel(await getJson(kickChannelApiUrl(slug)));
-    if (info) return info;
+    const json = await getJson(kickChannelApiUrl(slug));
+    const info = parseKickChannel(json);
+    if (info) {
+      const sample = followerSampleFromKickChannel(json) || followerSampleFromDom(document, 'kick');
+      return sample ? { ...info, followerSample: sample } : info;
+    }
   } catch {
     /* 下で数える */
   }
@@ -300,6 +342,8 @@ function lookupIcons(slugs) {
 
 // ---- 1配信ぶんの読み取り ----
 let current = /** @type {null | { slug: string, key: string, stop: () => void }} */ (null);
+/** @type {null | { count: number, rounded: boolean, source: string, noun?: string }} */
+let lastKickFollow = null;
 
 /**
  * @param {string} slug
@@ -307,6 +351,8 @@ let current = /** @type {null | { slug: string, key: string, stop: () => void }}
  * @param {{ chatroomId: string, channelId: string, userId?: string, startedAtMs?: number }} ids
  */
 function startReader(slug, key, ids) {
+  void fetchEmoteCatalog(slug);
+  startKickDomEmotes();
   let stopped = false;
   /** @type {WebSocket | null} */
   let ws = null;
@@ -353,6 +399,11 @@ function startReader(slug, key, ids) {
   const onEvent = (f, opts = {}) => {
     const evName = f.event.replace(/^App\\Events\\/, '').slice(0, 60);
     diag.events[evName] = (diag.events[evName] || 0) + 1;
+    const follow = followerSampleFromKickEvent(evName, f.data);
+    if (follow) {
+      lastKickFollow = follow;
+      safeSendMessage({ type: 'YT_STREAM_META', payload: { videoId: key, followerSample: { ...follow, at: Date.now() } } });
+    }
     if (evName === 'KicksLeaderboardUpdated') return sendBoard(parseKickKicksLeaderboard(f.data), 'socket');
     if (evName === 'GiftsLeaderboardUpdated') return sendSubBoard(parseKickSubsLeaderboard(f.data), 'socket');
     const del = parseKickDeleted(f);
@@ -698,7 +749,14 @@ async function check() {
         const endedKey = current.key;
         current.stop();
         current = null;
-        safeSendMessage({ type: 'YT_STREAM_META', payload: { videoId: endedKey, endedAt: Date.now() } });
+        safeSendMessage({
+          type: 'YT_STREAM_META',
+          payload: {
+            videoId: endedKey,
+            endedAt: Date.now(),
+            ...(lastKickFollow ? { followerSample: { ...lastKickFollow, at: Date.now(), force: true } } : {}),
+          },
+        });
       }
       diag.streamKey = '';
       saveDiagSoon();
@@ -723,8 +781,10 @@ async function check() {
         broadcasterIconUrl: info.iconUrl || '',
         concurrentViewers: typeof info.viewers === 'number' ? info.viewers : undefined,
         ...(info.startedAtMs ? { startedAt: info.startedAtMs, startedAtApprox: false } : {}),
+        ...(info.followerSample ? { followerSample: { ...info.followerSample, at: Date.now() } } : {}),
       },
     });
+    if (info.followerSample) lastKickFollow = info.followerSample;
     saveDiagSoon();
   } finally {
     checking = false;

@@ -142,7 +142,7 @@ export function buildYtGiftBags(entries, lv, opts = {}) {
     // 投げ一覧の「アイテム」に元の金額を添える(例: スーパーチャット $5.00)。種類ごとの合計は元の名前で数える
     // YouTube の新しい「ギフト」(ジュエルのスタンプ)はギフトの名前と絵がある(例: ハイ)。金額は出ないので pt は 0
     // ふわっちのアイテム・SHOWROOM のギフトも名前と絵がある
-    const named = kind === 'yt_gift' || /^(?:whowatch|showroom|mixch|twitcasting)$/.test(String(e.ytPlatform || ''));
+    const named = kind === 'yt_gift' || /^(?:whowatch|showroom|mixch|twitcasting|tiktok)$/.test(String(e.ytPlatform || ''));
     const giftName = named ? String(e.ytGiftName || '').trim() : '';
     const giftThumb = named ? String(e.ytGiftImageUrl || '') : '';
     const twGiftCount = Number(e.ytGiftCount || 0);

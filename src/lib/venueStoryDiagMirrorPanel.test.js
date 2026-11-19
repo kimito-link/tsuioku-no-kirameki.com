@@ -55,6 +55,19 @@ describe('renderVenueStoryDiagMirrorPanel', () => {
     expect(host.textContent).toContain('①の診断(内訳 4秒前)');
     expect(host.innerHTML).toContain('nl-story-diag--compact');
     expect(host.innerHTML).toContain('nl-story-diag--verbose');
+    expect(host.innerHTML).toContain('ニコの「user 英数字」仮名は強い表示名に入りません');
+  });
+
+  it('Kick と Twitch の会場では、ニコ生だけの仮名の注記を出さない', () => {
+    const host = document.createElement('div');
+    const kick = { ...SNAP, liveId: 'kk.westcol.1' };
+    renderVenueStoryDiagMirrorPanel(host, kick, { liveId: 'kk.westcol.1', nowMs: 14_000, lastSig: '' });
+    expect(host.innerHTML).toContain('ユーザーレーンの候補');
+    expect(host.innerHTML).not.toContain('ニコの「user 英数字」仮名は強い表示名に入りません');
+    const tw = document.createElement('div');
+    const twitch = { ...SNAP, liveId: 'tw.examplechan.1' };
+    renderVenueStoryDiagMirrorPanel(tw, twitch, { liveId: 'tw.examplechan.1', nowMs: 14_000, lastSig: '' });
+    expect(tw.innerHTML).not.toContain('user 英数字');
   });
 
   it('liveId が会場対象配信と不一致なら非表示(panelSummary 未指定=挙動不変)', () => {

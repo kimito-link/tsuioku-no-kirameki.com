@@ -342,7 +342,7 @@ test('Twitch のチャットを記録し、送信も届く', async ({ context, i
     .poll(() => ext.evaluate(() => String(document.querySelector('[data-lane="contributionRanking"] .nl-north-star-lane__label')?.textContent || '').trim()), { timeout: 10_000 })
     .toBe('Twitch 公式の Bits ランキング');
 
-  // 絵文字(Kappa)は名前 → 画像の対応を覚え、コメントの一覧では画像で見せる。文字は消さない(textContent はそのまま)
+  // 絵文字(Kappa)は名前 → 画像の対応を覚え、一覧では画像だけにする。印の名前は文字に残さない。
   await expect
     .poll(async () => (await sw.evaluate(async () => chrome.storage.local.get('yt_tw_emotes'))).yt_tw_emotes, { timeout: 10_000 })
     .toEqual({ Kappa: 'https://static-cdn.jtvnw.net/emoticons/v2/25/default/dark/2.0' });
@@ -357,7 +357,8 @@ test('Twitch のチャットを記録し、送信も届く', async ({ context, i
   await expect
     .poll(() => ext.evaluate(() => {
       const e = document.querySelector('.nl-tl-row__text .nl-emote');
-      return e ? `${e.textContent}|${e.classList.contains('is-ready')}|${/emoticons\/v2\/25\//.test(/** @type {HTMLElement} */ (e).style.backgroundImage)}|${e.closest('.nl-tl-row__text')?.textContent}` : '';
+      const row = (e?.closest('.nl-tl-row__text')?.textContent || '').replace(/\s+/g, ' ').trim();
+      return e ? `${e.textContent}|${e.classList.contains('is-ready')}|${/emoticons\/v2\/25\//.test(/** @type {HTMLElement} */ (e).style.backgroundImage)}|${row}` : '';
     }), { timeout: 20_000 })
-    .toBe('Kappa|true|true|わこつ Kappa');
+    .toBe('|true|true|わこつ');
 });

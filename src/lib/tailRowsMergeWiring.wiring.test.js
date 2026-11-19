@@ -12,8 +12,7 @@ const strip = (s) => s.replace(/\/\*[\s\S]*?\*\//g, '').replace(/^[ \t]*\/\/.*$/
 
 const SITES = [
   { file: 'src/extension/popup-entry.js', min: 4 },
-  { file: 'src/lib/readAllCommentsForLive.js', min: 1 },
-  { file: 'src/extension/marketing-export-entry.js', min: 1 }
+  { file: 'src/lib/readAllCommentsForLive.js', min: 2 }
 ];
 
 describe('テールの連結は mergeTailRowsIntoDisplay を通す', () => {
@@ -26,4 +25,11 @@ describe('テールの連結は mergeTailRowsIntoDisplay を通す', () => {
       expect(uses.length).toBeGreaterThanOrEqual(min);
     });
   }
+
+  it('書き出し画面は全件読み(readCommentsForExport)に任せ、テールを生で連結しない', () => {
+    const src = strip(read('src/extension/marketing-export-entry.js'));
+    expect(src).not.toMatch(/\.concat\(\s*(tailDisplayRows|tail)\s*\)/);
+    expect(src).toContain('readCommentsForExport(');
+    expect(src).not.toContain('mergeTailRowsIntoDisplay(');
+  });
 });

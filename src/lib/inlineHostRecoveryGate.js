@@ -75,6 +75,25 @@ export function shouldRenderInlineHostOnPoll(args) {
 }
 
 /**
+ * 視聴ページを離れてから、短い移動では消さず、一定時間たったら消す。
+ * 回数ではなく時刻で見る。裏のタブで点検が間引かれても、待ち時間は伸びない。
+ *
+ * @param {object} args
+ * @param {number} [args.sinceMs] 離れ始めた時刻。0 以下はまだ測っていない。
+ * @param {number} [args.nowMs]
+ * @param {number} [args.waitMs]
+ * @returns {{ hide: boolean, reason: 'not-started'|'debouncing'|'left-page' }}
+ */
+export function shouldHideAfterWatchLeave(args) {
+  const since = Number(args?.sinceMs);
+  const now = Number(args?.nowMs);
+  const waitMs = Math.max(0, Number(args?.waitMs) || 0);
+  if (!Number.isFinite(since) || since <= 0) return { hide: false, reason: 'not-started' };
+  if (!Number.isFinite(now) || now - since < waitMs) return { hide: false, reason: 'debouncing' };
+  return { hide: true, reason: 'left-page' };
+}
+
+/**
  * 「watch ページに居るのにパネルを消してよいか」の判定。
  *
  * ★消しすぎの真因: 消す条件が hasWatchCommentPanel() の false 連続だけだった。

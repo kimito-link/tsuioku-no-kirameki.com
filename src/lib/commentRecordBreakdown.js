@@ -9,8 +9,9 @@
  *     記録には含まれない。よって本関数の対象は「保存された後の rows」のみ。
  *   - 内訳カテゴリ:
  *       normal           - 通常コメント(一般人 + 配信者本人含む応援系)
- *       interestArrival  - 「○○が好きなN人が来場しました」
- *       followNotice     - フォロー通知(Phase B で parser 追加・現状 0)
+ *       interestArrival  - ニコ生の来場通知（好きなタグ・大百科・放送者の好み・放送者のサポーター）。
+ *                          公式どうしは時刻が違えばそれぞれ。約2秒で1回なのは公式と画面の二重だけ。
+ *       followNotice     - フォロー通知(ページが出したときだけ。コメント件数には入れない)
  *       otherSystem      - その他システムメッセージ(運営アナウンス等)
  *   - 「ギフト・広告は別カウント」をユーザーに明示するため、合計テキスト表示側で
  *     "ギフト・広告は別カードを参照" を出すのが UX 上の正解。
@@ -18,7 +19,7 @@
  * @module commentRecordBreakdown
  */
 
-import { parseInterestArrivalComment } from './parseInterestArrivalComment.js';
+import { createArrivalNoticeGate } from './arrivalNoticeRows.js';
 
 /**
  * @typedef {{
@@ -38,22 +39,28 @@ import { parseInterestArrivalComment } from './parseInterestArrivalComment.js';
  */
 export function summarizeCommentRecordBreakdown(comments) {
   let interestArrival = 0;
-  const followNotice = 0; // Phase B 用 placeholder(現状はパーサ未実装で常に 0)
+  let followNotice = 0;
   let otherSystem = 0;
   let normal = 0;
   const total = Array.isArray(comments) ? comments.length : 0;
   if (!total) {
     return { total: 0, normal: 0, interestArrival: 0, followNotice: 0, otherSystem: 0 };
   }
+  const arrivalGate = createArrivalNoticeGate();
   for (const c of comments) {
     if (!c || typeof c !== 'object') continue;
-    const text = String(/** @type {any} */ (c).text ?? '');
-    if (parseInterestArrivalComment(text)) {
+    const arrival = arrivalGate.accept(c);
+    if (arrival === 'count') {
       interestArrival += 1;
       continue;
     }
-    // Phase B 用 placeholder: parseFollowNoticeComment 実装後にここで分岐追加。
+    if (arrival === 'dup') continue;
     const commentType = /** @type {any} */ (c).commentType;
+    const kind = String(/** @type {any} */ (c).ytKind || /** @type {any} */ (c).kind || '');
+    if (commentType === 'followNotice' || kind === 'follow') {
+      followNotice += 1;
+      continue;
+    }
     const isSystem = /** @type {any} */ (c).isSystem === true;
     if (commentType === 'generalSystemMessage' || isSystem) {
       otherSystem += 1;

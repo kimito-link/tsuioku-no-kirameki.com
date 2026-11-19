@@ -513,6 +513,11 @@ import { buildWatchMetaCardAudienceViewModel } from '../lib/buildWatchMetaCardAu
 import { createAppliedEntriesMemo } from '../lib/appliedEntriesMemo.js';
 import { mergeTailRowsIntoDisplay } from '../lib/mergeTailRowsIntoDisplay.js';
 import {
+  EXPORT_COMMENT_READ_TIMEOUT_MS,
+  normalizeTailRowsForDisplay as normalizeTailRowsForDisplayShared,
+  readCommentsForExport
+} from '../lib/readAllCommentsForLive.js';
+import {
   formatAiShareDiagnosticsMarkdown,
   romiDebugDataChecklist
 } from '../lib/aiShareDiagnosticsMarkdown.js';
@@ -8297,27 +8302,9 @@ function storyDetailRecentEntries(entries, focusEntry, liveId, opts = {}) {
  * @returns {PopupCommentEntry[]}
  */
 function normalizeTailRowsForDisplay(rows, lv) {
-  if (!Array.isArray(rows) || rows.length === 0) return [];
-  const lid = String(lv || '').trim().toLowerCase();
-  /** @type {PopupCommentEntry[]} */
-  const out = [];
-  for (let i = 0; i < rows.length; i += 1) {
-    const r = /** @type {Record<string, unknown>} */ (rows[i]);
-    if (!r || typeof r !== 'object') continue;
-    const text = String(r.text ?? '').trim();
-    if (!text) continue;
-    const cap = Number(r.capturedAt);
-    out.push(
-      /** @type {PopupCommentEntry} */ ({
-        ...r,
-        id: String(r.id || `nls_tail_${lid}_${i}`),
-        liveId: lid,
-        text,
-        capturedAt: Number.isFinite(cap) && cap > 0 ? cap : Date.now()
-      })
-    );
-  }
-  return out;
+  return /** @type {PopupCommentEntry[]} */ (
+    normalizeTailRowsForDisplayShared(rows, lv, Date.now())
+  );
 }
 
 /**
@@ -8363,7 +8350,17 @@ async function readAllCommentsFromCommentDb(lv) {
  */
 async function resolveCommentsForHtmlExport(liveId) {
   const lid = String(liveId || '').trim().toLowerCase();
-  const full = await readAllCommentsForLive(liveId);
+  // 表示の見回りは短い時間切れのまま。書き出しだけ、保存した全件が返るまで待つ。
+  const full = await readCommentsForExport(liveId, {
+    readAllFromCommentDb: readAllCommentsFromCommentDb,
+    getMany: (keys) =>
+      readStorageBagWithRetry(() => chrome.storage.local.get(keys), {
+        attempts: 2,
+        delaysMs: [0, 200],
+        perAttemptTimeoutMs: EXPORT_COMMENT_READ_TIMEOUT_MS
+      }),
+    nowMs: Date.now()
+  });
   const memLive = String(STORY_SOURCE_STATE.liveId || '').trim().toLowerCase();
   const memEntries = Array.isArray(STORY_SOURCE_STATE.entries) ? STORY_SOURCE_STATE.entries : [];
   return /** @type {PopupCommentEntry[]} */ (pickCommentsForExport(full, memEntries, memLive === lid));
@@ -15310,8 +15307,11 @@ async function refresh() {
   if (treatAsNoActiveWatch) {
     if (!isFreshRefresh()) return;
     resetPerBroadcastPopupCachesIfLiveIdChanged('');
-    if (liveEl) liveEl.textContent = '（ニコ生watchを開いてください）';
+    const pinnedStream = new URLSearchParams(location.search).get('stream') || '';
+    if (liveEl) liveEl.textContent = pinnedStream ? 'この配信の記録がありません' : '（ニコ生watchを開いてください）';
+    if (pinnedStream) { const trend = $('devMonitorExportTrendStatus'); if (trend) trend.textContent = 'この配信の記録がありません'; }
     setCountDisplay('（この配信は未取得）');
+    exportBtn.dataset.liveId = '';
     renderCommentTicker([]);
     exportBtn.disabled = true;
     exportBtn.dataset.watchUrl = '';

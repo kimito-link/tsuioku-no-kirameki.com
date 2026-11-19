@@ -5,7 +5,9 @@
 import { normalizeCommentText } from './commentRecord.js';
 import { anonymousNicknameFallback } from './nicoAnonymousDisplay.js';
 import { parseGiftCommentText } from './parseGiftComment.js';
+import { parseArrivalCommentText } from './parseArrivalComment.js';
 import { shouldAcceptNdgrChatAsComment } from './ndgrDecode.js';
+import { toEpochMs } from './timeAuthority.js';
 
 /**
  * @param {import('./ndgrDecode.js').NdgrChat} chat
@@ -22,14 +24,15 @@ function ndgrChatUserId(chat) {
 }
 
 /**
- * @typedef {{ commentNo: string, text: string, userId: string|null, nickname?: string, vpos?: number|null, accountStatus?: number|null, is184?: boolean }} NdgrMergeRow
+ * @typedef {{ commentNo: string, text: string, userId: string|null, nickname?: string, vpos?: number|null, accountStatus?: number|null, is184?: boolean, capturedAt?: number, arrivalCapture?: 'ndgr', ndgrMessageId?: string }} NdgrMergeRow
  */
 
 /**
  * @param {import('./ndgrDecode.js').NdgrChat[]} chats
+ * @param {number} [nowMs] メッセージ時刻が無い来場を、受信時刻で残すときだけ渡す
  * @returns {NdgrMergeRow[]}
  */
-export function ndgrChatsToMergeRows(chats) {
+export function ndgrChatsToMergeRows(chats, nowMs) {
   if (!Array.isArray(chats) || !chats.length) return [];
   /** @type {NdgrMergeRow[]} */
   const out = [];
@@ -40,13 +43,15 @@ export function ndgrChatsToMergeRows(chats) {
     // v0.1.195: ギフトシステムメッセージは通常コメントとして記録しない
     // （cleanNdgrChatRows と同じ guard を NDGR decode 経路にも適用）
     if (parseGiftCommentText(text)) continue;
+    // 来場通知は番号も userId も無い。shouldAccept はそれを捨てるので、本文が来場のときだけ通す。
+    const arrivalNotice = Boolean(parseArrivalCommentText(text));
     // v0.1.803(星野ロミ式最大化): 採用判定を shouldAcceptNdgrChatAsComment に一元化。
     //   no(コメント番号)が無くても「content 非空 かつ userId を持つ」匿名(184)
     //   コメントは採用し、捨てずレーンへ活かす(userLaneCandidatesFromStorage は
     //   userId 必須)。no 無し+userId 無し(gift payload 誤読等)は採用しない。
     //   commentNo 欠落行は buildDedupeKey が text+sec+uid フォールバックで安全に
     //   重複排除する(commentRecord.js:75-84 + createLoneDedupeIndex で裏取り済)。
-    if (!shouldAcceptNdgrChatAsComment(chat)) continue;
+    if (!arrivalNotice && !shouldAcceptNdgrChatAsComment(chat)) continue;
     const commentNo = chat.no != null ? String(chat.no).trim() : '';
     const uid = ndgrChatUserId(chat);
     /** @type {NdgrMergeRow} */
@@ -56,6 +61,15 @@ export function ndgrChatsToMergeRows(chats) {
     if (chat.vpos != null) row.vpos = chat.vpos;
     if (chat.accountStatus != null) row.accountStatus = chat.accountStatus;
     if (chat.is184) row.is184 = true;
+    if (arrivalNotice) {
+      const at = toEpochMs(chat.atMs);
+      const now = toEpochMs(nowMs);
+      const cap = at > 0 ? at : now;
+      if (cap > 0) row.capturedAt = cap;
+      row.arrivalCapture = 'ndgr';
+      const mid = String(chat.messageId || '').trim();
+      if (mid) row.ndgrMessageId = mid;
+    }
     out.push(row);
   }
   return out;

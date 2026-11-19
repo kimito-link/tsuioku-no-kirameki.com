@@ -1,7 +1,9 @@
 /** @vitest-environment happy-dom */
 import { describe, expect, it } from 'vitest';
-import { applyPlatformMetricChrome, watchPlatformMetricChrome } from './platformMetricChrome.js';
-import { tallySupportItems } from './platformMetrics.js';
+import { readFileSync } from 'node:fs';
+import { join } from 'node:path';
+import { applyPlatformMetricChrome, buildForeignCapabilityCss, watchPlatformMetricChrome } from './platformMetricChrome.js';
+import { PLATFORM_CAPABILITIES, bootSubBoardIds, rewriteForeignWording, tallySupportItems } from './platformMetrics.js';
 
 function mount() {
   document.body.innerHTML = `
@@ -161,24 +163,24 @@ describe('applyPlatformMetricChrome', () => {
     expect(document.documentElement.classList.contains('nl-cap-subboard')).toBe(false);
   });
 
-  it('見出しを持たないサービスに移ったら、前のサービスで付けた見出しを元に戻す(ミクチャに YouTube の見出しが残らない)', () => {
+  it('ミクチャへ移ると YouTube の見出しは残さず、ギフトの見出しにする', () => {
     const root = mount();
     const label = () => root.querySelector('[data-lane="giftHistory"] .nl-north-star-lane__label').firstChild.nodeValue;
     const sub = () => root.querySelector('[data-lane="giftHistory"] .nl-north-star-lane__sublabel').textContent;
     applyPlatformMetricChrome(root, { platform: 'youtube', facts: {} });
     expect(label()).toBe('スーパーチャット・ギフト');
     applyPlatformMetricChrome(root, { platform: 'mixch', facts: {} });
-    expect(label()).toBe('この番組へのギフト履歴');
-    expect(sub()).toBe('履歴');
+    expect(label()).toBe('ギフト');
+    expect(sub()).toBe('このPCの記録です。');
     expect(root.querySelector('#giftHistoryProgramPt')).not.toBeNull();
   });
 
-  it('ニコ生版の描画が書き直した見出しは、元に戻す対象にしない', () => {
+  it('見出しを持たないサービスでは、ニコ生版の描画が書き直した見出しを戻さない', () => {
     const root = mount();
     const p = root.querySelector('[data-lane="giftHistory"] .nl-north-star-lane__label');
     applyPlatformMetricChrome(root, { platform: 'youtube', facts: {} });
     p.firstChild.nodeValue = 'ギフト履歴(書き直し)';
-    applyPlatformMetricChrome(root, { platform: 'mixch', facts: {} });
+    applyPlatformMetricChrome(root, { platform: 'other', facts: {} });
     expect(p.firstChild.nodeValue).toBe('ギフト履歴(書き直し)');
   });
 
@@ -188,5 +190,162 @@ describe('applyPlatformMetricChrome', () => {
     expect(root.querySelector('.nl-live-stat-card--visitors').hidden).toBe(false);
     expect(root.querySelector('#officialStatNicoAdPts').parentElement.hidden).toBe(false);
     expect(root.querySelector('#watchConcurrentCard .nl-live-stat-label').textContent).toBe('推定同時接続');
+  });
+
+  it('SHOWROOM の見出しを出し、ニコ生の「直接値」は消す', () => {
+    const root = mount();
+    const est = root.querySelector('#watchConcurrentEst');
+    const sub = root.createElement('div');
+    sub.id = 'watchConcurrentSub';
+    sub.textContent = '直接値';
+    est.after(sub);
+    applyPlatformMetricChrome(root, { platform: 'showroom', facts: {} });
+    expect(root.querySelector('#watchConcurrentCard .nl-live-stat-label').textContent).toBe('視聴者数');
+    expect(sub.textContent).toBe('');
+    const css = root.querySelector('#nl-platform-capability-style').textContent;
+    expect(css).toContain('html.nl-cap-showroom #watchConcurrentCard .nl-live-stat-label::after{content:"視聴者数"');
+    expect(css).not.toContain('[data-lane="adRanking"]{display:none');
+    expect(css).toContain('html.nl-cap-foreign:not(.nl-cap-subboard) [data-lane="adRanking"]');
+  });
+});
+
+  it('SHOWROOM ではなふだと空の公式の数字を出さず、コメント欄は残す', () => {
+    const root = mount();
+    const inline = root.createElement('div');
+    inline.className = 'nl-nameplate-inline';
+    inline.textContent = 'これはニコ生そのものの設定';
+    const details = root.createElement('details');
+    details.id = 'nlPopupSettings';
+    const summary = root.createElement('summary');
+    summary.textContent = '詳細設定（記録のON/OFF・なふだ・取り込み・パネル位置・動き・表示トラブル）';
+    details.append(summary);
+    const lanes = root.createElement('section');
+    lanes.id = 'northStarLanes';
+    const lane = root.createElement('div');
+    lane.dataset.lane = 'adRanking';
+    lane.hidden = true;
+    lanes.append(lane);
+    const compose = root.createElement('section');
+    compose.className = 'nl-comment-compose';
+    root.body.append(inline, details, lanes, compose);
+    applyPlatformMetricChrome(root, { platform: 'showroom', facts: {} });
+    expect(inline.hidden).toBe(true);
+    expect(summary.textContent).toBe('詳細設定（記録のON/OFF・取り込み・パネル位置・動き・表示トラブル）');
+    expect(compose.hidden).toBe(false);
+    const css = root.getElementById('nl-platform-capability-style').textContent;
+    expect(css).toContain('html.nl-cap-foreign .nl-nameplate-inline{display:none!important;}');
+    expect(css).toContain('#northStarLanes:not(:has([data-lane]:not([hidden])))');
+    expect(css).not.toContain('html.nl-cap-foreign .nl-comment-compose');
+    expect(css).toContain('details:has(#giftSubAppHistorySummary)');
+    expect(css).toContain('html.nl-cap-no-paid details:has(#giftQuickStatsMount)');
+  });
+
+  it('SHOWROOM はギフトの見出しに直し、広告とサイドバーと a: を出さない', () => {
+    const root = mount();
+    const header = root.createElement('p');
+    header.className = 'nl-sub';
+    const brand = root.createElement('div');
+    brand.className = 'nl-header';
+    brand.append(header);
+    header.textContent = 'ニコ生の応援コメントを、このPCで見える化（記録は自分でON）';
+    const tl = root.createElement('span');
+    tl.className = 'nl-support-timeline__summary-label';
+    tl.textContent = '応援タイムライン（コメント＋ギフト）';
+    const users = root.createElement('details');
+    const usersSummary = root.createElement('summary');
+    usersSummary.textContent = 'ギフト・広告ユーザー（簡易）';
+    const mountEl = root.createElement('div');
+    mountEl.id = 'giftQuickStatsMount';
+    users.append(usersSummary, mountEl);
+    const side = root.createElement('details');
+    const sideSummary = root.createElement('summary');
+    sideSummary.id = 'giftSubAppHistorySummary';
+    sideSummary.textContent = 'ギフトサイドバー履歴（未取得）';
+    side.append(sideSummary);
+    const anon = root.createElement('label');
+    anon.className = 'nl-anonymous-identicon-opt';
+    anon.textContent = 'a:xxxxx';
+    const concept = root.createElement('div');
+    concept.className = 'nl-project-concept-body';
+    concept.textContent = 'ニコ生の応援コメントをこのPCに記録';
+    root.body.append(brand, tl, users, side, anon, concept);
+    applyPlatformMetricChrome(root, { platform: 'showroom', facts: {} });
+    expect(header.textContent).toBe('応援コメントを、このPCで見える化（記録は自分でON）');
+    expect(tl.textContent).toBe('応援タイムライン（コメント＋ギフト）');
+    expect(usersSummary.textContent).toBe('ギフトユーザー（簡易）');
+    expect(users.hidden).toBe(false);
+    expect(side.hidden).toBe(true);
+    expect(anon.hidden).toBe(true);
+    expect(concept.textContent).toBe('応援コメントをこのPCに記録');
+    expect(root.documentElement.classList.contains('nl-cap-no-paid')).toBe(false);
+  });
+
+  it('ABEMA はギフトの欄を出さず、タイムラインはコメントだけ', () => {
+    const root = mount();
+    const tl = root.createElement('span');
+    tl.className = 'nl-support-timeline__summary-label';
+    tl.textContent = '応援タイムライン（コメント＋ギフト）';
+    const users = root.createElement('details');
+    const mountEl = root.createElement('div');
+    mountEl.id = 'giftQuickStatsMount';
+    users.append(root.createElement('summary'), mountEl);
+    root.body.append(tl, users);
+    applyPlatformMetricChrome(root, { platform: 'abema', facts: {} });
+    expect(tl.textContent).toBe('応援タイムライン（コメント）');
+    expect(users.hidden).toBe(true);
+    expect(root.documentElement.classList.contains('nl-cap-no-paid')).toBe(true);
+  });
+
+  it('watch と nicolivelog を1回だけ配信ページの言い方にする。コメント本文は残す', () => {
+    document.documentElement.removeAttribute('data-nl-foreign-wording');
+    const root = mount();
+    const legend = root.createElement('span');
+    legend.id = 'inlinePanelWidthLegend';
+    legend.textContent = 'ページ内パネルの位置・幅（watch）';
+    const reload = root.createElement('button');
+    reload.id = 'reloadWatchTabPanelBtn';
+    reload.textContent = 'watch を再読み込み';
+    reload.title = '対象の watch タブを再読み込みします（F5 と同じ）';
+    const about = root.createElement('p');
+    about.className = 'nl-project-concept';
+    about.textContent = '開発識別子として nicolivelog が含まれることがあります。';
+    const box = root.createElement('textarea');
+    box.id = 'commentInput';
+    box.textContent = 'watch を見てね';
+    root.body.append(legend, reload, about, box);
+    applyPlatformMetricChrome(root, { platform: 'twitch', facts: {} });
+    expect(legend.textContent).toBe('ページ内パネルの位置・幅（配信ページ）');
+    expect(reload.textContent).toBe('配信ページを再読み込み');
+    expect(reload.getAttribute('title')).toBe('対象の配信タブを再読み込みします（F5 と同じ）');
+    expect(about.textContent).toBe('開発識別子として 開発用の名前 が含まれることがあります。');
+    expect(box.textContent).toBe('watch を見てね');
+    legend.textContent = 'ページ内パネルの位置・幅（watch）';
+    applyPlatformMetricChrome(root, { platform: 'twitch', facts: {} });
+    expect(legend.textContent).toBe('ページ内パネルの位置・幅（watch）');
+    document.documentElement.removeAttribute('data-nl-foreign-wording');
+    const nico = mount();
+    const nicoLegend = nico.createElement('span');
+    nicoLegend.textContent = 'ページ内パネルの位置・幅（watch）';
+    nico.body.append(nicoLegend);
+    applyPlatformMetricChrome(nico, { platform: 'niconico', facts: {} });
+    expect(nicoLegend.textContent).toBe('ページ内パネルの位置・幅（watch）');
+  });
+
+describe('開いた瞬間の CSS', () => {
+  it('boot は能力表と同じ文字列と、全サービスの見出しを持つ', () => {
+    const boot = readFileSync(join(process.cwd(), 'extension/yt-loading-boot.js'), 'utf8');
+    expect(boot).toContain(buildForeignCapabilityCss());
+    expect(boot).toContain('nl-count-loading');
+    expect(boot).toContain("q.get('site')");
+    for (const id of bootSubBoardIds()) expect(boot).toContain(`${id}: 1`);
+    for (const [id, cap] of Object.entries(PLATFORM_CAPABILITIES)) {
+      if (cap.native === true) continue;
+      expect(boot).toContain(`${id}: '${cap.concurrentLabel}'`);
+    }
+    const start = boot.indexOf('function foreignWords');
+    const end = boot.indexOf('function applyForeignWords');
+    const foreignWords = new Function(`${boot.slice(start, end)}\nreturn foreignWords;`)();
+    const sample = 'watch を再読み込み。開発識別子として nicolivelog。別々の生放送。';
+    expect(foreignWords(sample)).toBe(rewriteForeignWording(sample, 'showroom'));
   });
 });

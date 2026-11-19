@@ -24,6 +24,39 @@ function viewCountText(viewCount) {
   return '';
 }
 
+const SUBSCRIBER_WALK_MAX = 20_000;
+
+/**
+ * 画面に出ている登録者数の文（simpleText / runs）。隠しの正確な数は使わない。
+ * @param {any} data
+ * @returns {string}
+ */
+export function subscriberCountTextInInnertube(data) {
+  return walkSubscriberText(data, 0, { n: 0 });
+}
+
+/**
+ * @param {any} node
+ * @param {number} depth
+ * @param {{ n: number }} budget
+ * @returns {string}
+ */
+function walkSubscriberText(node, depth, budget) {
+  if (!node || typeof node !== 'object' || depth > 30 || budget.n > SUBSCRIBER_WALK_MAX) return '';
+  budget.n += 1;
+  if (!Array.isArray(node) && node.subscriberCountText) {
+    const t = viewCountText(node.subscriberCountText).replace(/\s+/g, ' ').trim();
+    if (t) return t.slice(0, 80);
+  }
+  const vals = Array.isArray(node) ? node : Object.values(node);
+  for (const v of vals) {
+    if (!v || typeof v !== 'object') continue;
+    const hit = /** @type {string} */ (walkSubscriberText(v, depth + 1, budget));
+    if (hit) return hit;
+  }
+  return '';
+}
+
 /**
  * videoViewCountRenderer から同時視聴者数を取る。
  * 総再生回数（ライブ配信でない originalViewCount）は同時視聴として使わない。

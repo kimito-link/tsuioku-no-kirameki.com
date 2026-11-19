@@ -182,6 +182,11 @@ export function decideHeldBubbleAfterHold(dropResult) {
  * @returns {boolean} 吹き出しを出した(または出す予定)か
  */
 export function startVenueSpeechBubbleVoice(state, speech, ctx) {
+  const voiceBody = typeof speech?.voiceText === 'string' ? speech.voiceText : speech?.text;
+  if (!String(voiceBody ?? '').trim()) {
+    const bubble = ctx.isOpen() ? ctx.showBubble(speech) : null;
+    return !!bubble;
+  }
   const now = ctx.now || Date.now;
   const setTimer = ctx.setTimer || ((fn, ms) => setTimeout(fn, ms));
   const clearTimer = ctx.clearTimer || ((t) => clearTimeout(t));
@@ -195,7 +200,7 @@ export function startVenueSpeechBubbleVoice(state, speech, ctx) {
   const failing = (Number(state.failStreak) || 0) >= VENUE_BUBBLE_VOICE_FAIL_STREAK_MAX;
   const probeDue = failing && now() - (Number(state.lastProbeAt) || 0) >= VENUE_BUBBLE_VOICE_PROBE_MS;
   const itemBase = {
-    ...(ctx.itemFields || {}), kind: 'comment', userId: speech.userId, nickname: speech.name, key: speech.key, text: speech.text
+    ...(ctx.itemFields || {}), kind: 'comment', userId: speech.userId, nickname: speech.name, key: speech.key, text: voiceBody
   };
   const important = typeof vp?.previewImportant === 'function' && vp.previewImportant(itemBase) === true;
   const holdForVoice = shouldHoldBubbleForVoiceSync({ voiceEnabled: !!vp?.enabled, primeBurst: ctx.primeBurst, failStreak: state.failStreak, probeDue, important });

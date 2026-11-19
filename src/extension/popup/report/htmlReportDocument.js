@@ -57,6 +57,7 @@ import { buildExternalLinksSectionHtml } from '../../../lib/externalLinksSection
 import { resolveReportUserThumbSrc } from '../../../lib/reportUserThumb.js';
 import { categorizeUsersForThumbGrid } from '../../../lib/userThumbGrid.js';
 import { buildReportThumbedUsersSectionHtml } from '../../../lib/reportThumbedUsersSectionHtml.js';
+import { marketingViewFor } from '../../../lib/platform/marketingPlatformPlan.js';
 import { computeKiramekiAwards } from '../../../lib/kiramekiAwards.js';
 import { buildKiramekiAwardsSectionHtml, KIRAMEKI_AWARDS_CSS } from '../../../lib/kiramekiAwardsSectionHtml.js';
 import { resolveKiramekiReturningAndFirstTimeUserKeys } from '../../../lib/resolveKiramekiReturningAndFirstTimeUserKeys.js';
@@ -825,6 +826,7 @@ export async function buildHtmlReportDocument(
     firstTimeUserKeys: kiramekiFirstTimeUserKeys,
     broadcasterUserId: reportBroadcasterUserId
   });
+  const awardView = marketingViewFor(snapshot?.platform);
   const kiramekiAwardsSectionHtml = buildKiramekiAwardsSectionHtml(
     kiramekiAwards,
     aggregatedRooms,
@@ -836,7 +838,10 @@ export async function buildHtmlReportDocument(
           identiconResolver: deps.getCachedAnonymousIdenticonDataUrl
         }),
       escapeHtml,
-      escapeAttr
+      escapeAttr,
+      ...(awardView
+        ? { descriptionByAwardId: { tomoshibi: awardView.awardAllDescription } }
+        : {})
     }
   );
 

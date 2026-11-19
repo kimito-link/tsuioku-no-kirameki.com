@@ -134,6 +134,18 @@ describe('startVenueSpeechBubbleVoice: 開いた瞬間の3件と声が鳴らな�
     const enq = [];
     return { enq, enabled: true, enqueue: (/** @type {any[]} */ items) => enq.push(...items), dropQueuedUnstarted: () => 'not-queued', dropQueuedAny: () => 'not-queued', estimateStartDelayMs: () => null };
   };
+  it('絵文字だけで読む文字が無いコメントは声に載せない', async () => {
+    const { startVenueSpeechBubbleVoice } = await import('./venueBubbleVoiceSync.js');
+    const st = createVenueBubbleVoiceSyncState();
+    const vp = mkVp();
+    let shown = 0;
+    startVenueSpeechBubbleVoice(st, { key: 'em', text: 'KEKW', voiceText: '' }, {
+      voicePlayer: vp, primeBurst: false, arrivedAt: Date.now(), isOpen: () => true,
+      showBubble: () => { shown += 1; return {}; }, onSpeaking() {}, onDone() {}, onResolved() {}
+    });
+    expect(shown).toBe(1);
+    expect(vp.enq.length).toBe(0);
+  });
   it('開いた瞬間のまとめ届き(primeBurst)は吹き出しをすぐ出し、声は読まない', async () => {
     const { startVenueSpeechBubbleVoice } = await import('./venueBubbleVoiceSync.js');
     const st = createVenueBubbleVoiceSyncState();

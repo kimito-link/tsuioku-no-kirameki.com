@@ -48,6 +48,31 @@ describe('summarizeCommentRecordBreakdown', () => {
     expect(r.interestArrival).toBe(2);
   });
 
+  it('大百科と放送者の好みと複数タグも来場に数え、他サービスの同じ文は通常のまま', () => {
+    const fw = '\u3000';
+    const r = summarizeCommentRecordBreakdown([
+      { text: 'こんばんは' },
+      { text: `${fw}「VOCALOID」が好きな3人が来場しました${fw}` },
+      { text: `「A」が好きな2人、${fw}「B」が好きな1人が来場しました` },
+      { text: `${fw}大百科記事「X」から1人が来場しました` },
+      { text: `大百科記事「P」から1人、${fw}「Q」から1人が来場しました` },
+      { text: `${fw}放送者の好み「夜」に興味のある2人が来場しました${fw}` },
+      { text: '「VOCALOID」が好きな9人が来場しました', ytPlatform: 'youtube' }
+    ]);
+    expect(r.interestArrival).toBe(5);
+    expect(r.normal).toBe(2);
+    expect(r.otherSystem).toBe(0);
+  });
+
+  it('放送者のサポーターも来場に数える', () => {
+    const r = summarizeCommentRecordBreakdown([
+      { text: 'こんばんは' },
+      { text: '放送者のサポーターが1人来場しました' }
+    ]);
+    expect(r.interestArrival).toBe(1);
+    expect(r.normal).toBe(1);
+  });
+
   it('commentType=generalSystemMessage を otherSystem にカウント', () => {
     const r = summarizeCommentRecordBreakdown([
       { text: '普通コメ' },
@@ -139,6 +164,22 @@ describe('formatCommentRecordBreakdownLine', () => {
         { broadcasterCount: 25 }
       )
     ).toBe('内訳: 通常 596 / 配信者 25');
+  });
+
+  it('フォロー通知は通常コメントにもシステムにも入れない', () => {
+    const r = summarizeCommentRecordBreakdown([
+      { text: 'こんにちは' },
+      { text: 'フォローしました', ytKind: 'follow', isSystem: true, commentType: 'followNotice' },
+      { text: 'お知らせ', isSystem: true, commentType: 'generalSystemMessage' },
+    ]);
+    expect(r).toEqual({
+      total: 3,
+      normal: 1,
+      interestArrival: 0,
+      followNotice: 1,
+      otherSystem: 1,
+    });
+    expect(formatCommentRecordBreakdownLine(r)).toBe('内訳: 通常 1 / フォロー通知 1 / システム 1');
   });
 
   it('broadcasterCount=0 のとき「配信者」を表示しない', () => {

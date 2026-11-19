@@ -5,9 +5,54 @@
 //   gql.twitch.tv の応答から読む(BetterTTV・7TV など広く使われている拡張と同じ入口)。
 //   非公式なので、AGENTS.md §3.6 のとおり形を必ず確かめ、取れなければ null を返す(記録は止めない)。
 
+import { isEmoteName, twEmoteUrl } from '../platform/streamEmotes.js';
+
 /** twitch.tv の Web が使う公開の Client-ID(ページの中に平文で書かれている・秘密ではない) */
 export const TW_WEB_CLIENT_ID = 'kimne78kx3ncx6brgo4mv6wki5h1ko';
 export const TW_GQL_URL = 'https://gql.twitch.tv/gql';
+
+const TW_CLIENT_ID_RE = /(?:clientId|Client-ID)["']?\s*[:=]\s*["']([a-z0-9]{20,40})["']/i;
+
+/**
+ * ページに書いてある公開の Client-ID。ログインのトークンは拾わない。
+ * 見つからなければ ''（呼び出し側が公開の既定値を使う）。
+ * @param {unknown} text
+ */
+export function twitchClientIdFromText(text) {
+  const s = String(text || '');
+  if (!s || s.length > 500_000) return '';
+  const m = TW_CLIENT_ID_RE.exec(s);
+  return m ? m[1] : '';
+}
+
+/**
+ * チャンネルページが使う人数の問い合わせ。followers.totalCount だけ。
+ * 登録済みハッシュは 2026-11-18 に PersistedQueryNotFound だったので、同じ名前の本文を1回送る。
+ * @param {string} login
+ */
+export function buildTwFollowerCountQuery(login) {
+  const l = String(login || '').toLowerCase().replace(/[^a-z0-9_]/g, '');
+  if (!/^[a-z0-9_]{1,25}$/.test(l)) return null;
+  return {
+    operationName: 'ChannelPage_ChannelFollowerCount',
+    variables: { login: l },
+    query: 'query ChannelPage_ChannelFollowerCount($login:String!){user(login:$login){followers{totalCount}}}',
+  };
+}
+
+/**
+ * @param {unknown} json
+ * @returns {number | null}
+ */
+export function parseTwFollowerCount(json) {
+  const one = Array.isArray(json) ? json[0] : json;
+  if (!one || typeof one !== 'object') return null;
+  const row = /** @type {Record<string, any>} */ (one);
+  if (Array.isArray(row.errors) && row.errors.length) return null;
+  const n = Number(row.data?.user?.followers?.totalCount);
+  if (!Number.isInteger(n) || n < 0 || n > 50_000_000) return null;
+  return n;
+}
 
 /** @param {string} login */
 export function buildTwStreamInfoQuery(login) {
@@ -221,6 +266,17 @@ export function parseTwVodComments(json, channelLogin) {
     const fragments = Array.isArray(node.message?.fragments) ? node.message.fragments : [];
     const text = fragments.map((/** @type {any} */ f) => String(f?.text || '')).join('').trim();
     if (!id || !text) continue;
+    // fragment.text が絵文字の名前で、emote.emoteID が画像の id。ここを捨てると名前だけが文字で残る。
+    /** @type {Map<string, string>} */
+    const emoteMap = new Map();
+    for (const f of fragments) {
+      const em = f?.emote;
+      if (!em || typeof em !== 'object') continue;
+      const url = twEmoteUrl(String(em.emoteID || '').trim());
+      const name = String(f?.text || '').trim();
+      if (url && isEmoteName(name) && !emoteMap.has(name)) emoteMap.set(name, url);
+    }
+    const emotes = [...emoteMap].map(([name, url]) => ({ name, url }));
     const c = node.commenter && typeof node.commenter === 'object' ? node.commenter : null;
     const uLogin = String(c?.login || '').toLowerCase();
     const uid = String(c?.id || '').trim();
@@ -246,6 +302,7 @@ export function parseTwVodComments(json, channelLogin) {
       amount: 0,
       currency: '',
       skipVoice: true,
+      ...(emotes.length ? { emotes } : {}),
     });
   }
   return {

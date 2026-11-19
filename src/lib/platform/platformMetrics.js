@@ -9,10 +9,39 @@
  * 無い数字は作らない。公式の数と、このPCの記録の数をラベルで分ける。
  */
 
-import { platformOfStreamKey } from './streamPlatform.js';
+import { platformOfStreamKey, STREAM_PLATFORMS } from './streamPlatform.js';
+import { FOLLOWER_NOUN, followerKpiLabels } from './followerCountSample.js';
 
 /** 能力表を持つサービス。ABEMA は記録の実装が別の変更にあるので、数字の枠だけを先に置く。 */
-export const PLATFORM_METRIC_IDS = Object.freeze(['niconico', 'youtube', 'twitch', 'kick', 'abema', 'showroom', 'mixch', 'whowatch', 'twitcasting']);
+export const PLATFORM_METRIC_IDS = Object.freeze(['niconico', 'youtube', 'twitch', 'kick', 'abema', 'showroom', 'mixch', 'whowatch', 'twitcasting', 'tiktok']);
+
+/**
+ * 能力表の「人数」の列。章と KPI はここ以外の書き方を使わない。
+ * exact = ページの整数。ja-compact = 万・億（YouTube の「13.9万人」）。空 = 人数を出さない。
+ */
+export const FOLLOWER_NOTATION = Object.freeze({
+  niconico: 'exact',
+  youtube: 'ja-compact',
+  twitch: 'exact',
+  kick: 'exact',
+  abema: '',
+  showroom: 'exact',
+  mixch: 'exact',
+  whowatch: 'exact',
+  twitcasting: 'exact',
+  tiktok: 'exact',
+});
+
+/**
+ * @param {string} platformId
+ * @returns {'exact' | 'ja-compact' | ''}
+ */
+export function followerNotationOf(platformId) {
+  const id = String(platformId || '').trim().toLowerCase();
+  const noted = /** @type {Record<string, string>} */ (FOLLOWER_NOTATION)[id];
+  if (noted === 'ja-compact' || noted === 'exact' || noted === '') return noted;
+  return 'exact';
+}
 
 /**
  * パネルと会場が同じ表を見る。native のサービスは今までの画面のまま。
@@ -23,74 +52,239 @@ export const PLATFORM_METRIC_IDS = Object.freeze(['niconico', 'youtube', 'twitch
  *   (src/lib/platform/platformSubBoard.js・2026-11-11 りんく「各サービス特有のランキングを」)。欄の中身が無い配信では
  *   ニコ生版の部品が欄を出さないので、ここでは隠さないだけにする。
  */
+/**
+ * 分析レポート「応援が届いた瞬間」の1種類。kinds は記録の ytKind。
+ * 通貨・subEvent が書いてある種類は、記録がその値のときだけ出す。
+ * amount は記録の数の出し方。none は数を出さない。
+ * @typedef {{
+ *   id: string,
+ *   label: string,
+ *   kinds: readonly string[],
+ *   currency?: string,
+ *   subEvent?: string,
+ *   amount: 'money' | 'point' | 'count' | 'viewers' | 'pieces' | 'none'
+ * }} SupportArrivalSpec
+ */
+
+/**
+ * @param {string} id
+ * @param {readonly string[]} kinds
+ * @param {string} label
+ * @param {SupportArrivalSpec['amount']} amount
+ * @param {{ currency?: string, subEvent?: string }} [extra]
+ * @returns {SupportArrivalSpec}
+ */
+function arrivalSpec(id, kinds, label, amount, extra) {
+  return Object.freeze({
+    id,
+    label,
+    kinds: Object.freeze(kinds),
+    amount,
+    ...(extra?.currency ? { currency: extra.currency } : {}),
+    ...(extra?.subEvent ? { subEvent: extra.subEvent } : {}),
+  });
+}
+
 export const PLATFORM_CAPABILITIES = Object.freeze({
   niconico: Object.freeze({
     native: true,
     concurrentLabel: '推定同時接続',
     visitorCard: true,
+    // なふだはニコ生の公式コメント欄だけの設定。他のサービスには無い。
+    nameplate: true,
+    // コメント送信は各サービスの content 入口(sendType)がある。ニコ生は NLS_POST_COMMENT。
+    commentPost: true,
     chips: Object.freeze(['viewers', 'comments', 'streamAge', 'adPts', 'giftPts']),
+    supportArrival: Object.freeze([
+      arrivalSpec('gift', ['niconico_gift'], 'ギフト', 'point'),
+    ]),
   }),
   youtube: Object.freeze({
     native: false,
+    pageNoun: '配信ページ',
     concurrentLabel: '同時視聴者数',
     visitorCard: false,
     chips: Object.freeze(['streamAge', 'superchat']),
     superchatWhenPositive: true,
+    paidLabel: 'スーパーチャット',
+    timelineLabel: '応援タイムライン（コメント＋スーパーチャット）',
+    giftUsersLabel: 'スーパーチャット・ギフトのユーザー（簡易）',
+    supportArrival: Object.freeze([
+      arrivalSpec('superchat', ['superchat'], 'スーパーチャット', 'money'),
+      arrivalSpec('member', ['membership'], 'メンバー加入', 'none'),
+      arrivalSpec('member_gift', ['membership_gift'], 'メンバーギフト', 'pieces'),
+    ]),
   }),
   twitch: Object.freeze({
     native: false,
+    pageNoun: '配信ページ',
     concurrentLabel: '視聴者数',
     visitorCard: false,
     chips: Object.freeze(['streamAge', 'bits', 'subs', 'gifts', 'raids']),
     officialSubBoard: true,
+    paidLabel: 'Bits',
+    timelineLabel: '応援タイムライン（コメント＋Bits・ギフトサブ）',
+    giftUsersLabel: 'Bits・ギフトサブのユーザー（簡易）',
+    supportArrival: Object.freeze([
+      arrivalSpec('bits', ['superchat'], 'Bits', 'money', { currency: 'BITS' }),
+      arrivalSpec('sub', ['membership'], 'サブスク', 'none', { subEvent: 'sub' }),
+      arrivalSpec('resub', ['membership'], '再サブ', 'none', { subEvent: 'resub' }),
+      arrivalSpec('gift', ['membership_gift'], 'ギフトサブ', 'pieces'),
+      arrivalSpec('raid', ['tw_raid'], 'レイド', 'viewers'),
+    ]),
   }),
   kick: Object.freeze({
     native: false,
+    pageNoun: '配信ページ',
     concurrentLabel: '視聴者数',
     visitorCard: false,
     chips: Object.freeze(['streamAge', 'kicks', 'subs', 'gifts']),
     officialSubBoard: true,
+    paidLabel: 'Kicks',
+    timelineLabel: '応援タイムライン（コメント＋Kicks・ギフトサブ）',
+    giftUsersLabel: 'Kicks・ギフトサブのユーザー（簡易）',
+    supportArrival: Object.freeze([
+      arrivalSpec('kicks', ['superchat'], 'Kicks', 'money', { currency: 'KICKS' }),
+      arrivalSpec('sub', ['membership'], 'サブスク', 'none'),
+      arrivalSpec('gift', ['membership_gift'], 'ギフトサブ', 'pieces'),
+    ]),
   }),
   // SHOWROOM: イベントの貢献ランキング(部屋の画面の「貢献ユーザー」)を2つめの欄に、イベント順位・pt・目標Lv をチップに。
   showroom: Object.freeze({
     native: false,
+    pageNoun: '配信ページ',
     concurrentLabel: '視聴者数',
     visitorCard: false,
     chips: Object.freeze(['streamAge', 'eventRank', 'eventPoint', 'quest']),
     officialSubBoard: true,
+    paidLabel: 'ギフト',
+    timelineLabel: '応援タイムライン（コメント＋ギフト）',
+    giftUsersLabel: 'ギフトユーザー（簡易）',
+    supportArrival: Object.freeze([
+      arrivalSpec('gift', ['superchat'], 'ギフト', 'point', { currency: 'SRPT' }),
+    ]),
   }),
   // ミクチャ: 名前の下のレベル・ファン・スーパーファン・ライバーランク(と、出ているときのイベント順位・pt)
   mixch: Object.freeze({
     native: false,
+    pageNoun: '配信ページ',
     concurrentLabel: '視聴者数',
     visitorCard: false,
     // eventInfo.point は 2026-11-11 の実ページで 0 なのに画面には別の数が出ていた(どの値か未確定)→ イベントpt は出さない。
     //   「スーパーファン」は画面の言葉「ガチファン」、streamerRank.score はランク記号(B1 等)の横のポイント。
     chips: Object.freeze(['streamAge', 'level', 'fans', 'superfans', 'liverRank', 'eventRank']),
+    paidLabel: 'ギフト',
+    timelineLabel: '応援タイムライン（コメント＋ギフト）',
+    giftUsersLabel: 'ギフトユーザー（簡易）',
+    supportArrival: Object.freeze([
+      arrivalSpec('gift', ['superchat'], 'ギフト', 'money', { currency: 'MXCOIN' }),
+      arrivalSpec('fan', ['mx_fan'], 'ファン登録', 'none'),
+    ]),
   }),
   // ふわっち: イベント順位(同時に出ているイベントは title に並べる)・累計視聴
   whowatch: Object.freeze({
     native: false,
+    pageNoun: '配信ページ',
     concurrentLabel: '視聴者数',
     visitorCard: false,
     chips: Object.freeze(['streamAge', 'eventRank', 'totalViews']),
+    paidLabel: 'アイテム',
+    timelineLabel: '応援タイムライン（コメント＋アイテム）',
+    giftUsersLabel: 'アイテムユーザー（簡易）',
+    supportArrival: Object.freeze([
+      arrivalSpec('item', ['superchat'], 'アイテム', 'count', { currency: 'WWITEM' }),
+    ]),
+  }),
+  // TikTok LIVE: 同時視聴は WebcastRoomUserSeqMessage（tt-content-entry.js の parseTtRoomUserSeq）。
+  //   配信中の視聴者ランキングはギフト欄の見出し側。いいね数などはページから取っていないので出さない。
+  tiktok: Object.freeze({
+    native: false,
+    pageNoun: '配信ページ',
+    concurrentLabel: '視聴者数',
+    visitorCard: false,
+    chips: Object.freeze(['streamAge']),
+    paidLabel: 'ギフト',
+    timelineLabel: '応援タイムライン（コメント＋ギフト）',
+    giftUsersLabel: 'ギフトユーザー（簡易）',
+    supportArrival: Object.freeze([
+      arrivalSpec('gift', ['superchat'], 'ギフト', 'money', { currency: 'TTCOIN' }),
+      arrivalSpec('follow', ['follow'], 'フォロー', 'none'),
+    ]),
   }),
   // ツイキャス: 配信ページの「現在/累計」の累計とコメント数(#viewer-counter・#comment-count に出ている数そのまま)。
   //   視聴者数は同じ欄の左(現在)。公式の応援ランキングは配信者ページのサポーターランキング(2つめの欄)。
   twitcasting: Object.freeze({
     native: false,
+    pageNoun: '配信ページ',
     concurrentLabel: '視聴者数',
     visitorCard: false,
     chips: Object.freeze(['streamAge', 'totalViews', 'commentTotal']),
+    paidLabel: 'ギフト',
+    timelineLabel: '応援タイムライン（コメント＋ギフト）',
+    giftUsersLabel: 'ギフトユーザー（簡易）',
+    supportArrival: Object.freeze([
+      arrivalSpec('gift', ['superchat'], 'ギフト', 'point', { currency: 'TCSCORE' }),
+    ]),
   }),
+  // headlineCount:views = 大きな数字はページの視聴数（同時接続では埋めない）。countUnit 空 = 「人」と書かない。
+  // 出典: src/lib/abema/abParse.js の abAudienceFromPayload（stats.view は視聴数、concurrentViewers は別）。
+  // TikTok の「視聴者数」は上の定義（pageNoun とギフトの見出し付き）を使う。同じキーを後ろで重ねない。
   abema: Object.freeze({
     native: false,
+    pageNoun: '配信ページ',
     concurrentLabel: '視聴数',
+    headlineCount: 'views',
+    countUnit: '',
     visitorCard: false,
     chips: Object.freeze(['streamAge', 'comments']),
     hideSections: Object.freeze(['contributionRanking', 'giftHistory']),
+    // ABEMA のページにギフトは出さない（視聴数とコメント数だけ。streamPlatform の paid は使わない）。
+    paidLabel: '',
+    timelineLabel: '応援タイムライン（コメント）',
+    giftUsersLabel: '',
   }),
 });
+
+/**
+ * 横の欄を開いた瞬間のサービス。外枠が焼く stream（`yt:` / `twitch:` / 記録キー `sr.` など）と、
+ * 配信ページでないときの `site=` の両方を見る。分からなければ ''（ニコ生の見出しは付けない）。
+ * @param {unknown} stream
+ * @param {unknown} site
+ */
+export function bootPlatformId(stream, site) {
+  const s = String(stream || '').trim();
+  if (/^yt:/i.test(s)) return 'youtube';
+  const head = s.split(':')[0].toLowerCase();
+  if (head && head !== 'niconico' && Object.prototype.hasOwnProperty.call(PLATFORM_CAPABILITIES, head)) return head;
+  const byKey = platformOfStreamKey(s);
+  if (byKey) return byKey.id;
+  const siteId = String(site || '').trim().toLowerCase();
+  if (siteId === 'youtube') return 'youtube';
+  if (siteId && siteId !== 'niconico' && Object.prototype.hasOwnProperty.call(PLATFORM_CAPABILITIES, siteId)) return siteId;
+  return '';
+}
+
+/** 2つめの公式ランキング欄を最初の描画から使うサービス @returns {string[]} */
+export function bootSubBoardIds() {
+  return Object.keys(PLATFORM_CAPABILITIES).filter((id) => {
+    const cap = PLATFORM_CAPABILITIES[/** @type {keyof typeof PLATFORM_CAPABILITIES} */ (id)];
+    return 'officialSubBoard' in cap && cap.officialSubBoard === true;
+  });
+}
+
+/**
+ * 会場の詳しい状況に、ニコ生だけの「user 英数字」注記を足すか。
+ * 能力表で native でないサービス（Twitch・Kick など）では出さない。
+ * 配信キーからサービスが分からないときは、ニコ生の文を残す。
+ * @param {unknown} liveId
+ */
+export function includeNiconicoUserAliasNote(liveId) {
+  const raw = String(liveId || '').trim();
+  const plat = platformOfStreamKey(raw);
+  if (plat) return platformCapability(plat.id).native === true;
+  if (/^yt:/i.test(raw)) return false;
+  return true;
+}
 
 /** @param {string} platformId */
 export function platformCapability(platformId) {
@@ -98,9 +292,167 @@ export function platformCapability(platformId) {
   return PLATFORM_CAPABILITIES[/** @type {keyof typeof PLATFORM_CAPABILITIES} */ (id)] || Object.freeze({
     native: false,
     concurrentLabel: '視聴者数',
+    nameplate: false,
+    commentPost: false,
     visitorCard: false,
     chips: Object.freeze(['streamAge']),
   });
+}
+
+const MEDIA_KIT_SERVICE_NAME = Object.freeze({
+  niconico: 'ニコニコ',
+  youtube: 'YouTube',
+});
+
+/**
+ * メディアキットに出すサービス名。能力表の id から、配信キーの表にある名前を使う。
+ * @param {string} platformId
+ * @returns {string}
+ */
+export function mediaKitServiceName(platformId) {
+  const id = resolvePlatformId(platformId);
+  if (Object.prototype.hasOwnProperty.call(MEDIA_KIT_SERVICE_NAME, id)) {
+    return MEDIA_KIT_SERVICE_NAME[/** @type {'niconico' | 'youtube'} */ (id)];
+  }
+  if (Object.prototype.hasOwnProperty.call(STREAM_PLATFORMS, id)) {
+    return STREAM_PLATFORMS[/** @type {keyof typeof STREAM_PLATFORMS} */ (id)].name;
+  }
+  return '';
+}
+
+/**
+ * メディアキットのサービス名・応援の種類・人数の呼び方。
+ * 書き出す配信のサービスだけから作る。最後に記録した別のサービスは見ない。
+ * 人数を出さないサービス（ABEMA）は、出所の文を空にする。
+ * @param {string} platformId
+ */
+export function mediaKitServiceCopy(platformId) {
+  const id = resolvePlatformId(platformId);
+  const name = mediaKitServiceName(id);
+  const cap = platformCapability(id);
+  const paid = cap && 'paidLabel' in cap ? String(cap.paidLabel || '') : '';
+  const notation = followerNotationOf(id);
+  const noun = /** @type {Record<string, string>} */ (FOLLOWER_NOUN)[id] || '';
+  const countLabel = noun ? followerKpiLabels(noun).countLabel : '';
+  const native = id === 'niconico';
+  const supportKind = paid ? `コメント・${paid}` : 'コメント';
+  const where = native ? 'ニコニコの公開プロフィール' : `${name} の公開ページ`;
+  return {
+    id,
+    name,
+    paid,
+    countLabel,
+    channelPrefix: native ? 'ニコニコユーザーID: ' : `${name} チャンネル: `,
+    supportLead: native
+      ? 'ニコ生上で公開されている応援(コメント・ギフト)の記録から表彰します。'
+      : `${name} 上で公開されている応援(${supportKind})の記録から表彰します。`,
+    awardSource: native
+      ? 'ニコ生上で公開されているコメント・ギフト情報(オープンデータ)'
+      : `${name} 上で公開されている${paid ? `コメント・${paid}` : 'コメント'}情報(オープンデータ)`,
+    followerSource: notation && countLabel ? `${countLabel}は、${where}から配信時に取得したスナップショットです。` : '',
+  };
+}
+
+/**
+ * メディアキットの言葉を直すサービス。
+ * 書き出す配信の lv が分かっているときは、その配信のキーだけを見る。
+ * 最後にコメントを読んだ配信や、最近増えた別の配信は引数に無く、見ない。
+ * キーがまだ無いときは ''（別サービスの名前で埋めない）。
+ * 配信キーの表に無いキーは YouTube（YouTube の動画IDは接頭辞を持たない）。
+ * @param {{ exportLv?: unknown, videoIdForLv?: (lv: string) => unknown, platformOfKey?: (key: string) => { id?: string } | null }} [args]
+ * @returns {string}
+ */
+export function mediaKitWordingPlatformId(args) {
+  const lv = String(args?.exportLv || '').trim().toLowerCase();
+  if (!lv) return '';
+  const vid = typeof args?.videoIdForLv === 'function' ? String(args.videoIdForLv(lv) || '') : '';
+  if (!vid) return '';
+  if (typeof args?.platformOfKey !== 'function') return '';
+  const plat = args.platformOfKey(vid);
+  if (plat && plat.id) return String(plat.id);
+  return 'youtube';
+}
+
+/**
+ * 横の欄の下の見出し。広告・ギフトサイドバー・a: の匿名はニコ生だけなので、ここには入れない。
+ * paidLabel が空のサービス（ABEMA）はギフトの欄を出さない。
+ * @param {string} platformId
+ * @returns {null | {
+ *   id: string, paidLabel: string, timelineLabel: string, giftUsersLabel: string,
+ *   showGiftUsers: boolean, effectLabel: string, effectHint: string,
+ *   header: string, calm: string, timelineAria: string
+ * }}
+ */
+export function foreignPanelCopy(platformId) {
+  const id = resolvePlatformId(platformId);
+  if (id === 'niconico') return null;
+  const cap = platformCapability(id);
+  const paidLabel = 'paidLabel' in cap ? String(cap.paidLabel) : '';
+  const timelineLabel = 'timelineLabel' in cap && cap.timelineLabel
+    ? String(cap.timelineLabel)
+    : (paidLabel ? `応援タイムライン（コメント＋${paidLabel}）` : '応援タイムライン（コメント）');
+  const giftUsersLabel = 'giftUsersLabel' in cap ? String(cap.giftUsersLabel || '') : '';
+  const effectLabel = paidLabel ? `${paidLabel}の効果音を鳴らす` : 'コメントが増えたときの効果音を鳴らす';
+  const effectHint = paidLabel
+    ? `${paidLabel}が来たときに短い効果音を鳴らします。会場モードを開いている間はそちらだけで鳴ります。`
+    : 'コメントが増えたときに短い効果音を鳴らします。会場モードを開いている間はそちらだけで鳴ります。';
+  return {
+    id,
+    paidLabel,
+    timelineLabel,
+    giftUsersLabel,
+    showGiftUsers: giftUsersLabel !== '',
+    effectLabel,
+    effectHint,
+    header: '応援コメントを、このPCで見える化（記録は自分でON）',
+    calm: 'パネル内の動きを抑える（ループアニメ・帯など。節目の演出は出ます）',
+    timelineAria: paidLabel ? `コメントと${paidLabel}の時系列` : 'コメントの時系列',
+  };
+}
+
+/**
+ * ニコ生以外で「watch」の代わりに出すページの呼び方。能力表の pageNoun。
+ * ニコ生は空（文面を変えない）。
+ * @param {string} platformId
+ * @returns {string}
+ */
+export function foreignPageNoun(platformId) {
+  const id = resolvePlatformId(platformId);
+  if (!id || id === 'niconico') return '';
+  const cap = platformCapability(id);
+  if (cap.native === true) return '';
+  return 'pageNoun' in cap && cap.pageNoun ? String(cap.pageNoun) : '配信ページ';
+}
+
+/**
+ * ニコ生の URL の「watch」と、開発用のファイル名だけを、能力表のページの呼び方に変える。
+ * ニコ生（pageNoun が空）はそのまま返す。英単語の途中（watchConcurrent など）は変えない。
+ * 「ニコ生」「ニコニコ」の決まった文は ytWording がサービスの名前に変えるので、ここでは触らない。
+ * @param {unknown} text
+ * @param {string} [platformId]
+ * @returns {string}
+ */
+export function rewriteForeignWording(text, platformId) {
+  const raw = String(text ?? '');
+  const page = foreignPageNoun(platformId || 'youtube');
+  if (!page || !raw) return raw;
+  if (!/watch|nicolivelog|生放送/i.test(raw)) return raw;
+  let s = raw;
+  s = s.replace(/\s*watch\s*ページ/g, page);
+  s = s.replace(/\s*watch\s*タブ/g, '配信タブ');
+  s = s.replace(/（watch）/g, `（${page}）`);
+  s = s.replace(/\s*watch\s*を/g, `${page}を`);
+  s = s.replace(/\s*watch\s*の/g, `${page}の`);
+  if (s.trim() === 'watch') s = page;
+  const pairs = [
+    ['Downloads/nicolivelog-mcp/', 'ダウンロードフォルダ'],
+    ['nicolivelog', '開発用の名前'],
+    ['別々の生放送', '別々の配信'],
+  ];
+  for (const [from, to] of pairs) {
+    if (s.includes(from)) s = s.split(from).join(to);
+  }
+  return s;
 }
 
 const OFFICIAL = '配信ページが出している公式の数です。';
@@ -233,6 +585,20 @@ const OFFICIAL_MAIN_LABEL = Object.freeze({
 });
 
 /**
+ * ニコ生以外で、ギフト欄の見出し。rankOfficial は公式の順位表を入れているときだけ。
+ * 出典: extension-youtube/src の sr/mx/tt/tc-content-entry.js が YT_LEADERBOARD に渡す名前
+ * （SHOWROOM 貢献ランキング、ミクチャ今月のファンランキング、TikTok 視聴者ランキング、ツイキャス サポーターランキング）。
+ * ふわっちのギフトはアイテム（streamPlatform.js の paid）。
+ */
+const FOREIGN_LANES = Object.freeze({
+  showroom: Object.freeze({ rank: 'ギフトの合計順', rankOfficial: '貢献ランキング', gift: 'ギフト' }),
+  mixch: Object.freeze({ rank: 'ギフトの合計順', rankOfficial: '今月のファンランキング', gift: 'ギフト' }),
+  tiktok: Object.freeze({ rank: 'ギフトの合計順', rankOfficial: '視聴者ランキング', gift: 'ギフト' }),
+  twitcasting: Object.freeze({ rank: 'ギフトの合計順', rankOfficial: 'サポーターランキング', gift: 'ギフト' }),
+  whowatch: Object.freeze({ rank: 'アイテムの合計順', gift: 'アイテム' }),
+});
+
+/**
  * @param {string} platformId
  * @param {{ officialBoard?: boolean }} [opts] officialBoard: ギフト貢献度の欄に公式の順位表を入れている
  */
@@ -246,6 +612,8 @@ export function platformSectionPlan(platformId, opts) {
       native: true,
       visitorCard: true,
       concurrentLabel: '推定同時接続',
+      nameplate: true,
+      commentPost: true,
       subBoard: false,
       hide: /** @type {string[]} */ ([]),
       note: '',
@@ -306,11 +674,22 @@ export function platformSectionPlan(platformId, opts) {
     sections.giftHistory = { show: false };
     hide.push('contributionRanking', 'giftHistory');
     trio = { rink: 'りんく', konta: 'こん太', tanu: 'たぬ姉' };
+  } else if (Object.prototype.hasOwnProperty.call(FOREIGN_LANES, id)) {
+    // 見出しだけそのサービスの順位表の名前にする（欄の部品はニコ生版のまま。数は作らない）。
+    const lane = FOREIGN_LANES[/** @type {keyof typeof FOREIGN_LANES} */ (id)];
+    const rankOfficial = 'rankOfficial' in lane ? lane.rankOfficial : '';
+    const rankLabel = official && rankOfficial ? rankOfficial : lane.rank;
+    sections.contributionRanking = { show: true, label: rankLabel };
+    sections.giftHistory = { show: true, label: lane.gift, sub: 'このPCの記録です。' };
   }
+  const known = Object.prototype.hasOwnProperty.call(PLATFORM_CAPABILITIES, id);
   return {
     id,
     native: false,
     visitorCard: cap.visitorCard === true,
+    // なふだは能力表で true のサービスだけ。コメント欄は、送信口があるサービスだけ残す。
+    nameplate: 'nameplate' in cap && cap.nameplate === true,
+    commentPost: known && (!('commentPost' in cap) || cap.commentPost === true),
     concurrentLabel,
     subBoard,
     hide,
@@ -499,14 +878,24 @@ export function venueItemsForPlatform(platformId, bag) {
   if (id === 'niconico') return null;
   const plan = platformSectionPlan(id);
   const facts = bag?.facts && typeof bag.facts === 'object' ? bag.facts : {};
-  const fromFacts = id === 'abema' ? (num(facts.viewCount) ?? num(facts.viewers)) : num(facts.viewers);
+  const cap = platformCapability(id);
+  // 視聴数のサービスは、同時接続(viewers)で視聴数の欄を埋めない。
+  const pageViews = 'headlineCount' in cap && cap.headlineCount === 'views';
+  const fromFacts = pageViews ? num(facts.viewCount) : num(facts.viewers);
   const concText = String(bag?.concurrent?.text || '').trim();
   // ページに出ている数だけを出す。数でない文字(—・推定中・接続中・読み込み中 等)や推定(~)は「読み込み中」にまとめる。
-  const concIsCount = /^[\d,]+$/.test(concText) && bag?.concurrent?.isPlaceholder !== true;
+  // 視聴数の欄は、同時接続の文字でも埋めない（別の数を視聴数と書かない）。
+  const concIsCount = pageViews
+    ? false
+    : (/^[\d,]+$/.test(concText) && bag?.concurrent?.isPlaceholder !== true);
   const viewer = fromFacts != null
     ? { text: formatInt(fromFacts), isPlaceholder: false }
     : (concIsCount ? { text: concText, isPlaceholder: false } : { text: LOADING, isPlaceholder: true });
-  const age = bag.streamAge || { text: '—', isPlaceholder: true };
+  const rawAge = bag.streamAge || { text: LOADING, isPlaceholder: true };
+  // 開始時刻が無いのに「0分」になるのを、公式の開始時刻があるとき以外は出さない。
+  const age = rawAge.text === '0分' && facts.streamAgeProvenance !== 'official'
+    ? { text: LOADING, isPlaceholder: true }
+    : rawAge;
   /** @type {Array<{ key: string, label: string, text: string, unit: string, isPlaceholder: boolean, face: ''|'link'|'konta'|'tanu', title: string }>} */
   const items = [
     {
@@ -522,7 +911,7 @@ export function venueItemsForPlatform(platformId, bag) {
       key: 'concurrent',
       label: plan.concurrentLabel,
       text: viewer.text,
-      unit: viewer.isPlaceholder ? '' : '人',
+      unit: viewer.isPlaceholder ? '' : ('countUnit' in cap ? cap.countUnit : '人'),
       isPlaceholder: viewer.isPlaceholder,
       face: 'konta',
       title: OFFICIAL,

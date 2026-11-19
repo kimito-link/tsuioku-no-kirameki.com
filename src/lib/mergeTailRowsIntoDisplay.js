@@ -14,7 +14,7 @@
  *   畳み込み(テール→本体)の競合でも、本体の末尾とテールが重なりうる(書き出し系も同じ)。
  *
  * ■ 規則(新しい判定は作らない=既存の正本を再利用)
- *   - キー: storedCommentDedupeKey(commentNo があれば no:<n>、無ければ 同じ人×同じ文言×10分バケット)
+ *   - キー: storedCommentDedupeKey(commentNo があれば no:<n>、無ければ 同じ人×同じ文言×10分バケット。来場は時刻そのもの)
  *   - 重複は捨てずに mergeStoredCommentDedupeVariants で統合する(summary の薄い行に tail の userId 等を補う)
  *   - 重なりは base の【末尾】にしか起きない(畳み込み直後はテールが末尾へ移る・summary は小さい)ので、
  *     base の末尾 tail.length*2+64 件だけ索引にする=数万件の配信でも毎回 O(N) にしない

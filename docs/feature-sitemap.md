@@ -218,7 +218,7 @@
 
 - **応援レーン集約(誰が候補か)** — 保存コメント行を userId 単位に畳み込みレーン候補を作る唯一の集約正本(popup/venue 共通)
   - `src/lib/userLaneCandidatesFromStorage.js`
-<details><summary>🗂 このカテゴリの全担当ファイル(自動分類) 106</summary>
+<details><summary>🗂 このカテゴリの全担当ファイル(自動分類) 110</summary>
 
 - `scripts/council-trial.mjs` — 会議メンバー候補を「本番と同じ条件」で一斉に試す使い捨て計器。
 - `scripts/perf-ab/trace-summary.mjs` — Chrome のトレース(CDP Tracing)を取って、メインスレッドごとに「自分の時間(self time)」を名前別に集計する。
@@ -296,7 +296,11 @@
 - `src/lib/officialDomRankingRowsToStripRooms.js` — 公式イベント DOM バンドルの貢献度／広告ランキング行を、
 - `src/lib/personProfiles.js` — 人物プロファイル畳み込み（person-tile-unify 第1コミット・2026-06-17）。
 - `src/lib/pickBroadcasterNameForReputation.js` — 評判チェック用に「配信者名」を解決する純関数 (PR R4)
+- `src/lib/platform/followerCountSample.js` — 【層】L0 判定層(純粋関数・I/O禁止)
+- `src/lib/platform/followerEndRead.js` — 【層】L0 判定層(純粋関数)と、裏方の1回読み
+- `src/lib/platform/followerSampleStore.js` — ニコ生の配信者プロフィール（すでに取っている nvapi）と、そのフォロワー数の標本を一緒に書く。
 - `src/lib/platform/platformSubBoard.js` — 各サービスの「2つめの公式ランキング」(Twitch・Kick のギフトサブの順位など)を、
+- `src/lib/platform/slowFollowerFetch.js` — 【層】L0 判定層(純粋関数・I/O禁止)
 - `src/lib/popupConcurrentEstimateGate.js` — ポップアップ「推定同時接続」カードでローディングを解除するかどうか。
 - `src/lib/popupWatchMetaConcurrentGate.js` — popup の同時視聴者数推定を「出してよいか」判定するゲート(DOM/公式値/直近アクティブから)。
 - `src/lib/popupWatchUrlResolveMultiTab.js` — popup が参照する watch URL を「複数の候補ソース」から決める純粋関数。
@@ -349,7 +353,7 @@
   - `src/lib/giftThrowProjectile.js`
 - **吹き出し寿命管理** — 会場の吹き出しの表示上限・追い出し(eviction)ライフサイクル
   - `src/lib/venueBubbleLifecycle.js`
-<details><summary>🗂 このカテゴリの全担当ファイル(自動分類) 303</summary>
+<details><summary>🗂 このカテゴリの全担当ファイル(自動分類) 304</summary>
 
 - `app/live-view-sound.js` — v0.1.1737: スマホの WEB版でギフトの効果音を鳴らす(拡張の会場モードと同じ音・同じ金額帯の選び方)。
 - `app/live-view-venue.js` — v0.1.1739: スマホの「かんたん会場モード」。右下の 🎪 を押すと全画面の会場になる。
@@ -469,6 +473,7 @@
 - `src/lib/inlineHostBesideSizing.js` — beside（横付き）モードの inline panel の幅・高さを最適計算する純粋関数。
 - `src/lib/inlineHostDockSizing.js` — dock_bottom モードの inline panel 高さを viewport と player rect から最適計算する純粋関数。
 - `src/lib/inlineHostLayoutReset.js` — インラインパネルの placement（below / beside / floating / dock_bottom）を切り替える際に、
+- `src/lib/inlineHostLeave.js` — 視聴ページを離れた時刻と、欄を閉じる操作。
 - `src/lib/inlineHostMoveProbe.js` — ①POPインラインパネルの host(#nls-inline-popup-host)DOM移設を観測する
 - `src/lib/inlineHostRecoveryGate.js` — パネルが「消えたまま戻らない」を防ぐ復帰ゲート(純関数)。
 - `src/lib/inlineHostVisibilityIntent.js` — 応援パネル(inline host)を「見せる/消す」1回分の指示を組み立てる純関数。
@@ -762,7 +767,7 @@
   - `api/billing.js`
   - `app/supporter.html`
   - `tsuioku-no-kirameki/tokushoho.html`
-<details><summary>🗂 このカテゴリの全担当ファイル(自動分類) 52</summary>
+<details><summary>🗂 このカテゴリの全担当ファイル(自動分類) 58</summary>
 
 - `extension-youtube/marketing-export-guard.js` — マーケ分析タブ(marketing-export.html)の「何があっても開く」保険。
 - `extension-youtube/marketing-export.js` — ニコ生版 marketing-export-entry.js(本物)+ YouTube の記録を読む入口のバンドル
@@ -775,6 +780,7 @@
 - `src/extension/popup/init/devMonitorExport.js` — devMonitorExport — 開発モニタの「エクスポート/ダウンロード/較正データ消去」一式。
 - `src/extension/popup/report/htmlReportDocument.js` — HTMLレポート(振り返り用の保存HTML)組み立てクラスタ。
 - `src/lib/adMessageLines.js` — 広告主が入れた文字を、そのままレポートに残すための整形。
+- `src/lib/arrivalNoticeRows.js` — 来場通知を、サイドパネルの内訳と分析レポートで同じ行として数える。
 - `src/lib/audienceEngagementGap.js` — 来場者数は多いがコメントが少ない状態を検出するローカル分析コア。
 - `src/lib/broadcastNarrativeBuilder.js` — コメント本文だけから「配信内容の流れ」を再構成する純粋関数。
 - `src/lib/broadcastReportSummary.js` — HTML レポート / マーケ分析の双方で使う「放送全体の純粋集計」。
@@ -799,6 +805,8 @@
 - `src/lib/newVsRepeatBasis.js` — マーケレポートの「新規 vs 常連」を出してよいか判定する純関数(2026-10-20)。
 - `src/lib/northStarFallbackHtml.js` — v0.1.241: 北極星「鏡のように貼り付け」レーンの fallback HTML 生成。
 - `src/lib/panelMetricsExport.js` — パネル向け速報メトリクス（content メモリ → popup 直結、storage バイパス）。
+- `src/lib/platform/marketingPlatformChapters.js` — ニコ生以外のマーケHTMLに足す章。見た目のクラスは既存の mkt-* を使う。
+- `src/lib/platform/marketingPlatformPlan.js` — 【層】L0 判定層(純粋関数・I/O禁止)
 - `src/lib/reportCommentsCsv.js` — 保存コメント配列を「Excel / LibreOffice / Google Sheets で安全に開ける CSV」に変換する純関数。
 - `src/lib/reportCommentsTableSection.js` — HTML レポート「保存コメント一覧」セクション。
 - `src/lib/reportFriendlyMetaRowsHtml.js` — v0.1.635: HTML レポートの「やさしいメタ情報」テーブル行ビルダ + ラベル変換（純ロジック）。
@@ -813,6 +821,9 @@
 - `src/lib/supportTimelineHtml.js` — 応援タイムラインの行 HTML を純粋に組み立てる（v0.1.340）。
 - `src/lib/topSupportRankLinesHtml.js` — 応援ランクストリップの各行（renderTopSupportRankStrip の <a>/<div> 行群）の HTML を組む純関数。
 - `src/lib/viewerRetentionSectionHtml.js` — マーケ分析レポートの章「視聴維持率（最後まで見たか・推定）」。
+- `src/lib/youtube/exportStoredComments.js` — 疑似 lv の書き出しは、画面用の組み立て（人物・アイコン・ランキング）を待たない。
+- `src/lib/youtube/ytLvKeyBridge.js` — 疑似 lv → 配信キー。マーケの過去比較が他サービスの配信を混ぜないために使う。
+- `src/lib/youtube/ytPanelExportTarget.js` — 【層】L0 判定層(純粋関数・I/O禁止)
 - `src/lib/youtube/ytRankLinesHtml.js` — 応援ユーザーの順位カード(`.nl-top-support-rank__line`)の HTML を YouTube 用に組む純関数。
 - `src/lib/youtube/ytReportHtml.js` — YouTube 版の「💾 HTML（記録レポート）」と「📊 マーケ（分析レポート）」を組み立てる純粋関数
 - `src/shared/html/escape.js` — ユーザー由来文字列を HTML 断片に埋め込む前にエスケープする（XSS 対策の共通実装）。
@@ -1185,7 +1196,7 @@
   - `src/extension/live-ranking-entry.js`
   - `tsuioku-no-kirameki/live/index.html`
   - `.github/workflows/live-ranking.yml`
-<details><summary>🗂 このカテゴリの全担当ファイル(自動分類) 344</summary>
+<details><summary>🗂 このカテゴリの全担当ファイル(自動分類) 345</summary>
 
 - `app/app.js` — スマホ閲覧用 status Web 版。
 - `app/live-view-block.js` — iPhone アプリの「🚩 見たくない人を隠す・報告する」(App Store の審査 1.2: ほかの人の書き込みを見せるアプリの決まり)。
@@ -1426,6 +1437,7 @@
 - `src/lib/platform/noWatchHint.js` — 配信ページが開いていないときにパネルへ出す「配信を探す」案内を、そのサービスの言葉と行き先にする。
 - `src/lib/platform/platformStats.js` — 【層】L0 判定層(純粋関数・I/O禁止)
 - `src/lib/platform/streamEmotes.js` — Twitch・Kick のチャットの絵文字(エモート)を、画面で画像として出すための部品(純粋関数)。
+- `src/lib/platform/supportArrival.js` — 【層】L0 判定層(純粋関数・I/O禁止)
 - `src/lib/pollUntil.js` — 再読み込み直後など DOM が遅れて現れるまで待つ（純粋な間隔ポーリング）
 - `src/lib/popupBooleanSettingController.js` — popup のブール設定 1 件を管理する純粋コントローラ。
 - `src/lib/popupBooleanSettingsRegistry.js` — popup のブール設定コントローラをまとめて扱うレジストリ。
@@ -1539,44 +1551,34 @@
 > changelog 全 20 版を「バグ系統」で束ねた枝。同系統をまた触るとき、過去の修正と「なぜ毎回触るか」を辿る(再発防止)。新しい順。
 
 ### 💾 記録件数 (2版)
-- `v0.1.2134` 2026-11-16 — 混んだ配信でも指定の声で読みやすく
-- `v0.1.2127` 2026-11-15 — 大きな記録で開いた直後の固まりを減らした
+- `v0.1.2165` 2026-11-18 — 終わりの人数と書き出しの全件
+- `v0.1.2155` 2026-11-18 — 応援が届いた時刻を先頭に出す
 
 ### 🏟 会場・席 (4版)
-- `v0.1.2139` 2026-11-16 — 読み足した過去コメントを吹き出しに出さない
-- `v0.1.2133` 2026-11-16 — Twitch などで数え始めた時刻を出す
-- `v0.1.2130` 2026-11-16 — 混んだ配信でも読み上げが止まらない
-- `v0.1.2119` 2026-11-13 — YouTube の会場で最初のギフト音も鳴る
+- `v0.1.2154` 2026-11-18 — 横の欄と来場の記録をまとめた
+- `v0.1.2153` 2026-11-18 — Kickの絵文字を名前のまま出さない
+- `v0.1.2152` 2026-11-18 — 公式どうしの来場は1秒差でも残す
+- `v0.1.2150` 2026-11-17 — 来場は時刻で区別し、二重だけ畳む
 
 ### 🎈 吹き出し (1版)
-- `v0.1.2139` 2026-11-16 — 読み足した過去コメントを吹き出しに出さない
+- `v0.1.2153` 2026-11-18 — Kickの絵文字を名前のまま出さない
 
-### 🎁 ギフト (3版)
-- `v0.1.2134` 2026-11-16 — 混んだ配信でも指定の声で読みやすく
-- `v0.1.2133` 2026-11-16 — Twitch などで数え始めた時刻を出す
-- `v0.1.2119` 2026-11-13 — YouTube の会場で最初のギフト音も鳴る
-
-### 🔊 読み上げ (7版)
-- `v0.1.2139` 2026-11-16 — 読み足した過去コメントを吹き出しに出さない
-- `v0.1.2138` 2026-11-16 — Kick・ABEMA・Twitch等で開始からの過去コメントも記録
-- `v0.1.2136` 2026-11-16 — 使わない権限を拡張から外した
-- `v0.1.2134` 2026-11-16 — 混んだ配信でも指定の声で読みやすく
-- `v0.1.2130` 2026-11-16 — 混んだ配信でも読み上げが止まらない
-- `v0.1.2120` 2026-11-13 — スタンプの名前を読み上げない
-- `v0.1.2118` 2026-11-13 — 混んでも合唱が途中で消えにくく
+### 🎁 ギフト (1版)
+- `v0.1.2159` 2026-11-18 — 概数の登録者と長い応援一覧を直す
 
 ### 🪟 応援レーン・タイル (1版)
-- `v0.1.2122` 2026-11-13 — 拡張の短い説明文を見直した
+- `v0.1.2157` 2026-11-18 — Twitchなどの人数を低い頻度で取る
 
-### ⚡ 描画・性能 (1版)
-- `v0.1.2128` 2026-11-16 — 大きな記録でコメントの流れ欄を軽くした
-
-### その他 (8版)
-- `v0.1.2137` 2026-11-16 — ツイキャスで開く前のコメントをさかのぼって記録
-- `v0.1.2135` 2026-11-16 — ツイキャスで開く前のコメントも記録
-- `v0.1.2132` 2026-11-16 — ニコ生以外で横の欄がさらに軽くなる
-- `v0.1.2129` 2026-11-16 — ニコ生以外でコメントのたびの書き直しを減らした
-- `v0.1.2126` 2026-11-15 — ニコ生以外の横の欄が裏で回り続けるのを止めた
-- `v0.1.2125` 2026-11-15 — 人が少ない順位のカードが横に伸びない
-- `v0.1.2121` 2026-11-13 — 文字にくっついたスタンプ名も読まない
-- `v0.1.2117` 2026-11-13 — 書き方が違う笑いや拍手も合唱に
+### その他 (12版)
+- `v0.1.2169` 2026-11-18 — 引き継ぎノートの公開版表記を最新に
+- `v0.1.2168` 2026-11-18 — ストア提出記録の版表記を最新に
+- `v0.1.2167` 2026-11-18 — 開いたままの書き出しと概数
+- `v0.1.2166` 2026-11-18 — メディアキットのサービス名
+- `v0.1.2164` 2026-11-18 — 視聴ページを離れたら欄を閉じる
+- `v0.1.2163` 2026-11-18 — 権限を足さず終わりの人数
+- `v0.1.2162` 2026-11-18 — 記録の終わりの人数と書き出し先
+- `v0.1.2161` 2026-11-18 — フォロワー数の正本を一つにする
+- `v0.1.2160` 2026-11-18 — 保存したフォロワー数を書き出しに出す
+- `v0.1.2158` 2026-11-18 — 記録が無いときは応援の章を出さない
+- `v0.1.2156` 2026-11-18 — フォロワーの増えた時刻を出す
+- `v0.1.2151` 2026-11-17 — 記録テストは絵文字の名前を見ない

@@ -60,8 +60,11 @@ export const MEDIA_KIT_SUPPORTER_SCAN_TIMEOUT_MS = 15_000;
  *   withTimeout: <T>(p: Promise<T>, ms: number, code: string) => Promise<T>,
  *   resolveProfileMap: () => Promise<Record<string, any>>,
  *   maskSupporters?: boolean,
+ *   omitVisitorTotal?: boolean,
  *   broadcasterUserId?: string,
  *   currentLiveId?: string,
+ *   followerSamples?: unknown[],
+ *   platformId?: string,
  *   openDb?: () => Promise<IDBDatabase>,
  *   listLiveIds?: (db: IDBDatabase, opts: { limit: number }) => Promise<string[]>,
  *   listSummaryForLive?: (db: IDBDatabase, liveId: string, limit: number) => Promise<unknown[]>
@@ -138,7 +141,9 @@ export async function buildMediaKitDocument(deps) {
     profileSnapshots,
     giftEventsByLive,
     nowMs,
-    windowsDays: [30, 60, 90]
+    windowsDays: [30, 60, 90],
+    followerSamples: deps.followerSamples,
+    platformId: deps.platformId
   });
 
   // 応援者セクション。コメント全件読みは直近 MEDIA_KIT_COMMENT_LIVE_CAP 配信のみ・時間で打ち切り(取れた分で出す)。
@@ -181,7 +186,9 @@ export async function buildMediaKitDocument(deps) {
     generatedAtMs: nowMs,
     sourceLiveLimit: MEDIA_KIT_LIVE_LIMIT,
     sourceLiveLimitReached: liveIds.length >= MEDIA_KIT_LIVE_LIMIT,
-    maskSupporters: deps.maskSupporters === true
+    maskSupporters: deps.maskSupporters === true,
+    omitVisitorTotal: deps.omitVisitorTotal === true,
+    platformId: deps.platformId
   });
   const date = new Intl.DateTimeFormat('en-CA', {
     timeZone: 'Asia/Tokyo',

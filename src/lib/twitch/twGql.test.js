@@ -5,6 +5,9 @@ import {
   safeTwImageUrl,
   buildTwUsersIconQuery,
   buildTwStreamInfoQuery,
+  buildTwFollowerCountQuery,
+  parseTwFollowerCount,
+  twitchClientIdFromText,
   buildTwLiveVodQuery,
   parseTwLiveVod,
   buildTwVodCommentsQuery,
@@ -40,6 +43,24 @@ describe('twGql', () => {
   it('問い合わせ文は login を英数字に限る(差し込み防止)', () => {
     expect(buildTwStreamInfoQuery('a"){x}').query).toContain('user(login:"ax")');
     expect(buildTwUsersIconQuery(['AAA', 'aaa', 'b"c', 'ok_1']).logins).toEqual(['aaa', 'ok_1']);
+  });
+  it('フォロワー合計は ChannelPage_ChannelFollowerCount の totalCount だけ', () => {
+    const q = buildTwFollowerCountQuery('Twitch');
+    expect(q?.operationName).toBe('ChannelPage_ChannelFollowerCount');
+    expect(q?.variables).toEqual({ login: 'twitch' });
+    expect(q?.query).toContain('followers{totalCount}');
+    expect(JSON.stringify(q)).not.toMatch(/authorization/i);
+    expect(buildTwFollowerCountQuery('a"){x}')?.variables).toEqual({ login: 'ax' });
+    const live = {
+      data: { user: { followers: { totalCount: 2499322 } } },
+      extensions: { operationName: 'ChannelPage_ChannelFollowerCount' },
+    };
+    expect(parseTwFollowerCount(live)).toBe(2499322);
+    expect(parseTwFollowerCount([live])).toBe(2499322);
+    expect(parseTwFollowerCount({ errors: [{ message: 'PersistedQueryNotFound' }] })).toBeNull();
+    expect(parseTwFollowerCount({ data: { user: { stream: { viewersCount: 10 } } } })).toBeNull();
+    expect(twitchClientIdFromText('{"clientId":"kimne78kx3ncx6brgo4mv6wki5h1ko"}')).toBe('kimne78kx3ncx6brgo4mv6wki5h1ko');
+    expect(twitchClientIdFromText('Authorization: Bearer secret-token-value')).toBe('');
   });
 });
 
@@ -147,6 +168,33 @@ describe('Twitch 公式の応援ランキング(ChannelLeaderboards・2026-11-08
     expect(parsed.items[0]).toMatchObject({
       id: 'uuid-1', channelId: 'tw:99', login: 'fan1', text: 'hello world', skipVoice: true, badges: ['subscriber'],
     });
+    expect(parsed.items[0].emotes).toBeUndefined();
+    const withEmote = parseTwVodComments({
+      data: {
+        video: {
+          comments: {
+            edges: [{
+              node: {
+                id: 'uuid-2',
+                contentOffsetSeconds: 16,
+                createdAt: '2026-11-16T08:09:02Z',
+                commenter: { id: '99', login: 'fan1', displayName: 'Fan1' },
+                message: {
+                  fragments: [
+                    { text: 'unkochanPower', emote: { emoteID: '99' } },
+                    { text: ' hello' },
+                  ],
+                },
+              },
+            }],
+          },
+        },
+      },
+    }, 'stylishnoob4');
+    expect(withEmote.items[0].text).toBe('unkochanPower hello');
+    expect(withEmote.items[0].emotes).toEqual([
+      { name: 'unkochanPower', url: 'https://static-cdn.jtvnw.net/emoticons/v2/99/default/dark/2.0' },
+    ]);
     expect(parsed.nextOffsetSeconds).toBe(16);
     expect(shouldStopTwVodBackfill({
       count: 1, nextOffsetSeconds: 16, prevOffsetSeconds: 0, lastCreatedAtMs: 1000, cutoffMs: 2000, lengthSeconds: 6500,

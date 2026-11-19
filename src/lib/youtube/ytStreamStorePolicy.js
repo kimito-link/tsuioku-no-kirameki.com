@@ -4,6 +4,7 @@
 import { assignYtCommentLane } from './ytLaneAssign.js';
 import { ytHandleLivePath } from './ytPageMeta.js';
 import { normalizePlatformStats } from '../platform/platformStats.js';
+import { appendFollowerSample } from '../platform/followerCountSample.js';
 import {
   createYtSupportRankingAccumulator,
   applyYtSupportRankingDelta,
@@ -47,7 +48,8 @@ export function buildYtCommentPrimaryKey(videoId, commentId) {
  *   startedAt?: number | null,
  *   startedAtApprox?: boolean,
  *   endedAt?: number | null,
- *   platformStats?: Record<string, any> | null
+ *   platformStats?: Record<string, any> | null,
+ *   followerSample?: { at?: number, count?: number, rounded?: boolean, source?: string, noun?: string, raw?: string, force?: boolean } | null
  * }} patch
  * @param {number} [nowMs]
  * @returns {{
@@ -168,6 +170,9 @@ export function mergeYtStreamSummary(existing, patch, nowMs = Date.now()) {
       ? prev.createdAt
       : nowMs;
 
+  // ページがすでに出しているフォロワー数。空のときは欄を足さない（要約全体の一致テストを崩さない）。
+  const followerSamples = appendFollowerSample(prev.followerSamples, patch?.followerSample, nowMs);
+
   return {
     videoId,
     title,
@@ -188,6 +193,7 @@ export function mergeYtStreamSummary(existing, patch, nowMs = Date.now()) {
     startedAt,
     ...(startedAtApprox ? { startedAtApprox: true } : {}),
     ...(endedAt ? { endedAt } : {}),
+    ...(followerSamples.length ? { followerSamples } : {}),
     createdAt,
     updatedAt: nowMs,
   };
@@ -200,14 +206,16 @@ export function mergeYtStreamSummary(existing, patch, nowMs = Date.now()) {
  * @param {string} videoId
  * @param {any[]} incomingItems
  * @param {number} [nowMs]
+ * @param {{ keepEmotes?: boolean }} [opts] keepEmotes: 会場へ先に届ける行だけ絵文字の画像を残す。保存には残さない。
  * @returns {any[]}
  */
-export function prepareYtCommentsForIdb(videoId, incomingItems, nowMs = Date.now()) {
+export function prepareYtCommentsForIdb(videoId, incomingItems, nowMs = Date.now(), opts = {}) {
   const vid = String(videoId || '').trim();
   if (!vid || !Array.isArray(incomingItems) || incomingItems.length === 0) {
     return [];
   }
 
+  const keepEmotes = opts?.keepEmotes === true;
   /** @type {Set<string>} */
   const seenPks = new Set();
   /** @type {any[]} */
@@ -221,8 +229,10 @@ export function prepareYtCommentsForIdb(videoId, incomingItems, nowMs = Date.now
     if (!pk || seenPks.has(pk)) continue;
     seenPks.add(pk);
 
+    const { emotes, ...withoutEmotes } = item;
+    const body = keepEmotes && Array.isArray(emotes) && emotes.length ? { ...withoutEmotes, emotes } : withoutEmotes;
     records.push({
-      ...item,
+      ...body,
       id: commentId,
       videoId: vid,
       pk,
@@ -334,8 +344,6 @@ export function applyYtStreamIncrementalItems(state, incomingItems, opts = {}) {
       buildYtCommentPrimaryKey(state.videoId || item.videoId, item.id);
     if (!pk || state.seenPks.has(pk)) continue;
     state.seenPks.add(pk);
-    unseen.push(item);
-
     const recAt = Number(item.recordedAt || 0);
     if (Number.isFinite(recAt) && recAt > 0) {
       if (state.firstRecordedAt === 0 || recAt < state.firstRecordedAt) {
@@ -345,6 +353,9 @@ export function applyYtStreamIncrementalItems(state, incomingItems, opts = {}) {
         state.lastRecordedAt = recAt;
       }
     }
+    // フォロー通知は記録に残すが、コメントの件数・レーンには入れない。
+    if (String(item.kind || '') === 'follow' || item.commentType === 'followNotice') continue;
+    unseen.push(item);
   }
 
   if (unseen.length === 0) {

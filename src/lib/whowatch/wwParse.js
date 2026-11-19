@@ -52,12 +52,23 @@ export function wwLiveApiUrl(liveId, lastUpdatedAt = 0, limit = 0) {
   return lim > 0 ? `${base}&limit=${Math.min(500, lim)}` : base;
 }
 
+/**
+ * プロフィールの人数。サイト自身が使う GET /users/<番号>/profile の follower_count。
+ * 番号だけ（user_path の「w:」は入れない）。ログイン不要の公開 JSON。
+ * @param {unknown} userId
+ */
+export function wwUserProfileUrl(userId) {
+  const id = String(userId || '');
+  return /^\d{1,20}$/.test(id) ? `${WW_API_ORIGIN}/users/${id}/profile` : '';
+}
+
 /** API の URL として通してよいか(バックグラウンドが代わりに読むとき) @param {unknown} url */
 export function isWwApiUrl(url) {
   const u = String(url || '');
-  // 配信の情報とコメント、イベントの順位(events/event_info・ログイン不要・2026-11-11 実測)だけ
+  // 配信の情報とコメント、イベントの順位、プロフィールの人数(ログイン不要)だけ
   return /^https:\/\/api\.whowatch\.tv\/lives\/\d{1,20}(?:\/play)?(?:\?last_updated_at=\d{1,16}(?:&limit=\d{1,4})?)?$/.test(u)
-    || /^https:\/\/api\.whowatch\.tv\/events\/event_info\?live_id=\d{1,20}$/.test(u);
+    || /^https:\/\/api\.whowatch\.tv\/events\/event_info\?live_id=\d{1,20}$/.test(u)
+    || /^https:\/\/api\.whowatch\.tv\/users\/\d{1,20}\/profile$/.test(u);
 }
 
 /** 秒でも ms でも ms にする(読めなければ 0) @param {unknown} v */

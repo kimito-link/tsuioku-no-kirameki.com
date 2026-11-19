@@ -71,7 +71,7 @@ export function slimMarketingReportForHeavyEmbed(report, opts = {}) {
 /**
  * `<script type="application/json">` 内にそのまま置ける文字列（`</script>` 破壊を防ぐ）。
  * @param {MarketingReport} report
- * @param {{ maskShareLabels?: boolean, exportedAt?: string, slimForHeavyExport?: boolean, maxNumericCommenters?: number }} [opts]
+ * @param {{ maskShareLabels?: boolean, exportedAt?: string, slimForHeavyExport?: boolean, maxNumericCommenters?: number, platform?: string, idAliases?: Array<{ userId: string, serviceId: string }> }} [opts]
  * @returns {string}
  */
 export function buildMarketingEmbedScriptInnerText(report, opts = {}) {
@@ -84,6 +84,7 @@ export function buildMarketingEmbedScriptInnerText(report, opts = {}) {
     });
   }
   const safeReport = cloneReportForJsonEmbed(baseReport, maskShareLabels);
+  /** @type {{ schemaVersion: number, exportedAt: string, maskShareLabels: boolean, slimForHeavyExport: boolean, liveId: string, report: MarketingReport, platform?: string, idAliases?: Array<{ userId: string, serviceId: string }> }} */
   const payload = {
     schemaVersion: 1,
     exportedAt,
@@ -92,5 +93,8 @@ export function buildMarketingEmbedScriptInnerText(report, opts = {}) {
     liveId: report.liveId,
     report: safeReport
   };
+  // ニコ生の JSON には足さない（キーが増えるとスナップショットが変わる）。
+  if (opts.platform && opts.platform !== 'niconico') payload.platform = opts.platform;
+  if (Array.isArray(opts.idAliases) && opts.idAliases.length) payload.idAliases = opts.idAliases;
   return JSON.stringify(payload).replace(/</g, '\\u003c');
 }

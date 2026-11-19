@@ -3,6 +3,7 @@ import {
   buildStoryAvatarDiagVerboseHtml
 } from './storyAvatarDiagLine.js';
 import { resolveStoryDiagTotal } from './storyDiagTotalSource.js';
+import { includeNiconicoUserAliasNote } from './platform/platformMetrics.js';
 
 /** @param {unknown} value @returns {string} */
 function normalizeLiveId(value) {
@@ -53,7 +54,9 @@ function buildVenueStoryDiagMirrorHtml(snap, nowMs) {
   const s = /** @type {import('./storyAvatarDiagLine.js').StoryAvatarDiagSnapshot & { liveId?: string, capturedAt?: number }} */ (snap);
   const compactHtml = buildStoryAvatarDiagHtml(s);
   if (compactHtml == null) return { html: null, sig: '__hidden__' };
-  const verboseHtml = buildStoryAvatarDiagVerboseHtml(s);
+  const verboseHtml = buildStoryAvatarDiagVerboseHtml(s, {
+    includeUserAliasNote: includeNiconicoUserAliasNote(s?.liveId)
+  });
   const ageLabel = formatAgeLabel(storyDiagAgeSec(s?.capturedAt, nowMs));
   const sig = `${normalizeLiveId(s?.liveId)}|${finiteNumberOrZero(s?.capturedAt)}|${compactHtml}|${verboseHtml}`;
   return {

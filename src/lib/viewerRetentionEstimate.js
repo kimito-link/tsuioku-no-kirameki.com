@@ -19,7 +19,7 @@
  * 純関数（storage / DOM に触らない）。
  */
 
-import { parseInterestArrivalComment } from './parseInterestArrivalComment.js';
+import { parseArrivalCommentText } from './parseArrivalComment.js';
 import { toEpochMs } from './timeAuthority.js';
 
 /** 配信がこれより短いと終盤と序盤の区別がつかないので判定しない */
@@ -88,7 +88,7 @@ export function estimateViewerRetention(comments, opts = {}) {
     const uid = c.userId == null ? '' : String(c.userId).trim();
     if (!uid) continue;
     if (broadcasterUid && uid === broadcasterUid) continue;
-    if (parseInterestArrivalComment(String(c.text || ''))) continue;
+    if (parseArrivalCommentText(String(c.text || ''))) continue;
     if (!firstAll || at < firstAll) firstAll = at;
     if (at > lastAll) lastAll = at;
     const nick = typeof c.nickname === 'string' ? c.nickname : '';

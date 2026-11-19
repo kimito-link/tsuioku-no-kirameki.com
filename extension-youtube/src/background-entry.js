@@ -62,6 +62,14 @@ import {
   readAllVoices,
 } from '../../src/lib/youtube/ytSplitPersistStore.js';
 import { computePseudoLvForVideoId } from '../../src/lib/youtube/ytPseudoLv.js';
+import { followerSamplesExportEntry } from '../../src/lib/platform/followerSampleStore.js';
+import {
+  fetchFollowerEndSample,
+  followerEndEventFromTabChange,
+  followerEndReadForEvent,
+  normalizeFollowerEndArm,
+  stillOnFollowerLive,
+} from '../../src/lib/platform/followerEndRead.js';
 import { swStaleDecision } from '../../src/lib/swStaleCheck.js';
 /** @type {Map<string, string>} 配信 → 最後に書いた公式ランキングの指紋(0.1.1959) */
 const lastLeaderboardSig = new Map();
@@ -304,6 +312,39 @@ async function persistChangedVoices(assignments) {
   const res = await putVoicePeople(batch);
   if (!verifiedBeforeRetire(res)) return;
   for (const row of changed) voiceSavedJson[row.userKey] = JSON.stringify(row.body);
+}
+
+/** 書き出し用に置いた人数の標本の署名。同じ標本では保存しない。 @type {Map<string, string>} */
+const followerExportSig = new Map();
+
+/**
+ * 人数の標本だけを小さい鍵へ置く。配信要約の IndexedDB 書き込みはしない。
+ * 書き出しが要約の読み込みを待っているとき、人数の取得で待たせない。
+ * @param {string} videoId
+ * @param {any} summary
+ */
+async function rememberFollowerSamplesForExport(videoId, summary) {
+  const entry = followerSamplesExportEntry(videoId, summary);
+  if (!entry) return;
+  const last = /** @type {{ at?: number, count?: number, rounded?: boolean, raw?: string }} */ (entry.samples[entry.samples.length - 1] || {});
+  const sig = `${entry.samples.length}:${last.at}:${last.count}:${last.rounded ? 1 : 0}:${last.raw || ''}`;
+  if (followerExportSig.get(videoId) === sig) return;
+  followerExportSig.set(videoId, sig);
+  try {
+    const prevBag = await chrome.storage.local.get(entry.profileKey);
+    const prev = prevBag?.[entry.profileKey];
+    const profile = prev && typeof prev === 'object' ? { ...prev } : {};
+    if (entry.followerCount != null) {
+      profile.followerCount = entry.followerCount;
+      profile.capturedAt = entry.capturedAt;
+    }
+    await chrome.storage.local.set({
+      [entry.key]: entry.samples,
+      [entry.profileKey]: profile,
+    });
+  } catch {
+    followerExportSig.delete(videoId);
+  }
 }
 
 /** 読み込み中のまとめ(同時に呼ばれても1回だけ読み、全員が同じ入れ物を受け取る) @type {Promise<Record<string, any>> | null} */
@@ -1002,6 +1043,102 @@ async function resolveHandleIcons(handles) {
   }
 }
 
+/** 記録の終わりの人数。ページが閉じる fetch は消えるので、裏方がタブの閉じ・移動・配信の終わりで1回読む。 */
+const FOLLOWER_END_SESSION_KEY = 'nls_follower_end_watch';
+/** @type {Map<number, import('../../src/lib/platform/followerEndRead.js').FollowerEndArm>} */
+const followerEndArms = new Map();
+/** @type {Set<string>} */
+const followerEndDone = new Set();
+/** @type {Promise<void> | null} */
+let followerEndLoaded = null;
+
+function loadFollowerEndWatch() {
+  if (!followerEndLoaded) {
+    followerEndLoaded = (async () => {
+      try {
+        const bag = await chrome.storage.session.get(FOLLOWER_END_SESSION_KEY);
+        const saved = bag?.[FOLLOWER_END_SESSION_KEY];
+        const arms = saved && typeof saved === 'object' ? saved.arms : null;
+        if (arms && typeof arms === 'object') {
+          for (const [id, arm] of Object.entries(arms)) {
+            const n = normalizeFollowerEndArm(arm, Number(id));
+            if (n) followerEndArms.set(n.tabId, n);
+          }
+        }
+        const done = saved && typeof saved === 'object' ? saved.done : null;
+        if (Array.isArray(done)) for (const key of done) followerEndDone.add(String(key));
+      } catch {
+        /* session が無ければ、この起動の間だけ覚える */
+      }
+    })();
+  }
+  return followerEndLoaded;
+}
+
+async function persistFollowerEndWatch() {
+  /** @type {Record<string, unknown>} */
+  const arms = {};
+  for (const [id, arm] of followerEndArms) arms[String(id)] = arm;
+  try {
+    await chrome.storage.session.set({
+      [FOLLOWER_END_SESSION_KEY]: { arms, done: [...followerEndDone] },
+    });
+  } catch {
+    /* 覚えられなくても、この起動の間は読む */
+  }
+}
+
+/** ページを離れた知らせのあと、更新で同じ配信に戻ったかを見るまでの待ち */
+const FOLLOWER_END_LEAVE_RECHECK_MS = 700;
+
+/**
+ * URL が見えるあいだは、まだその配信のページにいるか。見えない(about:blank)・タブが無いときは離れた。
+ * @param {import('../../src/lib/platform/followerEndRead.js').FollowerEndArm} arm
+ */
+async function tabStillOnFollowerLive(arm) {
+  try {
+    const tab = await chrome.tabs.get(arm.tabId);
+    const url = tab && typeof tab.url === 'string' ? tab.url : '';
+    if (!url) return false;
+    return stillOnFollowerLive(arm, url);
+  } catch {
+    return false;
+  }
+}
+
+/**
+ * @param {{ type: 'removed' | 'url' | 'stream-end' | 'leave' | 'unseen-url', tabId?: number, url?: string, videoKey?: string, arm?: import('../../src/lib/platform/followerEndRead.js').FollowerEndArm | null }} event
+ */
+async function onFollowerEndTabEvent(event) {
+  await loadFollowerEndWatch();
+  const pick = () => followerEndReadForEvent([...followerEndArms.values()], followerEndDone, event);
+  let arm = pick();
+  if (!arm) return;
+  // 配信ページのままの読み込み(URL が欠けるだけの変化・更新の途中)では、1回の枠を使わない。
+  if (event.type === 'leave' || event.type === 'unseen-url') {
+    if (await tabStillOnFollowerLive(arm)) {
+      if (event.type !== 'leave') return;
+      await new Promise((resolve) => setTimeout(resolve, FOLLOWER_END_LEAVE_RECHECK_MS));
+      arm = pick();
+      if (!arm || (await tabStillOnFollowerLive(arm))) return;
+    }
+  }
+  followerEndDone.add(arm.videoKey);
+  if (event.type !== 'stream-end') followerEndArms.delete(arm.tabId);
+  const sample = await fetchFollowerEndSample(arm, { fetch: globalThis.fetch.bind(globalThis), now: () => Date.now() });
+  await persistFollowerEndWatch();
+  if (!sample) return;
+  await runSerialized(async () => {
+    const summaries = await ensureSummaryMem();
+    summaries[arm.videoKey] = mergeYtStreamSummary(
+      summaries[arm.videoKey],
+      { videoId: arm.videoKey, followerSample: sample },
+      sample.at,
+    );
+    await rememberFollowerSamplesForExport(arm.videoKey, summaries[arm.videoKey]);
+  });
+}
+
 chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
   if (!message || typeof message.type !== 'string') return false;
 
@@ -1010,6 +1147,26 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
     ensureSummaryMem()
       .then((summaries) => sendResponse({ ok: true, summaries }))
       .catch(() => sendResponse({ ok: false, summaries: {} }));
+    return true;
+  }
+
+  if (message.type === 'YT_GET_FOLLOWER_SAMPLES') {
+    if (!sender || sender.id !== chrome.runtime.id) return false;
+    const lv = String(message.liveId || '').trim().toLowerCase();
+    ensureSummaryMem()
+      .then((summaries) => {
+        let samples = /** @type {unknown[]} */ ([]);
+        if (lv && summaries) {
+          for (const [vid, sum] of Object.entries(summaries)) {
+            if (computePseudoLvForVideoId(vid).toLowerCase() !== lv) continue;
+            const rows = /** @type {{ followerSamples?: unknown }} */ (sum)?.followerSamples;
+            if (Array.isArray(rows) && rows.length) samples = rows;
+            break;
+          }
+        }
+        sendResponse({ ok: true, samples });
+      })
+      .catch(() => sendResponse({ ok: false, samples: [] }));
     return true;
   }
 
@@ -1221,11 +1378,25 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
               : undefined,
           startedAtApprox: payload.startedAtApprox === true,
           endedAt: typeof payload.endedAt === 'number' ? payload.endedAt : undefined,
+          ...(payload.followerSample && typeof payload.followerSample === 'object' ? { followerSample: payload.followerSample } : {}),
         },
         Date.now(),
       );
 
+      // 人数だけの知らせは要約の保存を走らせない。書き出しの読み込みを止めない。
+      const followerOnly = !!(
+        payload.followerSample
+        && !payload.title
+        && payload.concurrentViewers == null
+        && payload.endedAt == null
+        && !Object.prototype.hasOwnProperty.call(payload, 'platformStats')
+      );
+      if (followerOnly) {
+        await rememberFollowerSamplesForExport(videoId, summaries[videoId]);
+        return { ok: true, videoId };
+      }
       await publishOneSummary(videoId, summaries[videoId]);
+      await rememberFollowerSamplesForExport(videoId, summaries[videoId]);
       // 裏の ABEMA タブは claimActive:false(#608)。要約は更新し、いま見ている配信は奪わない。
       if (payload.claimActive !== false) await claimActiveVideo(sender, videoId);
       void ytViewerSampler.maybeSample(videoId, payload.concurrentViewers, summaries[videoId]);
@@ -1378,7 +1549,8 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
       const vidNow = String(p0.videoId || extractVideoIdFromSender(sender) || '').trim();
       if (typeof tabId === 'number' && vidNow && Array.isArray(p0.items) && p0.items.length) {
         // 別の配信の記録に入っていると分かっているコメントは、保存より先に会場へ届けない(保存の側でも入れない)
-        const recs = prepareYtCommentsForIdb(vidNow, p0.items).filter((r) => {
+        // 保存には絵文字の配列を残さない。会場へ先に届ける行だけ残し、名前を文字で出さない。
+        const recs = prepareYtCommentsForIdb(vidNow, p0.items, Date.now(), { keepEmotes: true }).filter((r) => {
           const owner = ytCommentOwnerById.get(String(r?.id || ''));
           return !owner || owner === vidNow;
         });
@@ -1809,5 +1981,36 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
     return true;
   }
 
+  if (message.type === 'YT_FOLLOWER_END_ARM' || message.type === 'YT_FOLLOWER_END_NOW' || message.type === 'YT_FOLLOWER_END_LEAVE') {
+    const arm = normalizeFollowerEndArm(message, sender?.tab?.id);
+    if (!arm) {
+      sendResponse({ ok: false });
+      return false;
+    }
+    void (async () => {
+      await loadFollowerEndWatch();
+      followerEndArms.set(arm.tabId, arm);
+      if (message.type === 'YT_FOLLOWER_END_NOW') {
+        await onFollowerEndTabEvent({ type: 'stream-end', tabId: arm.tabId, videoKey: arm.videoKey });
+      } else if (message.type === 'YT_FOLLOWER_END_LEAVE') {
+        // ページが閉じる瞬間。登録が消えていても、知らせ自身の部屋番号で1回読む。
+        await onFollowerEndTabEvent({ type: 'leave', tabId: arm.tabId, videoKey: arm.videoKey, arm });
+      } else {
+        await persistFollowerEndWatch();
+      }
+      sendResponse({ ok: true });
+    })().catch(() => sendResponse({ ok: false }));
+    return true;
+  }
+
   return false;
+});
+
+chrome.tabs.onRemoved.addListener((tabId) => {
+  void onFollowerEndTabEvent({ type: 'removed', tabId });
+});
+chrome.tabs.onUpdated.addListener((tabId, info) => {
+  const ev = followerEndEventFromTabChange(info);
+  if (!ev) return;
+  void onFollowerEndTabEvent(ev.type === 'url' ? { type: 'url', tabId, url: ev.url } : { type: 'unseen-url', tabId });
 });

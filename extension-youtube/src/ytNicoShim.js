@@ -14,8 +14,11 @@
 //   4. YouTube 側の記録が増えたら(yt_stream_summaries の変化)、nls_comments_<疑似lv> が変わったと popup に知らせる。
 
 import { computePseudoLvForVideoId, isYtPseudoLvShape } from '../../src/lib/youtube/ytPseudoLv.js';
+import { setYtLvMetaResolver } from '../../src/lib/youtube/ytLvKeyBridge.js';
+import { marketingViewFor } from '../../src/lib/platform/marketingPlatformPlan.js';
 import { makeYtDefaultIconJudge, YT_DEFAULT_ICON_STORE_KEY } from './ytDefaultIcon.js';
 import { countYtStreamComments, getYtStreamCommentsByVideoId, getYtStreamCommentsSince } from './ytIdbStore.js';
+import { exportCommentsFromStoredRows, setStoredExportCommentReader } from '../../src/lib/youtube/exportStoredComments.js';
 import { buildCommentSummary, summaryStorageKey } from '../../src/lib/commentSummary.js';
 import { videoIdFromSummaryStorageKey } from '../../src/lib/youtube/ytSplitPersist.js';
 import { startPageStallWatch } from '../../src/lib/stallTrace.js';
@@ -35,7 +38,9 @@ import { ytLocalAssetUrlFor } from './ytLocalAssetUrls.js';
 import { buildZeroPtSenderLabels, isZeroPtCountText } from '../../src/lib/youtube/ytZeroPtGiftLabel.js';
 import { YT_LAST_STREAM_URL_KEY } from './pfLastStreamUrl.js';
 import { readYtPanelStreamKey, readYtPanelSite } from '../../src/lib/youtube/ytPanelRoute.js';
+import { recordingKeyForPanelStream, streamKeyMatchesPanel } from '../../src/lib/youtube/ytPanelExportTarget.js';
 import { noWatchHintFor } from '../../src/lib/platform/noWatchHint.js';
+import { mediaKitWordingPlatformId, rewriteForeignWording } from '../../src/lib/platform/platformMetrics.js';
 import { callerNameFromStack, createPanelStreamDiag, panelStreamDiagContext, serviceOfStreamKey, YT_PANEL_STREAM_DIAG_KEY_PREFIX } from '../../src/lib/youtube/ytPanelStreamDiag.js';
 import { createStaleFrameHold } from '../../src/lib/youtube/ytStaleFrameHold.js';
 import { ytFullRefreshIntervalMs } from '../../src/lib/youtube/ytFullRefreshInterval.js';
@@ -215,6 +220,8 @@ function mapTab(tab) {
     panelDiag.unmappedWatchTab(url); // 計器: 配信のページなのに写せない(記録の無い部屋など)
     return tab;
   }
+  // 横の欄は一つの配信を焼いて開く。別のサービスのタブをニコ生の視聴タブに見せると、書き出しがそちらになる。
+  if (PANEL_STREAM_KEY && !streamKeyMatchesPanel(PANEL_STREAM_KEY, vid)) return tab;
   const lv = pseudoLvForVideoId(vid);
   return { ...tab, url: `https://live.nicovideo.jp/watch/${lv}`, pendingUrl: undefined, __ytUrl: url };
 }
@@ -399,6 +406,9 @@ export function ytRecordToNicoEntry(r, i, lv, personKey, stableNo) {
   //   吹き出し・読み上げに出していた(0.1.2138 PC 実測: Twitch で吹き出し12個すべてが約3時間前の発言)。
   const backfilled = r?.skipVoice === true;
   const capturedAt = (r?.replay && IS_MARKETING_PAGE && postedAt > 0) || (backfilled && postedAt > 0 && postedAt < at) ? postedAt : at;
+  const emotes = Array.isArray(r?.emotes)
+    ? r.emotes.filter((e) => e && isEmoteName(e.name) && isSafeEmoteUrl(e.url)).slice(0, 40)
+    : [];
   return {
     id: String(r?.id || r?.pk || `yt${i}`),
     liveId: lv,
@@ -425,7 +435,21 @@ export function ytRecordToNicoEntry(r, i, lv, personKey, stableNo) {
     ...(r?.giftImageUrl ? { ytGiftImageUrl: String(r.giftImageUrl) } : {}),
     ytAmount: Number(r?.amount || 0),
     ytCurrency: String(r?.currency || ''),
+    ...(Number(r?.subMonths) > 0 ? { subMonths: Math.floor(Number(r.subMonths)) } : {}),
+    ...(r?.subTier ? { subTier: String(r.subTier) } : {}),
+    ...(r?.subEvent === 'sub' || r?.subEvent === 'resub' ? { subEvent: r.subEvent } : {}),
+    ...(Array.isArray(r?.badges) && r.badges.length
+      ? { badges: r.badges.filter((b) => typeof b === 'string' && b).slice(0, 8) }
+      : {}),
+    ...(Array.isArray(r?.giftRecipients) && r.giftRecipients.length
+      ? { giftRecipients: r.giftRecipients.map((name) => String(name || '').trim()).filter(Boolean).slice(0, 20) }
+      : {}),
+    ...(Number(r?.postedAtMs) > 0 ? { ytPostedAtSource: 'service' } : {}),
     ...(backfilled ? { skipVoice: true } : {}),
+    ...(r?.isSystem === true ? { isSystem: true } : {}),
+    ...(r?.commentType === 'followNotice' ? { commentType: 'followNotice' } : {}),
+    // 絵文字の名前→画像。落とすと吹き出しは名前の文字だけになる（一覧を覚える前の1回目）。
+    ...(emotes.length ? { emotes } : {}),
   };
 }
 
@@ -530,6 +554,9 @@ export function ytSummaryToNicoSnapshot(sum, videoId, tabTitle, all) {
     officialViewerStale: Number.isFinite(viewers) && viewers > 0 && sum?.viewersStale === true,
     officialViewerReadAt: Number(sum?.viewersReadAt || 0) || null,
     officialStatsUpdatedAt: Number(sum?.updatedAt || 0) || Date.now(),
+    // ページの開始時刻が目安(「3時間前」など)のときは、レポートの「開始から」を出さない。
+    ...(startedAt > 0 && sum?.startedAtApprox !== true ? { programStartAtMs: startedAt } : {}),
+    ...(Array.isArray(sum?.followerSamples) && sum.followerSamples.length ? { followerSamples: sum.followerSamples } : {}),
     // アーカイブ(チャットのリプレイで記録した配信)は今も配信中ではないので、開始からの経過は出さない(2週間前の配信が「372時間」になる)
     //   配信が終わっていたら(endedAt)、終わった時刻までで止める
     streamAgeMin:
@@ -1285,6 +1312,16 @@ async function buildCommentsForLvUncached(lv) {
 // 配信者の数字ID → YouTube の対応が分からないまま(ニコニコのリンク・ID のまま)になる。記録のある配信の配信者を先に登録する。
 /** @type {Record<string, any>} */
 let knownSummaries = {};
+setYtLvMetaResolver((lv) => {
+  const key = videoIdForPseudoLv(lv);
+  if (!key) return null;
+  const plat = platformOfStreamKey(key);
+  const sum = knownSummaries[key];
+  return {
+    platform: plat?.id || 'youtube',
+    channelId: String(sum?.broadcasterChannelId || ''),
+  };
+});
 // 「ギフト貢献度」の欄に入れたのが YouTube のトップファン(XP)か、スパチャの合計の順位(pt)か。言葉の直しを切り替える。
 let kokenIsTopFans = true;
 // Twitch/Kick の配信で「ギフト貢献度」の欄にそのサービスの公式ランキング(Kick の Kicks ランキング等)が入っているか。
@@ -1342,6 +1379,15 @@ if (real && real.storage && real.storage.local && (real.tabs || YT_SHIM_IN_PAGE)
       knownSummariesLoaded = true;
       schedulePlatformChrome();
     });
+  // 書き出しは、視聴タブが開いていても画面用の組み立て(人物・アイコン)を待たない。
+  // 保存した行をそのまま写す。組み立てはコメントが多いと30秒で打ち切られ、報告が出なかった。
+  setStoredExportCommentReader(async (lv) => {
+    await knownVideosReady;
+    const vid = videoIdForPseudoLv(lv);
+    if (!vid) return null;
+    const raw = await getYtStreamCommentsByVideoId(vid);
+    return exportCommentsFromStoredRows(Array.isArray(raw) ? raw : [], String(lv || ''));
+  });
   /**
    * 配信のまとめの一覧を { yt_stream_summaries: {...} } の形で返す。
    * 0.1.2057: 裏方は一覧を丸ごと書かなくなった(配信ごとの小さい鍵 ytm:sum:v1:<id> と IndexedDB)。
@@ -1367,6 +1413,13 @@ if (real && real.storage && real.storage.local && (real.tabs || YT_SHIM_IN_PAGE)
   };
   const lastWatchUrl = async () => {
     await knownVideosReady;
+    // 焼いた配信がある欄は、その記録だけ。最後に更新された別のサービスや、閉じたあとの全局の「最後に見た配信」は使わない。
+    if (PANEL_STREAM_KEY) {
+      const vid = recordingKeyForPanelStream(PANEL_STREAM_KEY, knownSummaries);
+      const pinnedLv = vid ? pseudoLvForVideoId(vid) : '';
+      panelDiag.lastWatch(vid ? 'panel' : 'none', pinnedLv);
+      return pinnedLv ? `https://live.nicovideo.jp/watch/${pinnedLv}` : '';
+    }
     const lv = lvOfLastStream(lastStreamValue);
     if (lv) {
       panelDiag.lastWatch('page', lv);
@@ -2219,7 +2272,7 @@ function fixTextNode(node) {
       return;
     }
   }
-  let next = screenWording(v); // ニコニコの言葉 → YouTube(Twitch・Kick)の言葉(決まった文言だけ)
+  let next = screenWording(v, { rewrite: !inRecordedText(node) }); // ニコニコの言葉 → YouTube(Twitch・Kick)の言葉(決まった文言だけ)
   if (/ID[:：]\s?8\d{9}/.test(next)) next = ytDropEmptyIdTag(next);
   if (subBoardShown) next = subBoardCelebrationWording(next, subBoardShown);
   if (/8\d{9}/.test(next)) next = next.replace(PSEUDO_UID_RE, (uid) => (ytKeyForNumericUid(uid) ? ytLabelForUid(uid) : uid));
@@ -2237,9 +2290,42 @@ function screenPlatform() {
   const p = screenPlatformBase();
   return p && platformBoardPeriod ? { ...p, boardPeriod: platformBoardPeriod } : p;
 }
+
+/** 分析レポートの URL に焼かれた lv。最後にコメントを読んだ別の配信は使わない。 */
+function marketingExportLv() {
+  try {
+    return new URLSearchParams(String(location.search || '')).get('lv') || '';
+  } catch {
+    return '';
+  }
+}
+
+/**
+ * 分析レポートの言葉。書き出す配信のサービスだけ。
+ * hold は、配信キーがまだ無いので別サービスの名前へ直さない印。
+ * @returns {{ hold: true } | { hold: false, id: string, platform: (typeof STREAM_PLATFORMS)[keyof typeof STREAM_PLATFORMS] | null }}
+ */
+function marketingWordingPick() {
+  const id = mediaKitWordingPlatformId({
+    exportLv: marketingExportLv(),
+    videoIdForLv: (lv) => videoIdForPseudoLv(lv),
+    platformOfKey: (key) => platformOfStreamKey(key),
+  });
+  if (!id) return { hold: true };
+  if (id === 'youtube' || id === 'niconico') return { hold: false, id, platform: null };
+  if (Object.prototype.hasOwnProperty.call(STREAM_PLATFORMS, id)) {
+    return { hold: false, id, platform: STREAM_PLATFORMS[/** @type {keyof typeof STREAM_PLATFORMS} */ (id)] };
+  }
+  return { hold: true };
+}
+
 /** いま画面に出ている配信のサービス(Twitch/Kick・YouTube なら null。視聴ページの中ならそのページのサービス) */
 function screenPlatformBase() {
   if (YT_SHIM_IN_PAGE) return platformOfHostname(location.hostname);
+  if (IS_MARKETING_PAGE) {
+    const picked = marketingWordingPick();
+    return picked.hold ? null : picked.platform;
+  }
   if (lastAskedLv) {
     const vid = videoIdForPseudoLv(lastAskedLv);
     // 0.1.2103: 聞いてきた配信が分からない(記録の無い配信)ときは、外枠が焼いたタブのサービス。
@@ -2324,19 +2410,44 @@ function applyNoWatchHintOnce() {
 }
 applyNoWatchHintOnce();
 
-/** 画面の決まった文言の置き換え。Twitch/Kick の配信なら、YouTube の言葉にした所だけをさらにそのサービスの言葉に @param {string} t */
-function screenWording(t) {
+/** 記録したコメント本文・更新履歴は、配信ページの言い方に書き換えない @param {Node|Element|null} node */
+function inRecordedText(node) {
+  const el = node && (node.nodeType === 1 ? /** @type {Element} */ (node) : node.parentElement);
+  return !!(el && typeof el.closest === 'function' && el.closest('#supportTimelineBody,#commentTickerViewport,#commentInput,#userRoomList,#changelogList'));
+}
+
+/** 画面の決まった文言の置き換え。Twitch/Kick の配信なら、YouTube の言葉にした所だけをさらにそのサービスの言葉に @param {string} t @param {{ rewrite?: boolean }} [opt] */
+function screenWording(t, opt) {
+  // 分析レポートは、書き出す配信のサービスだけ。最後に読んだ別の配信の名前へ直さない。
+  if (IS_MARKETING_PAGE) {
+    const picked = marketingWordingPick();
+    if (picked.hold || picked.id === 'niconico') return t;
+    const p = picked.platform;
+    if (!p) return ytWording(t, { topFans: false });
+    const w = ytWording(t, { topFans: false });
+    return w !== t ? ytWordingForPlatform(w, p) : ytWordingPlatformFixed(w, p);
+  }
   // Twitch にはトップファンの順位表が無い=ランキング欄は最初から「合計の順位」の言葉で描く
   const p = screenPlatform();
-  if (!p) return ytWording(t, { topFans: kokenIsTopFans });
-  if (platformOfficial) {
+  let out;
+  if (!p) out = ytWording(t, { topFans: kokenIsTopFans });
+  else if (platformOfficial) {
     // 公式ランキングの言葉(Kick 公式の Kicks ランキング)。YouTube の言葉にした所はそのサービスの言葉に
     const w1 = ytWording(t, { topFans: true });
     const o = ytWordingPlatformOfficial(w1, p);
-    return w1 !== t ? o.split('スーパーチャット').join(p.paid).split('スパチャ').join(p.paid).split('YouTube').join(p.name) : o;
+    out = w1 !== t ? o.split('スーパーチャット').join(p.paid).split('スパチャ').join(p.paid).split('YouTube').join(p.name) : o;
+  } else {
+    const w = ytWording(t, { topFans: false });
+    out = w !== t ? ytWordingForPlatform(w, p) : ytWordingPlatformFixed(w, p);
   }
-  const w = ytWording(t, { topFans: false });
-  return w !== t ? ytWordingForPlatform(w, p) : ytWordingPlatformFixed(w, p);
+  if (opt && opt.rewrite === false) return out;
+  // 有料のマーケティングレポートは、ニコ生の分析語（184・プレミアム）を残す
+  try {
+    if (/marketing-export\.html$/.test(String(location.pathname || ''))) return out;
+  } catch { /* location が無い実行ではパネルと同じ置き換えにする */ }
+  // watch はニコ生の URL の言い方。他のサービスは能力表のページ名にする（ニコ生の画面はこの関数を通らない）
+  const id = (p && p.id) || (screenPlatformBase() && screenPlatformBase().id) || 'youtube';
+  return rewriteForeignWording(out, id);
 }
 
 // ニコ生版のコメビュは名前の横に data-nl-uid(数字ID)を CSS で「(数字)」と出す。疑似IDなので、
@@ -2357,7 +2468,7 @@ function fixTitleAttr(el) {
     const t = el.getAttribute(name);
     if (!t) continue;
     const subP = subBoardShown && el.closest('[data-lane="adRanking"]') ? screenPlatformBase() : null;
-    let next = subP && subBoardShown ? subBoardLaneWording(t, subP, subBoardShown) : screenWording(t);
+    let next = subP && subBoardShown ? subBoardLaneWording(t, subP, subBoardShown) : screenWording(t, { rewrite: !inRecordedText(el) });
     if (/ID[:：]\s?8\d{9}/.test(next)) next = ytDropEmptyIdTag(next);
     if (/8\d{9}/.test(next)) next = next.replace(PSEUDO_UID_RE, (uid) => (ytKeyForNumericUid(uid) ? ytLabelForUid(uid) || '' : uid));
     if (next !== t) el.setAttribute(name, next);
@@ -2475,14 +2586,7 @@ function fixSubtree(root) {
  * @param {Document} doc
  */
 function ytTrimMarketingDoc(doc) {
-  for (const id of ['mkt-commenter-follow', 'mkt-commenter-follow-analytics']) {
-    doc.getElementById(id)?.remove();
-    doc.querySelectorAll(`a[href="#${id}"]`).forEach((a) => (a.closest('li') || a).remove());
-  }
-  // 来場者数のカードの「未取得」は故障に見えるので「—」(YouTube には来場者数がない)
-  doc.querySelectorAll('#mkt-participation-lead *').forEach((el) => {
-    if (el.children.length === 0 && String(el.textContent || '').trim() === '未取得') el.textContent = '—';
-  });
+  // フォローの章と「未取得」は、描く側で出さない（ここでもう一度 DOM を歩かない）。
   // ギフトの章では名前の後ろの「（UC…）」を外す(ID の列があるので二重になって長い)
   const ledger = doc.getElementById('mkt-gift-ledger');
   if (ledger) {
@@ -2650,7 +2754,8 @@ function ytRebuildMarketingLedger(doc) {
     head.textContent = '投げ一覧（新しい順）';
     const wrap = doc.createElement('div');
     wrap.className = 'mkt-table-scroll';
-    wrap.innerHTML = '<table class="mkt-rank mkt-gift-ledger-table"><thead><tr><th>#</th><th>時刻</th><th>アイテム</th><th>サムネ</th><th>アカウント</th><th>ID</th><th>pt</th><th>出典</th></tr></thead><tbody></tbody></table>';
+    const pointHead = marketingViewFor(screenPlatform()?.id || 'youtube')?.pointColumn || 'pt';
+    wrap.innerHTML = `<table class="mkt-rank mkt-gift-ledger-table"><thead><tr><th>#</th><th>時刻</th><th>アイテム</th><th>サムネ</th><th>アカウント</th><th>ID</th><th>${pointHead}</th><th>出典</th></tr></thead><tbody></tbody></table>`;
     section.append(head, wrap);
     table = wrap.querySelector('table');
   }
@@ -2784,6 +2889,7 @@ function startDomFixer() {
       setTimeout(startDomFixer, onWatch ? 500 : 3000);
       return;
     }
+    startEmotes();
     startDomFixerOn(root, true);
     return;
   }
@@ -2807,8 +2913,7 @@ function hideNicoOnlyParts() {
 }
 // ---- Twitch・Kick の絵文字を画像で見せる(0.1.1928) ----
 // 記録の本文は絵文字の名前(Kappa・KEKW)のまま。コメントの本文が出る所だけ、名前と同じ語を画像に見せる。
-//   ★文字は消さない(画像は背景にして文字を透明にする)= textContent を読む部品(PICK UP のドラッグ・
-//   吹き出しの書き直し判定など)はそのまま動く。画像が読めなければ文字のまま(§3.6)。
+//   印から来た名前は文字に戻さない。画像が読めなければその語だけ消す(空の吹き出しも残さない)。
 /** コメントの本文が出る所(コメビュの一覧・会場の吹き出し・ピン・PICK UP・人の詳細・ホバーの最後の一言) */
 const EMOTE_HOST_SEL =
   '.nl-tl-row__text, .nlsb-bubble-text, .cv-panel-text, .cv-pin-text, .nlsb-hover-card__last-text, .nlsb-pickup__body';
@@ -2838,10 +2943,14 @@ function setEmoteDict(key, raw) {
       if (isEmoteName(k) && isSafeEmoteUrl(v)) m.set(k, String(v));
     }
   }
-  const had = emoteDicts.get(p.id)?.size || 0;
+  const prev = emoteDicts.get(p.id);
+  let grew = !prev || m.size !== prev.size;
+  if (!grew && prev) {
+    for (const k of m.keys()) if (!prev.has(k)) { grew = true; break; }
+  }
   emoteDicts.set(p.id, m);
   // 新しく覚えた絵文字は、もう出ている本文にも当てる
-  if (m.size > had && document.body) {
+  if (grew && m.size && document.body) {
     for (const el of document.querySelectorAll(EMOTE_HOST_SEL)) {
       const w = document.createTreeWalker(el, NodeFilter.SHOW_TEXT);
       /** @type {Text[]} */
@@ -2871,9 +2980,9 @@ function startEmotes() {
     const st = document.createElement('style');
     st.id = 'yt-emote-style';
     st.textContent =
-      '.nl-emote.is-ready{display:inline-block;width:1.6em;height:1.6em;vertical-align:middle;overflow:hidden;' +
-      'white-space:nowrap;color:transparent !important;-webkit-text-fill-color:transparent;text-shadow:none !important;' +
-      'background:center/contain no-repeat;margin:0 .08em;line-height:1.6em;font-size:inherit}';
+      '.nl-emote{display:inline-block;width:1.6em;height:1.6em;vertical-align:middle;overflow:hidden;' +
+      'white-space:nowrap;color:transparent !important;-webkit-text-fill-color:transparent;text-shadow:none !important;margin:0 .08em;line-height:1.6em;font-size:inherit}' +
+      '.nl-emote.is-ready{background:center/contain no-repeat;}';
     (document.head || document.documentElement).appendChild(st);
   }
 }
@@ -2896,10 +3005,27 @@ function loadEmoteImg(url) {
   return p;
 }
 
+/** 画像が無く、周りも空なら吹き出しごと消す @param {HTMLElement} span */
+function dropBrokenEmote(span) {
+  const host = span.parentElement;
+  span.remove();
+  if (!host || !host.classList.contains('nlsb-bubble-text')) return;
+  if ((host.textContent || '').trim()) return;
+  if (host.querySelector('.nl-emote')) return;
+  const bubble = host.closest('.nlsb-bubble');
+  if (bubble) bubble.remove();
+}
+
 /** @param {HTMLElement} span @param {string} url */
 function showEmoteImg(span, url) {
+  span.textContent = '';
+  span.title = '';
   void loadEmoteImg(url).then((ok) => {
-    if (!ok || !span.isConnected) return;
+    if (!span.isConnected) return;
+    if (!ok) {
+      dropBrokenEmote(span);
+      return;
+    }
     span.style.backgroundImage = `url("${url}")`;
     span.classList.add('is-ready');
   });
@@ -2926,8 +3052,9 @@ function decorateEmotes(node) {
       }
       const span = document.createElement('span');
       span.className = 'nl-emote';
-      span.textContent = sg.name;
-      span.title = sg.name;
+      span.textContent = '';
+      span.title = '';
+      span.setAttribute('role', 'img');
       frag.appendChild(span);
       showEmoteImg(span, sg.url);
     }

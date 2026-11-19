@@ -4,7 +4,7 @@
  * 2026-07-06: X で話題になった「来場通知」をパチンコの入賞演出(保留玉が入る)として
  * 検知するための土台。parseGiftComment.js と同じ流儀(厳格 regex・誤検知ゼロ優先)。
  *
- * 対応する4形式(すべて実例):
+ * 対応する形式(すべて実例):
  *   1. 「放送者の好み「真夏の夜の淫夢」に興味のある1人が来場しました」
  *        → { entries: [{ keyword: '真夏の夜の淫夢', count: 1, source: 'preference' }], totalCount: 1 }
  *   2. 「大百科記事「真夏の夜の淫夢」から1人が来場しました」
@@ -19,13 +19,15 @@
  *             { keyword: 'おっぱい', count: 1, source: 'dictionary' },
  *             { keyword: '百合', count: 1, source: 'dictionary' }
  *           ], totalCount: 2 }
+ *   5. 「放送者のサポーターが1人来場しました」
+ *        → { entries: [{ keyword: 'サポーター', count: 1, source: 'supporter' }], totalCount: 1 }
  *
  * 鉤括弧は「」『』の両方を許容(niconico 側の表記揺れ対策・parseGiftComment.js と同方針)。
  * マッチしなければ null(通常コメント・ギフトコメント等の誤検知を避ける)。
  */
 
 /**
- * @typedef {{ keyword: string, count: number, source: 'dictionary'|'preference'|'like'|'interest' }} ArrivalEntry
+ * @typedef {{ keyword: string, count: number, source: 'dictionary'|'preference'|'like'|'interest'|'supporter' }} ArrivalEntry
  */
 
 /**
@@ -79,6 +81,15 @@ export function parseArrivalCommentText(text) {
   if (typeof text !== 'string') return null;
   const trimmed = text.trim();
   if (!trimmed) return null;
+  // 形式5は「が1人来場しました」で、他形式の末尾「人が来場しました」より先に見る。
+  const mSupporter = trimmed.match(/^放送者のサポーターが(\d+)人来場しました$/);
+  if (mSupporter) {
+    const count = parseInt(mSupporter[1], 10);
+    if (Number.isFinite(count) && count > 0) {
+      return { entries: [{ keyword: 'サポーター', count, source: 'supporter' }], totalCount: count };
+    }
+    return null;
+  }
   if (!/が来場しました$/.test(trimmed)) return null; // 誤検知ゼロ優先: 末尾が違えば即棄却
 
   // 形式1: 放送者の好み(常に単一)。
