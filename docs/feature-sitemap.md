@@ -128,7 +128,7 @@
   - `src/lib/monotonicCommentCount.js`
 - **storage キー定義** — chrome.storage のキー名の正本(nls_comments_<lv> 等)
   - `src/lib/storageKeys.js`
-<details><summary>🗂 このカテゴリの全担当ファイル(自動分類) 78</summary>
+<details><summary>🗂 このカテゴリの全担当ファイル(自動分類) 77</summary>
 
 - `extension-youtube/sidepanel.js` — ニコ生版 popup-entry.js(本物)+ YouTube の記録を読む入口のバンドル
 - `extension-youtube/src/pfEmoteStore.js` — Twitch/Kick の視聴ページ(content)で見た絵文字の「名前 → 画像」を storage に覚える。
@@ -195,7 +195,6 @@
 - `src/lib/storedCommentEntriesNormalize.js` — 保存済みコメント配列の重複潰し（純粋関数）。
 - `src/lib/storyDetailRelatedEntries.js` — ストーリー詳細／プレビュー脇の「同一ユーザーの直近」リスト用。
 - `src/lib/storyDiagMonotonic.js` — 診断カウンタchurn(内訳・用語の顔一覧が増減して見える)の根治。
-- `src/lib/supporterAccess.js` — 【層】L1 拡張の画面から呼ぶ部品(chrome.storage と fetch を外から受け取る=試験で差し替えられる)
 - `src/lib/supportVisualExpanded.js` — 応援ビジュアル（アイコン列・グリッド・診断）の開閉を storage に保存するときの正規化。
 - `src/lib/userCommentProfileMerge.js` — 横の欄(popup)の描き直しごとに、記録の行から名前・顔の控えを学び、行を補い、控えを刈る1回分。
 - `src/lib/userProfileLinkHtml.js` — 応援コメントの各種 HTML 出力（マーケティング HTML・HTML 保存レポート等）で、
@@ -759,9 +758,17 @@
 
 - **HTMLレポート生成** — マーケ/イベント順位/タイムライン等を1枚の HTML レポートに組み立てる(popup-entry 内)
   - `src/extension/popup-entry.js`
-<details><summary>🗂 このカテゴリの全担当ファイル(自動分類) 60</summary>
+- **サポーター課金(マーケ HTML だけ有料)** — 有料はマーケ分析レポート(マーケ HTML)だけ=レポート全体に関所1つ(全サービス共通)。それ以外は無料。方針の正本は docs/policies/MONETIZATION.md(価格・お試し14日・1コード1台・猶予7日・やらないこと)。関所は marketing-export-entry.js の passSupporterGate→supporterAccess.checkMarketingAccess→supporterLicense.decideFeatureAccess。証明書は Ed25519・サーバーは api/billing.js(Stripe・Upstash)
+  - `docs/policies/MONETIZATION.md`
+  - `src/lib/supporterLicense.js`
+  - `src/lib/supporterAccess.js`
+  - `src/extension/marketing-export-entry.js`
+  - `src/server/billingApi.js`
+  - `api/billing.js`
+  - `app/supporter.html`
+  - `tsuioku-no-kirameki/tokushoho.html`
+<details><summary>🗂 このカテゴリの全担当ファイル(自動分類) 58</summary>
 
-- `api/billing.js` — サポーター(有料=マーケ HTML)の受け口(v0.1.1893・課金 第2段)。中身は src/server/billingApi.js。
 - `extension-youtube/marketing-export-guard.js` — マーケ分析タブ(marketing-export.html)の「何があっても開く」保険。
 - `extension-youtube/marketing-export.js` — ニコ生版 marketing-export-entry.js(本物)+ YouTube の記録を読む入口のバンドル
 - `extension-youtube/src/marketing-export-nico-entry.js` — ニコ生版のマーケ画面(本物 marketing-export-entry.js)を YouTube の記録で動かす入口。
@@ -770,7 +777,6 @@
 - `scripts/build-youtube-sidepanel-html.mjs` — YouTube 版のサイドパネル HTML = ニコ生版 popup.html の完全コピー。
 - `scripts/inspect-nicolive-watch-stats.mjs` — ニコ生 watch ページの HTML から、来場・同接まわりの数値がどう埋め込まれているかを CLI で確認する。
 - `scripts/layer-map-html.mjs` — ★`src/lib` の構成を【HTMLで見える】ようにする。
-- `src/extension/marketing-export-entry.js` — マーケ分析レポートの別タブ化(marketing-export.html)のエントリ。
 - `src/extension/popup/init/devMonitorExport.js` — devMonitorExport — 開発モニタの「エクスポート/ダウンロード/較正データ消去」一式。
 - `src/extension/popup/report/htmlReportDocument.js` — HTMLレポート(振り返り用の保存HTML)組み立てクラスタ。
 - `src/lib/adMessageLines.js` — 広告主が入れた文字を、そのままレポートに残すための整形。
@@ -1190,7 +1196,7 @@
   - `src/extension/live-ranking-entry.js`
   - `tsuioku-no-kirameki/live/index.html`
   - `.github/workflows/live-ranking.yml`
-<details><summary>🗂 このカテゴリの全担当ファイル(自動分類) 347</summary>
+<details><summary>🗂 このカテゴリの全担当ファイル(自動分類) 345</summary>
 
 - `app/app.js` — スマホ閲覧用 status Web 版。
 - `app/live-view-block.js` — iPhone アプリの「🚩 見たくない人を隠す・報告する」(App Store の審査 1.2: ほかの人の書き込みを見せるアプリの決まり)。
@@ -1482,7 +1488,6 @@
 - `src/lib/storyGrowthAppendPlan.js` — 応援マス(グリッド)を「増えた分だけ足す」か「全部作り直す」かの判定(純関数・I/O禁止)。v0.1.1689
 - `src/lib/storyGrowthRebuildReasons.js` — 【層】L0 判定層(純粋関数・DOM/chrome.* には触れない)
 - `src/lib/supportActivityTimeline.js` — 応援タイムライン: コメントとギフト着弾を時刻順に統合する純関数（v0.1.340）。
-- `src/lib/supporterLicense.js` — 【層】L0 判定層(純粋関数 + WebCrypto の署名確認だけ)
 - `src/lib/supportTimelineGuard.js` — 応援タイムラインの重い全件読み込みを実行してよいか判定する。
 - `src/lib/swCrawlSlots.js` — SW backfill の per-lid 並列スロット判定。
 - `src/lib/swScriptStamp.js` — service worker の本体(extension/background.js)に、束ねた中身の指紋を1行で刻む(v0.1.1971)。
@@ -1526,7 +1531,6 @@
 - `src/lib/youtube/ytSuperChatTier.js` — YouTube のスーパーチャットは金額で色が決まる(青→水色→緑→黄→橙→赤紫→赤)。
 - `src/lib/youtube/ytSwitchLeakCleanup.js` — 配信を切り替えた瞬間に、前の配信のチャット欄に残っていたコメントが
 - `src/lib/youtube/ytWording.js` — ニコ生版の画面をそのまま使う YouTube 版で、画面に出る「ニコニコの言葉」を YouTube の言葉に直す。
-- `src/server/billingApi.js` — global process, Buffer -- サーバー(Vercel 関数)専用の部品。api/ と同じく env を読む
 - `src/server/liveEventsApi.js` — global process, Buffer -- サーバー(Vercel 関数)専用の部品。api/ と同じく env を読む
 - `src/shared/niconico/liveId.js` — ニコ生 放送 ID（`lv…` / `ch…`（チャンネル枠））の正規化ユーティリティ。
 - `src/speech-recognition-globals.d.ts` — Web Speech API（Chrome は webkit 接頭辞のことがある）
@@ -1550,30 +1554,24 @@
 - `v0.1.2165` 2026-11-18 — 終わりの人数と書き出しの全件
 - `v0.1.2155` 2026-11-18 — 応援が届いた時刻を先頭に出す
 
-### 🏟 会場・席 (6版)
+### 🏟 会場・席 (4版)
 - `v0.1.2154` 2026-11-18 — 横の欄と来場の記録をまとめた
 - `v0.1.2153` 2026-11-18 — Kickの絵文字を名前のまま出さない
 - `v0.1.2152` 2026-11-18 — 公式どうしの来場は1秒差でも残す
 - `v0.1.2150` 2026-11-17 — 来場は時刻で区別し、二重だけ畳む
-- `v0.1.2149` 2026-11-17 — 絵文字の名前を吹き出しに残さない
-- `v0.1.2148` 2026-11-17 — 空の順位表と絵文字コードを出さない
 
-### 🎈 吹き出し (3版)
+### 🎈 吹き出し (1版)
 - `v0.1.2153` 2026-11-18 — Kickの絵文字を名前のまま出さない
-- `v0.1.2149` 2026-11-17 — 絵文字の名前を吹き出しに残さない
-- `v0.1.2148` 2026-11-17 — 空の順位表と絵文字コードを出さない
 
 ### 🎁 ギフト (1版)
 - `v0.1.2159` 2026-11-18 — 概数の登録者と長い応援一覧を直す
 
-### 🔊 読み上げ (2版)
-- `v0.1.2149` 2026-11-17 — 絵文字の名前を吹き出しに残さない
-- `v0.1.2148` 2026-11-17 — 空の順位表と絵文字コードを出さない
-
 ### 🪟 応援レーン・タイル (1版)
 - `v0.1.2157` 2026-11-18 — Twitchなどの人数を低い頻度で取る
 
-### その他 (10版)
+### その他 (12版)
+- `v0.1.2169` 2026-11-18 — 引き継ぎノートの公開版表記を最新に
+- `v0.1.2168` 2026-11-18 — ストア提出記録の版表記を最新に
 - `v0.1.2167` 2026-11-18 — 開いたままの書き出しと概数
 - `v0.1.2166` 2026-11-18 — メディアキットのサービス名
 - `v0.1.2164` 2026-11-18 — 視聴ページを離れたら欄を閉じる
