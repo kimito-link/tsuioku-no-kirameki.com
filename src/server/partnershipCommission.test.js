@@ -1,6 +1,6 @@
 import { describe, expect, it, vi } from 'vitest';
 import { COMMISSION_EVENTS_PATH, COMMISSION_REFUND_PATH } from '../lib/referralAttribution.js';
-import { reportPaidInvoice, reportRefundedCharge } from './partnershipCommission.js';
+import { buyerEmailHmac, reportPaidInvoice, reportRefundedCharge } from './partnershipCommission.js';
 
 const ENV = {
   PARTNERSHIP_COMMISSION_URL: 'https://partner.example.test/',
@@ -73,6 +73,39 @@ describe('partnershipCommission', () => {
     expect(skipped.skipped).toBe('unknown_code');
     const down = vi.fn(async () => ({ ok: false, status: 503, json: async () => ({ ok: false }) }));
     await expect(reportPaidInvoice(invoice(), { stripe: {}, env: ENV, fetchImpl: down })).rejects.toThrow('commission_http_503');
+  });
+
+  it('メールがある請求は buyerEmailHmac だけ足し、メールそのものは送らない', async () => {
+    const { fetchImpl, calls } = fetchOk();
+    await reportPaidInvoice(invoice({ customer_email: ' Fan@Example.com ' }), { stripe: {}, env: ENV, fetchImpl });
+    expect(calls[0].body.buyerEmailHmac).toBe('5715bc48639a00cdc9367852d9af692a5f77ebdd0eb4e863b74947a085872253');
+    expect(calls[0].body.buyerEmailHmac).toBe(await buyerEmailHmac(ENV.PARTNERSHIP_COMMISSION_SECRET, 'fan@example.com'));
+    expect(JSON.stringify(calls[0].body)).not.toMatch(/fan@example\.com/i);
+    const none = fetchOk();
+    await reportPaidInvoice(invoice(), { stripe: {}, env: ENV, fetchImpl: none.fetchImpl });
+    expect(none.calls[0].body.buyerEmailHmac).toBeUndefined();
+    const expanded = fetchOk();
+    await reportPaidInvoice(invoice({ customer: { email: 'Other@Example.com' } }), { stripe: {}, env: ENV, fetchImpl: expanded.fetchImpl });
+    expect(expanded.calls[0].body.buyerEmailHmac).toBe(await buyerEmailHmac('secret-tsuioku', 'other@example.com'));
+  });
+
+  it('台帳が自己紹介と答えたら成功にし、返金は送らない', async () => {
+    const fetchImpl = vi.fn(async () => ({
+      ok: true,
+      status: 200,
+      json: async () => ({ ok: true, commissionYen: 0, selfReferral: true })
+    }));
+    const paid = await reportPaidInvoice(invoice({ customer_email: 'fan@example.com' }), { stripe: {}, env: ENV, fetchImpl });
+    expect(paid).toEqual({ ok: true, duplicate: false, selfReferral: true });
+    expect(fetchImpl).toHaveBeenCalledTimes(1);
+    const stripe = { getInvoice: vi.fn(async () => invoice({ customer_email: 'fan@example.com' })) };
+    const refunded = await reportRefundedCharge(
+      { invoice: 'in_abc123', amount_refunded: 9800 },
+      { stripe, env: ENV, fetchImpl }
+    );
+    expect(refunded.selfReferral).toBe(true);
+    expect(fetchImpl).toHaveBeenCalledTimes(2);
+    expect(String(fetchImpl.mock.calls[1][0])).not.toContain('/refund');
   });
 
   it('持ち主のメールが同じときは送らない。不明なら送る', async () => {

@@ -26,6 +26,54 @@ function fallbackEnv() {
 }
 
 /**
+ * 台帳が紹介コードの持ち主と比べる値。hex HMAC-SHA256。
+ * 鍵は PARTNERSHIP_COMMISSION_SECRET。本文はメールを trim して小文字にしたもの。
+ * メールそのものは送らない。
+ * @param {string} secret
+ * @param {unknown} email
+ * @returns {Promise<string | null>}
+ */
+export async function buyerEmailHmac(secret, email) {
+  const message = typeof email === 'string' ? email.trim().toLowerCase() : '';
+  const key = typeof secret === 'string' ? secret.trim() : '';
+  if (!message || !key) return null;
+  const cryptoKey = await crypto.subtle.importKey(
+    'raw',
+    new TextEncoder().encode(key),
+    { name: 'HMAC', hash: 'SHA-256' },
+    false,
+    ['sign']
+  );
+  const sig = await crypto.subtle.sign('HMAC', cryptoKey, new TextEncoder().encode(message));
+  return [...new Uint8Array(sig)].map((b) => b.toString(16).padStart(2, '0')).join('');
+}
+
+/**
+ * 請求か、展開済みの顧客オブジェクトにあるメール。空なら null。
+ * @param {Record<string, any> | null | undefined} invoice
+ * @returns {string | null}
+ */
+function buyerEmail(invoice) {
+  const customer = invoice?.customer;
+  const raw = invoice?.customer_email
+    || invoice?.customer_details?.email
+    || (customer && typeof customer === 'object' ? customer.email : '');
+  const message = typeof raw === 'string' ? raw.trim().toLowerCase() : '';
+  return message || null;
+}
+
+/**
+ * @param {Record<string, unknown>} body
+ * @param {Record<string, any> | null | undefined} invoice
+ * @param {string} secret
+ */
+async function withBuyerEmailHmac(body, invoice, secret) {
+  const hmac = await buyerEmailHmac(secret, buyerEmail(invoice));
+  if (!hmac) return body;
+  return { ...body, buyerEmailHmac: hmac };
+}
+
+/**
  * @param {Record<string, string | undefined>} [env]
  */
 export function partnershipConfig(env) {
@@ -73,7 +121,8 @@ export async function postCommission(path, body, deps) {
     return { ok: true, skipped: 'bad_request' };
   }
   if (!res.ok || !json || json.ok !== true) throw new Error(`commission_http_${res.status}`);
-  return { ok: true, duplicate: json.duplicate === true };
+  // selfReferral は台帳が本人のコードだと判定した成功。再送しない。
+  return { ok: true, duplicate: json.duplicate === true, selfReferral: json.selfReferral === true };
 }
 
 /**
@@ -108,7 +157,8 @@ export async function reportPaidInvoice(invoice, deps) {
   });
   if (plan.action === 'skip') return plan;
   if (plan.action !== 'send') throw new Error(`commission_${plan.action}`);
-  return postCommission(COMMISSION_EVENTS_PATH, plan.body, deps);
+  const { secret } = partnershipConfig(deps.env);
+  return postCommission(COMMISSION_EVENTS_PATH, await withBuyerEmailHmac(plan.body, invoice, secret), deps);
 }
 
 /**
@@ -154,9 +204,10 @@ export async function reportRefundedCharge(charge, deps) {
   });
   if (plan.action === 'skip') return plan;
   if (plan.action !== 'send') throw new Error(`commission_${plan.action}`);
-  const sent = await postCommission(COMMISSION_EVENTS_PATH, plan.body, deps);
-  // 元の支払いが台帳に無い（知らないコード・壊れた本文）なら、返金を送っても突き合わせできない。
-  if (sent.skipped || !plan.refund) return sent;
+  const { secret } = partnershipConfig(deps.env);
+  const sent = await postCommission(COMMISSION_EVENTS_PATH, await withBuyerEmailHmac(plan.body, invoice, secret), deps);
+  // 元の支払いが台帳に無い、または自己紹介で行を作っていないときは、返金の突き合わせ先が無い。
+  if (sent.skipped || sent.selfReferral || !plan.refund) return sent;
   await postCommission(COMMISSION_REFUND_PATH, plan.refund, deps);
   return sent;
 }

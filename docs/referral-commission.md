@@ -47,7 +47,8 @@ Checkout の `subscription_data.metadata` にだけ載せる。
   "referralCode": "RH-XXXX",
   "kind": "recurring",
   "amountYen": 980,
-  "occurredAt": "2026-11-20T00:00:00.000Z"
+  "occurredAt": "2026-11-20T00:00:00.000Z",
+  "buyerEmailHmac": "（請求にメールがあるときだけ。hex の HMAC-SHA256）"
 }
 ```
 
@@ -62,7 +63,7 @@ Checkout の `subscription_data.metadata` にだけ載せる。
 }
 ```
 
-メールアドレス、名前、LINE の ID、Stripe の customer id は送らない。
+メールアドレスそのもの、名前、LINE の ID、Stripe の customer id は送らない。請求か顧客にメールがあるときだけ、`buyerEmailHmac` を足す。値は hex の HMAC-SHA256 で、鍵は `PARTNERSHIP_COMMISSION_SECRET`、本文はメールを前後の空白を除いて小文字にしたもの。返金の本文には付けない。
 
 ## いつ送るか
 
@@ -83,6 +84,7 @@ Stripe の webhook（`/api/billing?action=webhook`）で、台帳の更新が成
 ## 失敗したとき
 
 - 台帳が `200` かつ `duplicate: true` → 成功。再送しない。
+- 台帳が `200` かつ `ok: true` かつ `selfReferral: true`（報酬 0 円）→ 成功。再送しない。返金も続けて送らない。
 - 支払いイベントが `404`（`referral_not_found`）または `400` → そのコードでは送れないものとして打ち切る。Stripe には成功を返す（延々と再送させない）。返金は続けて送らない。
 - `401` / `5xx` / 通信失敗 / 通貨が jpy でない / 金額が整数でない → webhook を失敗させ、Stripe に再送させる。受け取った印（`billing:evt:`）は消す。
 - 紹介のある支払いに対して URL か秘密が未設定 → `commission_not_configured` で失敗させ、設定されるまで Stripe が再送する。紹介の無い請求は、未設定でも成功のまま。
@@ -91,7 +93,9 @@ Stripe の webhook（`/api/billing?action=webhook`）で、台帳の更新が成
 
 ## 自己紹介
 
-支払者のメールと、紹介コードの持ち主のメールが両方あり、同じなら送らない。持ち主を返す関数はテスト用の差し込みだけで、本番の webhook は渡さない。台帳の `POST /api/referrals/commission-events` は支払者と持ち主を比べず、このリポジトリはメールを送らない。**リリースまでには、partnership 側が source `tsuioku` の自己紹介を 0 円にする必要がある。** それまでは、自分のコードで申し込んだ紹介者に報酬が付く余地がある。
+支払者のメールと、紹介コードの持ち主のメールが両方こちらで分かって同じなら、イベント自体を送らない。持ち主を返す関数はテスト用の差し込みだけで、本番の webhook は渡さない。
+
+本番で本人かどうかを決めるのは台帳（partnership の PR #411）です。請求にメールがあるとき、上の `buyerEmailHmac` を支払いイベントに付けます。台帳は同じ鍵と、紹介コードの持ち主のメール（trim + 小文字）で同じ HMAC を作り、一致すれば `{ "ok": true, "commissionYen": 0, "selfReferral": true }` を返します。本人にも親にも報酬は付きません。この応答は成功として扱い、Stripe には再送させません。メールが請求に無いときはこの項目を付けないので、台帳は本人かどうかを判定できません。
 
 ## ソースを足すとき（partnership 側）
 
