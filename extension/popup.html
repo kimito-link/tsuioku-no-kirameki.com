@@ -3507,6 +3507,37 @@
         text-align: center;
       }
 
+      /* 2026-11-21 イベント💎ボード: いまの順位・pt・次まで を先頭に（推定は「推定」タグ） */
+      .nl-evb { margin: 0 0 8px; display: flex; flex-direction: column; gap: 6px; }
+      .nl-evb[hidden] { display: none !important; }
+      .nl-evb__card { padding: 8px 10px; border-radius: 10px; border: 1px solid color-mix(in srgb, var(--nl-lane-accent-event-broadcasters, #056dff) 35%, transparent); background: color-mix(in srgb, var(--nl-lane-accent-event-broadcasters, #056dff) 8%, transparent); }
+      .nl-evb__card--self { background: linear-gradient(135deg, color-mix(in srgb, var(--nl-lane-accent-event-broadcasters, #056dff) 18%, transparent), transparent); }
+      .nl-evb__title { margin: 0 0 4px; font-size: 11px; font-weight: 700; opacity: 0.9; overflow-wrap: anywhere; }
+      .nl-evb__main { display: flex; align-items: center; gap: 10px; }
+      .nl-evb__rank { flex: none; min-width: 56px; text-align: center; font-weight: 800; line-height: 1; }
+      .nl-evb__rank-num { font-size: 30px; }
+      .nl-evb__rank-suf { font-size: 13px; margin-inline-start: 2px; }
+      .nl-evb__body { min-width: 0; }
+      .nl-evb__body p, .nl-evb__card > p { margin: 0; line-height: 1.45; }
+      .nl-evb__who { font-size: 12px; font-weight: 700; overflow-wrap: anywhere; }
+      .nl-evb__score { font-size: 13px; }
+      .nl-evb__score strong, .nl-evb__next strong, .nl-evb__event strong, .nl-evb__since strong { font-size: 15px; }
+      .nl-evb__next { font-size: 12px; }
+      .nl-evb__event, .nl-evb__since { font-size: 12px; margin-top: 4px !important; }
+      .nl-evb__basis, .nl-evb__muted, .nl-evb__foot { font-size: 10.5px; opacity: 0.78; }
+      .nl-evb__foot { margin-top: 4px !important; }
+      .nl-evb__tag { display: inline-block; padding: 0 5px; border-radius: 6px; font-size: 10px; font-weight: 700; background: color-mix(in srgb, currentColor 12%, transparent); vertical-align: 1px; }
+      .nl-evb__tag--est { background: #ffe6a3; color: #6b4800; margin-inline-end: 4px; }
+      .nl-evb__open, .nl-evb__more, .nl-evb__jump { margin-top: 6px; font: inherit; font-size: 11px; padding: 3px 8px; border-radius: 8px; border: 1px solid currentColor; background: transparent; color: inherit; cursor: pointer; }
+      .nl-evb__full > summary { cursor: pointer; font-size: 11.5px; font-weight: 700; }
+      .nl-evb__list { list-style: none; margin: 4px 0 0; padding: 0; }
+      .nl-evb__row { display: grid; grid-template-columns: 34px 1fr auto; gap: 2px 6px; padding: 3px 4px; border-bottom: 1px solid color-mix(in srgb, currentColor 10%, transparent); font-size: 11.5px; }
+      .nl-evb__row--self { background: color-mix(in srgb, #ffcf5e 35%, transparent); font-weight: 700; border-radius: 6px; }
+      .nl-evb__row-rank { text-align: end; opacity: 0.8; }
+      .nl-evb__row-name { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+      .nl-evb__row-score { text-align: end; font-variant-numeric: tabular-nums; }
+      .nl-evb__row-extra { grid-column: 2 / 4; font-size: 10.5px; opacity: 0.85; }
+
       /* イベントランキング上部の「配信者本人の現在順位」= 大きなメダル風バッジ */
       .nl-event-self {
         display: flex;
@@ -11488,6 +11519,15 @@
             <div class="nl-north-star-lane__heading">
               <p class="nl-north-star-lane__label">イベントランキング</p>
               <p class="nl-north-star-lane__sublabel">このイベントの💎スコア順（公式ランキングに準拠）。</p>
+            </div>
+            <div id="nlEventLiveBoard" class="nl-evb" hidden>
+              <div data-evb-role="cards"></div>
+              <details class="nl-evb__full" data-evb-role="full">
+                <summary data-evb-role="summary">参加者全員の順位を見る</summary>
+                <div data-evb-role="fullhead"></div>
+                <ol class="nl-evb__list" data-evb-role="list"></ol>
+                <div data-evb-role="fullfoot"></div>
+              </details>
             </div>
             <div class="nl-north-star-lane__shell">
               <div class="nl-north-star-lane__gadget" data-nl-acq-mode="indeterminate">

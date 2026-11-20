@@ -733,7 +733,7 @@ import { buildGiftSubAppHistoryBlocksHtml } from '../lib/giftSubAppHistoryBlocks
 import { buildDevMonitorGiftRankingExtrasHtml } from '../lib/devMonitorGiftRankingExtrasHtml.js';
 import { buildGiftQuickStatsHtml } from '../lib/giftQuickStatsHtml.js';
 import { buildStoryUserLaneRenderSignature } from '../lib/storyUserLaneRenderSignature.js';
-import { buildEventSelfStatusHeaderHtml } from '../lib/eventSelfStatusHeaderHtml.js';
+import { buildEventSelfStatusHeaderHtml } from '../lib/eventSelfStatusHeaderHtml.js'; import { refreshEventLiveBoardAsync, isEventLiveBoardActive } from './popup/eventLiveBoardPopup.js';
 import { topSupportRankLineModels } from '../lib/topSupportRankStripLines.js';
 // v0.1.881: 応援帯/公式値レーンの描画本体を共有 lib に抽出(live-view と完全コピー共有)。popup は
 //   本物のローカル依存(guard/identicon/北極星DOM同期/待機UI teardown)を opts で渡す薄いラッパに。
@@ -12224,7 +12224,7 @@ async function refreshNorthStarEventBroadcastersLaneAsync(liveId) {
   // 配信者名は richview からは正しく取れない（「を応援しよう！」を拾う）ため、
   // 拡張が持つ正本 watchMetaCache.snapshot.broadcasterName を使う。
   const broadcasterNameFromSnapshot = String(watchMetaCache.snapshot?.broadcasterName || '').trim();
-  const selfHeaderHtml = buildEventSelfStatusHeaderHtml(selfStatus, broadcasterNameFromSnapshot);
+  void refreshEventLiveBoardAsync(lid, () => broadcasterNameFromSnapshot); const selfHeaderHtml = isEventLiveBoardActive() ? '' : buildEventSelfStatusHeaderHtml(selfStatus, broadcasterNameFromSnapshot); // 2026-11-21: 💎ボード(いまの順位・pt・次まで)を先頭に・出ている間は旧ヘッダを重ねない
   const beforeNoteHtml = (selfHeaderHtml || '') + (pretext || '');
 
   if (eventScoreRows && eventScoreRows.length > 0) {
@@ -12256,7 +12256,7 @@ async function refreshNorthStarEventBroadcastersLaneAsync(liveId) {
     });
     const rooms = officialDomRankingRowsToStripRooms(contribRows, { userKeyKind: 'contrib' });
     paintTopSupportRankStyleIntoElement(body, rooms, {
-      noteText: 'イベントランキング上位10名（公式一覧に準拠）',
+      noteText: isEventLiveBoardActive() ? '公式ランキング上位10名（リアルタイム）' : 'イベントランキング上位10名（公式一覧に準拠）',
       unitSuffix: '💎',
       ariaLabel: 'イベントランキング',
       isNorthStarBody: true,
