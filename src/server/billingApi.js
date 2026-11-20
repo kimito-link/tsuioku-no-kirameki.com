@@ -16,6 +16,8 @@
  */
 
 import { createHash, createHmac, randomBytes, timingSafeEqual } from 'node:crypto';
+import { invoiceSubscriptionId, subscriptionMetadata } from '../lib/referralAttribution.js';
+import { reportPaidInvoice, reportRefundedCharge } from './partnershipCommission.js';
 import {
   DEVICE_RESET_INTERVAL_MS,
   FEATURE_MARKETING,
@@ -149,6 +151,11 @@ export function createStripeClient({ fetchImpl = fetch, env = process.env } = {}
     createCheckout: (params) => call('POST', 'checkout/sessions', params),
     getCheckout: (id) => call('GET', `checkout/sessions/${encodeURIComponent(id)}`, { expand: ['subscription'] }),
     getSubscription: (id) => call('GET', `subscriptions/${encodeURIComponent(id)}`),
+    getInvoice: (id) => call('GET', `invoices/${encodeURIComponent(id)}`),
+    listInvoicePayments: (paymentIntent) => call('GET', 'invoice_payments', {
+      payment: { type: 'payment_intent', payment_intent: paymentIntent },
+      limit: 2
+    }),
     getEvent: (id) => call('GET', `events/${encodeURIComponent(id)}`),
     createPortal: (params) => call('POST', 'billing_portal/sessions', params)
   };
@@ -186,7 +193,9 @@ export async function signLicense({ sub, plan, nowMs, dev, env = process.env, su
  *   nowMs?: () => number,
  *   newCode?: () => string,
  *   sign?: (p: { sub: string, plan: string, nowMs: number, dev?: string }) => Promise<string>,
- *   env?: Record<string, string|undefined>
+ *   env?: Record<string, string|undefined>,
+ *   fetchImpl?: typeof fetch,
+ *   ownerEmail?: (ref: string) => Promise<string | null>
  * }} deps
  */
 export function createBillingService(deps) {
@@ -248,8 +257,12 @@ export function createBillingService(deps) {
   }
 
   return {
-    /** 申し込み画面(Stripe Checkout)の URL を作る。 */
-    async checkout({ plan }) {
+    /**
+     * 申し込み画面(Stripe Checkout)の URL を作る。
+     * 紹介コードは Subscription の metadata（source=tsuioku と ref）にだけ載せる。
+     * client_reference_id は使わない。コードが無い・形が違うときは source だけ（料金は同じ）。
+     */
+    async checkout({ plan, ref }) {
       const price = plan === 'monthly' ? env.STRIPE_PRICE_MONTHLY : env.STRIPE_PRICE_YEARLY;
       if (!price) return { status: 503, body: { ok: false, error: 'price_not_configured' } };
       const s = await stripe.createCheckout({
@@ -258,7 +271,8 @@ export function createBillingService(deps) {
         success_url: `${appBase}/supporter?session_id={CHECKOUT_SESSION_ID}`,
         cancel_url: `${appBase}/supporter?canceled=1`,
         allow_promotion_codes: 'true',
-        locale: 'ja'
+        locale: 'ja',
+        subscription_data: { metadata: subscriptionMetadata(ref) }
       });
       return { status: 200, body: { ok: true, url: s.url } };
     },
@@ -370,15 +384,27 @@ export function createBillingService(deps) {
       const seen = await upstash(['SET', billingKeys.event(ev.id), '1', 'NX', 'EX', String(EVENT_SEEN_TTL_SECONDS)]);
       if (seen === null) return { status: 200, body: { ok: true, duplicate: true } };
       const obj = ev.data?.object || {};
+      const commissionDeps = {
+        stripe,
+        env,
+        fetchImpl: deps.fetchImpl || fetch,
+        ...(deps.ownerEmail ? { ownerEmail: deps.ownerEmail } : {})
+      };
       try {
         if (String(ev.type).startsWith('customer.subscription.') && obj.id) {
           await upsertFromSubscription(await stripe.getSubscription(obj.id));
         } else if (ev.type === 'checkout.session.completed' && obj.subscription) {
           const subId = typeof obj.subscription === 'string' ? obj.subscription : obj.subscription.id;
           await upsertFromSubscription(await stripe.getSubscription(subId), { email: obj.customer_details?.email || '' });
-        } else if (String(ev.type).startsWith('invoice.') && obj.subscription) {
-          const subId = typeof obj.subscription === 'string' ? obj.subscription : obj.subscription.id;
-          await upsertFromSubscription(await stripe.getSubscription(subId));
+        } else if (ev.type === 'charge.refunded') {
+          await reportRefundedCharge(obj, commissionDeps);
+        } else if (String(ev.type).startsWith('invoice.')) {
+          const subId = invoiceSubscriptionId(obj);
+          if (subId) await upsertFromSubscription(await stripe.getSubscription(subId));
+          // 支払いの事実は invoice.paid。payment_succeeded も同じ請求で届くことがあり、台帳側が eventId で二重を捨てる。
+          if (ev.type === 'invoice.paid' || ev.type === 'invoice.payment_succeeded') {
+            await reportPaidInvoice(obj, commissionDeps);
+          }
         }
       } catch (e) {
         // 失敗したら「受け取った」印を消して Stripe に再送させる。

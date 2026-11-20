@@ -27,7 +27,7 @@
 
 > 値が次の段へ届かない「断線」(broadcaster バグ型)は `npm run feature-map -- --check` が機械検知。
 
-## ⚠️ 役割コメントが無いソース 13 / 1301 件
+## ⚠️ 役割コメントが無いソース 13 / 1305 件
 - `docs/handoff/bench/bench-interval.mjs`
 - `docs/handoff/bench/bench-lane.mjs`
 - `extension-youtube/cloak-failsafe.js`
@@ -44,34 +44,6 @@
 
 ## 全ファイルツリー
 
-- 📁 **"src/** (17)
-  - 📁 **images/** (17)
-    - 📁 **\343\203\207\343\203\274\343\202\277\345\207\272\345\212\233/** (14)
-      - 📁 **black/** (3)
-        - 📁 **PNG/** (3)
-          - `logo_funlink_black_RGB_black.png"`
-          - `logo_funlink_black_RGB_link_black.png"`
-          - `logo_funlink_black_RGB_maru_black.png"`
-      - 📁 **color/** (8)
-        - 📁 **RGB_\343\203\207\343\203\274\343\202\277\347\224\250/** (8)
-          - `logo_funlink_RGB_color.png"`
-          - `logo_funlink_RGB_ginga_color.png"`
-          - `logo_funlink_RGB_hoshi.png"`
-          - `logo_funlink_RGB_link_hoshi.png"`
-          - `logo_funlink_RGB_link_orange.png"`
-          - `logo_funlink_RGB_maru_blue.png"`
-          - `logo_funlink_RGB_maru_ginga.png"`
-          - `logo_funlink_RGB_maru_orange.png"`
-      - 📁 **white/** (3)
-        - `logo_funlink_white_RGB_black.png"`
-        - `logo_funlink_white_RGB_link_black.png"`
-        - `logo_funlink_white_RGB_maru_black.png"`
-    - 📁 **logo/** (3)
-      - 📁 **\343\203\207\343\203\274\343\202\277\344\270\200\345\274\217/** (3)
-        - 📁 **RGB/** (1)
-          - `logo_kimitolink_RGB_ginga_color.jpg"`
-        - `251016_logo_guide_kimitolink_ol.ai"`
-        - `251016_logo_guide_kimitolink_ol.pdf"`
 - 📁 **.codex/** (5)
   - 📁 **agents/** (4)
     - `code-reviewer.toml`
@@ -98,7 +70,7 @@
   - `live-recent-comments.js` — /api/live-recent-comments — `/live/` の「コメントで応援した人」にホバーしたとき、
   - `post.js` — スマホからのコメントの受け渡し口(v0.1.1734・スマホからコメントを届ける)。
   - `status.js` — status 受け口 Vercel Serverless Function。
-- 📁 **app/** (122)
+- 📁 **app/** (124)
   - 📁 **audio-test/** (7)
     - `t-opus.mp4`
     - `t.caf`
@@ -235,6 +207,8 @@
   - `live.html`
   - `phone.html`
   - `phone.js` — スマホの開始画面(/phone・iPhone アプリが最初に開くページ)。
+  - `referral-attribution.js` — 【層】L0 判定層(純粋関数・I/O禁止)
+  - `referral-passthrough.js` — LP（tsuioku-no-kirameki.com）で ?ref= を90日覚え、サポーターページへのリンクに足す。
   - `supporter.html`
   - `supporter.js` — 追憶のきらめき サポーター(v0.1.1893・課金 第1段)。素の JS(ビルドなし)。受け口は /api/billing。
 - 📁 **council-scout/** (26)
@@ -265,7 +239,7 @@
     - `2026-10-06.md`
     - `2026-10-12.md`
     - `2026-10-14.md`
-- 📁 **docs/** (371)
+- 📁 **docs/** (372)
   - 📁 **article-assets/** (87)
     - 📁 **venue-frames/** (12)
       - `f01.png`
@@ -640,6 +614,7 @@
   - `refactor-instructions-2026-08-29.md`
   - `refactor-instructions.md`
   - `reference_deterministic_backfill.md`
+  - `referral-commission.md`
   - `reliability-backlog-phase-b.md`
   - `repo-tree-map.html`
   - `repo-tree-map.md`
@@ -1218,7 +1193,7 @@
   - `gift-coin-hq.wav`
   - `gift-register-hq.wav`
   - `gift-register.mp3`
-- 📁 **src/** (2531)
+- 📁 **src/** (2552)
   - 📁 **data/** (7)
     - 📁 **acquirers/** (2)
       - `laneFromStorage.js` — 応援レーン acquirer: chrome.storage.local(nls_comments) → laneStore の橋渡し。
@@ -1381,7 +1356,7 @@
     - `yt-page-boot.js` — 会場(yt-venue-inline.js・約800KB)を配信の視聴ページだけに載せる。
   - 📁 **fixtures/** (1)
     - `nicolive-comment-list.html`
-  - 📁 **images/** (117)
+  - 📁 **images/** (134)
     - 📁 **brand/** (29)
       - 📁 **backgrounds/** (1)
         - `galaxy-background.PNG`
@@ -1481,7 +1456,7 @@
       - 📁 **rich-message/** (2)
         - `kimito-link-rich-message-1040x1040.png`
         - `line-rich-message-source.png`
-    - 📁 **logo/** (10)
+    - 📁 **logo/** (13)
       - 📁 **black/** (3)
         - `logo_kimito-link_black_RGB_black.png`
         - `logo_kimito-link_black_RGB_link_black.png`
@@ -1491,6 +1466,11 @@
         - `logo_kimito-link_RGB_ginga_color.png`
         - `logo_kimito-link_RGB_hoshi.png`
         - `logo_kimito-link_RGB_link_hoshi.png`
+      - 📁 **データ一式/** (3)
+        - 📁 **RGB/** (1)
+          - `logo_kimitolink_RGB_ginga_color.jpg`
+        - `251016_logo_guide_kimitolink_ol.ai`
+        - `251016_logo_guide_kimitolink_ol.pdf`
       - `creatorcrossposter.png`
       - `logo-text.png`
       - `nc321221_creatorcross.png`
@@ -1531,8 +1511,28 @@
         - `tanuki-yukkuri-normal-mouth-open.png`
         - `tanuki-yukkuri-smile-mouth-closed.png`
         - `tanuki-yukkuri-smile-mouth-open.png`
+    - 📁 **データ出力/** (14)
+      - 📁 **black/** (3)
+        - 📁 **PNG/** (3)
+          - `logo_funlink_black_RGB_black.png`
+          - `logo_funlink_black_RGB_link_black.png`
+          - `logo_funlink_black_RGB_maru_black.png`
+      - 📁 **color/** (8)
+        - 📁 **RGB_データ用/** (8)
+          - `logo_funlink_RGB_color.png`
+          - `logo_funlink_RGB_ginga_color.png`
+          - `logo_funlink_RGB_hoshi.png`
+          - `logo_funlink_RGB_link_hoshi.png`
+          - `logo_funlink_RGB_link_orange.png`
+          - `logo_funlink_RGB_maru_blue.png`
+          - `logo_funlink_RGB_maru_ginga.png`
+          - `logo_funlink_RGB_maru_orange.png`
+      - 📁 **white/** (3)
+        - `logo_funlink_white_RGB_black.png`
+        - `logo_funlink_white_RGB_link_black.png`
+        - `logo_funlink_white_RGB_maru_black.png`
     - `hero-connect-hub.svg`
-  - 📁 **lib/** (2241)
+  - 📁 **lib/** (2243)
     - 📁 **__snapshots__/** (4)
       - `marketing-abema-baseline.html`
       - `marketing-niconico.html`
@@ -3072,6 +3072,8 @@
     - `recordRate.test.js`
     - `recordingStallWatchdog.js` — 記録停止ウォッチドッグの純粋判定ロジック。
     - `recordingStallWatchdog.test.js`
+    - `referralAttribution.js` — 【層】L0 判定層(純粋関数・I/O禁止)
+    - `referralAttribution.test.js`
     - `refreshCoalescer.js` — 描き直し(refresh)の「実行中に来た要求は、あとで1回にまとめる」合流器(時計は deps で注入)。v0.1.1687
     - `refreshCoalescer.test.js`
     - `refreshCoalescerWiring.wiring.test.js`
@@ -3787,7 +3789,7 @@
     - `yieldToBrowserPaint.js` — 【層】L0 判定層(依存ゼロ・chrome.* 非依存)
     - `yukkuriBroadcastSummary.js` — 放送終了後の HTML レポート / マーケ分析の頭にくる「ゆっくり解説風」要約セクション。
     - `yukkuriBroadcastSummary.test.js`
-  - 📁 **server/** (16)
+  - 📁 **server/** (18)
     - `billingApi.js` — global process, Buffer -- サーバー(Vercel 関数)専用の部品。api/ と同じく env を読む
     - `billingApi.test.js`
     - `deviceApi.test.js`
@@ -3801,6 +3803,8 @@
     - `liveRankingOne.test.js`
     - `nicoliveGuest.js` — ニコ生の「ゲスト視聴」で必要な素の I/O だけを持つ Node 側の共有部品。
     - `nicoliveGuest.test.js`
+    - `partnershipCommission.js` — サポーターの支払い・返金を partnership の紹介料台帳へ送る。
+    - `partnershipCommission.test.js`
     - `phonePostApi.test.js`
     - `phoneVoiceApi.js` — global process -- サーバー(Vercel 関数)専用の部品。api/ と同じく env を読む
     - `phoneVoiceApi.test.js`
