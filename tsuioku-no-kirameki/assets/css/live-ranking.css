@@ -57,8 +57,9 @@ a { color: var(--navy); }
 #kouhaku h2 small { display: block; margin-top: 2px; font-size: .82rem; font-weight: 600; color: var(--ink-sub); }
 #kouhaku .meta { margin: 6px 0 0; color: var(--ink-sub); font-size: .88rem; }
 #kouhaku .more { margin: 4px 0 8px; font-size: .85rem; }
-#kouhaku .teams { display: grid; gap: 12px; max-height: 62vh; overflow: auto; }
+#kouhaku .teams { display: grid; gap: 12px; }
 #kouhaku .team { border: 1px solid var(--line); border-radius: 12px; overflow: hidden; background: #fffdf9; }
+#kouhaku .team-rows { max-height: 30vh; overflow: auto; }
 #kouhaku .team h2 { padding: 10px 12px; font-size: 1rem; }
 #kouhaku .team--aka h2 { background: #fff1f4; color: #9d2948; }
 #kouhaku .team--shiro h2 { background: #fff7ec; color: #8a5a12; }
@@ -72,6 +73,7 @@ a { color: var(--navy); }
 #kouhaku .cheer { grid-column: 3; grid-row: 1 / span 3; align-self: center; display: inline-flex; align-items: center; justify-content: center; min-width: 4.5rem; min-height: 44px; padding: 6px 12px; border-radius: 999px; background: var(--navy-deep); color: #fff7ec; text-decoration: none; font-weight: 700; }
 @media (min-width: 760px) {
   #kouhaku .teams { grid-template-columns: 1fr 1fr; align-items: start; }
+  #kouhaku .team-rows { max-height: 62vh; }
 }
 .rank-top h1 { font-size: clamp(1.2rem, 3.4vw, 1.6rem); margin: 0 0 2px; }
 .rank-top h1 small { font-size: .85rem; }

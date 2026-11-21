@@ -81,6 +81,7 @@
     [['aka', '紅組', data.aka], ['shiro', '白組', data.shiro]].forEach(function (part) {
       var section = el('section', part[0] === 'shiro' ? 'team team--shiro' : 'team team--aka');
       section.appendChild(el('h2', '', part[1]));
+      var rows = el('div', 'team-rows');
       (part[2] || []).forEach(function (entry) {
         var href = localPath(entry.pagePath);
         var row = el('div', 'row');
@@ -103,8 +104,9 @@
           cheer.rel = 'noopener noreferrer';
           row.appendChild(cheer);
         }
-        section.appendChild(row);
+        rows.appendChild(row);
       });
+      section.appendChild(rows);
       teams.appendChild(section);
     });
     root.appendChild(teams);
