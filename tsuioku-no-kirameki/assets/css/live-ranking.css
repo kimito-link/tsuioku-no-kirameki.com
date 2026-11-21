@@ -52,6 +52,8 @@ a { color: var(--navy); }
 }
 @media (min-width: 760px) { .brand { grid-template-columns: 260px 1fr; gap: 22px; padding: 22px 26px; } }
 .rank-top { margin: 4px 0 14px; }
+.kouhaku-link { margin: 6px 0 0; font-size: .92rem; }
+.kouhaku-link a { font-weight: 700; }
 .rank-top h1 { font-size: clamp(1.2rem, 3.4vw, 1.6rem); margin: 0 0 2px; }
 .rank-top h1 small { font-size: .85rem; }
 .rank-top .meta { margin-top: 6px; }

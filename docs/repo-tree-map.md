@@ -5,7 +5,7 @@
 > 下にマインドマップ（GitHub で図として表示）→ ディレクトリ一覧 → 機能逆引き索引 の順。
 > **全部の地図への入口: [MAP.md](MAP.md)** ／ 視覚ビュー: [repo-tree-map.html](repo-tree-map.html) ／ 機能依存図: [feature-map/index.md](feature-map/index.md) ／ 配置ルール正本: [AGENTS.md](../AGENTS.md) §4。
 
-ルート直下の設定ファイル: 58 件（package.json / *.config.js / AGENTS.md 等）
+ルート直下の設定ファイル: 62 件（package.json / *.config.js / AGENTS.md 等）
 
 ## マインドマップ（自動生成・GitHub で図として表示）
 
@@ -358,53 +358,66 @@ graph LR
   f58 --> f58_2["lib/liveRecentHoverCard.js"]
   f58 --> f58_3["extension/live-ranking-entry.js"]
   f58 --> f58_4["live/index.html"]
-  HUB --> f59["ランキング(/live/)の配信ごと OGP"]
-  f59 --> f59_0["live-og.js"]
-  f59 --> f59_1["live-og-image.js"]
-  f59 --> f59_2["lib/liveOgHtml.js"]
-  f59 --> f59_3["lib/liveOgStats.js"]
-  f59 --> f59_4["lib/liveRankingView.js"]
-  f59 --> f59_5["live-og-bake.mjs"]
-  f59 --> f59_6["og-live-compose.py"]
-  f59 --> f59_7["workflows/live-ranking.yml"]
-  f59 --> f59_8[""]
-  HUB --> f60["dist 鮮度ゲート(buildId無限差分ループ根治)"]
-  f60 --> f60_0["lib/distFingerprint.js"]
-  f60 --> f60_1["check-dist-fresh.mjs"]
-  f60 --> f60_2["build.mjs"]
-  f60 --> f60_3["pre-push"]
-  f60 --> f60_4["pre-commit"]
-  HUB --> f61["横断応援者ランキング(デバイス内・段B)"]
-  f61 --> f61_0["lib/crossSupporterRanking.js"]
-  f61 --> f61_1["lib/commenterHistoricalAnalytics.js"]
-  f61 --> f61_2["lib/supporterRanking.js"]
-  f61 --> f61_3["lib/marketingChartsHtml.js"]
-  HUB --> f62["/live/ コメント速度演出・応援者チップ・熱いチップ"]
-  f62 --> f62_0["lib/liveMotion.js"]
-  f62 --> f62_1["lib/liveGiftPulse.js"]
-  f62 --> f62_2["extension/live-ranking-entry.js"]
-  f62 --> f62_3["live/index.html"]
-  HUB --> f63["/live/ ⚡ いま動いた人"]
-  f63 --> f63_0["lib/liveMovers.js"]
-  f63 --> f63_1["extension/live-ranking-entry.js"]
-  f63 --> f63_2["assets/css/live-ranking.css"]
-  HUB --> f64["/live/ Kick セクション(ほかの配信サービス)"]
-  f64 --> f64_0["live-platforms.js"]
-  f64 --> f64_1["server/kickApi.js"]
-  f64 --> f64_2["lib/kickLivestreams.js"]
-  f64 --> f64_3["lib/livePlatformsHtml.js"]
-  f64 --> f64_4["extension/live-ranking-entry.js"]
-  f64 --> f64_5["live/index.html"]
-  f64 --> f64_6["workflows/live-ranking.yml"]
-  HUB --> f65["サポーター課金(マーケ HTML だけ有料)"]
-  f65 --> f65_0["policies/MONETIZATION.md"]
-  f65 --> f65_1["lib/supporterLicense.js"]
-  f65 --> f65_2["lib/supporterAccess.js"]
-  f65 --> f65_3["extension/marketing-export-entry.js"]
-  f65 --> f65_4["server/billingApi.js"]
-  f65 --> f65_5["billing.js"]
-  f65 --> f65_6["supporter.html"]
-  f65 --> f65_7["tokushoho.html"]
+  HUB --> f59["紅白歌枠合戦2026のイベントpt応援ランキング"]
+  f59 --> f59_0["lib/kouhaku/parse.js"]
+  f59 --> f59_1["lib/kouhaku/policy.js"]
+  f59 --> f59_2["lib/kouhaku/job.js"]
+  f59 --> f59_3["server/kouhakuOfficialPage.js"]
+  f59 --> f59_4["server/kouhakuRead.js"]
+  f59 --> f59_5["kouhaku-ranking.js"]
+  f59 --> f59_6["kouhaku-og.js"]
+  f59 --> f59_7["kouhaku-og-image.js"]
+  f59 --> f59_8["live/kouhaku/index.html"]
+  f59 --> f59_9["assets/js/kouhaku-board.js"]
+  f59 --> f59_10["workflows/kouhaku-ranking.yml"]
+  f59 --> f59_11[""]
+  HUB --> f60["ランキング(/live/)の配信ごと OGP"]
+  f60 --> f60_0["live-og.js"]
+  f60 --> f60_1["live-og-image.js"]
+  f60 --> f60_2["lib/liveOgHtml.js"]
+  f60 --> f60_3["lib/liveOgStats.js"]
+  f60 --> f60_4["lib/liveRankingView.js"]
+  f60 --> f60_5["live-og-bake.mjs"]
+  f60 --> f60_6["og-live-compose.py"]
+  f60 --> f60_7["workflows/live-ranking.yml"]
+  f60 --> f60_8[""]
+  HUB --> f61["dist 鮮度ゲート(buildId無限差分ループ根治)"]
+  f61 --> f61_0["lib/distFingerprint.js"]
+  f61 --> f61_1["check-dist-fresh.mjs"]
+  f61 --> f61_2["build.mjs"]
+  f61 --> f61_3["pre-push"]
+  f61 --> f61_4["pre-commit"]
+  HUB --> f62["横断応援者ランキング(デバイス内・段B)"]
+  f62 --> f62_0["lib/crossSupporterRanking.js"]
+  f62 --> f62_1["lib/commenterHistoricalAnalytics.js"]
+  f62 --> f62_2["lib/supporterRanking.js"]
+  f62 --> f62_3["lib/marketingChartsHtml.js"]
+  HUB --> f63["/live/ コメント速度演出・応援者チップ・熱いチップ"]
+  f63 --> f63_0["lib/liveMotion.js"]
+  f63 --> f63_1["lib/liveGiftPulse.js"]
+  f63 --> f63_2["extension/live-ranking-entry.js"]
+  f63 --> f63_3["live/index.html"]
+  HUB --> f64["/live/ ⚡ いま動いた人"]
+  f64 --> f64_0["lib/liveMovers.js"]
+  f64 --> f64_1["extension/live-ranking-entry.js"]
+  f64 --> f64_2["assets/css/live-ranking.css"]
+  HUB --> f65["/live/ Kick セクション(ほかの配信サービス)"]
+  f65 --> f65_0["live-platforms.js"]
+  f65 --> f65_1["server/kickApi.js"]
+  f65 --> f65_2["lib/kickLivestreams.js"]
+  f65 --> f65_3["lib/livePlatformsHtml.js"]
+  f65 --> f65_4["extension/live-ranking-entry.js"]
+  f65 --> f65_5["live/index.html"]
+  f65 --> f65_6["workflows/live-ranking.yml"]
+  HUB --> f66["サポーター課金(マーケ HTML だけ有料)"]
+  f66 --> f66_0["policies/MONETIZATION.md"]
+  f66 --> f66_1["lib/supporterLicense.js"]
+  f66 --> f66_2["lib/supporterAccess.js"]
+  f66 --> f66_3["extension/marketing-export-entry.js"]
+  f66 --> f66_4["server/billingApi.js"]
+  f66 --> f66_5["billing.js"]
+  f66 --> f66_6["supporter.html"]
+  f66 --> f66_7["tokushoho.html"]
 ```
 
 ---
@@ -420,15 +433,15 @@ graph LR
 ## `_docs/` — 横断キット(web-ios-android)との手紙・KB・コンセプトメモ  〔横断 / KB〕
 <sub>ファイル 5 件</sub>
 
-## `api/` — サーバレス API(status / live-ranking / live-recent-comments / live-og / live-platforms)  〔API〕
-<sub>ファイル 10 件</sub>
+## `api/` — サーバレス API(status / live-ranking / live-recent-comments / live-og / live-platforms / kouhaku-ranking)  〔API〕
+<sub>ファイル 13 件</sub>
 
 ## `app/` — Web 版状態ページのアプリ(app.js + dist)  〔Web版〕
-<sub>ファイル 126 件</sub>
+<sub>ファイル 128 件</sub>
 
 - `audio-test/`（7 件） — スマホで鳴る音声形式の実機テスト用の短い声(audio-test.html が使う・同じ声を形式ごとに用意)  〔Web版〕
 - `demo/`（1 件） — スマホ版デモ(/live-view?v=demo)の作り物の見本(scripts/build-phone-demo-snapshot.mjs が生成)  〔Web版 / デモ〕
-- `dist/`（4 件） — Web 版アプリのビルド成果物  〔ビルド成果物〕
+- `dist/`（6 件） — Web 版アプリのビルド成果物  〔ビルド成果物〕
 - `images/`（93 件） — 純Web版 応援ライブビューの同梱画像(ゆっくり顔)  〔Web版 / 画像〕
 
 ## `council/` — 会議(COUNCIL)の問い・回答・統合(SYNTHESIS)。設計判断の根拠  〔会議 / 設計〕
@@ -442,7 +455,7 @@ graph LR
 - `briefs/`（26 件） — スカウトの日次ブリーフ(md)  〔会議 / 原稿〕
 
 ## `docs/` — 設計正本・マインドマップ・フロー図・feature-map(AI/人間向け)  〔設計 / レポート〕
-<sub>ファイル 371 件</sub>
+<sub>ファイル 375 件</sub>
 
 - `article-assets/`（87 件） — 記事用の画像・動画・音声アセット  〔記事 / 画像〕
 - `article-drafts/`（2 件） — 公開前の記事下書き(防御的公開の草稿)  〔記事 / 下書き〕
@@ -456,10 +469,10 @@ graph LR
 - `workflows/`（1 件） — 開発ワークフロー設計(TDD/UI-UX ロードマップ等)  〔ワークフロー〕
 
 ## `extension/` — 拡張本体の配布版ソース(ここを編集)。manifest/background/各 html  〔配布 / manifest〕
-<sub>ファイル 183 件</sub>
+<sub>ファイル 203 件</sub>
 
 - `data/`（1 件） — 拡張同梱の静的データ(応援バナー定義 json)  〔データ / 応援〕
-- `dist/`（38 件） — ビルド成果物(content/popup/status 等の bundle)。build が生成  〔ビルド成果物〕
+- `dist/`（54 件） — ビルド成果物(content/popup/status 等の bundle)。build が生成  〔ビルド成果物〕
 - `images/`（87 件） — アイコン・ロゴのマスター画像  〔画像〕
 - `sound/`（39 件） — 読み上げ・完了音などの音声素材  〔音声〕
 
@@ -492,7 +505,7 @@ graph LR
 - `voice-bridge/`（9 件） — Native音声ホスト・ユーザー単位setup・専用環境検証  〔読み上げ / Native Messaging / 検証〕
 
 ## `scripts/` — ビルド・検証・自動生成スクリプト(build/feature-map/repo-tree-map 等)  〔ビルド / 自動生成〕
-<sub>ファイル 118 件</sub>
+<sub>ファイル 119 件</sub>
 
 - `audit/`（4 件） — 「面(popup/会場/別窓/・live)の間でCSSとDOMがずれていないか」を機械で洗う監査(静的=一度も効かないCSSの検出+基準値のラチェット / 実ブラウザ=hidden・押せない・はみ出し・クリック透過)  〔監査 / CSS / 会場〕
 - `lib/`（4 件） — スクリプト共有の小部品(計器コア等)  〔ビルド / 共有〕
@@ -505,15 +518,15 @@ graph LR
 - `soundeffect-lab/`（19 件） — 効果音ラボ由来の素材候補(採否検討用)  〔音声 / 素材〕
 
 ## `src/` — LP 側 + 純粋関数ライブラリの源  〔ソース〕
-<sub>ファイル 2563 件</sub>
+<sub>ファイル 2587 件</sub>
 
 - `data/`（7 件） — 保存コメントからレーン候補を読む acquirer / source 層  〔コメント / 取得〕
 - `domain/`（20 件） — ドメイン正本(応援レーンの集約・列ポリシー等。識別子判定など)  〔応援 / 集約 / 識別子〕
 - `extension/`（120 件） — バンドル entry(content/popup/venue/status/offscreen/backfill-sw 等=機能境界)  〔entry / 記録 / 会場 / 応援〕
-- `fixtures/`（1 件） — テスト用フィクスチャ  〔テスト〕
+- `fixtures/`（3 件） — テスト用フィクスチャ  〔テスト〕
 - `images/`（134 件） — LP / CWS 提出物のマスター画像  〔画像〕
-- `lib/`（2253 件） — 純粋関数ライブラリ(unit test 対象)。色・速度・コメント・レポート等の計算ロジックの大半  〔色 / 速度 / コメント / レポート / 純粋関数〕
-- `server/`（18 件） — Node 側 I/O 部品(fetch/WebSocket を実際に叩く。api と scripts が共用。lib には置けない)  〔API / 公開 / ランキング〕
+- `lib/`（2271 件） — 純粋関数ライブラリ(unit test 対象)。色・速度・コメント・レポート等の計算ロジックの大半  〔色 / 速度 / コメント / レポート / 純粋関数〕
+- `server/`（22 件） — Node 側 I/O 部品(fetch/WebSocket を実際に叩く。api と scripts が共用。lib には置けない)  〔API / 公開 / ランキング〕
 - `shared/`（7 件） — 複数機能で共有する小部品(アバター URL ガード等)  〔共有 / アバター〕
 - `sound/`（1 件） — 音声素材(src 側)  〔音声〕
 
@@ -525,17 +538,17 @@ graph LR
 - `helpers/`（3 件） — テスト共有ヘルパ(配線テストのソース走査等)  〔テスト / 共有〕
 
 ## `tools/` — 補助ツール(LP overflow 監査・MCP サーバ・OG カード画像合成 等)  〔ツール〕
-<sub>ファイル 7 件</sub>
+<sub>ファイル 8 件</sub>
 
 - `mcp-nicolive/`（3 件） — ニコ生状態を読む MCP サーバ(司令塔の状態取得用)  〔MCP / 診断〕
 
 ## `tsuioku-no-kirameki/` — 本番 LP の配信ディレクトリ(Cloudflare Pages へ deploy)  〔LP / 公開〕
-<sub>ファイル 70 件</sub>
+<sub>ファイル 77 件</sub>
 
 - `articles/`（14 件） — 技術記事(防御的公開)。手法を再利用可能な形で解説  〔記事 / 公開〕
-- `assets/`（4 件） — 公開ページ群が共有する静的資産の置き場(2026-09-14)  〔LP / 共有〕
-- `images/`（40 件） — LP 用の favicon・OG 画像等  〔画像〕
-- `live/`（1 件） — /live/ 追憶のきらめき ランキング(描画は app/dist/live-ranking.js・収集は api/live-ranking.js)  〔LP / 公開 / ランキング〕
+- `assets/`（6 件） — 公開ページ群が共有する静的資産の置き場(2026-09-14)  〔LP / 共有〕
+- `images/`（41 件） — LP 用の favicon・OG 画像等  〔画像〕
+- `live/`（3 件） — /live/ 追憶のきらめき ランキング(描画は app/dist/live-ranking.js・収集は api/live-ranking.js)。/live/kouhaku/ は紅白歌枠合戦2026の公式イベントpt  〔LP / 公開 / ランキング〕
 - `sound/`（1 件） — LP 公開用の音声素材(エール音等)  〔音声 / 公開〕
 
 ---
@@ -981,6 +994,22 @@ esbuild の import 到達グラフを逆引きし「このファイルを変え�
 - [`src/lib/liveRecentHoverCard.js`](../src/lib/liveRecentHoverCard.js)
 - [`src/extension/live-ranking-entry.js`](../src/extension/live-ranking-entry.js)
 - [`tsuioku-no-kirameki/live/index.html`](../tsuioku-no-kirameki/live/index.html)
+
+### 紅白歌枠合戦2026のイベントpt応援ランキング  〔LP / 公開 / ランキング / 紅白〕
+/live/kouhaku/ と /live/kouhaku/u/<ユーザーID>/。出典は公式15106だけ。サーバが JST 16:30、失敗時のみ 19:30 に最大2回取得し、ブラウザは /api/kouhaku-ranking だけを読む。画像は保存もホットリンクもしない。共有は X と LINE(https、openExternalBrowser=1)。定期実行は .github/workflows/kouhaku-ranking.yml。保存は Upstash の kouhaku:v1:*。無ければ同梱シード
+
+- [`src/lib/kouhaku/parse.js`](../src/lib/kouhaku/parse.js)
+- [`src/lib/kouhaku/policy.js`](../src/lib/kouhaku/policy.js)
+- [`src/lib/kouhaku/job.js`](../src/lib/kouhaku/job.js)
+- [`src/server/kouhakuOfficialPage.js`](../src/server/kouhakuOfficialPage.js)
+- [`src/server/kouhakuRead.js`](../src/server/kouhakuRead.js)
+- [`api/kouhaku-ranking.js`](../api/kouhaku-ranking.js)
+- [`api/kouhaku-og.js`](../api/kouhaku-og.js)
+- [`api/kouhaku-og-image.js`](../api/kouhaku-og-image.js)
+- [`tsuioku-no-kirameki/live/kouhaku/index.html`](../tsuioku-no-kirameki/live/kouhaku/index.html)
+- [`tsuioku-no-kirameki/assets/js/kouhaku-board.js`](../tsuioku-no-kirameki/assets/js/kouhaku-board.js)
+- [`.github/workflows/kouhaku-ranking.yml`](../.github/workflows/kouhaku-ranking.yml)
+- [`vercel.json`](../vercel.json)
 
 ### ランキング(/live/)の配信ごと OGP  〔LP / 公開 / ランキング〕
 vercel.json が「?lv= あり∧カード用クローラー UA」だけ /api/live-og へ rewrite。api は live:ranking:latest から該当配信を引き、数字(来場・コメント・ギフト・広告)を description と焼いた JPEG に出す(0/欠落は省く)。焼き画像がある lv(HEXISTS)は og:image=/api/live-og-image?lv=(1200x630・配信サムネ＋数字帯)、無ければサムネ直。画像は GitHub Actions(og ジョブ)が live-og-bake.mjs→og-live-compose.py(Pillow)で焼き、base64 を Upstash(live:og:img・TTL 1h)へ POST(?ingest=og-image)。api はニコ生へ fetch しない・リダイレクト無し・no-store。人間は静的 /live/。支援者名・コメント本文・個別ポイントは出さない(v0.1.1519)

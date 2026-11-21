@@ -153,7 +153,7 @@ export function buildMoversHtml(o) {
     const span = spanText(o.commentSpanMs);
     whenParts.push(`💬 ${span ? `${span}の増分` : '前回の集計からの増分'}${cAt ? `（${cAt} 集計）` : ''}`);
   }
-  const count = `<span class="movers__count">${num(movers.length)}人${more > 0 ? `（ほか ${num(more)}人は下の順位表に）` : ''}</span>`;
+  const count = `<span class="movers__count">${num(movers.length)}人${more > 0 ? `（ほか ${num(more)}人）` : ''}</span>`;
   return `<div class="movers">${head}${count}<ul class="movers__list">${items}</ul>`
     + `<p class="movers__when">${esc(whenParts.join('・'))}</p></div>`;
 }
