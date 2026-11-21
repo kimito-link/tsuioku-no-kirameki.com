@@ -949,7 +949,7 @@ esbuild の import 到達グラフを逆引きし「このファイルを変え�
 - [`tools/gen-og-live-ranking.py`](../tools/gen-og-live-ranking.py)
 
 ### ランキング(/live/)のコメント件数集計  〔LP / 公開 / ランキング / コメント / 集計〕
-3枠目「コメントで応援した人」。GitHub Actions(live-ranking.yml の tally ジョブ)が watch HTML→視聴セッション握手→NDGR を crawlNdgrBackward で遡り、ndgrChatsToMergeRows→createCommentTally で【件数だけ】数えて POST(?ingest=comments)。本文・時刻は保存しない。匿名(184)も件数順にそのまま(匿名NNN＋identicon)。GET 側は attachComments が lives[i].comment に合流(v0.1.1511)。v0.1.2173 から --loop-seconds 390 で 1 run の中で約60秒ごとに新しい側だけ数えて保存(新しく一覧に入った配信を先に・前の結果は持ち越す・viewUri はメモリだけ・state は最後の回だけ POST・純ロジックは liveTallyLoop.js)
+3枠目「コメントで応援した人」。GitHub Actions(live-ranking.yml の tally ジョブ)が watch HTML→視聴セッション握手→NDGR を crawlNdgrBackward で遡り、ndgrChatsToMergeRows→createCommentTally で【件数だけ】数えて POST(?ingest=comments)。本文・時刻は保存しない。匿名(184)も件数順にそのまま(匿名NNN＋identicon)。GET 側は attachComments が lives[i].comment に合流(v0.1.1511)。v0.1.2173 から --loop-seconds 390 で 1 run の中で約60秒ごとに新しい側だけ数えて保存(新しく一覧に入った配信を先に・前の結果は持ち越す・viewUri はメモリだけ・state は最後の回だけ POST・純ロジックは liveTallyLoop.js)。v0.1.2174: 前回の高水位より新しい行だけを別に数えた recent(前回の集計から増えたコメント)を entry に載せる・未集計の配信は短い上限で先に数えて表示用だけ先に POST
 
 - [`src/lib/liveCommentTally.js`](../src/lib/liveCommentTally.js)
 - [`src/lib/liveTallyLoop.js`](../src/lib/liveTallyLoop.js)

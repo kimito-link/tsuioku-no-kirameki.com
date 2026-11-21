@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { buildMoversHtml, pickMovers, MOVERS_MAX } from './liveMovers.js';
+import { buildMoversHtml, pickMovers, recentCommentPulse, MOVERS_MAX } from './liveMovers.js';
 
 const row = (uid, name, point) => ({ rank: 1, uid, name, point, avatar: '', url: `https://www.nicovideo.jp/user/${uid}` });
 const pulse = (entries) => ({ byKey: new Map(entries.map(([uid, d]) => [`u:${uid}`, { delta: d, tier: 'small' }])), sum: 0, spanMs: 61_000, top: null, tier: 'small' });
@@ -44,5 +44,20 @@ describe('buildMoversHtml', () => {
     const h = buildMoversHtml({ movers: [{ kind: 'comment', name: 'C', avatar: '', url: '', uid: '3', delta: 4, tier: 'small' }], firstSample: false, commentAt: 1795258000000, commentSpanMs: 60_000 });
     expect(h).toContain('💬+4件');
     expect(h).toMatch(/\d{2}:\d{2} 集計/);
+  });
+});
+
+describe('recentCommentPulse (v0.1.2174)', () => {
+  const tier = (n) => (n >= 5 ? 'large' : 'small');
+  const now = 1795260000000;
+  it('集計側の「前回より新しい側だけ」の件数を増分にし、間隔は recentAt - recentSince', () => {
+    const r = recentCommentPulse({ partial: true, recent: [{ uid: '123', name: 'A', count: 3 }, { uid: 'a:x', name: '', count: 0 }], recentAt: now - 10_000, recentSince: now - 70_000 }, now, tier);
+    expect(r.uids).toEqual(['123']);
+    expect(r.pulse.byKey.get('u:123')).toEqual({ delta: 3, tier: 'small' });
+    expect(r.pulse.spanMs).toBe(60_000);
+  });
+  it('recent が無い・古すぎる(5 分超)なら null(古い集計を「いま」と言わない)', () => {
+    expect(recentCommentPulse({ rankers: [] }, now, tier)).toBeNull();
+    expect(recentCommentPulse({ recent: [{ uid: '1', count: 1 }], recentAt: now - 6 * 60_000 }, now, tier)).toBeNull();
   });
 });

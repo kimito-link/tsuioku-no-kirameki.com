@@ -97,6 +97,12 @@ const HTTP_TIMEOUT_MS = 8_000;
 const CRAWL_CAPS = Object.freeze({ elapsedMs: 20_000, segments: 150, bytes: 8_000_000, rows: 400_000 });
 /** くり返しの 2 回目以降の巡回上限(新しい側だけ。前回の続きの区画で止まるのでふつうは 1〜2 区画)。 */
 const LATER_CRAWL_CAPS = Object.freeze({ elapsedMs: 10_000, segments: 30, bytes: 2_000_000, rows: 100_000 });
+/**
+ * ★まだ一度も数えていない配信(新しく一覧に入った配信)の最初の巡回の上限(2026-11-21・v0.1.2174)。
+ *   まず新しい側を浅く数えて早く「集計あり」にする(=一覧に入ってから 1〜2 分で出る)。
+ *   古い側は次の run の 1 回目の掘り下げ(フェーズ B)で順にさかのぼる(partial のまま正直に出す)。
+ */
+const NEW_LIVE_CRAWL_CAPS = Object.freeze({ elapsedMs: 6_000, segments: 20, bytes: 1_500_000, rows: 100_000 });
 /** 巡回の fetch 間隔(ms)。lib の既定より安全側。 */
 const FETCH_GAP_MS = 30;
 /** 「最後まで遡れた」とみなす終了理由。これ以外は partial(直近ぶん)。 */
@@ -147,6 +153,14 @@ let isFirstPass = true;
  * @type {Map<string, string>}
  */
 const viewUriCache = new Map();
+/**
+ * 配信ごとの「前回数え終えた時刻」(lv → epoch ms)。「💬 前回の集計から増えたコメント」の間隔に使う。
+ * 1 回目は保存済み state の時刻(loadState が入れる)。数えられなかった回は進めない。
+ * @type {Map<string, number>}
+ */
+const lastTalliedAt = new Map();
+/** 保存済み state の時刻(前 run の最後の回)。無ければ 0。 */
+let savedStateAt = 0;
 
 /**
  * 巡回エンジンへ注入する fetch。★`credentials` を送らない素の GET。
@@ -266,7 +280,21 @@ async function tallyOne(live, prev) {
     broadcasterUid: live.streamer ? live.streamer.id : '',
     seed: p ? { uids: p.uids, comments: p.comments } : undefined
   });
-  const addRows = (rows) => { if (Array.isArray(rows) && rows.length) tally.add(rows); };
+  // ★「前回の集計から増えたコメント」(新しい側だけ)を別に数える(2026-11-21・v0.1.2174)。
+  //   前回の高水位(maxNo/maxVpos)より新しい行だけ=古い側の掘り下げ(フェーズ B)や partial→complete の
+  //   切り替えで増えた分は入らない(見かけの大増分を作らない)。前回が無い配信は数えない(比べる相手が無い)。
+  const recentWater = p && (p.maxNo != null || p.maxVpos != null)
+    ? { maxNo: p.maxNo ?? null, maxVpos: p.maxVpos ?? null, minNo: null, minVpos: null }
+    : null;
+  const recentTally = recentWater ? createCommentTally({ broadcasterUid: live.streamer ? live.streamer.id : '' }) : null;
+  const addRows = (rows) => {
+    if (!Array.isArray(rows) || !rows.length) return;
+    tally.add(rows);
+    if (recentTally) {
+      const newer = rowsBeyondWater(rows, recentWater);
+      if (newer.length) recentTally.add(newer);
+    }
+  };
   const nulls = { maxNo: null, maxVpos: null, minNo: null, minVpos: null };
   const prevWater = p
     ? { maxNo: p.maxNo ?? null, maxVpos: p.maxVpos ?? null, minNo: p.minNo ?? null, minVpos: p.minVpos ?? null }
@@ -276,7 +304,7 @@ async function tallyOne(live, prev) {
 
   // ── フェーズ A(常に): 新しい区画から。増分なら前回領域を含む区画で止める。
   // ★2 回目以降(くり返しモード)は前回の続きがある配信だけ短い上限にする。初めての配信は通常の上限。
-  const capsA = (!isFirstPass && p) ? LATER_CRAWL_CAPS : CRAWL_CAPS;
+  const capsA = !p ? NEW_LIVE_CRAWL_CAPS : (!isFirstPass ? LATER_CRAWL_CAPS : CRAWL_CAPS);
   const genA = crawlNdgrBackward({
     viewBase: viewUri,
     fetchBinary,
@@ -320,6 +348,11 @@ async function tallyOne(live, prev) {
   const dug = stopB != null; // フェーズ B(古い側の掘り下げ)が走ったか。
 
   const r = tally.result();
+  const tallyAt = Date.now();
+  const crawlBroken = stopA === 'crawl_error' || (stopB != null && stopB === 'crawl_error');
+  // ★壊れた回は state を進めない(次の回が同じ行をもう一度読む)ので、recent も出さない(二重に「増えた」と言わない)。
+  const rr = recentTally && !crawlBroken ? recentTally.result() : null;
+  const sinceAt = lastTalliedAt.get(lv) || (p ? savedStateAt : 0) || 0;
   const entry = {
     rankers: r.rankers,
     commenters: r.commenters,
@@ -331,13 +364,15 @@ async function tallyOne(live, prev) {
     segments,
     bytes,
     ms: Date.now() - t0,
-    partial: !complete
+    partial: !complete,
+    ...(rr ? { recent: rr.rankers, recentComments: rr.comments, recentAt: tallyAt, recentSince: sinceAt } : {})
   };
+  if (!crawlBroken) lastTalliedAt.set(lv, tallyAt);
 
   // ★state: crawl が壊れた run(crawl_error)の水位は信じない=prev をそのまま持ち越す(設計 §6-5)。
   //   uids が多すぎる配信は state を書かない(=次 run フル・cap で守られる)。
   let state;
-  if (stopA === 'crawl_error' || (stopB != null && stopB === 'crawl_error')) {
+  if (crawlBroken) {
     state = p || null;
   } else if (Object.keys(r.uids).length > TALLY_STATE_UIDS_MAX) {
     state = null;
@@ -455,6 +490,7 @@ async function loadState() {
     const data = await res.json();
     const st = data && data.state && typeof data.state === 'object' ? data.state : null;
     const byLive = st && st.byLive && typeof st.byLive === 'object' ? st.byLive : null;
+    savedStateAt = Math.max(0, Number(st && st.at) || 0);
     return byLive || {};
   } catch {
     return {};
@@ -487,6 +523,28 @@ function trimStateBytes(stateByLive) {
 }
 
 /**
+ * 集計を POST する(?ingest=comments)。★鍵はヘッダにだけ載せ、ログには出さない。
+ * @param {any} payload
+ * @returns {Promise<{ stored: boolean, status: number, text: string, error?: string }>}
+ */
+async function postComments(payload) {
+  const key = process.env.STATUS_INGEST_KEY || '';
+  if (!key) return { stored: false, status: 0, text: '', error: 'no key' };
+  try {
+    const res = await fetch(`${API_BASE}?ingest=comments`, {
+      method: 'POST',
+      headers: { 'content-type': 'application/json', 'x-share-key': key, 'user-agent': UA },
+      body: JSON.stringify(payload),
+      signal: AbortSignal.timeout(30_000)
+    });
+    const text = await res.text();
+    return { stored: res.status === 200 && text.includes('"stored":true'), status: res.status, text };
+  } catch (e) {
+    return { stored: false, status: 0, text: '', error: String(e && e.message ? e.message : e) };
+  }
+}
+
+/**
  * 1 回ぶん: 一覧を読み直し → 新しい配信から数える → 表示用を合流 → POST。
  * @param {{ stateIn: Record<string, any>, display: Record<string, object>, isLast: () => boolean }} ctx
  * @returns {Promise<{ stored: boolean, fatal: boolean, stateByLive: Record<string, any>, display: Record<string, object> }>}
@@ -507,7 +565,33 @@ async function runPass(ctx) {
   // ★前に数えた結果(前 run の保存分・この run の前の回)を持ち越す。数えられなかった配信を「集計待ち」に戻さない。
   const seeded = { ...seedDisplayFromLives(lives), ...ctx.display };
 
-  const { byLive, stateByLive, reasons, okN, ng, skipped, incremental, dug } = await runAll(orderNewFirst(lives, ctx.stateIn), ctx.stateIn);
+  // ★(v0.1.2174) まだ数えていない配信を先に【別の組で】浅く数え、すぐ表示用だけ POST する。
+  //   1 回目は古い側の掘り下げで 2 分ほどかかるため、それを待たずに新しい配信の集計を出す。
+  const ordered = orderNewFirst(lives, ctx.stateIn);
+  const hasState = (l) => !!ctx.stateIn[String(l && l.liveId || '').toLowerCase()];
+  const fresh = ordered.filter((l) => !hasState(l));
+  const known = ordered.filter(hasState);
+  let early = null;
+  if (fresh.length && known.length) {
+    early = await runAll(fresh, ctx.stateIn);
+    const earlyDisplay = mergeDisplay(seeded, early.byLive, lives);
+    if (!DRY_RUN && early.okN > 0) {
+      const r0 = await postComments({ ok: true, at: Date.now(), runMs: Date.now() - passStartedAt, lives: lives.length, ok_n: early.okN, ng: early.ng, skipped: early.skipped, reasons: early.reasons, byLive: earlyDisplay });
+      console.log(`early POST (new lives ${fresh.length}) HTTP ${r0.status}`);
+    }
+    Object.assign(seeded, earlyDisplay);
+  }
+  const rest = await runAll(early ? known : ordered, ctx.stateIn);
+  const sumReasons = { ...(early ? early.reasons : {}) };
+  for (const [k, v] of Object.entries(rest.reasons)) sumReasons[k] = (sumReasons[k] || 0) + v;
+  const byLive = { ...(early ? early.byLive : {}), ...rest.byLive };
+  const stateByLive = { ...(early ? early.stateByLive : {}), ...rest.stateByLive };
+  const reasons = sumReasons;
+  const okN = (early ? early.okN : 0) + rest.okN;
+  const ng = (early ? early.ng : 0) + rest.ng;
+  const skipped = (early ? early.skipped : 0) + rest.skipped;
+  const incremental = (early ? early.incremental : 0) + rest.incremental;
+  const dug = (early ? early.dug : 0) + rest.dug;
   const display = mergeDisplay(seeded, byLive, lives);
 
   const last = ctx.isLast();
@@ -575,27 +659,18 @@ async function runPass(ctx) {
     return { stored: false, fatal: isFirstPass, stateByLive: ctx.stateIn, display };
   }
 
-  const key = process.env.STATUS_INGEST_KEY || '';
-  if (!key) {
+  if (!(process.env.STATUS_INGEST_KEY || '')) {
     console.log('::error::STATUS_INGEST_KEY がありません');
     return { stored: false, fatal: true, stateByLive, display };
   }
-  let res;
-  try {
-    res = await fetch(`${API_BASE}?ingest=comments`, {
-      method: 'POST',
-      headers: { 'content-type': 'application/json', 'x-share-key': key, 'user-agent': UA },
-      body: JSON.stringify(payload),
-      signal: AbortSignal.timeout(30_000)
-    });
-  } catch (e) {
-    console.log(`::error::POST に失敗しました: ${String(e && e.message ? e.message : e)}`);
+  const r = await postComments(payload);
+  if (r.error) {
+    console.log(`::error::POST に失敗しました: ${r.error}`);
     return { stored: false, fatal: isFirstPass, stateByLive, display };
   }
-  const text = await res.text();
-  console.log(`POST HTTP ${res.status} ${text.slice(0, 300)}`);
-  if (res.status !== 200 || !text.includes('"stored":true')) {
-    console.log(`::error::保存されませんでした (HTTP ${res.status})`);
+  console.log(`POST HTTP ${r.status} ${r.text.slice(0, 300)}`);
+  if (!r.stored) {
+    console.log(`::error::保存されませんでした (HTTP ${r.status})`);
     return { stored: false, fatal: isFirstPass, stateByLive, display };
   }
   return { stored: true, fatal: false, stateByLive, display };

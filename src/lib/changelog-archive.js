@@ -24,6 +24,14 @@
 /** @type {ChangelogEntry[]} */
 const ARCHIVE_ENTRIES = [
   Object.freeze({
+    version: '0.1.2154',
+    date: '2026-11-18',
+    summary: '横の欄と来場の記録をまとめた',
+    items: Object.freeze([
+      'ニコ生以外の横の欄と会場の絵文字の直しと、公式の来場の数え方を、同じ版にまとめました。どちらも残しています。',
+    ])
+  }),
+  Object.freeze({
     version: '0.1.2153',
     date: '2026-11-18',
     summary: 'Kickの絵文字を名前のまま出さない',

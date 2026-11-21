@@ -26,7 +26,7 @@ import {
 import { toEpochMs } from '../lib/timeAuthority.js';
 import { buildPlatformSectionHtml, platformsErrorHtml } from '../lib/livePlatformsHtml.js';
 import { mountDirectComments } from './liveDirectComments.js';
-import { pickMovers, buildMoversHtml } from '../lib/liveMovers.js';
+import { pickMovers, buildMoversHtml, recentCommentPulse } from '../lib/liveMovers.js';
 
 const elList = /** @type {HTMLElement} */ (document.getElementById('list'));
 const elMeta = /** @type {HTMLElement} */ (document.getElementById('meta'));
@@ -327,13 +327,18 @@ function render(data) {
     const capAt = toEpochMs(data.capturedAt);
     if (!firstSeenAt.has(l.liveId) && capAt) firstSeenAt.set(l.liveId, capAt);
     seenNow.add(l.liveId);
+    // ★(v0.1.2174) コメントは集計側が「前回の集計より新しい側だけ」数えた件数(comment.recent)を優先する。
+    //   partial(直近ぶんの集計)の配信でも正直に出せる。無い古いデータだけ従来の 2 点差(cp)に戻る。
+    const rc = recentCommentPulse(l.comment, nowMs, tierForCommentDelta);
+    const cMoverRows = rc ? commentRows({ comment: { rankers: (l.comment.recent || []) } }) : commentRows(l);
+    const cMoverPulse = rc ? rc.pulse : cp;
     const moversHtml = buildMoversHtml({
-      movers: pickMovers({ giftRows: rows.gift, giftPulse: gp, commentRows: commentRows(l), commentPulse: cp }),
+      movers: pickMovers({ giftRows: rows.gift, giftPulse: gp, commentRows: cMoverRows, commentPulse: cMoverPulse }),
       firstSample: !capAt || firstSeenAt.get(l.liveId) === capAt,
       giftAt: data.capturedAt,
       giftSpanMs: gp.spanMs,
-      commentAt: data.commentsCapturedAt,
-      commentSpanMs: cp ? cp.spanMs : 0,
+      commentAt: rc ? rc.at : data.commentsCapturedAt,
+      commentSpanMs: cMoverPulse ? cMoverPulse.spanMs : 0,
       isBlankIcon,
       faceQuiet: FACE.kontaHalf
     });

@@ -18,6 +18,39 @@ import { escapeHtml as esc, formatNumberJa as num } from './htmlText.js';
 import { formatPtDelta, formatCountDelta, spanText } from './liveGiftPulse.js';
 import { toEpochMs } from './timeAuthority.js';
 
+/** これより古い「前回の集計から増えた」は出さない(持ち越された古い集計を「いま」と言わない)。 */
+export const RECENT_MAX_AGE_MS = 5 * 60_000;
+
+/**
+ * 集計側が数えた「前回の集計から増えたコメント」(comment.recent)を、pickMovers に渡せる形にする。
+ * ★新しい側だけを数えた件数なので、partial(直近ぶんの集計)の配信でも見かけの大増分にならない。
+ * ★recent が無い(古いデータ)・古すぎる(nowMs から RECENT_MAX_AGE_MS 超)なら null。
+ * @param {any} comment lives[i].comment
+ * @param {number} nowMs
+ * @param {(d: number) => string} tierFor
+ * @returns {{ uids: string[], pulse: { byKey: Map<string, { delta: number, tier: string }>, sum: number, spanMs: number, top: null, tier: null }, at: number }|null}
+ */
+export function recentCommentPulse(comment, nowMs, tierFor) {
+  const c = comment && typeof comment === 'object' ? comment : null;
+  if (!c || !Array.isArray(c.recent)) return null;
+  const at = Number(c.recentAt) || 0;
+  if (!at || !(nowMs - at <= RECENT_MAX_AGE_MS)) return null;
+  const since = Number(c.recentSince) || 0;
+  /** @type {Map<string, { delta: number, tier: string }>} */
+  const byKey = new Map();
+  const uids = [];
+  let sum = 0;
+  for (const r of c.recent) {
+    const uid = String((r && r.uid) || '').trim();
+    const n = Math.floor(Number(r && r.count) || 0);
+    if (!uid || n <= 0) continue;
+    byKey.set(`u:${uid}`, { delta: n, tier: tierFor(n) });
+    uids.push(uid);
+    sum += n;
+  }
+  return { uids, pulse: { byKey, sum, spanMs: since > 0 && at > since ? at - since : 0, top: null, tier: null }, at };
+}
+
 /** 1 配信に並べる最大人数(低スペック・スマホでも 1〜2 行に収める)。 */
 export const MOVERS_MAX = 6;
 
