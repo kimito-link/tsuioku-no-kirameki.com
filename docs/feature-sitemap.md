@@ -1145,7 +1145,7 @@
   - `src/extension/live-ranking-entry.js`
   - `tsuioku-no-kirameki/live/index.html`
   - `tools/gen-og-live-ranking.py`
-- **ランキング(/live/)のコメント件数集計** — 3枠目「コメントで応援した人」。GitHub Actions(live-ranking.yml の tally ジョブ)が watch HTML→視聴セッション握手→NDGR を crawlNdgrBackward で遡り、ndgrChatsToMergeRows→createCommentTally で【件数だけ】数えて POST(?ingest=comments)。本文・時刻は保存しない。匿名(184)も件数順にそのまま(匿名NNN＋identicon)。GET 側は attachComments が lives[i].comment に合流(v0.1.1511)。v0.1.2173 から --loop-seconds 390 で 1 run の中で約60秒ごとに新しい側だけ数えて保存(新しく一覧に入った配信を先に・前の結果は持ち越す・viewUri はメモリだけ・state は最後の回だけ POST・純ロジックは liveTallyLoop.js)
+- **ランキング(/live/)のコメント件数集計** — 3枠目「コメントで応援した人」。GitHub Actions(live-ranking.yml の tally ジョブ)が watch HTML→視聴セッション握手→NDGR を crawlNdgrBackward で遡り、ndgrChatsToMergeRows→createCommentTally で【件数だけ】数えて POST(?ingest=comments)。本文・時刻は保存しない。匿名(184)も件数順にそのまま(匿名NNN＋identicon)。GET 側は attachComments が lives[i].comment に合流(v0.1.1511)。v0.1.2173 から --loop-seconds 390 で 1 run の中で約60秒ごとに新しい側だけ数えて保存(新しく一覧に入った配信を先に・前の結果は持ち越す・viewUri はメモリだけ・state は最後の回だけ POST・純ロジックは liveTallyLoop.js)。v0.1.2174: 前回の高水位より新しい行だけを別に数えた recent(前回の集計から増えたコメント)を entry に載せる・未集計の配信は短い上限で先に数えて表示用だけ先に POST
   - `src/lib/liveCommentTally.js`
   - `src/lib/liveTallyLoop.js`
   - `scripts/live-comment-tally.mjs`
@@ -1563,7 +1563,8 @@
 
 > changelog 全 20 版を「バグ系統」で束ねた枝。同系統をまた触るとき、過去の修正と「なぜ毎回触るか」を辿る(再発防止)。新しい順。
 
-### 💾 記録件数 (2版)
+### 💾 記録件数 (3版)
+- `v0.1.2174` 2026-11-21 — ランキングページの「いま動いた人」にコメントも
 - `v0.1.2165` 2026-11-18 — 終わりの人数と書き出しの全件
 - `v0.1.2155` 2026-11-18 — 応援が届いた時刻を先頭に出す
 
@@ -1572,10 +1573,9 @@
 - `v0.1.2172` 2026-11-21 — 各サービスのイベント今の順位と次まで
 - `v0.1.2170` 2026-11-21 — イベントの今の順位と次まで
 
-### 🏟 会場・席 (3版)
+### 🏟 会場・席 (2版)
 - `v0.1.2172` 2026-11-21 — 各サービスのイベント今の順位と次まで
 - `v0.1.2170` 2026-11-21 — イベントの今の順位と次まで
-- `v0.1.2154` 2026-11-18 — 横の欄と来場の記録をまとめた
 
 ### 🎁 ギフト (2版)
 - `v0.1.2173` 2026-11-21 — ランキングページのコメント集計を約1分ごとに
