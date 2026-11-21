@@ -121,17 +121,39 @@ describe('eventLiveBoardHtml', () => {
     rows: [],
     gotAt: JST('2026-11-21T07:31:00')
   };
-  it('先頭に順位・pt・次まで、推定には「推定」と根拠、最終取得時刻', () => {
-    const html = buildEventSelfCardHtml(buildEventLiveBoardModel(ev, sanitizeServerAnnotation(ANN)), { showListButton: true });
+  it('イベントptの順位があれば、それを大きな数字に（推定タグ・根拠）、年間は2行目に「年間」と明記', () => {
+    const m = buildEventLiveBoardModel(ev, sanitizeServerAnnotation(ANN));
+    const html = buildEventSelfCardHtml(m, { showListButton: true });
     expect(html).toContain('紅白&lt;script&gt;');
-    expect(html.indexOf('nl-evb__rank-num')).toBeLessThan(html.indexOf('推定'));
-    expect(html).toContain('次の<strong>3位</strong>まで あと <strong>💎1,000</strong>');
-    expect(html).toContain('年間（リアルタイム）');
-    expect(html).toContain('推定');
-    expect(html).toContain('公式表（11月21日（土）6時30分頃更新分）');
+    expect(html).toContain('data-evb-big="event"');
+    expect(m.self.estRank).not.toBeNull();
+    expect(html).toContain(`<span class="nl-evb__rank-num">${m.self.estRank}</span>`);
+    // 大きな数字のすぐ横に イベントpt（推定）
+    const big = html.indexOf('nl-evb__rank-num');
+    expect(html.indexOf('nl-evb__tag--est')).toBeLessThan(big);
+    expect(html.indexOf('イベントpt（推定）')).toBeGreaterThan(big);
+    expect(html.indexOf('イベントpt（推定）')).toBeLessThan(html.indexOf('nl-evb__annual'));
+    // 年間は2行目・「年間」と明記・あと◯
+    expect(html).toMatch(/nl-evb__annual"><span class="nl-evb__tag">年間（リアルタイム）<\/span> <strong>4位<\/strong>・<span class="nl-evb__nowrap">💎4,428,432<\/span>・<span class="nl-evb__nowrap">次の3位まで あと 💎1,000<\/span>/);
+    // 解説のゆっくりは数字より下・既存画像・lazy
+    expect(html.indexOf('nl-evb__guide')).toBeGreaterThan(html.indexOf('nl-evb__annual'));
+    expect(html).toContain('こん太: 大きな数字は公式表（11月21日（土）6時30分頃更新分）');
+    expect(html).toContain('images/yukkuri-charactore-english/konta/kitsune-yukkuri-normal.thumb128.png');
+    expect(html).toMatch(/nl-evb__guide-face[^>]*loading="lazy"/);
+    expect(html).toContain('images/logo/kimito-maru-black.png');
     expect(html).toContain('公式更新（11/21 6:30頃）以降');
     expect(html).toContain('最終取得 07:31');
     expect(html).toContain('data-evb-open');
+  });
+  it('25位より下（イベントpt無し）は年間の順位が大きな数字のまま・りんくが説明', () => {
+    const below = { ...ev, self: { id: '555', name: 'x', rank: 47, score: 163500, scoreToNext: 300 } };
+    const html = buildEventSelfCardHtml(buildEventLiveBoardModel(below, sanitizeServerAnnotation(ANN)));
+    expect(html).toContain('data-evb-big="score"');
+    expect(html).toContain('<span class="nl-evb__rank-num">47</span>');
+    expect(html).toContain('次の<strong>46位</strong>まで あと <strong>💎300</strong>');
+    expect(html.indexOf('nl-evb__rank-num')).toBeLessThan(html.indexOf('nl-evb__guide'));
+    expect(html).toContain('りんく: イベントptの合計は、公式が1日1回・各組25位まで');
+    expect(html).not.toContain('nl-evb__tag--est');
   });
   it('有料・紹介・LINE の言葉を出さない', () => {
     const html = buildEventSelfCardHtml(buildEventLiveBoardModel(ev, sanitizeServerAnnotation(ANN)));
@@ -144,5 +166,6 @@ describe('eventLiveBoardHtml', () => {
     expect(html).toContain('&lt;b&gt;');
     expect(html).toContain('公式更新以降 +75');
     expect(buildEventFullListHeadHtml({ scoreLabel: '年間（リアルタイム）', gotAt: JST('2026-11-21T07:31:00'), totalCount: 146, shown: 25, officialNote: 'n' })).toContain('25 / 146人');
+    expect(buildEventFullListHeadHtml({ scoreLabel: 'x', gotAt: 0, totalCount: 1, shown: 1, officialNote: 'n' })).toContain('たぬ姉: 「推定」は公式表（n）');
   });
 });

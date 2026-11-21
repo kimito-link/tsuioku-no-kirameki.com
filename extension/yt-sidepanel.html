@@ -3522,9 +3522,9 @@
       .nl-evb__body p, .nl-evb__card > p { margin: 0; line-height: 1.45; }
       .nl-evb__who { font-size: 12px; font-weight: 700; overflow-wrap: anywhere; }
       .nl-evb__score { font-size: 13px; }
-      .nl-evb__score strong, .nl-evb__next strong, .nl-evb__event strong, .nl-evb__since strong { font-size: 15px; }
+      .nl-evb__score strong, .nl-evb__next strong, .nl-evb__since strong { font-size: 15px; }
       .nl-evb__next { font-size: 12px; }
-      .nl-evb__event, .nl-evb__since { font-size: 12px; margin-top: 4px !important; }
+      .nl-evb__since { font-size: 12px; margin-top: 4px !important; }
       .nl-evb__basis, .nl-evb__muted, .nl-evb__foot { font-size: 10.5px; opacity: 0.78; }
       .nl-evb__foot { margin-top: 4px !important; }
       .nl-evb__tag { display: inline-block; padding: 0 5px; border-radius: 6px; font-size: 10px; font-weight: 700; background: color-mix(in srgb, currentColor 12%, transparent); vertical-align: 1px; }
@@ -3538,6 +3538,19 @@
       .nl-evb__row-name { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
       .nl-evb__row-score { text-align: end; font-variant-numeric: tabular-nums; }
       .nl-evb__row-extra { grid-column: 2 / 4; font-size: 10.5px; opacity: 0.85; }
+      /* 2026-11-21 ゆっくり・ロゴ（既存画像のみ・小さく・lazy・アニメ無し）。数字より下に置き、数字は押し下げない */
+      .nl-evb__head { display: flex; align-items: flex-start; justify-content: space-between; gap: 6px; margin: 0 0 4px; }
+      .nl-evb__head .nl-evb__title { margin: 0; flex: 1 1 auto; min-width: 0; }
+      .nl-evb__brand { flex: none; display: inline-flex; align-items: center; gap: 3px; font-size: 9.5px; font-weight: 700; opacity: 0.7; white-space: nowrap; }
+      .nl-evb__brand-mark { width: 14px; height: 14px; border-radius: 50%; }
+      .nl-evb__rank .nl-evb__tag { display: block; width: max-content; margin: 0 auto 3px; }
+      .nl-evb__tag--official { background: color-mix(in srgb, var(--nl-lane-accent-event-broadcasters, #056dff) 22%, transparent); }
+      .nl-evb__annual { font-size: 11.5px; margin-top: 4px !important; }
+      .nl-evb__annual strong { font-size: 13px; }
+      .nl-evb__nowrap { white-space: nowrap; }
+      .nl-evb__guide { display: flex; align-items: flex-start; gap: 6px; margin-top: 5px; }
+      .nl-evb__guide-face { flex: none; width: 24px; height: 24px; border-radius: 50%; object-fit: cover; }
+      .nl-evb__guide-text { font-size: 10.5px; line-height: 1.45; opacity: 0.88; overflow-wrap: anywhere; }
 
       /* イベントランキング上部の「配信者本人の現在順位」= 大きなメダル風バッジ */
       .nl-event-self {

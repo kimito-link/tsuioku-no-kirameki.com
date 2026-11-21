@@ -24,6 +24,14 @@
 /** @type {ChangelogEntry[]} */
 const ARCHIVE_ENTRIES = [
   Object.freeze({
+    version: '0.1.2151',
+    date: '2026-11-17',
+    summary: '記録テストは絵文字の名前を見ない',
+    items: Object.freeze([
+      'Kick と Twitch の記録テストは、画像になった絵文字の名前が画面の文字として残ることを見なくなりました。使い方は 0.1.2149 と同じです。',
+    ])
+  }),
+  Object.freeze({
     version: '0.1.2150',
     date: '2026-11-17',
     summary: '来場は時刻で区別し、二重だけ畳む',

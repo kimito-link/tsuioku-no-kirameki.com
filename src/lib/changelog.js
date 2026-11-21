@@ -18,6 +18,17 @@
 /** @type {readonly ChangelogEntry[]} */
 export const EXTENSION_CHANGELOG = Object.freeze([
   Object.freeze({
+    version: '0.1.2171',
+    date: '2026-11-21',
+    summary: 'イベントptの順位を大きく表示',
+    items: Object.freeze([
+      'イベントptの順位（推定または公式表）があるときは、それを大きな数字にしました。横に「推定」とイベントpt、根拠を添えます。',
+      '年間の順位・💎・次の順位まであと何💎は、2行目に「年間」と書いて出します。',
+      '25位より下の人は、これまでどおり年間の順位が大きな数字です。',
+      '数字の下で、りんく・こん太・たぬ姉が「推定」や「25位まで」の意味をひとことで説明します。カードの見出しに小さなロゴを付けました。'
+    ])
+  }),
+  Object.freeze({
     version: '0.1.2170',
     date: '2026-11-21',
     summary: 'イベントの今の順位と次まで',
@@ -187,14 +198,6 @@ export const EXTENSION_CHANGELOG = Object.freeze([
     items: Object.freeze([
       '来場の通知は、公式のメッセージが1秒違いでもそれぞれ数えます。同じ公式メッセージだけ1回です。',
       '約2秒以内に1回に数えるのは、公式と画面の両方から入った同じ通知だけです。',
-    ])
-  }),
-  Object.freeze({
-    version: '0.1.2151',
-    date: '2026-11-17',
-    summary: '記録テストは絵文字の名前を見ない',
-    items: Object.freeze([
-      'Kick と Twitch の記録テストは、画像になった絵文字の名前が画面の文字として残ることを見なくなりました。使い方は 0.1.2149 と同じです。',
     ])
   })
 ]);
