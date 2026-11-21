@@ -76,10 +76,17 @@ jobs:
   #     1 run 150 秒の締め切りを script 側が持っており、当たってもその時点の結果を保存する。
   #   ★node-version: "22" は必須。視聴セッションの握手に global WebSocket を使う（Node 22 から）。
   #   ★npm ci は不要（このスクリプトの import 木は npm 依存ゼロ＝Node 標準だけで動く）。
+  #   ★2026-11-21: 1 run の中で約 60 秒ごとに「新しく増えた分だけ数えて保存」を約 6.5 分くり返す
+  #     (--loop-seconds 390・りんくさん「ユーザーがもとめるリアルタイム性だして」)。
+  #     cron は実測 8〜17 分おき(中央値 8.4 分)なので、これでコメント集計は ふだん 1〜3 分前の値になる。
+  #     ★重なり: 上の concurrency(workflow 全体で 1 本・cancel-in-progress: false)で run どうしは重ならない
+  #       = 同じキーへの二重書き込み・競合は起きない。run は 約 7.5 分で終わるので、次の cron とはふつう重ならない。
+  #     ★script 側の固い締め切りは 390 + 150 = 540 秒(9 分)。timeout-minutes: 11 はそれより必ず後。
+  #     ★ニコ生へ: 2 回目以降は新しい区画だけ(接続先はメモリで持ち回し・古い側の掘り下げは 1 run 1 回のまま)。
   tally:
     needs: refresh
     runs-on: ubuntu-latest
-    timeout-minutes: 6
+    timeout-minutes: 11
     steps:
       - uses: actions/checkout@v7
         with:
@@ -96,7 +103,7 @@ jobs:
             echo "::error::secrets.STATUS_INGEST_KEY が未登録です。リポジトリの Settings > Secrets で登録してください。"
             exit 1
           fi
-          node scripts/live-comment-tally.mjs
+          node scripts/live-comment-tally.mjs --loop-seconds 390
 
   # ★配信ごとの OGP カード画像（配信サムネ＋数字帯）を焼いて投入（2026-09-15 追加・第2段）。
   #   refresh が保存した一覧を読んでから走るので needs: refresh（tally と並列）。

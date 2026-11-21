@@ -338,11 +338,12 @@ graph LR
   f54 --> f54_4["gen-og-live-ranking.py"]
   HUB --> f55["ランキング(/live/)のコメント件数集計"]
   f55 --> f55_0["lib/liveCommentTally.js"]
-  f55 --> f55_1["live-comment-tally.mjs"]
-  f55 --> f55_2["live-ranking.js"]
-  f55 --> f55_3["lib/liveRankingView.js"]
-  f55 --> f55_4["extension/live-ranking-entry.js"]
-  f55 --> f55_5["workflows/live-ranking.yml"]
+  f55 --> f55_1["lib/liveTallyLoop.js"]
+  f55 --> f55_2["live-comment-tally.mjs"]
+  f55 --> f55_3["live-ranking.js"]
+  f55 --> f55_4["lib/liveRankingView.js"]
+  f55 --> f55_5["extension/live-ranking-entry.js"]
+  f55 --> f55_6["workflows/live-ranking.yml"]
   HUB --> f56["ランキング(/live/)ギフト増分バッジ"]
   f56 --> f56_0["lib/liveGiftPulse.js"]
   f56 --> f56_1["extension/live-ranking-entry.js"]
@@ -383,23 +384,27 @@ graph LR
   f62 --> f62_1["lib/liveGiftPulse.js"]
   f62 --> f62_2["extension/live-ranking-entry.js"]
   f62 --> f62_3["live/index.html"]
-  HUB --> f63["/live/ Kick セクション(ほかの配信サービス)"]
-  f63 --> f63_0["live-platforms.js"]
-  f63 --> f63_1["server/kickApi.js"]
-  f63 --> f63_2["lib/kickLivestreams.js"]
-  f63 --> f63_3["lib/livePlatformsHtml.js"]
-  f63 --> f63_4["extension/live-ranking-entry.js"]
-  f63 --> f63_5["live/index.html"]
-  f63 --> f63_6["workflows/live-ranking.yml"]
-  HUB --> f64["サポーター課金(マーケ HTML だけ有料)"]
-  f64 --> f64_0["policies/MONETIZATION.md"]
-  f64 --> f64_1["lib/supporterLicense.js"]
-  f64 --> f64_2["lib/supporterAccess.js"]
-  f64 --> f64_3["extension/marketing-export-entry.js"]
-  f64 --> f64_4["server/billingApi.js"]
-  f64 --> f64_5["billing.js"]
-  f64 --> f64_6["supporter.html"]
-  f64 --> f64_7["tokushoho.html"]
+  HUB --> f63["/live/ ⚡ いま動いた人"]
+  f63 --> f63_0["lib/liveMovers.js"]
+  f63 --> f63_1["extension/live-ranking-entry.js"]
+  f63 --> f63_2["assets/css/live-ranking.css"]
+  HUB --> f64["/live/ Kick セクション(ほかの配信サービス)"]
+  f64 --> f64_0["live-platforms.js"]
+  f64 --> f64_1["server/kickApi.js"]
+  f64 --> f64_2["lib/kickLivestreams.js"]
+  f64 --> f64_3["lib/livePlatformsHtml.js"]
+  f64 --> f64_4["extension/live-ranking-entry.js"]
+  f64 --> f64_5["live/index.html"]
+  f64 --> f64_6["workflows/live-ranking.yml"]
+  HUB --> f65["サポーター課金(マーケ HTML だけ有料)"]
+  f65 --> f65_0["policies/MONETIZATION.md"]
+  f65 --> f65_1["lib/supporterLicense.js"]
+  f65 --> f65_2["lib/supporterAccess.js"]
+  f65 --> f65_3["extension/marketing-export-entry.js"]
+  f65 --> f65_4["server/billingApi.js"]
+  f65 --> f65_5["billing.js"]
+  f65 --> f65_6["supporter.html"]
+  f65 --> f65_7["tokushoho.html"]
 ```
 
 ---
@@ -459,13 +464,13 @@ graph LR
 - `sound/`（39 件） — 読み上げ・完了音などの音声素材  〔音声〕
 
 ## `extension-youtube/` — YouTube Live 版の試作拡張(単一用途分離)。manifest/content-chat/background/sidepanel/offscreen  〔YouTube / 試作 / 記録 / 読み上げ〕
-<sub>ファイル 162 件</sub>
+<sub>ファイル 163 件</sub>
 
 - `data/`（1 件） — YouTube 同梱ビルドの静的データ(応援バナー定義 json)  〔データ / 応援〕
 - `dist/`（1 件） — YouTube 同梱ビルドの成果物。build が生成  〔ビルド成果物〕
 - `images/`（72 件） — YouTube Live 版試作拡張のアイコン・キャラ画像(ニコ生版と共通の3キャラ)  〔YouTube / 画像〕
 - `sound/`（39 件） — YouTube 同梱ビルドの読み上げ・完了音  〔音声〕
-- `src/`（32 件） — YouTube Live 版試作拡張のバンドル entry(content-chat/background/sidepanel/offscreen)  〔YouTube / entry / 記録〕
+- `src/`（33 件） — YouTube Live 版試作拡張のバンドル entry(content-chat/background/sidepanel/offscreen)  〔YouTube / entry / 記録〕
 
 ## `memory/` — セッション横断の知見・引き継ぎ(AI のメモリ)。コミット対象外も混在  〔メモリ / 知見〕
 <sub>ファイル 132 件</sub>
@@ -500,14 +505,14 @@ graph LR
 - `soundeffect-lab/`（19 件） — 効果音ラボ由来の素材候補(採否検討用)  〔音声 / 素材〕
 
 ## `src/` — LP 側 + 純粋関数ライブラリの源  〔ソース〕
-<sub>ファイル 2554 件</sub>
+<sub>ファイル 2563 件</sub>
 
 - `data/`（7 件） — 保存コメントからレーン候補を読む acquirer / source 層  〔コメント / 取得〕
 - `domain/`（20 件） — ドメイン正本(応援レーンの集約・列ポリシー等。識別子判定など)  〔応援 / 集約 / 識別子〕
 - `extension/`（120 件） — バンドル entry(content/popup/venue/status/offscreen/backfill-sw 等=機能境界)  〔entry / 記録 / 会場 / 応援〕
 - `fixtures/`（1 件） — テスト用フィクスチャ  〔テスト〕
 - `images/`（134 件） — LP / CWS 提出物のマスター画像  〔画像〕
-- `lib/`（2244 件） — 純粋関数ライブラリ(unit test 対象)。色・速度・コメント・レポート等の計算ロジックの大半  〔色 / 速度 / コメント / レポート / 純粋関数〕
+- `lib/`（2253 件） — 純粋関数ライブラリ(unit test 対象)。色・速度・コメント・レポート等の計算ロジックの大半  〔色 / 速度 / コメント / レポート / 純粋関数〕
 - `server/`（18 件） — Node 側 I/O 部品(fetch/WebSocket を実際に叩く。api と scripts が共用。lib には置けない)  〔API / 公開 / ランキング〕
 - `shared/`（7 件） — 複数機能で共有する小部品(アバター URL ガード等)  〔共有 / アバター〕
 - `sound/`（1 件） — 音声素材(src 側)  〔音声〕
@@ -944,9 +949,10 @@ esbuild の import 到達グラフを逆引きし「このファイルを変え�
 - [`tools/gen-og-live-ranking.py`](../tools/gen-og-live-ranking.py)
 
 ### ランキング(/live/)のコメント件数集計  〔LP / 公開 / ランキング / コメント / 集計〕
-3枠目「コメントで応援した人」。GitHub Actions(live-ranking.yml の tally ジョブ)が watch HTML→視聴セッション握手→NDGR を crawlNdgrBackward で遡り、ndgrChatsToMergeRows→createCommentTally で【件数だけ】数えて POST(?ingest=comments)。本文・時刻は保存しない。匿名(184)も件数順にそのまま(匿名NNN＋identicon)。GET 側は attachComments が lives[i].comment に合流(v0.1.1511)
+3枠目「コメントで応援した人」。GitHub Actions(live-ranking.yml の tally ジョブ)が watch HTML→視聴セッション握手→NDGR を crawlNdgrBackward で遡り、ndgrChatsToMergeRows→createCommentTally で【件数だけ】数えて POST(?ingest=comments)。本文・時刻は保存しない。匿名(184)も件数順にそのまま(匿名NNN＋identicon)。GET 側は attachComments が lives[i].comment に合流(v0.1.1511)。v0.1.2173 から --loop-seconds 390 で 1 run の中で約60秒ごとに新しい側だけ数えて保存(新しく一覧に入った配信を先に・前の結果は持ち越す・viewUri はメモリだけ・state は最後の回だけ POST・純ロジックは liveTallyLoop.js)
 
 - [`src/lib/liveCommentTally.js`](../src/lib/liveCommentTally.js)
+- [`src/lib/liveTallyLoop.js`](../src/lib/liveTallyLoop.js)
 - [`scripts/live-comment-tally.mjs`](../scripts/live-comment-tally.mjs)
 - [`api/live-ranking.js`](../api/live-ranking.js)
 - [`src/lib/liveRankingView.js`](../src/lib/liveRankingView.js)
@@ -1013,6 +1019,13 @@ pre-pushのbuild再実行でbuildIdタイムスタンプが毎回変わりdist�
 - [`src/lib/liveGiftPulse.js`](../src/lib/liveGiftPulse.js)
 - [`src/extension/live-ranking-entry.js`](../src/extension/live-ranking-entry.js)
 - [`tsuioku-no-kirameki/live/index.html`](../tsuioku-no-kirameki/live/index.html)
+
+### /live/ ⚡ いま動いた人  〔LP / 公開 / ランキング / 表示〕
+配信カードの名前のすぐ下に、前回の取得からギフトptが増えた人と前回の集計からコメントが増えた人だけを最大6人(ギフト優先)、取得/集計の時刻と間隔つきで出す。差は既存の createGiftPulseRegistry の結果だけ(コメントは commentsCapturedAt どうしで比べる)。増えた人がいなければ「いない」、初回は「次の取得と比べる」と正直に出す。演出なし・描き直しは取得時のみ(v0.1.2173)
+
+- [`src/lib/liveMovers.js`](../src/lib/liveMovers.js)
+- [`src/extension/live-ranking-entry.js`](../src/extension/live-ranking-entry.js)
+- [`tsuioku-no-kirameki/assets/css/live-ranking.css`](../tsuioku-no-kirameki/assets/css/live-ranking.css)
 
 ### /live/ Kick セクション(ほかの配信サービス)  〔LP / 公開 / ランキング / Kick〕
 ニコ生とは別セクション・別データ(/api/live-platforms・Redis live:kick:latest)で、Kick 公式 API(App Access Token)の日本語配信を同時視聴数の多い順に最大20件。値は Kick が返したものをそのまま表示し推定・増分・順位推移は作らない(YouTube を同じ枠に乗せるため・規約)。収集は Actions の kick ジョブ(リポジトリ変数 KICK_COLLECT=1 で有効)だけで、閲覧者の操作では Kick へ問い合わせない。成人向けは既定で非表示(件数は表示)。live:platforms:off で再デプロイなしに停止

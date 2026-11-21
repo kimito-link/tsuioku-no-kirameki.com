@@ -1145,8 +1145,9 @@
   - `src/extension/live-ranking-entry.js`
   - `tsuioku-no-kirameki/live/index.html`
   - `tools/gen-og-live-ranking.py`
-- **ランキング(/live/)のコメント件数集計** — 3枠目「コメントで応援した人」。GitHub Actions(live-ranking.yml の tally ジョブ)が watch HTML→視聴セッション握手→NDGR を crawlNdgrBackward で遡り、ndgrChatsToMergeRows→createCommentTally で【件数だけ】数えて POST(?ingest=comments)。本文・時刻は保存しない。匿名(184)も件数順にそのまま(匿名NNN＋identicon)。GET 側は attachComments が lives[i].comment に合流(v0.1.1511)
+- **ランキング(/live/)のコメント件数集計** — 3枠目「コメントで応援した人」。GitHub Actions(live-ranking.yml の tally ジョブ)が watch HTML→視聴セッション握手→NDGR を crawlNdgrBackward で遡り、ndgrChatsToMergeRows→createCommentTally で【件数だけ】数えて POST(?ingest=comments)。本文・時刻は保存しない。匿名(184)も件数順にそのまま(匿名NNN＋identicon)。GET 側は attachComments が lives[i].comment に合流(v0.1.1511)。v0.1.2173 から --loop-seconds 390 で 1 run の中で約60秒ごとに新しい側だけ数えて保存(新しく一覧に入った配信を先に・前の結果は持ち越す・viewUri はメモリだけ・state は最後の回だけ POST・純ロジックは liveTallyLoop.js)
   - `src/lib/liveCommentTally.js`
+  - `src/lib/liveTallyLoop.js`
   - `scripts/live-comment-tally.mjs`
   - `api/live-ranking.js`
   - `src/lib/liveRankingView.js`
@@ -1192,6 +1193,10 @@
   - `src/lib/liveGiftPulse.js`
   - `src/extension/live-ranking-entry.js`
   - `tsuioku-no-kirameki/live/index.html`
+- **/live/ ⚡ いま動いた人** — 配信カードの名前のすぐ下に、前回の取得からギフトptが増えた人と前回の集計からコメントが増えた人だけを最大6人(ギフト優先)、取得/集計の時刻と間隔つきで出す。差は既存の createGiftPulseRegistry の結果だけ(コメントは commentsCapturedAt どうしで比べる)。増えた人がいなければ「いない」、初回は「次の取得と比べる」と正直に出す。演出なし・描き直しは取得時のみ(v0.1.2173)
+  - `src/lib/liveMovers.js`
+  - `src/extension/live-ranking-entry.js`
+  - `tsuioku-no-kirameki/assets/css/live-ranking.css`
 - **/live/ Kick セクション(ほかの配信サービス)** — ニコ生とは別セクション・別データ(/api/live-platforms・Redis live:kick:latest)で、Kick 公式 API(App Access Token)の日本語配信を同時視聴数の多い順に最大20件。値は Kick が返したものをそのまま表示し推定・増分・順位推移は作らない(YouTube を同じ枠に乗せるため・規約)。収集は Actions の kick ジョブ(リポジトリ変数 KICK_COLLECT=1 で有効)だけで、閲覧者の操作では Kick へ問い合わせない。成人向けは既定で非表示(件数は表示)。live:platforms:off で再デプロイなしに停止
   - `api/live-platforms.js`
   - `src/server/kickApi.js`
@@ -1200,7 +1205,7 @@
   - `src/extension/live-ranking-entry.js`
   - `tsuioku-no-kirameki/live/index.html`
   - `.github/workflows/live-ranking.yml`
-<details><summary>🗂 このカテゴリの全担当ファイル(自動分類) 346</summary>
+<details><summary>🗂 このカテゴリの全担当ファイル(自動分類) 349</summary>
 
 - `app/app.js` — スマホ閲覧用 status Web 版。
 - `app/live-view-block.js` — iPhone アプリの「🚩 見たくない人を隠す・報告する」(App Store の審査 1.2: ほかの人の書き込みを見せるアプリの決まり)。
@@ -1217,6 +1222,7 @@
 - `extension-youtube/src/sidepanel-nico-entry.js` — YouTube 版サイドパネル = ニコ生版の本物 popup-entry.js をそのまま動かす。
 - `extension-youtube/src/sidepanelNicoView.js` — ニコ生版 popup.html を丸写ししたサイドパネルに、YouTube のデータを流し込む。
 - `extension-youtube/src/ytDefaultIcon.js` — YouTube の「最初からの文字アイコン」(色付きの丸に1文字)を画像から見分ける。
+- `extension-youtube/src/ytEventStanding.js` — global document, setTimeout, clearTimeout, fetch
 - `extension-youtube/src/ytMergedIsolationBoot.js` — 本体に同梱した YouTube 版の画面・視聴ページの入口で、いちばん先に動く仕切り。
 - `extension/background.js` — MV3 Service Worker
 - `mobile/capacitor.config.ts` — server.url リモート読込型の Capacitor 設定(web-ios-android キットの金型に準拠)。
@@ -1437,6 +1443,8 @@
 - `src/lib/phoneNativeCues.js` — iPhone アプリ(mobile/)だけの「ギフトが届いたら通知・振動」の判定(純関数)。
 - `src/lib/phoneSoundCues.js` — v0.1.1737: スマホの WEB版でギフトの効果音を鳴らす「どれが新しく来たか」の判定(純関数)。
 - `src/lib/pickLatestComment.js` — ストレージ上のコメント配列の並びは一定でないため、
+- `src/lib/platform/eventStandingParsers.js` — 【層】L0 判定層(純粋関数・I/O禁止)
+- `src/lib/platform/eventStandingView.js` — 【層】L0 判定層(純粋関数・I/O禁止)
 - `src/lib/platform/fetchTimeout.js` — 【層】L0 判定層(純粋関数・I/O禁止)
 - `src/lib/platform/infoPollGate.js` — 配信の情報の口を何秒おきに読むかを決める小さな門(純関数)
 - `src/lib/platform/noWatchHint.js` — 配信ページが開いていないときにパネルへ出す「配信を探す」案内を、そのサービスの言葉と行き先にする。
@@ -1559,25 +1567,25 @@
 - `v0.1.2165` 2026-11-18 — 終わりの人数と書き出しの全件
 - `v0.1.2155` 2026-11-18 — 応援が届いた時刻を先頭に出す
 
-### 📥 コメント取得 (1版)
+### 📥 コメント取得 (3版)
+- `v0.1.2173` 2026-11-21 — ランキングページのコメント集計を約1分ごとに
+- `v0.1.2172` 2026-11-21 — 各サービスのイベント今の順位と次まで
 - `v0.1.2170` 2026-11-21 — イベントの今の順位と次まで
 
-### 🏟 会場・席 (4版)
+### 🏟 会場・席 (3版)
+- `v0.1.2172` 2026-11-21 — 各サービスのイベント今の順位と次まで
 - `v0.1.2170` 2026-11-21 — イベントの今の順位と次まで
 - `v0.1.2154` 2026-11-18 — 横の欄と来場の記録をまとめた
-- `v0.1.2153` 2026-11-18 — Kickの絵文字を名前のまま出さない
-- `v0.1.2152` 2026-11-18 — 公式どうしの来場は1秒差でも残す
 
-### 🎈 吹き出し (1版)
-- `v0.1.2153` 2026-11-18 — Kickの絵文字を名前のまま出さない
-
-### 🎁 ギフト (1版)
+### 🎁 ギフト (2版)
+- `v0.1.2173` 2026-11-21 — ランキングページのコメント集計を約1分ごとに
 - `v0.1.2159` 2026-11-18 — 概数の登録者と長い応援一覧を直す
 
 ### 🪟 応援レーン・タイル (1版)
 - `v0.1.2157` 2026-11-18 — Twitchなどの人数を低い頻度で取る
 
 ### その他 (12版)
+- `v0.1.2171` 2026-11-21 — イベントptの順位を大きく表示
 - `v0.1.2169` 2026-11-18 — 引き継ぎノートの公開版表記を最新に
 - `v0.1.2168` 2026-11-18 — ストア提出記録の版表記を最新に
 - `v0.1.2167` 2026-11-18 — 開いたままの書き出しと概数
@@ -1589,4 +1597,3 @@
 - `v0.1.2160` 2026-11-18 — 保存したフォロワー数を書き出しに出す
 - `v0.1.2158` 2026-11-18 — 記録が無いときは応援の章を出さない
 - `v0.1.2156` 2026-11-18 — フォロワーの増えた時刻を出す
-- `v0.1.2151` 2026-11-17 — 記録テストは絵文字の名前を見ない
