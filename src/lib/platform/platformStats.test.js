@@ -65,7 +65,7 @@ describe('SHOWROOM', () => {
 });
 
 describe('ミクチャ', () => {
-  it('レベル・ファン・スーパーファン・ライバーランク・イベント', () => {
+  it('レベル・ファン・スーパーファン・ライバーランク・イベント(eventInfo.point は実測で 0 のままなので読まない)', () => {
     expect(
       parseMxLiveStats({
         broadcasterInfo: { fan: 123456, superfan: 321 },
@@ -74,7 +74,7 @@ describe('ミクチャ', () => {
         eventInfo: { id: 9, rank: 7, point: 8888, title: 'ミクチャイベント' },
         liveInfo: { viewer: 3 },
       }),
-    ).toEqual({ level: 27, fans: 123456, superfans: 321, liverRankScore: 45678, superfanBonus: 12, eventRank: 7, eventPoint: 8888, eventName: 'ミクチャイベント' });
+    ).toEqual({ level: 27, fans: 123456, superfans: 321, liverRankScore: 45678, superfanBonus: 12, eventRank: 7, eventName: 'ミクチャイベント' });
   });
   it('ライバーランクが無効なら出さない・イベント未参加は欄なし', () => {
     const s = parseMxLiveStats({ broadcasterInfo: { fan: 1 }, streamerRank: { available: false, score: 99 }, eventInfo: null });

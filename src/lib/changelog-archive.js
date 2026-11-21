@@ -24,6 +24,15 @@
 /** @type {ChangelogEntry[]} */
 const ARCHIVE_ENTRIES = [
   Object.freeze({
+    version: '0.1.2150',
+    date: '2026-11-17',
+    summary: '来場は時刻で区別し、二重だけ畳む',
+    items: Object.freeze([
+      '来場の通知に、届いた時刻を記録します。同じ文面でも時間が違えば、それぞれ数えます。',
+      '公式と画面から約2秒以内に届いた同じ通知だけ、1回に数えます。横の内訳と分析レポートは、未保存の末尾も含めて同じ行を数えます。',
+    ])
+  }),
+  Object.freeze({
     version: '0.1.2149',
     date: '2026-11-17',
     summary: '絵文字の名前を吹き出しに残さない',

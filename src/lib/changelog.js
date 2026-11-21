@@ -18,6 +18,17 @@
 /** @type {readonly ChangelogEntry[]} */
 export const EXTENSION_CHANGELOG = Object.freeze([
   Object.freeze({
+    version: '0.1.2172',
+    date: '2026-11-21',
+    summary: '各サービスのイベント今の順位と次まで',
+    items: Object.freeze([
+      'ふわっち・SHOWROOM・ミクチャのイベントに出ている配信では、横の欄の公式の数字の下に「いまの順位・イベントpt・次の順位まで」を出します。数の出どころ(公式/公式の数字から計算)と最終取得の時刻も書きます。',
+      '「参加者の順位を見る」を開いている間だけ、参加者の順位を3分ごとに取り直し、前回からの上がり下がりと増えたptを出します。横の欄が見えていない間は読みません。',
+      'SHOWROOM はブロックの中の順位かイベント全体の順位かを書きます。公式がptを隠している期間は、一覧にptを出しません。',
+      'ミクチャのイベントptが0と読める値を使わないようにしました。Twitch・Kick・YouTube・ABEMA・TikTok・ツイキャスでは、イベント順位を出せない理由を一言で書きます。',
+    ])
+  }),
+  Object.freeze({
     version: '0.1.2169',
     date: '2026-11-18',
     summary: '引き継ぎノートの公開版表記を最新に',
@@ -184,15 +195,6 @@ export const EXTENSION_CHANGELOG = Object.freeze([
     summary: '記録テストは絵文字の名前を見ない',
     items: Object.freeze([
       'Kick と Twitch の記録テストは、画像になった絵文字の名前が画面の文字として残ることを見なくなりました。使い方は 0.1.2149 と同じです。',
-    ])
-  }),
-  Object.freeze({
-    version: '0.1.2150',
-    date: '2026-11-17',
-    summary: '来場は時刻で区別し、二重だけ畳む',
-    items: Object.freeze([
-      '来場の通知に、届いた時刻を記録します。同じ文面でも時間が違えば、それぞれ数えます。',
-      '公式と画面から約2秒以内に届いた同じ通知だけ、1回に数えます。横の内訳と分析レポートは、未保存の末尾も含めて同じ行を数えます。',
     ])
   })
 ]);
