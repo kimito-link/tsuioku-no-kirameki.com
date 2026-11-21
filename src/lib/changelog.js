@@ -18,6 +18,15 @@
 /** @type {readonly ChangelogEntry[]} */
 export const EXTENSION_CHANGELOG = Object.freeze([
   Object.freeze({
+    version: '0.1.2176',
+    date: '2026-11-21',
+    summary: '開発モードではマーケHTMLを自由に保存',
+    items: Object.freeze([
+      'りんくさんの開発用の読み込み（フォルダから読み込んだ版／ストア提出ではないビルド）では、コードがなくてもマーケレポートのHTMLを保存できます。',
+      'Chromeウェブストアから入れた版と、提出用のZIPの関所・14日のお試しは、今までどおりです。',
+    ])
+  }),
+  Object.freeze({
     version: '0.1.2174',
     date: '2026-11-21',
     summary: 'ランキングページの「いま動いた人」にコメントも',
@@ -199,15 +208,6 @@ export const EXTENSION_CHANGELOG = Object.freeze([
       '1.2万のような概数だけのときは、増えた人数は出しません。ページに人数が無い配信では、この欄は出ません。',
     ])
   }),
-  Object.freeze({
-    version: '0.1.2155',
-    date: '2026-11-18',
-    summary: '応援が届いた時刻を先頭に出す',
-    items: Object.freeze([
-      'マーケティングレポートの先頭に「応援が届いた瞬間」を出しました。記録にある応援だけを、届いた時刻と直前1分のコメント（推定）と一緒に並べます。記録が無いときはこの章は出ません。',
-      'TikTok でページが「フォローしました」と出したときだけ、フォローを時刻つきで記録します。コメントの件数には入れません。ページがフォローを出さないサービスでは、数を作りません。',
-    ])
-  })
 ]);
 
 
