@@ -27,7 +27,7 @@
 
 > 値が次の段へ届かない「断線」(broadcaster バグ型)は `npm run feature-map -- --check` が機械検知。
 
-## ⚠️ 役割コメントが無いソース 13 / 1336 件
+## ⚠️ 役割コメントが無いソース 14 / 1333 件
 - `docs/handoff/bench/bench-interval.mjs`
 - `docs/handoff/bench/bench-lane.mjs`
 - `extension-youtube/cloak-failsafe.js`
@@ -41,6 +41,7 @@
 - `src/lib/reportPreviewPublish.js`
 - `src/lib/venueLaneBuckets.js`
 - `src/lib/venueStoryDiagMirrorPanel.js`
+- `src/server/kouhakuSeed.js`
 
 ## 全ファイルツリー
 
@@ -241,7 +242,7 @@
     - `2026-10-06.md`
     - `2026-10-12.md`
     - `2026-10-14.md`
-- 📁 **docs/** (375)
+- 📁 **docs/** (371)
   - 📁 **article-assets/** (87)
     - 📁 **venue-frames/** (12)
       - `f01.png`
@@ -585,10 +586,6 @@
   - `dist-fingerprint-gate-IMPLEMENTATION-HANDOFF.md`
   - `extension-bump-checklist.md`
   - `feature-sitemap.html`
-  - `feature-sitemap.html`
-  - `feature-sitemap.html`
-  - `feature-sitemap.md`
-  - `feature-sitemap.md`
   - `feature-sitemap.md`
   - `inline-popup-sync.md`
   - `investigation-prompt-popup-not-appearing.md`
@@ -632,7 +629,7 @@
   - `venue-pop-parity-loop-flow.html`
   - `visual-explainer.md`
   - `voice-quality-pipeline-flow.html`
-- 📁 **extension/** (149)
+- 📁 **extension/** (145)
   - 📁 **data/** (1)
     - `ouen-banner.json`
   - 📁 **images/** (87)
@@ -774,12 +771,8 @@
     - `voice-complete.mp3`
     - `voice-watch.mp3`
   - `background.js` — MV3 Service Worker
-  - `background.js` — MV3 Service Worker
-  - `background.js` — MV3 Service Worker
   - `comeview.html`
   - `live-view.html`
-  - `manifest.json`
-  - `manifest.json`
   - `manifest.json`
   - `marketing-export-guard.js` — マーケ分析タブ(marketing-export.html)の「何があっても開く」保険。
   - `marketing-export.html`
@@ -1569,11 +1562,13 @@
       - `kickChatParse.test.js`
       - `kickRealtime.js` — Kick のチャットの「つなぎ先」を決めて、届いた1通を読む(純関数)
       - `kickRealtime.test.js`
-    - 📁 **kouhaku/** (13)
+    - 📁 **kouhaku/** (15)
       - `board.js` — 【層】L0 判定層(純粋関数・I/O禁止)
       - `calc.js` — 【層】L0 判定層(純粋関数・I/O禁止)
       - `constants.js` — 【層】L0 判定層(純粋関数・I/O禁止)
       - `format.js` — 【層】L0 判定層(純粋関数・I/O禁止)
+      - `icon.js` — 【層】L0 判定層(純粋関数・I/O禁止)
+      - `icon.test.js`
       - `job.js` — 【層】L0 判定層(純粋関数・I/O禁止)
       - `model.js` — 【層】L0 判定層(純粋関数・I/O禁止)
       - `ogHtml.js` — 【層】L0 判定層(純粋関数・I/O禁止)
@@ -1984,8 +1979,6 @@
     - `censusWatch.js` — 状態速報の「拡張プロセスの忙しさ(文書別)」を、数字だけで機械的に読む純関数(2026-10-20)。
     - `censusWatch.test.js`
     - `changelog-archive.js` — 追憶のきらめき 更新履歴アーカイブ（popup のバンドル外）。
-    - `changelog.js` — 拡張の更新履歴データと semver 比較ヘルパ。
-    - `changelog.js` — 拡張の更新履歴データと semver 比較ヘルパ。
     - `changelog.js` — 拡張の更新履歴データと semver 比較ヘルパ。
     - `changelog.test.js`
     - `changelogBundleBudget.test.js`
@@ -3848,7 +3841,7 @@
     - `kouhakuOfficialPage.js` — 公式15106へ GET する唯一の場所。
     - `kouhakuOfficialPage.test.js`
     - `kouhakuRead.js` — 保存済みスナップショットを読む。公式ページへは行かない。
-    - `kouhakuSeed.js` — 2026-11-21 に公式15106を1回読んだ初期スナップショット。画像URLは含まない。
+    - `kouhakuSeed.js` — ⚠️ 役割コメント無し
     - `liveEventsApi.js` — global process, Buffer -- サーバー(Vercel 関数)専用の部品。api/ と同じく env を読む
     - `liveEventsApi.test.js`
     - `liveRankingOne.test.js`
@@ -3989,7 +3982,7 @@
   - `kouhaku_og.py`
   - `og-live-compose.py`
   - `render-og.js` — 追憶の煌めき LP 用 OG 画像（1200×630）を生成する。
-- 📁 **tsuioku-no-kirameki/** (77)
+- 📁 **tsuioku-no-kirameki/** (75)
   - 📁 **articles/** (14)
     - 📁 **role-separation-design/** (2)
       - 📁 **img/** (1)
@@ -4073,8 +4066,6 @@
   - `.htaccess`
   - `google7e3e79636d884c2.html`
   - `google7e3e79636d884c2f.html`
-  - `index.html`
-  - `index.html`
   - `index.html`
   - `privacy.html`
   - `robots.txt`

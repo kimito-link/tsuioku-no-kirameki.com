@@ -50,6 +50,7 @@ export function rankEntries(current, previous) {
         userId: entry.userId,
         displayName: entry.displayName,
         score: entry.score,
+        iconUrl: entry.iconUrl || null,
         gapToNext,
         nextRank,
         scoreDelta: prev ? entry.score - prev.score : null,

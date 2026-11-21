@@ -5,7 +5,7 @@
 > 下にマインドマップ（GitHub で図として表示）→ ディレクトリ一覧 → 機能逆引き索引 の順。
 > **全部の地図への入口: [MAP.md](MAP.md)** ／ 視覚ビュー: [repo-tree-map.html](repo-tree-map.html) ／ 機能依存図: [feature-map/index.md](feature-map/index.md) ／ 配置ルール正本: [AGENTS.md](../AGENTS.md) §4。
 
-ルート直下の設定ファイル: 62 件（package.json / *.config.js / AGENTS.md 等）
+ルート直下の設定ファイル: 58 件（package.json / *.config.js / AGENTS.md 等）
 
 ## マインドマップ（自動生成・GitHub で図として表示）
 
@@ -360,17 +360,19 @@ graph LR
   f58 --> f58_4["live/index.html"]
   HUB --> f59["紅白歌枠合戦2026のイベントpt応援ランキング"]
   f59 --> f59_0["lib/kouhaku/parse.js"]
-  f59 --> f59_1["lib/kouhaku/policy.js"]
-  f59 --> f59_2["lib/kouhaku/job.js"]
-  f59 --> f59_3["server/kouhakuOfficialPage.js"]
-  f59 --> f59_4["server/kouhakuRead.js"]
-  f59 --> f59_5["kouhaku-ranking.js"]
-  f59 --> f59_6["kouhaku-og.js"]
-  f59 --> f59_7["kouhaku-og-image.js"]
-  f59 --> f59_8["live/kouhaku/index.html"]
-  f59 --> f59_9["assets/js/kouhaku-board.js"]
-  f59 --> f59_10["workflows/kouhaku-ranking.yml"]
-  f59 --> f59_11[""]
+  f59 --> f59_1["lib/kouhaku/icon.js"]
+  f59 --> f59_2["lib/kouhaku/policy.js"]
+  f59 --> f59_3["lib/kouhaku/job.js"]
+  f59 --> f59_4["server/kouhakuOfficialPage.js"]
+  f59 --> f59_5["server/kouhakuRead.js"]
+  f59 --> f59_6["kouhaku-ranking.js"]
+  f59 --> f59_7["kouhaku-og.js"]
+  f59 --> f59_8["kouhaku-og-image.js"]
+  f59 --> f59_9["live/index.html"]
+  f59 --> f59_10["live/kouhaku/index.html"]
+  f59 --> f59_11["assets/js/kouhaku-board.js"]
+  f59 --> f59_12["workflows/kouhaku-ranking.yml"]
+  f59 --> f59_13[""]
   HUB --> f60["ランキング(/live/)の配信ごと OGP"]
   f60 --> f60_0["live-og.js"]
   f60 --> f60_1["live-og-image.js"]
@@ -437,11 +439,11 @@ graph LR
 <sub>ファイル 13 件</sub>
 
 ## `app/` — Web 版状態ページのアプリ(app.js + dist)  〔Web版〕
-<sub>ファイル 128 件</sub>
+<sub>ファイル 126 件</sub>
 
 - `audio-test/`（7 件） — スマホで鳴る音声形式の実機テスト用の短い声(audio-test.html が使う・同じ声を形式ごとに用意)  〔Web版〕
 - `demo/`（1 件） — スマホ版デモ(/live-view?v=demo)の作り物の見本(scripts/build-phone-demo-snapshot.mjs が生成)  〔Web版 / デモ〕
-- `dist/`（6 件） — Web 版アプリのビルド成果物  〔ビルド成果物〕
+- `dist/`（4 件） — Web 版アプリのビルド成果物  〔ビルド成果物〕
 - `images/`（93 件） — 純Web版 応援ライブビューの同梱画像(ゆっくり顔)  〔Web版 / 画像〕
 
 ## `council/` — 会議(COUNCIL)の問い・回答・統合(SYNTHESIS)。設計判断の根拠  〔会議 / 設計〕
@@ -455,7 +457,7 @@ graph LR
 - `briefs/`（26 件） — スカウトの日次ブリーフ(md)  〔会議 / 原稿〕
 
 ## `docs/` — 設計正本・マインドマップ・フロー図・feature-map(AI/人間向け)  〔設計 / レポート〕
-<sub>ファイル 375 件</sub>
+<sub>ファイル 371 件</sub>
 
 - `article-assets/`（87 件） — 記事用の画像・動画・音声アセット  〔記事 / 画像〕
 - `article-drafts/`（2 件） — 公開前の記事下書き(防御的公開の草稿)  〔記事 / 下書き〕
@@ -469,10 +471,10 @@ graph LR
 - `workflows/`（1 件） — 開発ワークフロー設計(TDD/UI-UX ロードマップ等)  〔ワークフロー〕
 
 ## `extension/` — 拡張本体の配布版ソース(ここを編集)。manifest/background/各 html  〔配布 / manifest〕
-<sub>ファイル 203 件</sub>
+<sub>ファイル 183 件</sub>
 
 - `data/`（1 件） — 拡張同梱の静的データ(応援バナー定義 json)  〔データ / 応援〕
-- `dist/`（54 件） — ビルド成果物(content/popup/status 等の bundle)。build が生成  〔ビルド成果物〕
+- `dist/`（38 件） — ビルド成果物(content/popup/status 等の bundle)。build が生成  〔ビルド成果物〕
 - `images/`（87 件） — アイコン・ロゴのマスター画像  〔画像〕
 - `sound/`（39 件） — 読み上げ・完了音などの音声素材  〔音声〕
 
@@ -543,7 +545,7 @@ graph LR
 - `mcp-nicolive/`（3 件） — ニコ生状態を読む MCP サーバ(司令塔の状態取得用)  〔MCP / 診断〕
 
 ## `tsuioku-no-kirameki/` — 本番 LP の配信ディレクトリ(Cloudflare Pages へ deploy)  〔LP / 公開〕
-<sub>ファイル 77 件</sub>
+<sub>ファイル 75 件</sub>
 
 - `articles/`（14 件） — 技術記事(防御的公開)。手法を再利用可能な形で解説  〔記事 / 公開〕
 - `assets/`（6 件） — 公開ページ群が共有する静的資産の置き場(2026-09-14)  〔LP / 共有〕
@@ -996,9 +998,10 @@ esbuild の import 到達グラフを逆引きし「このファイルを変え�
 - [`tsuioku-no-kirameki/live/index.html`](../tsuioku-no-kirameki/live/index.html)
 
 ### 紅白歌枠合戦2026のイベントpt応援ランキング  〔LP / 公開 / ランキング / 紅白〕
-/live/kouhaku/ と /live/kouhaku/u/<ユーザーID>/。出典は公式15106だけ。サーバが JST 16:30、失敗時のみ 19:30 に最大2回取得し、ブラウザは /api/kouhaku-ranking だけを読む。画像は保存もホットリンクもしない。共有は X と LINE(https、openExternalBrowser=1)。定期実行は .github/workflows/kouhaku-ranking.yml。保存は Upstash の kouhaku:v1:*。無ければ同梱シード
+/live/ の中と /live/kouhaku/、/live/kouhaku/u/<ユーザーID>/。出典は公式15106だけ。サーバが JST 16:30、失敗時のみ 19:30 に最大2回取得し、ブラウザは /api/kouhaku-ranking だけを読む。アイコンは公式HTMLの公開 usericon、無ければユーザーIDから組み立て、失敗時は blank.jpg。共有は X と LINE(https、openExternalBrowser=1)。定期実行は .github/workflows/kouhaku-ranking.yml。保存は Upstash の kouhaku:v1:*。無ければ同梱シード
 
 - [`src/lib/kouhaku/parse.js`](../src/lib/kouhaku/parse.js)
+- [`src/lib/kouhaku/icon.js`](../src/lib/kouhaku/icon.js)
 - [`src/lib/kouhaku/policy.js`](../src/lib/kouhaku/policy.js)
 - [`src/lib/kouhaku/job.js`](../src/lib/kouhaku/job.js)
 - [`src/server/kouhakuOfficialPage.js`](../src/server/kouhakuOfficialPage.js)
@@ -1006,6 +1009,7 @@ esbuild の import 到達グラフを逆引きし「このファイルを変え�
 - [`api/kouhaku-ranking.js`](../api/kouhaku-ranking.js)
 - [`api/kouhaku-og.js`](../api/kouhaku-og.js)
 - [`api/kouhaku-og-image.js`](../api/kouhaku-og-image.js)
+- [`tsuioku-no-kirameki/live/index.html`](../tsuioku-no-kirameki/live/index.html)
 - [`tsuioku-no-kirameki/live/kouhaku/index.html`](../tsuioku-no-kirameki/live/kouhaku/index.html)
 - [`tsuioku-no-kirameki/assets/js/kouhaku-board.js`](../tsuioku-no-kirameki/assets/js/kouhaku-board.js)
 - [`.github/workflows/kouhaku-ranking.yml`](../.github/workflows/kouhaku-ranking.yml)

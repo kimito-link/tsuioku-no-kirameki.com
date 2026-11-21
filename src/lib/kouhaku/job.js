@@ -108,7 +108,8 @@ export async function runScheduledFetch(deps) {
         rank: entry.rank,
         userId: entry.userId,
         displayName: entry.displayName,
-        score: entry.score
+        score: entry.score,
+        iconUrl: entry.iconUrl
       }))
     };
     await deps.store.saveSnapshot(snapshot);

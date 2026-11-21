@@ -141,12 +141,16 @@ describe('公式15106のパーサ', () => {
     });
   });
 
-  it('画像URLを結果に残さない', () => {
+  it('公式ページの配信者アイコンURLだけを残す', () => {
+    expect(parsed.entries.find((entry) => entry.userId === '41979749')?.iconUrl).toBe(
+      'https://secure-dcdn.cdn.nimg.jp/nicoaccount/usericon/4197/41979749.jpg'
+    );
+    expect(parsed.entries.find((entry) => entry.userId === '144158487')?.iconUrl).toBe(
+      'https://secure-dcdn.cdn.nimg.jp/nicoaccount/usericon/14415/144158487.jpg'
+    );
     const serialized = JSON.stringify(parsed);
-    expect(serialized).not.toContain('nimg.jp');
-    expect(serialized).not.toContain('usericon');
-    expect(serialized).not.toContain('.jpg');
-    expect(serialized).not.toContain('secure-dcdn');
+    expect(serialized).not.toContain('niconicoinfo_logo');
+    expect(serialized).not.toContain('wp-content');
   });
 
   it('保存済みシードは、このフィクスチャの再パースと一致する', async () => {
@@ -156,7 +160,7 @@ describe('公式15106のパーサ', () => {
     expect(seed.officialUpdateAt).toBe(parsed.officialUpdateAt);
     expect(seed.entries).toEqual(parsed.entries);
     expect(seed.etag).toBe(headers.match(/^etag:\s*(.+)$/im)?.[1]?.trim());
-    expect(JSON.stringify(seed)).not.toContain('nimg.jp');
+    expect(JSON.stringify(seed)).not.toContain('niconicoinfo_logo');
   });
 
   it('改行・文字参照・カンマ区切りスコアを読む', () => {
@@ -175,7 +179,8 @@ describe('公式15106のパーサ', () => {
     expect(result.entries.find((entry) => entry.userId === '10')).toMatchObject({
       displayName: 'A&B',
       score: 1000,
-      team: 'aka'
+      team: 'aka',
+      iconUrl: null
     });
     expect(result.officialUpdateAt).toBe('2026-11-21T09:05:00+09:00');
     expect(JSON.stringify(result)).not.toContain('nimg.jp');
@@ -280,8 +285,11 @@ describe('定期取得ジョブ', () => {
     expect(calls).toBe(1);
     const latest = await store.getLatest();
     expect(latest?.origin).toBe('cron');
-    expect(JSON.stringify(latest)).not.toContain('nimg.jp');
-    expect(latest?.entries.find((entry) => entry.rank === 1 && entry.team === 'aka')?.displayName).toBe('ゴリアテ');
+    expect(latest?.entries.find((entry) => entry.rank === 1 && entry.team === 'aka')).toMatchObject({
+      displayName: 'ゴリアテ',
+      iconUrl: 'https://secure-dcdn.cdn.nimg.jp/nicoaccount/usericon/4197/41979749.jpg'
+    });
+    expect(JSON.stringify(latest)).not.toContain('niconicoinfo_logo');
   });
 
   it('304 は成功扱いで新しいスナップショットを作らない', async () => {
@@ -425,13 +433,15 @@ describe('推定（日中）と連絡先', () => {
     const page = buildKouhakuOgHtml(card);
     expect(page).toContain(board.aka[1].displayName);
     expect(page).toContain('公式は1日1回更新');
+    expect(page).toContain('property="og:image"');
+    expect(page).toContain(`/api/kouhaku-og-image?user=${board.aka[1].userId}`);
     expect(page).not.toContain('line://');
     expect(page).not.toContain('nimg.jp');
     expect(buildKouhakuOgHtml(boardOgCard(board))).toContain('/live/kouhaku/');
   });
 });
 
-describe('画面からニコニコの画像ホストへ出ない', () => {
+describe('画面は公式ページを取りに行かない', () => {
   function walk(dir) {
     return readdirSync(dir).flatMap((name) => {
       const full = path.join(dir, name);
@@ -440,19 +450,27 @@ describe('画面からニコニコの画像ホストへ出ない', () => {
     });
   }
 
-  it('公開ページと描画スクリプトに画像ホストと line スキームが無い', () => {
+  it('公開ページは公式15106を取りに行かず、line スキームも無い', () => {
     const files = [
       ...walk('tsuioku-no-kirameki/live/kouhaku'),
+      'tsuioku-no-kirameki/live/index.html',
       'tsuioku-no-kirameki/assets/js/kouhaku-board.js',
       'tsuioku-no-kirameki/assets/css/kouhaku-ranking.css'
     ];
     for (const file of files) {
       const text = readFileSync(file, 'utf8');
-      expect(text, file).not.toContain('nimg.jp');
-      expect(text, file).not.toContain('usericon');
       expect(text, file).not.toContain('fetchRankingPage');
       expect(text, file).not.toContain('runScheduledFetch');
       expect(text, file).not.toContain('line://');
     }
+    const script = readFileSync('tsuioku-no-kirameki/assets/js/kouhaku-board.js', 'utf8');
+    expect(script).not.toContain('blog.nicovideo.jp');
+    const live = readFileSync('tsuioku-no-kirameki/live/index.html', 'utf8');
+    expect(live).toContain('id="list"');
+    expect(live).toContain('id="kouhaku"');
+    expect(live).toContain('id="kouhaku-root"');
+    expect(live).toContain('assets/js/kouhaku-board.js');
+    expect(script).toContain('usericon/defaults/blank.jpg');
+    expect(script).toContain('loading');
   });
 });
