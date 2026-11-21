@@ -213,7 +213,7 @@ export async function verifyLicenseToken(token, opts) {
 }
 
 /**
- * @typedef {'gate_open' | 'licensed' | 'grace' | 'unverifiable' | 'trial' | 'locked'} AccessReason
+ * @typedef {'gate_open' | 'licensed' | 'grace' | 'unverifiable' | 'trial' | 'locked' | 'dev_build'} AccessReason
  */
 
 /**

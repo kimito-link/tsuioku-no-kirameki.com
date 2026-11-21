@@ -17,11 +17,13 @@ const { copyReferencedImages } = await import('./build-youtube-sidepanel-html.mj
 const standaloneManifest = readFileSync(resolve(root, 'extension-youtube/manifest.standalone.json'), 'utf8');
 writeFileSync(resolve(root, 'extension-youtube/manifest.json'), standaloneManifest);
 const PKG_VERSION = JSON.parse(standaloneManifest).version;
+const IS_STORE_BUILD = process.env.NL_STORE_BUILD === '1' || process.env.NL_STORE_BUILD === 'true';
 const popupDefine = {
   NL_BUILD_ID: JSON.stringify(`yt-${new Date().toISOString().slice(0, 16)}`),
   NL_DEV_HOTRELOAD: 'false',
   NL_RELEASE: 'false',
   NL_BUNDLE_VERSION: JSON.stringify(PKG_VERSION),
+  NL_STORE_BUILD: IS_STORE_BUILD ? 'true' : 'false',
 };
 
 const { ytBuildTargets } = await import('./youtube-build.mjs');

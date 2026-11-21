@@ -4,6 +4,8 @@
  * 【この箱に入らないもの】判定そのもの(supporterLicense.js)・画面の描画(marketing-export-entry.js)
  *
  * ★v0.1.1893(課金 第3段): 関所はまだ開けたまま(SUPPORTER_GATE_ENFORCED=false)。
+ * ★v0.1.2176: 開発用の読み込み(未パック / NL_STORE_BUILD ではないビルド)だけ、
+ *   isDevMarketingUnlock でマーケ HTML を通す。ストア提出ビルドとストアから入れた版は通さない。
  *   - お試しの14日は「初めてマーケ HTML を開いた日」から数える(最初の配信でマーケ HTML の良さを丸ごと体験してもらう)。
  *   - サーバーに届かない・Stripe が落ちている → 手元の証明書(期限+7日の猶予)で判定し、止めない。
  *   - 保存キーは nls_supporter_ で始める(YouTube 版の画面とも共有する=ytMergedIsolation が素通しする)。
@@ -21,6 +23,7 @@ import {
   shouldRefreshLicense,
   verifyLicenseToken
 } from './supporterLicense.js';
+import { isDevMarketingUnlock } from './devMarketingUnlock.js';
 
 export const KEY_SUPPORTER_CODE = 'nls_supporter_code_v1';
 export const KEY_SUPPORTER_LICENSE = 'nls_supporter_license_v1';
@@ -112,6 +115,7 @@ export async function fetchSupporterLicense(code, opts = {}) {
  *   storage: StorageLike,
  *   nowMs?: number,
  *   enforced?: boolean,
+ *   devUnlock?: boolean,
  *   fetchImpl?: typeof fetch,
  *   publicKeys?: Readonly<Record<string, string>>
  * }} deps
@@ -119,6 +123,10 @@ export async function fetchSupporterLicense(code, opts = {}) {
 export async function checkMarketingAccess(deps) {
   const nowMs = deps.nowMs ?? Date.now();
   const enforced = deps.enforced ?? SUPPORTER_GATE_ENFORCED;
+  const devUnlock = deps.devUnlock ?? isDevMarketingUnlock();
+  if (devUnlock) {
+    return { allowed: true, reason: 'dev_build', trialDaysLeft: 0, hasCode: false, deviceLimit: false };
+  }
   /** @type {Record<string, any>} */
   let bag = {};
   try {

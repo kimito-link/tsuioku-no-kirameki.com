@@ -67,6 +67,8 @@ export default [
         // esbuild --define で注入する package.json version(版混在の実行時検知用・2026-07-06)。
         //   chrome.runtime.getManifest().version と突合する(src/lib/versionMismatch.js)。
         NL_BUNDLE_VERSION: 'readonly',
+        // ストア提出(NL_STORE_BUILD=1)だけ true。マーケ HTML の関所を開発用の読み込みだけ通す(v0.1.2176)。
+        NL_STORE_BUILD: 'readonly',
         // status の「スマホへ送信」用に esbuild --define で注入するアップロード設定
         //（.env から。未設定時は空文字 → ボタン無効）。
         NL_STATUS_INGEST_KEY: 'readonly',
