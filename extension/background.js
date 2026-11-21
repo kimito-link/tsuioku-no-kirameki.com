@@ -4,7 +4,7 @@
  * - 初回インストール/ブラウザ起動時: 既存 watch タブへ注入して即利用可能にする
  * - 拡張更新時: 既存 watch タブをリロードし、古い extension context を残さない
  */
-// nls-sw-fingerprint: dab44be1c0f5
+// nls-sw-fingerprint: 0e7da83f2423
 
 // @ts-nocheck — service worker; Chrome API と動的インデックスが多く checkJs コストが高い
 // PR1-b-1: backfill SW エンジン(ビルド産物)。既存コードは無改修(設計正本: memory/reference_backfill_sw_migration_pr1b.md)
@@ -2580,11 +2580,43 @@ async function fetchAuditionEventRankingJson(liveId) {
     fetchAuditionJsonOnce(rankUrl),
     votingUrl ? fetchAuditionJsonOnce(votingUrl) : Promise.resolve({ ok: false, json: null })
   ]);
+
+  // 2026-11-21 Phase 2: 2つ目以降のイベント（最大4つ）も rankings を取る。さらに「次の順位まで」は
+  //   25位より下だと rankings に1つ上の人が居ないので、その時だけ entry_items/<id>（score_to_next_rank）を引く。
+  const events = [];
+  try {
+    const items = Array.isArray(entry.json?.data?.entry_items) ? entry.json.data.entry_items.slice(0, 4) : [];
+    for (let i = 0; i < items.length; i++) {
+      const e = items[i];
+      const k = e && e.audition ? String(e.audition.key || '').trim() : '';
+      if (!AUDITION_EVENT_KEY_RE.test(k)) continue;
+      const ev = { key: k, rankingsJson: null, entryDetailJson: null };
+      if (i === 0 && k === auditionKey) ev.rankingsJson = rank.ok ? rank.json : null;
+      else {
+        const r = await fetchAuditionJsonOnce(
+          'https://audition.nicovideo.jp/capi/v1/auditions/' + encodeURIComponent(k) + '/rankings?limit=25'
+        );
+        ev.rankingsJson = r.ok ? r.json : null;
+      }
+      const myRank = Number(e.rank);
+      const eid = String(e.id == null ? '' : e.id).trim();
+      if (Number.isFinite(myRank) && myRank > 25 && AUDITION_EVENT_POSITIVE_INT_RE.test(eid)) {
+        const d = await fetchAuditionJsonOnce(
+          'https://audition.nicovideo.jp/capi/v1/entry_items/' + encodeURIComponent(eid)
+        );
+        ev.entryDetailJson = d.ok ? d.json : null;
+      }
+      events.push(ev);
+    }
+  } catch {
+    /* 追加分が取れなくても従来の1イベント分は返す */
+  }
   return {
     ok: true,
     entryItemsJson: entry.json,
     rankingsJson: rank.ok ? rank.json : null,
-    votingJson: voting.ok ? voting.json : null
+    votingJson: voting.ok ? voting.json : null,
+    events
   };
 }
 
@@ -2612,6 +2644,116 @@ chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
     .then(reply)
     .catch(() => reply({ ok: false }));
   return true; // 非同期 sendResponse のため message channel を保持
+});
+
+/* ------------------------------------------------------------------ */
+/* 2026-11-21 Phase 2: イベント💎の「全員一覧」と「サーバ側の起点（推定・公式更新以降 +X）」 */
+/* どちらも popup のイベント欄が開いている間だけ popup から頼まれる。SW 側でも間引く:     */
+/*   全員一覧 = 同じイベントは 60 秒に1回まで（rankings を page=1..N・最大10ページ）       */
+/*   起点     = 同じイベントは 5 分に1回まで（app.tsuioku-no-kirameki.com・既存の権限内）   */
+/* 文字列は src/lib/auditionEventRankingApi.js の *_MESSAGE_TYPE と同期。               */
+/* ------------------------------------------------------------------ */
+const AUDITION_EVENT_FULL_LIST_MESSAGE_TYPE = 'NLS_AUDITION_EVENT_FULL_LIST_FETCH';
+const AUDITION_EVENT_ANNOTATION_MESSAGE_TYPE = 'NLS_AUDITION_EVENT_ANNOTATION_FETCH';
+const AUDITION_EVENT_FULL_LIST_MIN_GAP_MS = 60_000;
+const AUDITION_EVENT_ANNOTATION_MIN_GAP_MS = 5 * 60_000;
+const AUDITION_EVENT_FULL_LIST_MAX_PAGES = 10;
+/** @type {Map<string, { at: number, value: any, pending: Promise<any>|null }>} */
+const _auditionFullListCache = new Map();
+/** @type {Map<string, { at: number, value: any, pending: Promise<any>|null }>} */
+const _auditionAnnotationCache = new Map();
+
+async function _auditionCachedFetch(cache, key, gapMs, run) {
+  const now = Date.now();
+  const c = cache.get(key);
+  if (c && c.pending) return c.pending;
+  if (c && c.value && now - c.at < gapMs) return c.value;
+  const entry = { at: now, value: c ? c.value : null, pending: null };
+  entry.pending = run()
+    .then((v) => {
+      entry.pending = null;
+      if (v && v.ok) {
+        entry.value = v;
+        entry.at = Date.now();
+      }
+      return v && v.ok ? v : entry.value || { ok: false };
+    })
+    .catch(() => {
+      entry.pending = null;
+      return entry.value || { ok: false };
+    });
+  cache.set(key, entry);
+  while (cache.size > 8) cache.delete(cache.keys().next().value);
+  return entry.pending;
+}
+
+async function fetchAuditionFullListPages(key) {
+  const pages = [];
+  for (let p = 1; p <= AUDITION_EVENT_FULL_LIST_MAX_PAGES; p++) {
+    const r = await fetchAuditionJsonOnce(
+      'https://audition.nicovideo.jp/capi/v1/auditions/' + encodeURIComponent(key) + '/rankings?limit=100&page=' + p
+    );
+    if (!r.ok || !r.json) break;
+    pages.push(r.json);
+    const list = Array.isArray(r.json?.data?.entry_items) ? r.json.data.entry_items : [];
+    const total = Number(r.json?.data?.total_count) || 0;
+    if (list.length < 100 || p * 100 >= total) break;
+  }
+  return pages.length ? { ok: true, key, pagesJson: pages, gotAt: Date.now() } : { ok: false };
+}
+
+async function fetchAuditionAnnotation(key) {
+  try {
+    const res = await fetch(
+      'https://app.tsuioku-no-kirameki.com/api/event-ranking?key=' + encodeURIComponent(key),
+      { method: 'GET', credentials: 'omit', cache: 'no-store', redirect: 'error', signal: AbortSignal.timeout(8000) }
+    );
+    if (!res.ok) return { ok: false };
+    const json = await res.json();
+    return json && json.ok === true ? { ok: true, key, annotation: json, fetchedAt: Date.now() } : { ok: false };
+  } catch {
+    return { ok: false };
+  }
+}
+
+chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
+  if (
+    !msg ||
+    (msg.type !== AUDITION_EVENT_FULL_LIST_MESSAGE_TYPE && msg.type !== AUDITION_EVENT_ANNOTATION_MESSAGE_TYPE)
+  ) {
+    return undefined;
+  }
+  const key = String(msg.key || '').trim();
+  if (!sender || sender.id !== chrome.runtime.id || !AUDITION_EVENT_KEY_RE.test(key)) {
+    try {
+      sendResponse({ ok: false });
+    } catch {
+      /* no-op */
+    }
+    return false;
+  }
+  const p =
+    msg.type === AUDITION_EVENT_FULL_LIST_MESSAGE_TYPE
+      ? _auditionCachedFetch(_auditionFullListCache, key, AUDITION_EVENT_FULL_LIST_MIN_GAP_MS, () =>
+          fetchAuditionFullListPages(key)
+        )
+      : _auditionCachedFetch(_auditionAnnotationCache, key, AUDITION_EVENT_ANNOTATION_MIN_GAP_MS, () =>
+          fetchAuditionAnnotation(key)
+        );
+  p.then((v) => {
+    try {
+      sendResponse(v);
+    } catch {
+      /* port closed */
+    }
+  }).catch(() => {
+    try {
+      sendResponse({ ok: false });
+    } catch {
+      /* port closed */
+    }
+  });
+  return true;
 });
 
 /* ------------------------------------------------------------------ */

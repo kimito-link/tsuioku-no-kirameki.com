@@ -1,0 +1,41 @@
+name: event ranking snapshot
+
+# ★イベント💎ランキングの「公式更新以降 +X」「推定イベントpt」用の控え（2026-11-21 追加）。
+#   api/event-ranking.js は ?refresh=1 で叩かれたときだけ、拡張が読んだイベントの順位表を5分おきに控える。
+#   ★鍵（secret）は使わない: サーバ側が「前回から4分未満なら何もしない」+ ロックで間引くので、
+#     誰が叩いてもニコニコへの負荷は一定。既存の STATUS_INGEST_KEY には触らない。
+#   ★Vercel Hobby の cron は1日1回なので GitHub Actions を使う（live-ranking.yml と同じ理由）。
+
+on:
+  schedule:
+    - cron: "*/5 * * * *"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: event-ranking-snapshot
+  cancel-in-progress: false
+
+jobs:
+  snapshot:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 3
+    steps:
+      - name: 控えを取る
+        run: |
+          code=$(curl -sS -o /tmp/out.json -w '%{http_code}' --max-time 90 \
+            "https://app.tsuioku-no-kirameki.com/api/event-ranking?refresh=1")
+          echo "HTTP $code"
+          cat /tmp/out.json || true
+          echo ""
+          # 404 = まだ本番に出ていない（このPRがマージ・公開される前）。失敗にはしない。
+          if [ "$code" = "404" ]; then
+            echo "::notice::/api/event-ranking はまだ公開されていません"
+            exit 0
+          fi
+          if [ "$code" != "200" ]; then
+            echo "::error::控えに失敗しました (HTTP $code)"
+            exit 1
+          fi
