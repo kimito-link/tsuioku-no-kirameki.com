@@ -245,8 +245,8 @@ describe('共有リンク', () => {
 
   it('X と LINE は https だけで、LINE の共有URLには外部ブラウザ指定がある', () => {
     const share = buildShareLinks(entry, 'https://example.com', '11月21日（土）15時55分頃更新分');
-    expect(pagePath(entry.userId)).toBe('/live/kouhaku/u/144158487/');
-    expect(share.pageUrl).toBe('https://example.com/live/kouhaku/u/144158487/?openExternalBrowser=1');
+    expect(pagePath(entry.userId)).toBe('/live/event/kouhaku-2026/u/144158487/');
+    expect(share.pageUrl).toBe('https://example.com/live/event/kouhaku-2026/u/144158487/?openExternalBrowser=1');
     expect(share.xUrl.startsWith('https://x.com/intent/post?')).toBe(true);
     expect(share.lineUrl.startsWith('https://social-plugins.line.me/lineit/share?')).toBe(true);
     expect(decodeURIComponent(share.lineUrl)).toContain('openExternalBrowser=1');
@@ -434,10 +434,11 @@ describe('推定（日中）と連絡先', () => {
     expect(page).toContain(board.aka[1].displayName);
     expect(page).toContain('公式は1日1回更新');
     expect(page).toContain('property="og:image"');
-    expect(page).toContain(`/api/kouhaku-og-image?user=${board.aka[1].userId}`);
+    expect(page).toContain(`user=${board.aka[1].userId}`);
+    expect(page).toContain('/live/event/kouhaku-2026/u/');
     expect(page).not.toContain('line://');
     expect(page).not.toContain('nimg.jp');
-    expect(buildKouhakuOgHtml(boardOgCard(board))).toContain('/live/kouhaku/');
+    expect(buildKouhakuOgHtml(boardOgCard(board))).toContain('/live/event/kouhaku-2026/');
   });
 });
 
@@ -453,6 +454,7 @@ describe('画面は公式ページを取りに行かない', () => {
   it('公開ページは公式15106を取りに行かず、line スキームも無い', () => {
     const files = [
       ...walk('tsuioku-no-kirameki/live/kouhaku'),
+      ...walk('tsuioku-no-kirameki/live/event'),
       'tsuioku-no-kirameki/live/index.html',
       'tsuioku-no-kirameki/assets/js/kouhaku-board.js',
       'tsuioku-no-kirameki/assets/css/kouhaku-ranking.css'

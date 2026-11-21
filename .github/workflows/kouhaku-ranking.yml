@@ -1,8 +1,8 @@
 name: kouhaku ranking
 
-# 紅白歌枠合戦2026の公式イベントランキング(15106)を、1日最大2回読む。
+# レジストリの公式イベント順位を、イベントごとに1日最大2回読む。
 # 16:30 JST = 07:30 UTC。失敗したときだけ 19:30 JST = 10:30 UTC。
-# 取得してよいかはサーバ(api/kouhaku-ranking.js)が決める。この workflow は叩くだけ。
+# 取得してよいかはサーバ(api/kouhaku-ranking.js)が決める。この workflow は1回叩くだけ。
 # Vercel Hobby の cron は1日1回までなので、ライブランキングと同じく GitHub Actions を使う。
 # 保存先(Upstash)が無いときはサーバが公式ページへ行かずに 503 を返す。
 

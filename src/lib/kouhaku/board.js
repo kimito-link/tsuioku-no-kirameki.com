@@ -8,6 +8,7 @@
  * board.js — 順位を先に出すためのデータ。説明文はページ側。
  */
 
+import { boardPath, eventCatalog, getEvent, groupLabel } from '../eventRanking/registry.js';
 import { FEATURES, PUBLIC_SITE_URL, teamLabel } from './constants.js';
 import { rankEntries } from './calc.js';
 import { formatGrowthSinceOfficial, formatGap, formatPt } from './format.js';
@@ -21,7 +22,7 @@ import { buildShareLinks, pagePath } from './share.js';
  *   rank: number,
  *   userId: string,
  *   displayName: string,
- *   team: 'aka'|'shiro',
+ *   team: string,
  *   teamLabel: string,
  *   scoreLabel: string,
  *   gapLabel: string,
@@ -44,20 +45,22 @@ export function loadDaytimeEstimates() {
 /**
  * @param {RankedEntry} entry
  * @param {string} [officialUpdateLabel]
+ * @param {import('../eventRanking/registry.js').RankingEvent|null} [event]
  * @returns {PresentedEntry}
  */
-export function presentEntry(entry, officialUpdateLabel) {
-  const share = buildShareLinks(entry, PUBLIC_SITE_URL, officialUpdateLabel || '');
+export function presentEntry(entry, officialUpdateLabel, event) {
+  const known = event || getEvent('kouhaku-2026');
+  const share = buildShareLinks(entry, PUBLIC_SITE_URL, officialUpdateLabel || '', known);
   return {
     rank: entry.rank,
     userId: entry.userId,
     displayName: entry.displayName,
     team: entry.team,
-    teamLabel: teamLabel(entry.team),
+    teamLabel: (known && groupLabel(known, entry.team)) || teamLabel(entry.team),
     scoreLabel: `${formatPt(entry.score)} pt`,
     gapLabel: formatGap(entry),
     deltaLabel: formatGrowthSinceOfficial(entry.scoreDelta),
-    pagePath: pagePath(entry.userId),
+    pagePath: pagePath(entry.userId, known && known.id),
     iconUrl: iconUrlForEntry(entry),
     shareUrl: share.xUrl
   };
@@ -67,6 +70,7 @@ export function presentEntry(entry, officialUpdateLabel) {
  * @param {Snapshot} snapshot
  * @param {Snapshot|null} previous
  * @param {string|null} confirmedAt
+ * @param {import('../eventRanking/registry.js').RankingEvent|null} [event]
  * @returns {{
  *   kind: 'board',
  *   officialUpdateLabel: string,
@@ -74,22 +78,46 @@ export function presentEntry(entry, officialUpdateLabel) {
  *   fetchedAt: string,
  *   confirmedAt: string|null,
  *   sourceUrl: string,
+ *   eventId: string,
+ *   eventName: string,
+ *   boardPath: string,
+ *   periodLabel: string,
+ *   catalog: { id: string, name: string, path: string, fetchStart: string, fetchUntil: string }[],
+ *   columns: { id: string, label: string, color: string, background: string, entries: PresentedEntry[] }[],
  *   aka: PresentedEntry[],
  *   shiro: PresentedEntry[]
  * }}
  */
-export function presentBoard(snapshot, previous, confirmedAt) {
-  const previousAka = previous ? previous.entries.filter((entry) => entry.team === 'aka') : null;
-  const previousShiro = previous ? previous.entries.filter((entry) => entry.team === 'shiro') : null;
+export function presentBoard(snapshot, previous, confirmedAt, event) {
+  const known = event || getEvent('kouhaku-2026');
+  const groups = known ? known.groups : [];
+  const columns = groups.map((group) => {
+    const previousGroup = previous ? previous.entries.filter((entry) => entry.team === group.id) : null;
+    return {
+      id: group.id,
+      label: group.label,
+      color: group.color,
+      background: group.background,
+      entries: rankEntries(snapshot.entries.filter((entry) => entry.team === group.id), previousGroup)
+        .map((entry) => presentEntry(entry, snapshot.officialUpdateLabel, known))
+    };
+  });
+  const byId = Object.fromEntries(columns.map((column) => [column.id, column.entries]));
   return {
     kind: 'board',
+    eventId: known ? known.id : '',
+    eventName: known ? known.name : '',
+    boardPath: known ? boardPath(known) : '',
+    periodLabel: known ? known.periodLabel : '',
+    catalog: eventCatalog(),
     officialUpdateLabel: snapshot.officialUpdateLabel,
     officialUpdateAt: snapshot.officialUpdateAt,
     fetchedAt: snapshot.fetchedAt,
     confirmedAt,
     sourceUrl: snapshot.sourceUrl,
-    aka: rankEntries(snapshot.entries.filter((entry) => entry.team === 'aka'), previousAka).map((entry) => presentEntry(entry, snapshot.officialUpdateLabel)),
-    shiro: rankEntries(snapshot.entries.filter((entry) => entry.team === 'shiro'), previousShiro).map((entry) => presentEntry(entry, snapshot.officialUpdateLabel))
+    columns,
+    aka: byId.aka || [],
+    shiro: byId.shiro || []
   };
 }
 
@@ -99,9 +127,10 @@ export function presentBoard(snapshot, previous, confirmedAt) {
  * @param {string} userId
  * @param {string|null} confirmedAt
  * @param {boolean} inLatest
+ * @param {import('../eventRanking/registry.js').RankingEvent|null} [event]
  * @returns {Record<string, unknown>|null}
  */
-export function presentProfile(snapshot, previous, userId, confirmedAt, inLatest) {
+export function presentProfile(snapshot, previous, userId, confirmedAt, inLatest, event) {
   if (!/^\d{1,16}$/.test(userId)) return null;
   const found = snapshot.entries.find((entry) => entry.userId === userId);
   if (!found) return null;
@@ -111,9 +140,13 @@ export function presentProfile(snapshot, previous, userId, confirmedAt, inLatest
     previousTeam
   ).find((entry) => entry.userId === userId);
   if (!ranked) return null;
-  const share = buildShareLinks(ranked, PUBLIC_SITE_URL, snapshot.officialUpdateLabel);
+  const known = event || getEvent('kouhaku-2026');
+  const share = buildShareLinks(ranked, PUBLIC_SITE_URL, snapshot.officialUpdateLabel, known);
   return {
     kind: 'profile',
+    eventId: known ? known.id : '',
+    eventName: known ? known.name : '',
+    boardPath: known ? boardPath(known) : '',
     found: true,
     inLatest,
     officialUpdateLabel: snapshot.officialUpdateLabel,
@@ -122,7 +155,7 @@ export function presentProfile(snapshot, previous, userId, confirmedAt, inLatest
     confirmedAt: inLatest ? confirmedAt : null,
     sourceUrl: snapshot.sourceUrl,
     officialUserUrl: `https://www.nicovideo.jp/user/${ranked.userId}`,
-    entry: presentEntry(ranked, snapshot.officialUpdateLabel),
+    entry: presentEntry(ranked, snapshot.officialUpdateLabel, known),
     share
   };
 }

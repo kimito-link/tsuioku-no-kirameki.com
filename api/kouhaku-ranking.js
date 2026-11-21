@@ -9,12 +9,11 @@
  * ブラウザはこの JSON だけを読む。アイコンは公開 usericon の URL だけを返し、画像バイトは中継しない。
  */
 import { upstash } from './live-ranking.js';
+import { EVENTS, getEvent, selectEvent } from '../src/lib/eventRanking/registry.js';
 import { buildUserAgent, PUBLIC_SITE_URL } from '../src/lib/kouhaku/constants.js';
 import { runScheduledFetch } from '../src/lib/kouhaku/job.js';
 import { fetchRankingPage } from '../src/server/kouhakuOfficialPage.js';
 import { createRedisStore, readBoard, readProfile } from '../src/server/kouhakuRead.js';
-
-const LOCK_KEY = 'kouhaku:v1:lock';
 
 function authorized(req) {
   const want = process.env.STATUS_INGEST_KEY;
@@ -26,9 +25,14 @@ function kvConfigured() {
   return Boolean(process.env.KV_REST_API_URL && process.env.KV_REST_API_TOKEN);
 }
 
-function storeOrNull() {
+function storeOrNull(event) {
   if (!kvConfigured()) return null;
-  return createRedisStore(upstash);
+  return createRedisStore(upstash, event);
+}
+
+function resolveEvent(query) {
+  if (query.event) return getEvent(String(query.event));
+  return selectEvent(new Date());
 }
 
 export default async function handler(req, res) {
@@ -53,36 +57,59 @@ export default async function handler(req, res) {
       return;
     }
     const slot = String(query.slot || '');
-    let locked = false;
-    try {
-      const got = await upstash(['SET', LOCK_KEY, String(Date.now()), 'NX', 'EX', '90']);
-      if (got !== 'OK') {
-        res.status(200).json({ ok: true, action: 'skipped', reason: 'locked', slot });
-        return;
-      }
-      locked = true;
-      const result = await runScheduledFetch({
-        now: new Date(),
-        store: createRedisStore(upstash),
-        fetchPage: fetchRankingPage,
-        userAgent: buildUserAgent(PUBLIC_SITE_URL)
-      });
-      res.status(result.status).json({ ...result.body, slot });
-    } catch {
-      res.status(200).json({ ok: false, action: 'failed', message: 'state-unavailable', slot });
-    } finally {
-      if (locked) {
-        try { await upstash(['DEL', LOCK_KEY]); } catch { /* ロック期限で消える */ }
+    const targets = query.event ? [getEvent(String(query.event))].filter(Boolean) : EVENTS.slice();
+    if (!targets.length) {
+      res.status(404).json({ ok: false, error: 'unknown-event' });
+      return;
+    }
+    const results = [];
+    for (const event of targets) {
+      const lockKey = `${event.storagePrefix}:lock`;
+      let locked = false;
+      try {
+        const got = await upstash(['SET', lockKey, String(Date.now()), 'NX', 'EX', '90']);
+        if (got !== 'OK') {
+          results.push({ eventId: event.id, ok: true, action: 'skipped', reason: 'locked', slot });
+          continue;
+        }
+        locked = true;
+        const result = await runScheduledFetch({
+          now: new Date(),
+          store: createRedisStore(upstash, event),
+          fetchPage: fetchRankingPage,
+          userAgent: buildUserAgent(PUBLIC_SITE_URL),
+          event
+        });
+        results.push({ eventId: event.id, ...result.body, slot });
+      } catch {
+        results.push({ eventId: event.id, ok: false, action: 'failed', message: 'state-unavailable', slot });
+      } finally {
+        if (locked) {
+          try { await upstash(['DEL', lockKey]); } catch { /* ロック期限で消える */ }
+        }
       }
     }
+    const failed = results.some((item) => item.ok === false);
+    const saved = results.some((item) => item.action === 'saved');
+    res.status(200).json({
+      ok: !failed,
+      action: saved ? 'saved' : ((results[0] && results[0].action) || 'skipped'),
+      slot,
+      events: results
+    });
     return;
   }
 
   res.setHeader('Cache-Control', 'public, max-age=120');
+  const event = resolveEvent(query);
+  if (!event) {
+    res.status(404).json({ ok: false, error: 'unknown-event' });
+    return;
+  }
   const userId = String(query.user || '');
   try {
-    const store = storeOrNull();
-    const payload = userId ? await readProfile(store, userId) : await readBoard(store);
+    const store = storeOrNull(event);
+    const payload = userId ? await readProfile(store, userId, event) : await readBoard(store, event);
     res.status(200).json(payload);
   } catch {
     res.status(200).json({ ok: false, error: 'unavailable' });

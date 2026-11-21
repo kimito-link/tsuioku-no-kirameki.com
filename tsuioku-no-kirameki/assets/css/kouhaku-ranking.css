@@ -44,7 +44,7 @@ a { color: var(--navy); }
 .meta b { color: var(--navy-deep); }
 .teams { display: grid; gap: 16px; margin-top: 14px; }
 .team { background: var(--card); border: 1px solid var(--line); border-radius: 16px; box-shadow: 0 1px 6px rgba(120, 80, 50, .08); overflow: hidden; }
-.team h2 { margin: 0; padding: 12px 14px; font-size: 1.05rem; }
+.team h2 { margin: 0; padding: 12px 14px; font-size: 1.05rem; background: var(--team-bg, transparent); color: var(--team-color, #14375c); }
 .team--aka h2 { background: #fff1f4; color: #9d2948; }
 .team--shiro h2 { background: #fff7ec; color: #8a5a12; }
 .row { display: grid; grid-template-columns: 2.2rem minmax(0, 1fr) auto; gap: 2px 8px; align-items: center; padding: 10px 12px; border-top: 1px solid var(--line); color: inherit; }

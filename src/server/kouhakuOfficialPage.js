@@ -3,6 +3,7 @@
  * ページ描画・OGP・共有ボタンからは import しない。
  */
 
+import { isRegisteredSource } from '../lib/eventRanking/registry.js';
 import { FETCH_TIMEOUT_MS, OFFICIAL_RANKING_URL } from '../lib/kouhaku/constants.js';
 
 /**
@@ -12,10 +13,14 @@ import { FETCH_TIMEOUT_MS, OFFICIAL_RANKING_URL } from '../lib/kouhaku/constants
  */
 
 /**
- * @param {{ etag: string|null, userAgent: string, signal?: AbortSignal }} input
+ * @param {{ etag: string|null, userAgent: string, sourceUrl?: string, signal?: AbortSignal }} input
  * @returns {Promise<FetchPageResult>}
  */
 export async function fetchRankingPage(input) {
+  const pageUrl = input.sourceUrl || OFFICIAL_RANKING_URL;
+  if (!isRegisteredSource(pageUrl)) {
+    return { ok: false, status: 0, etag: input.etag, error: 'source-not-registered' };
+  }
   /** @type {Record<string, string>} */
   const headers = {
     Accept: 'text/html,application/xhtml+xml',
@@ -23,7 +28,7 @@ export async function fetchRankingPage(input) {
   };
   if (input.etag) headers['If-None-Match'] = input.etag;
 
-  const response = await fetch(OFFICIAL_RANKING_URL, {
+  const response = await fetch(pageUrl, {
     method: 'GET',
     headers,
     redirect: 'follow',
@@ -32,7 +37,8 @@ export async function fetchRankingPage(input) {
   });
 
   const etag = response.headers.get('etag') ?? input.etag;
-  if (!response.url.includes('/niconews/15106')) {
+  const finalUrl = String(response.url || pageUrl).split('?')[0];
+  if (!isRegisteredSource(finalUrl)) {
     return { ok: false, status: response.status, etag, error: 'unexpected-redirect' };
   }
   if (response.status === 304) return { ok: true, status: 304, etag };

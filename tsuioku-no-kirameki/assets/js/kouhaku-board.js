@@ -8,11 +8,24 @@
   var BLANK_ICON = 'https://secure-dcdn.cdn.nimg.jp/nicoaccount/usericon/defaults/blank.jpg';
   var root = document.getElementById('kouhaku-root');
   if (!root) return;
-  var match = location.pathname.match(/\/live\/kouhaku\/u\/(\d{1,16})\/?$/);
-  var userId = match ? match[1] : '';
-  var endpoint = userId
-    ? '/api/kouhaku-ranking?user=' + encodeURIComponent(userId)
-    : '/api/kouhaku-ranking';
+  var route = routeFromPath(location.pathname);
+  var userId = route.userId;
+  var endpoint = rankingEndpoint(route.eventId, userId);
+
+  function routeFromPath(pathname) {
+    var event = String(pathname || '').match(/\/live\/event\/([a-z0-9-]{1,40})(?:\/u\/(\d{1,16}))?\/?$/);
+    if (event) return { eventId: event[1], userId: event[2] || '' };
+    var legacy = String(pathname || '').match(/\/live\/kouhaku(?:\/u\/(\d{1,16}))?\/?$/);
+    if (legacy) return { eventId: 'kouhaku-2026', userId: legacy[1] || '' };
+    return { eventId: '', userId: '' };
+  }
+
+  function rankingEndpoint(eventId, personId) {
+    var params = [];
+    if (eventId) params.push('event=' + encodeURIComponent(eventId));
+    if (personId) params.push('user=' + encodeURIComponent(personId));
+    return params.length ? '/api/kouhaku-ranking?' + params.join('&') : '/api/kouhaku-ranking';
+  }
 
   function el(tag, className, text) {
     var node = document.createElement(tag);
@@ -23,7 +36,37 @@
 
   function localPath(value) {
     var path = String(value || '');
-    return /^\/live\/kouhaku\/u\/\d{1,16}\/$/.test(path) ? path : '';
+    return /^\/live\/event\/[a-z0-9-]{1,40}\/u\/\d{1,16}\/$/.test(path) ? path : '';
+  }
+
+  function teamClass(id) {
+    if (id === 'shiro') return 'team team--shiro';
+    if (id === 'aka') return 'team team--aka';
+    return 'team';
+  }
+
+  function applyChrome(data) {
+    var title = document.getElementById('kouhaku-title');
+    if (title && data.eventName) {
+      title.textContent = title.tagName === 'H1' ? data.eventName : data.eventName + ' / イベントpt応援ランキング';
+    }
+    var more = document.getElementById('kouhaku-more');
+    if (more && /^\/live\/event\/[a-z0-9-]{1,40}\/$/.test(data.boardPath || '')) more.setAttribute('href', data.boardPath);
+    var source = document.getElementById('kouhaku-source');
+    var sourceUrl = officialPage(data.sourceUrl);
+    if (source && sourceUrl) {
+      source.setAttribute('href', sourceUrl);
+      source.hidden = false;
+    }
+  }
+
+  function officialPage(value) {
+    var url = httpsOnly(value);
+    var host = url.slice('https://'.length).split('/')[0].split(':')[0];
+    var suffix = 'nicovideo.jp';
+    if (!host || host.slice(-suffix.length) !== suffix) return '';
+    if (host.length > suffix.length && host.charAt(host.length - suffix.length - 1) !== '.') return '';
+    return url;
   }
 
   function httpsOnly(value) {
@@ -76,12 +119,21 @@
 
   function renderBoard(data) {
     fillMeta(data.officialUpdateLabel);
+    applyChrome(data);
     root.textContent = '';
     var teams = el('div', 'teams');
-    [['aka', '紅組', data.aka], ['shiro', '白組', data.shiro]].forEach(function (part) {
-      var section = el('section', part[0] === 'shiro' ? 'team team--shiro' : 'team team--aka');
-      section.appendChild(el('h2', '', part[1]));
-      (part[2] || []).forEach(function (entry) {
+    var columns = Array.isArray(data.columns) && data.columns.length
+      ? data.columns
+      : [
+        { id: 'aka', label: '紅組', entries: data.aka || [] },
+        { id: 'shiro', label: '白組', entries: data.shiro || [] }
+      ];
+    columns.forEach(function (column) {
+      var section = el('section', teamClass(column.id));
+      if (column.color) section.style.setProperty('--team-color', column.color);
+      if (column.background) section.style.setProperty('--team-bg', column.background);
+      section.appendChild(el('h2', '', column.label || ''));
+      (column.entries || []).forEach(function (entry) {
         var href = localPath(entry.pagePath);
         var row = el('div', 'row');
         row.appendChild(el('div', 'rank', String(entry.rank)));
@@ -113,9 +165,11 @@
   function renderProfile(data) {
     var entry = data.entry || {};
     fillMeta(data.officialUpdateLabel);
-    if (entry.displayName) document.title = entry.displayName + ' ' + entry.teamLabel + ' ' + entry.rank + '位 ― 紅白歌枠合戦2026';
+    applyChrome(data);
+    if (entry.displayName) document.title = entry.displayName + ' ' + (entry.teamLabel || '') + ' ' + entry.rank + '位 ― ' + (data.eventName || 'イベントpt応援ランキング');
     root.textContent = '';
-    var hero = el('article', 'hero hero--' + (entry.team === 'shiro' ? 'shiro' : 'aka'));
+    var hero = el('article', entry.team === 'shiro' ? 'hero hero--shiro' : (entry.team === 'aka' ? 'hero hero--aka' : 'hero'));
+    if (entry.team !== 'aka' && entry.team !== 'shiro') hero.style.setProperty('--team-color', '#14375c');
     hero.appendChild(iconImage(entry, 72));
     hero.appendChild(el('p', 'team-name', entry.teamLabel || ''));
     hero.appendChild(el('p', 'big', entry.rank ? String(entry.rank) + '位' : '—'));

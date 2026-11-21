@@ -8,6 +8,7 @@
  * parse.js — 順位表の img が公開 usericon のときだけ URL を残す。ロゴなどは捨てる。
  */
 
+import { getEvent } from '../eventRanking/registry.js';
 import { HTML_MAX_BYTES } from './constants.js';
 import { officialIconUrl } from './icon.js';
 import { parseOfficialUpdateAt } from './time.js';
@@ -50,7 +51,7 @@ export class RankingParseError extends Error {
 }
 
 /**
- * @typedef {'aka'|'shiro'} TeamId
+ * @typedef {string} TeamId
  * @typedef {{
  *   team: TeamId,
  *   rank: number,
@@ -67,7 +68,16 @@ export class RankingParseError extends Error {
  */
 
 const LABEL_RE = /※\s*(\d{1,2}月\d{1,2}日（[月火水木金土日]）\d{1,2}時\d{1,2}分頃更新分)/;
-const HEADING_RE = /<h3[^>]*>\s*(?:<span[^>]*>)?\s*(紅組|白組)\s*(?:<\/span>)?\s*<\/h3>/gi;
+
+/**
+ * @param {{ groups?: { id: string, heading: string|null }[] }|undefined} options
+ * @returns {{ id: string, heading: string|null }[]}
+ */
+function groupsOf(options) {
+  if (options && Array.isArray(options.groups) && options.groups.length) return options.groups;
+  const event = getEvent('kouhaku-2026');
+  return event ? event.groups : [];
+}
 const ROW_RE = /<tr>\s*<td>\s*(\d+)\s*<\/td>\s*<td>([\s\S]*?)<\/td>\s*<td>\s*<a href="https:\/\/www\.nicovideo\.jp\/user\/(\d+)"[^>]*>\s*([\s\S]*?)\s*<\/a>\s*<\/td>\s*<td>\s*([\d,]+)\s*<\/td>\s*<\/tr>/gi;
 
 /**
@@ -80,8 +90,33 @@ function iconFromCell(cell) {
 }
 
 /**
+ * @param {RankingEntry[]} entries
+ * @param {string} section
+ * @param {string} team
+ */
+function pushRows(entries, section, team) {
+  ROW_RE.lastIndex = 0;
+  const seen = new Set(entries.filter((entry) => entry.team === team).map((entry) => entry.userId));
+  for (const row of section.matchAll(ROW_RE)) {
+    const rank = Number(row[1]);
+    const userId = row[3] || '';
+    const displayName = decodeHtml(row[4] || '').replace(/<[^>]+>/g, '').trim();
+    const score = Number(String(row[5] || '').replaceAll(',', ''));
+    const iconUrl = iconFromCell(row[2] || '');
+    if (!Number.isInteger(rank) || rank < 1) continue;
+    if (!/^\d{1,16}$/.test(userId)) continue;
+    if (!displayName || displayName.length > 80) continue;
+    if (!Number.isInteger(score) || score < 0) continue;
+    if (seen.has(userId)) continue;
+    seen.add(userId);
+    entries.push({ team, rank, userId, displayName, score, iconUrl });
+  }
+  ROW_RE.lastIndex = 0;
+}
+
+/**
  * @param {string} html
- * @param {{ fetchedAt: Date }} options
+ * @param {{ fetchedAt: Date, groups?: { id: string, heading: string|null }[] }} options
  * @returns {ParsedRanking}
  */
 export function parseRankingHtml(html, options) {
@@ -91,44 +126,36 @@ export function parseRankingHtml(html, options) {
   const labelMatch = source.match(LABEL_RE);
   if (!labelMatch || !labelMatch[1]) throw new RankingParseError('official-update-label-missing');
   const officialUpdateLabel = labelMatch[1];
-
-  const headings = [...source.matchAll(HEADING_RE)];
-  if (headings.length === 0) throw new RankingParseError('team-heading-missing');
-
+  const groups = groupsOf(options);
+  const headed = groups.filter((group) => group.heading);
   /** @type {RankingEntry[]} */
   const entries = [];
-  for (let index = 0; index < headings.length; index += 1) {
-    const heading = headings[index];
-    if (!heading || heading.index === undefined) continue;
-    const teamName = heading[1];
-    const team = teamName === '紅組' ? 'aka' : 'shiro';
-    const start = heading.index + heading[0].length;
-    const next = headings[index + 1];
-    const end = next && next.index !== undefined ? next.index : source.length;
-    const section = source.slice(start, end);
-    const rows = [...section.matchAll(ROW_RE)];
-    if (rows.length === 0) throw new RankingParseError(`${teamName}-rows-missing`);
 
-    const seen = new Set();
-    for (const row of rows) {
-      const rank = Number(row[1]);
-      const userId = row[3] || '';
-      const displayName = decodeHtml(row[4] || '').replace(/<[^>]+>/g, '').trim();
-      const score = Number(String(row[5] || '').replaceAll(',', ''));
-      const iconUrl = iconFromCell(row[2] || '');
-      if (!Number.isInteger(rank) || rank < 1) continue;
-      if (!/^\d{1,16}$/.test(userId)) continue;
-      if (!displayName || displayName.length > 80) continue;
-      if (!Number.isInteger(score) || score < 0) continue;
-      if (seen.has(userId)) continue;
-      seen.add(userId);
-      entries.push({ team, rank, userId, displayName, score, iconUrl });
+  if (headed.length === 0) {
+    const only = groups[0];
+    if (!only) throw new RankingParseError('team-heading-missing');
+    pushRows(entries, source, only.id);
+    if (!entries.some((entry) => entry.team === only.id)) throw new RankingParseError(`${only.id}-empty`);
+  } else {
+    const names = headed.map((group) => String(group.heading).replace(/[.*+?^${}()|[\]\\]/g, '\\$&')).join('|');
+    const headingRe = new RegExp(`<h3[^>]*>\\s*(?:<span[^>]*>)?\\s*(${names})\\s*(?:<\\/span>)?\\s*<\\/h3>`, 'gi');
+    const headings = [...source.matchAll(headingRe)];
+    if (headings.length === 0) throw new RankingParseError('team-heading-missing');
+    for (let index = 0; index < headings.length; index += 1) {
+      const heading = headings[index];
+      if (!heading || heading.index === undefined) continue;
+      const teamName = heading[1];
+      const group = headed.find((item) => item.heading === teamName);
+      if (!group) continue;
+      const start = heading.index + heading[0].length;
+      const next = headings[index + 1];
+      const end = next && next.index !== undefined ? next.index : source.length;
+      const before = entries.length;
+      pushRows(entries, source.slice(start, end), group.id);
+      if (entries.length === before) throw new RankingParseError(`${teamName}-rows-missing`);
     }
-  }
-
-  for (const team of ['aka', 'shiro']) {
-    if (!entries.some((entry) => entry.team === team)) {
-      throw new RankingParseError(`${team}-empty`);
+    for (const group of headed) {
+      if (!entries.some((entry) => entry.team === group.id)) throw new RankingParseError(`${group.id}-empty`);
     }
   }
 

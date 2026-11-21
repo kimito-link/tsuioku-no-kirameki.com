@@ -27,7 +27,7 @@
 
 > 値が次の段へ届かない「断線」(broadcaster バグ型)は `npm run feature-map -- --check` が機械検知。
 
-## ⚠️ 役割コメントが無いソース 14 / 1333 件
+## ⚠️ 役割コメントが無いソース 14 / 1334 件
 - `docs/handoff/bench/bench-interval.mjs`
 - `docs/handoff/bench/bench-lane.mjs`
 - `extension-youtube/cloak-failsafe.js`
@@ -1197,7 +1197,7 @@
   - `gift-coin-hq.wav`
   - `gift-register-hq.wav`
   - `gift-register.mp3`
-- 📁 **src/** (2587)
+- 📁 **src/** (2589)
   - 📁 **data/** (7)
     - 📁 **acquirers/** (2)
       - `laneFromStorage.js` — 応援レーン acquirer: chrome.storage.local(nls_comments) → laneStore の橋渡し。
@@ -1540,7 +1540,7 @@
         - `logo_funlink_white_RGB_link_black.png`
         - `logo_funlink_white_RGB_maru_black.png`
     - `hero-connect-hub.svg`
-  - 📁 **lib/** (2271)
+  - 📁 **lib/** (2273)
     - 📁 **__snapshots__/** (4)
       - `marketing-abema-baseline.html`
       - `marketing-niconico.html`
@@ -1552,6 +1552,9 @@
       - `abCommentPanelOwnUi.test.js`
       - `abParse.js` — ABEMA の放送ページが受け取ったコメント JSON を、YouTube 版の記録と同じ形にする(純関数)
       - `abParse.test.js`
+    - 📁 **eventRanking/** (2)
+      - `registry.js` — 【層】L0 判定層(純粋関数・I/O禁止)
+      - `registry.test.js`
     - 📁 **fixtures/** (2)
       - `interceptLearn.sample.json`
       - `nicoliveVisitorJoinSignal.placeholder.json`
@@ -3982,7 +3985,7 @@
   - `kouhaku_og.py`
   - `og-live-compose.py`
   - `render-og.js` — 追憶の煌めき LP 用 OG 画像（1200×630）を生成する。
-- 📁 **tsuioku-no-kirameki/** (75)
+- 📁 **tsuioku-no-kirameki/** (77)
   - 📁 **articles/** (14)
     - 📁 **role-separation-design/** (2)
       - 📁 **img/** (1)
@@ -4055,7 +4058,11 @@
     - `og-kouhaku.jpg`
     - `og-live-ranking.png`
     - `twitter-icon.png`
-  - 📁 **live/** (3)
+  - 📁 **live/** (5)
+    - 📁 **event/** (2)
+      - 📁 **u/** (1)
+        - `index.html`
+      - `index.html`
     - 📁 **kouhaku/** (2)
       - 📁 **u/** (1)
         - `index.html`

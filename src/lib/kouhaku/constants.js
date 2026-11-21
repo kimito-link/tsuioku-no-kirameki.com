@@ -57,7 +57,7 @@ export const FEATURES = Object.freeze({
 });
 
 /**
- * @param {'aka'|'shiro'} team
+ * @param {string} team
  * @returns {string}
  */
 export function teamLabel(team) {

@@ -59,7 +59,7 @@ a { color: var(--navy); }
 #kouhaku .more { margin: 4px 0 8px; font-size: .85rem; }
 #kouhaku .teams { display: grid; gap: 12px; max-height: 62vh; overflow: auto; }
 #kouhaku .team { border: 1px solid var(--line); border-radius: 12px; overflow: hidden; background: #fffdf9; }
-#kouhaku .team h2 { padding: 10px 12px; font-size: 1rem; }
+#kouhaku .team h2 { padding: 10px 12px; font-size: 1rem; background: var(--team-bg, transparent); color: var(--team-color, #14375c); }
 #kouhaku .team--aka h2 { background: #fff1f4; color: #9d2948; }
 #kouhaku .team--shiro h2 { background: #fff7ec; color: #8a5a12; }
 #kouhaku .row { display: grid; grid-template-columns: 2.2rem minmax(0, 1fr) auto; gap: 2px 8px; align-items: center; padding: 8px 10px; border-top: 1px solid var(--line); }
