@@ -18,6 +18,15 @@
 /** @type {readonly ChangelogEntry[]} */
 export const EXTENSION_CHANGELOG = Object.freeze([
   Object.freeze({
+    version: '0.1.2176',
+    date: '2026-11-21',
+    summary: '開発モードではマーケHTMLを自由に保存',
+    items: Object.freeze([
+      'りんくさんの開発用の読み込み（フォルダから読み込んだ版／ストア提出ではないビルド）では、コードがなくてもマーケレポートのHTMLを保存できます。',
+      'Chromeウェブストアから入れた版と、提出用のZIPの関所・14日のお試しは、今までどおりです。',
+    ])
+  }),
+  Object.freeze({
     version: '0.1.2175',
     date: '2026-11-21',
     summary: 'ランキングページ「いま動いた人」の人数の書き方を直しました',
@@ -199,15 +208,6 @@ export const EXTENSION_CHANGELOG = Object.freeze([
       'ABEMA の視聴数はフォロワーにしません。視聴ページにフォロワー数が無いときは、レポートにその旨を書きます。',
     ])
   }),
-  Object.freeze({
-    version: '0.1.2156',
-    date: '2026-11-18',
-    summary: 'フォロワーの増えた時刻を出す',
-    items: Object.freeze([
-      'マーケティングレポートの先頭に、配信中のフォロワー（チャンネル登録者・ファン・サポーター）の始まりと終わり、増えた時間を出します。ページがすでに出している数だけを、数分おきに記録します。',
-      '1.2万のような概数だけのときは、増えた人数は出しません。ページに人数が無い配信では、この欄は出ません。',
-    ])
-  })
 ]);
 
 

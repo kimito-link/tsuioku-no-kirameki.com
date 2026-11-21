@@ -48,7 +48,7 @@ const devReloadSignalPlugin = {
 
 // NL_DEV_HOTRELOAD: dev watch ビルドだけ true。content の dev ポーラー/記録監視を有効化する。
 //   本番（scripts/build.mjs）は false 固定で dead-code 除去される。
-const commonDefine = { NL_DEV_HOTRELOAD: 'true' };
+const commonDefine = { NL_DEV_HOTRELOAD: 'true', NL_STORE_BUILD: 'false' };
 
 const common = {
   bundle: true,

@@ -771,7 +771,7 @@
   - `api/billing.js`
   - `app/supporter.html`
   - `tsuioku-no-kirameki/tokushoho.html`
-<details><summary>🗂 このカテゴリの全担当ファイル(自動分類) 59</summary>
+<details><summary>🗂 このカテゴリの全担当ファイル(自動分類) 60</summary>
 
 - `extension-youtube/marketing-export-guard.js` — マーケ分析タブ(marketing-export.html)の「何があっても開く」保険。
 - `extension-youtube/marketing-export.js` — ニコ生版 marketing-export-entry.js(本物)+ YouTube の記録を読む入口のバンドル
@@ -790,6 +790,7 @@
 - `src/lib/broadcastReportSummary.js` — HTML レポート / マーケ分析の双方で使う「放送全体の純粋集計」。
 - `src/lib/commentTimelineReport.js` — 状態速報に「応援コメント(最新N件・本文)」を出す整形 lib。
 - `src/lib/deepExportPolicy.js` — popup からの deep export 要求時に、仮想リスト走査を行うかを判定する。
+- `src/lib/devMarketingUnlock.js` — 【層】L0 判定層(ビルド旗と manifest を見るだけ。新しい権限は使わない)
 - `src/lib/devMonitorViz.js` — 開発・テスト用監視パネル向けの純粋 HTML 断片（DOM 非依存）。
 - `src/lib/eventLiveBoardHtml.js` — イベント💎ボードの HTML（純関数・2026-11-21 Phase 2）。モデルは eventLiveBoardModel.js。
 - `src/lib/exportDownloadFilename.js` — HTML / マーケ分析のダウンロードファイル名（配信開始日 + liveId）。
@@ -1608,6 +1609,7 @@
 - `v0.1.2157` 2026-11-18 — Twitchなどの人数を低い頻度で取る
 
 ### その他 (13版)
+- `v0.1.2176` 2026-11-21 — 開発モードではマーケHTMLを自由に保存
 - `v0.1.2175` 2026-11-21 — ランキングページ「いま動いた人」の人数の書き方を直しました
 - `v0.1.2171` 2026-11-21 — イベントptの順位を大きく表示
 - `v0.1.2169` 2026-11-18 — 引き継ぎノートの公開版表記を最新に
@@ -1620,4 +1622,3 @@
 - `v0.1.2161` 2026-11-18 — フォロワー数の正本を一つにする
 - `v0.1.2160` 2026-11-18 — 保存したフォロワー数を書き出しに出す
 - `v0.1.2158` 2026-11-18 — 記録が無いときは応援の章を出さない
-- `v0.1.2156` 2026-11-18 — フォロワーの増えた時刻を出す

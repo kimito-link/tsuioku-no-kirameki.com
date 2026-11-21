@@ -48,6 +48,8 @@ const BUILD_ID = buildIdJst();
 //   の version と突合できるようにする(src/lib/versionMismatch.js)。
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const PKG_VERSION = JSON.parse(readFileSync(resolve(__dirname, '..', 'package.json'), 'utf8')).version;
+// ストア提出ZIP(AGENTS.md: NL_STORE_BUILD=1 npm run build && python scripts/stage-submission.py)。
+const IS_STORE_BUILD = process.env.NL_STORE_BUILD === '1' || process.env.NL_STORE_BUILD === 'true';
 
 const common = {
   bundle: true,
@@ -68,7 +70,10 @@ const common = {
   define: {
     NL_BUILD_ID: JSON.stringify(BUILD_ID),
     NL_DEV_HOTRELOAD: 'false',
-    NL_BUNDLE_VERSION: JSON.stringify(PKG_VERSION)
+    NL_BUNDLE_VERSION: JSON.stringify(PKG_VERSION),
+    // ストア提出(NL_STORE_BUILD=1 / stage-submission)だけ true。既定の npm run build は false。
+    //   マーケ HTML の関所を、開発用の読み込みだけ通す判定に使う(v0.1.2176)。
+    NL_STORE_BUILD: IS_STORE_BUILD ? 'true' : 'false'
   }
 };
 
@@ -81,7 +86,8 @@ const popupDefine = {
   NL_BUILD_ID: JSON.stringify(BUILD_ID),
   NL_DEV_HOTRELOAD: 'false',
   NL_RELEASE: JSON.stringify(IS_RELEASE),
-  NL_BUNDLE_VERSION: JSON.stringify(PKG_VERSION)
+  NL_BUNDLE_VERSION: JSON.stringify(PKG_VERSION),
+  NL_STORE_BUILD: IS_STORE_BUILD ? 'true' : 'false'
 };
 
 // ★v0.1.1245: status の共有キーは【ビルドに一切焼き込まない】。
