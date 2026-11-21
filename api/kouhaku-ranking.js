@@ -6,7 +6,7 @@
  *   GET /api/kouhaku-ranking?user=数字     推し1人
  *   GET /api/kouhaku-ranking?refresh=1     公式15106を読む。x-share-key 必須。1日最大2回はサーバが決める。
  *
- * ブラウザはこの JSON だけを読む。画像URLは返さない。
+ * ブラウザはこの JSON だけを読む。アイコンは公開 usericon の URL だけを返し、画像バイトは中継しない。
  */
 import { upstash } from './live-ranking.js';
 import { buildUserAgent, PUBLIC_SITE_URL } from '../src/lib/kouhaku/constants.js';

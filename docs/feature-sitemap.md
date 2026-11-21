@@ -1168,8 +1168,9 @@
   - `src/lib/liveRecentHoverCard.js`
   - `src/extension/live-ranking-entry.js`
   - `tsuioku-no-kirameki/live/index.html`
-- **紅白歌枠合戦2026のイベントpt応援ランキング** — /live/kouhaku/ と /live/kouhaku/u/<ユーザーID>/。出典は公式15106だけ。サーバが JST 16:30、失敗時のみ 19:30 に最大2回取得し、ブラウザは /api/kouhaku-ranking だけを読む。画像は保存もホットリンクもしない。共有は X と LINE(https、openExternalBrowser=1)。定期実行は .github/workflows/kouhaku-ranking.yml。保存は Upstash の kouhaku:v1:*。無ければ同梱シード
+- **紅白歌枠合戦2026のイベントpt応援ランキング** — /live/ の中と /live/kouhaku/、/live/kouhaku/u/<ユーザーID>/。出典は公式15106だけ。サーバが JST 16:30、失敗時のみ 19:30 に最大2回取得し、ブラウザは /api/kouhaku-ranking だけを読む。アイコンは公式HTMLの公開 usericon、無ければユーザーIDから組み立て、失敗時は blank.jpg。共有は X と LINE(https、openExternalBrowser=1)。定期実行は .github/workflows/kouhaku-ranking.yml。保存は Upstash の kouhaku:v1:*。無ければ同梱シード
   - `src/lib/kouhaku/parse.js`
+  - `src/lib/kouhaku/icon.js`
   - `src/lib/kouhaku/policy.js`
   - `src/lib/kouhaku/job.js`
   - `src/server/kouhakuOfficialPage.js`
@@ -1177,6 +1178,7 @@
   - `api/kouhaku-ranking.js`
   - `api/kouhaku-og.js`
   - `api/kouhaku-og-image.js`
+  - `tsuioku-no-kirameki/live/index.html`
   - `tsuioku-no-kirameki/live/kouhaku/index.html`
   - `tsuioku-no-kirameki/assets/js/kouhaku-board.js`
   - `.github/workflows/kouhaku-ranking.yml`
@@ -1219,7 +1221,7 @@
   - `src/extension/live-ranking-entry.js`
   - `tsuioku-no-kirameki/live/index.html`
   - `.github/workflows/live-ranking.yml`
-<details><summary>🗂 このカテゴリの全担当ファイル(自動分類) 359</summary>
+<details><summary>🗂 このカテゴリの全担当ファイル(自動分類) 358</summary>
 
 - `app/app.js` — スマホ閲覧用 status Web 版。
 - `app/live-view-block.js` — iPhone アプリの「🚩 見たくない人を隠す・報告する」(App Store の審査 1.2: ほかの人の書き込みを見せるアプリの決まり)。
@@ -1567,7 +1569,6 @@
 - `src/lib/youtube/ytSuperChatTier.js` — YouTube のスーパーチャットは金額で色が決まる(青→水色→緑→黄→橙→赤紫→赤)。
 - `src/lib/youtube/ytSwitchLeakCleanup.js` — 配信を切り替えた瞬間に、前の配信のチャット欄に残っていたコメントが
 - `src/lib/youtube/ytWording.js` — ニコ生版の画面をそのまま使う YouTube 版で、画面に出る「ニコニコの言葉」を YouTube の言葉に直す。
-- `src/server/kouhakuSeed.js` — 2026-11-21 に公式15106を1回読んだ初期スナップショット。画像URLは含まない。
 - `src/server/liveEventsApi.js` — global process, Buffer -- サーバー(Vercel 関数)専用の部品。api/ と同じく env を読む
 - `src/shared/niconico/liveId.js` — ニコ生 放送 ID（`lv…` / `ch…`（チャンネル枠））の正規化ユーティリティ。
 - `src/speech-recognition-globals.d.ts` — Web Speech API（Chrome は webkit 接頭辞のことがある）

@@ -52,8 +52,27 @@ a { color: var(--navy); }
 }
 @media (min-width: 760px) { .brand { grid-template-columns: 260px 1fr; gap: 22px; padding: 22px 26px; } }
 .rank-top { margin: 4px 0 14px; }
-.kouhaku-link { margin: 6px 0 0; font-size: .92rem; }
-.kouhaku-link a { font-weight: 700; }
+#kouhaku { margin: 8px 0 16px; padding: 12px 12px 8px; border: 1px solid var(--line); border-radius: 16px; background: var(--card); }
+#kouhaku h2 { margin: 0; font-size: clamp(1.15rem, 4vw, 1.4rem); line-height: 1.35; color: var(--navy-deep); }
+#kouhaku h2 small { display: block; margin-top: 2px; font-size: .82rem; font-weight: 600; color: var(--ink-sub); }
+#kouhaku .meta { margin: 6px 0 0; color: var(--ink-sub); font-size: .88rem; }
+#kouhaku .more { margin: 4px 0 8px; font-size: .85rem; }
+#kouhaku .teams { display: grid; gap: 12px; max-height: 62vh; overflow: auto; }
+#kouhaku .team { border: 1px solid var(--line); border-radius: 12px; overflow: hidden; background: #fffdf9; }
+#kouhaku .team h2 { padding: 10px 12px; font-size: 1rem; }
+#kouhaku .team--aka h2 { background: #fff1f4; color: #9d2948; }
+#kouhaku .team--shiro h2 { background: #fff7ec; color: #8a5a12; }
+#kouhaku .row { display: grid; grid-template-columns: 2.2rem minmax(0, 1fr) auto; gap: 2px 8px; align-items: center; padding: 8px 10px; border-top: 1px solid var(--line); }
+#kouhaku .who { display: flex; align-items: center; gap: 8px; min-width: 0; color: inherit; text-decoration: none; }
+#kouhaku .who-text { min-width: 0; }
+#kouhaku .name { display: block; font-weight: 700; color: var(--navy-deep); word-break: break-word; }
+#kouhaku .score { display: block; font-weight: 700; font-variant-numeric: tabular-nums; }
+#kouhaku .rank { font-weight: 800; color: var(--navy-deep); font-variant-numeric: tabular-nums; }
+#kouhaku .sub { grid-column: 2; margin: 0; color: var(--ink-sub); font-size: .82rem; }
+#kouhaku .cheer { grid-column: 3; grid-row: 1 / span 3; align-self: center; display: inline-flex; align-items: center; justify-content: center; min-width: 4.5rem; min-height: 44px; padding: 6px 12px; border-radius: 999px; background: var(--navy-deep); color: #fff7ec; text-decoration: none; font-weight: 700; }
+@media (min-width: 760px) {
+  #kouhaku .teams { grid-template-columns: 1fr 1fr; align-items: start; }
+}
 .rank-top h1 { font-size: clamp(1.2rem, 3.4vw, 1.6rem); margin: 0 0 2px; }
 .rank-top h1 small { font-size: .85rem; }
 .rank-top .meta { margin-top: 6px; }

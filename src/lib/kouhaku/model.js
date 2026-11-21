@@ -3,10 +3,12 @@
  * 【この箱に入るもの】スナップショットの形の検証と、メモリ上の保管(テスト用)
  * 【この箱に入らないもの】fetch / Redis / DOM / chrome.*
  * 【書けるstorageキー】なし
- * 【正本宣言】保存してよいフィールド(画像URLを含まない)はこのファイルのみ
+ * 【正本宣言】保存してよいフィールドはこのファイルのみ。アイコンは公開 usericon のURLだけ
  *
  * model.js — 壊れた1件は捨て、空で既存の値を潰さない。
  */
+
+import { officialIconUrl } from './icon.js';
 
 /**
  * @typedef {'aka'|'shiro'} TeamId
@@ -15,7 +17,8 @@
  *   rank: number,
  *   userId: string,
  *   displayName: string,
- *   score: number
+ *   score: number,
+ *   iconUrl?: string|null
  * }} RankingEntry
  * @typedef {'bootstrap'|'cron'} SnapshotOrigin
  * @typedef {{
@@ -115,7 +118,8 @@ export function sanitizeSnapshot(value) {
     rank: entry.rank,
     userId: entry.userId,
     displayName: entry.displayName,
-    score: entry.score
+    score: entry.score,
+    iconUrl: officialIconUrl(entry.iconUrl) || null
   }));
   return {
     schemaVersion: 1,

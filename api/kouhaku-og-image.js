@@ -26,16 +26,17 @@ function imageId(query) {
   return 'board';
 }
 
-function sendJpeg(res, bytes) {
+function sendJpeg(res, bytes, head) {
   res.setHeader('Content-Type', 'image/jpeg');
+  res.setHeader('Content-Length', String(bytes.length));
   res.setHeader('Cache-Control', 'public, max-age=3600');
   res.setHeader('X-Content-Type-Options', 'nosniff');
-  res.status(200).end(bytes);
+  res.status(200).end(head ? undefined : bytes);
 }
 
-function sendFallback(res) {
+function sendFallback(res, head) {
   try {
-    sendJpeg(res, readFileSync(FALLBACK));
+    sendJpeg(res, readFileSync(FALLBACK), head);
   } catch {
     res.status(404).end();
   }
@@ -79,11 +80,12 @@ export default async function handler(req, res) {
     return;
   }
 
-  if (req.method !== 'GET') {
+  if (req.method !== 'GET' && req.method !== 'HEAD') {
     res.status(405).json({ ok: false, error: 'method not allowed' });
     return;
   }
 
+  const head = req.method === 'HEAD';
   const id = imageId(req.query);
   if (process.env.KV_REST_API_URL && process.env.KV_REST_API_TOKEN) {
     try {
@@ -91,7 +93,7 @@ export default async function handler(req, res) {
       if (typeof raw === 'string' && raw) {
         const bytes = Buffer.from(raw, 'base64');
         if (bytes.length > 100 && bytes[0] === 0xff && bytes[1] === 0xd8) {
-          sendJpeg(res, bytes);
+          sendJpeg(res, bytes, head);
           return;
         }
       }
@@ -99,5 +101,5 @@ export default async function handler(req, res) {
       /* 同梱カードへ */
     }
   }
-  sendFallback(res);
+  sendFallback(res, head);
 }

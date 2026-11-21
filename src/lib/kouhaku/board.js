@@ -11,6 +11,7 @@
 import { FEATURES, PUBLIC_SITE_URL, teamLabel } from './constants.js';
 import { rankEntries } from './calc.js';
 import { formatGrowthSinceOfficial, formatGap, formatPt } from './format.js';
+import { iconUrlForEntry } from './icon.js';
 import { buildShareLinks, pagePath } from './share.js';
 
 /**
@@ -25,7 +26,9 @@ import { buildShareLinks, pagePath } from './share.js';
  *   scoreLabel: string,
  *   gapLabel: string,
  *   deltaLabel: string,
- *   pagePath: string
+ *   pagePath: string,
+ *   iconUrl: string,
+ *   shareUrl: string
  * }} PresentedEntry
  */
 
@@ -40,9 +43,11 @@ export function loadDaytimeEstimates() {
 
 /**
  * @param {RankedEntry} entry
+ * @param {string} [officialUpdateLabel]
  * @returns {PresentedEntry}
  */
-export function presentEntry(entry) {
+export function presentEntry(entry, officialUpdateLabel) {
+  const share = buildShareLinks(entry, PUBLIC_SITE_URL, officialUpdateLabel || '');
   return {
     rank: entry.rank,
     userId: entry.userId,
@@ -52,7 +57,9 @@ export function presentEntry(entry) {
     scoreLabel: `${formatPt(entry.score)} pt`,
     gapLabel: formatGap(entry),
     deltaLabel: formatGrowthSinceOfficial(entry.scoreDelta),
-    pagePath: pagePath(entry.userId)
+    pagePath: pagePath(entry.userId),
+    iconUrl: iconUrlForEntry(entry),
+    shareUrl: share.xUrl
   };
 }
 
@@ -81,8 +88,8 @@ export function presentBoard(snapshot, previous, confirmedAt) {
     fetchedAt: snapshot.fetchedAt,
     confirmedAt,
     sourceUrl: snapshot.sourceUrl,
-    aka: rankEntries(snapshot.entries.filter((entry) => entry.team === 'aka'), previousAka).map(presentEntry),
-    shiro: rankEntries(snapshot.entries.filter((entry) => entry.team === 'shiro'), previousShiro).map(presentEntry)
+    aka: rankEntries(snapshot.entries.filter((entry) => entry.team === 'aka'), previousAka).map((entry) => presentEntry(entry, snapshot.officialUpdateLabel)),
+    shiro: rankEntries(snapshot.entries.filter((entry) => entry.team === 'shiro'), previousShiro).map((entry) => presentEntry(entry, snapshot.officialUpdateLabel))
   };
 }
 
@@ -115,7 +122,7 @@ export function presentProfile(snapshot, previous, userId, confirmedAt, inLatest
     confirmedAt: inLatest ? confirmedAt : null,
     sourceUrl: snapshot.sourceUrl,
     officialUserUrl: `https://www.nicovideo.jp/user/${ranked.userId}`,
-    entry: presentEntry(ranked),
+    entry: presentEntry(ranked, snapshot.officialUpdateLabel),
     share
   };
 }

@@ -27,7 +27,7 @@
 
 > 値が次の段へ届かない「断線」(broadcaster バグ型)は `npm run feature-map -- --check` が機械検知。
 
-## ⚠️ 役割コメントが無いソース 13 / 1331 件
+## ⚠️ 役割コメントが無いソース 14 / 1332 件
 - `docs/handoff/bench/bench-interval.mjs`
 - `docs/handoff/bench/bench-lane.mjs`
 - `extension-youtube/cloak-failsafe.js`
@@ -41,6 +41,7 @@
 - `src/lib/reportPreviewPublish.js`
 - `src/lib/venueLaneBuckets.js`
 - `src/lib/venueStoryDiagMirrorPanel.js`
+- `src/server/kouhakuSeed.js`
 
 ## 全ファイルツリー
 
@@ -1196,7 +1197,7 @@
   - `gift-coin-hq.wav`
   - `gift-register-hq.wav`
   - `gift-register.mp3`
-- 📁 **src/** (2582)
+- 📁 **src/** (2584)
   - 📁 **data/** (7)
     - 📁 **acquirers/** (2)
       - `laneFromStorage.js` — 応援レーン acquirer: chrome.storage.local(nls_comments) → laneStore の橋渡し。
@@ -1539,7 +1540,7 @@
         - `logo_funlink_white_RGB_link_black.png`
         - `logo_funlink_white_RGB_maru_black.png`
     - `hero-connect-hub.svg`
-  - 📁 **lib/** (2266)
+  - 📁 **lib/** (2268)
     - 📁 **__snapshots__/** (4)
       - `marketing-abema-baseline.html`
       - `marketing-niconico.html`
@@ -1561,11 +1562,13 @@
       - `kickChatParse.test.js`
       - `kickRealtime.js` — Kick のチャットの「つなぎ先」を決めて、届いた1通を読む(純関数)
       - `kickRealtime.test.js`
-    - 📁 **kouhaku/** (13)
+    - 📁 **kouhaku/** (15)
       - `board.js` — 【層】L0 判定層(純粋関数・I/O禁止)
       - `calc.js` — 【層】L0 判定層(純粋関数・I/O禁止)
       - `constants.js` — 【層】L0 判定層(純粋関数・I/O禁止)
       - `format.js` — 【層】L0 判定層(純粋関数・I/O禁止)
+      - `icon.js` — 【層】L0 判定層(純粋関数・I/O禁止)
+      - `icon.test.js`
       - `job.js` — 【層】L0 判定層(純粋関数・I/O禁止)
       - `model.js` — 【層】L0 判定層(純粋関数・I/O禁止)
       - `ogHtml.js` — 【層】L0 判定層(純粋関数・I/O禁止)
@@ -3835,7 +3838,7 @@
     - `kouhakuOfficialPage.js` — 公式15106へ GET する唯一の場所。
     - `kouhakuOfficialPage.test.js`
     - `kouhakuRead.js` — 保存済みスナップショットを読む。公式ページへは行かない。
-    - `kouhakuSeed.js` — 2026-11-21 に公式15106を1回読んだ初期スナップショット。画像URLは含まない。
+    - `kouhakuSeed.js` — ⚠️ 役割コメント無し
     - `liveEventsApi.js` — global process, Buffer -- サーバー(Vercel 関数)専用の部品。api/ と同じく env を読む
     - `liveEventsApi.test.js`
     - `liveRankingOne.test.js`

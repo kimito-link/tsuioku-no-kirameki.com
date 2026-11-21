@@ -1,10 +1,11 @@
 /*
  * 紅白の順位を、当サイトの /api/kouhaku-ranking だけから描く。
- * ニコニコへは接続しない。画像は出さない。
+ * ニコニコのページは取りに行かない。アイコンは返ってきた公開URLをブラウザが見る。
  */
 /* global document, location, fetch */
 (function () {
   'use strict';
+  var BLANK_ICON = 'https://secure-dcdn.cdn.nimg.jp/nicoaccount/usericon/defaults/blank.jpg';
   var root = document.getElementById('kouhaku-root');
   if (!root) return;
   var match = location.pathname.match(/\/live\/kouhaku\/u\/(\d{1,16})\/?$/);
@@ -32,14 +33,40 @@
     return url;
   }
 
+  function iconSrc(value) {
+    var url = httpsOnly(value);
+    if (url.indexOf('https://secure-dcdn.cdn.nimg.jp/nicoaccount/usericon/') !== 0) return BLANK_ICON;
+    return url;
+  }
+
+  function iconImage(entry, size) {
+    var img = el('img', size > 40 ? 'ava ava--lg' : 'ava');
+    img.src = iconSrc(entry.iconUrl);
+    img.alt = entry.displayName || '';
+    img.width = size;
+    img.height = size;
+    img.loading = 'lazy';
+    img.decoding = 'async';
+    img.referrerPolicy = 'no-referrer';
+    img.addEventListener('error', function () {
+      if (img.getAttribute('data-fallback') === '1') return;
+      img.setAttribute('data-fallback', '1');
+      img.src = BLANK_ICON;
+    });
+    return img;
+  }
+
   function fillMeta(label) {
     var meta = document.getElementById('official-meta');
     if (!meta) return;
     meta.textContent = '';
-    var face = el('img', 'face');
-    face.src = meta.getAttribute('data-face') || '';
-    face.alt = '';
-    meta.appendChild(face);
+    var faceSrc = meta.getAttribute('data-face') || '';
+    if (faceSrc) {
+      var face = el('img', 'face');
+      face.src = faceSrc;
+      face.alt = '';
+      meta.appendChild(face);
+    }
     var text = el('span');
     text.appendChild(document.createTextNode('最終の公式更新 '));
     text.appendChild(el('b', '', label || '—'));
@@ -56,15 +83,26 @@
       section.appendChild(el('h2', '', part[1]));
       (part[2] || []).forEach(function (entry) {
         var href = localPath(entry.pagePath);
-        var row = href ? el('a', 'row') : el('div', 'row');
-        if (href) row.href = href;
+        var row = el('div', 'row');
         row.appendChild(el('div', 'rank', String(entry.rank)));
-        var body = el('div');
-        body.appendChild(el('div', 'name', entry.displayName));
-        body.appendChild(el('div', 'score', entry.scoreLabel));
-        row.appendChild(body);
+        var who = href ? el('a', 'who') : el('div', 'who');
+        if (href) who.href = href;
+        who.appendChild(iconImage(entry, 28));
+        var body = el('span', 'who-text');
+        body.appendChild(el('span', 'name', entry.displayName));
+        body.appendChild(el('span', 'score', entry.scoreLabel));
+        who.appendChild(body);
+        row.appendChild(who);
         row.appendChild(el('p', 'sub', entry.gapLabel));
         row.appendChild(el('p', 'sub', entry.deltaLabel));
+        var shareUrl = httpsOnly(entry.shareUrl);
+        if (shareUrl.indexOf('https://x.com/intent/post?') === 0) {
+          var cheer = el('a', 'cheer', '応援');
+          cheer.href = shareUrl;
+          cheer.target = '_blank';
+          cheer.rel = 'noopener noreferrer';
+          row.appendChild(cheer);
+        }
         section.appendChild(row);
       });
       teams.appendChild(section);
@@ -78,6 +116,7 @@
     if (entry.displayName) document.title = entry.displayName + ' ' + entry.teamLabel + ' ' + entry.rank + '位 ― 紅白歌枠合戦2026';
     root.textContent = '';
     var hero = el('article', 'hero hero--' + (entry.team === 'shiro' ? 'shiro' : 'aka'));
+    hero.appendChild(iconImage(entry, 72));
     hero.appendChild(el('p', 'team-name', entry.teamLabel || ''));
     hero.appendChild(el('p', 'big', entry.rank ? String(entry.rank) + '位' : '—'));
     hero.appendChild(el('h2', '', entry.displayName || ''));

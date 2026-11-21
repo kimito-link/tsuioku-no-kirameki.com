@@ -1,14 +1,15 @@
 /**
  * 【層】L0 判定層(純粋関数・I/O禁止)
  * 【この箱に入るもの】公式15106のHTMLから紅組・白組の順位表を読む
- * 【この箱に入らないもの】fetch / storage / DOM / chrome.* / 画像URLの保持
+ * 【この箱に入らないもの】fetch / storage / DOM / chrome.* / 画像バイトの取得
  * 【書けるstorageキー】なし
  * 【正本宣言】公式ブログの表の読み方はこのファイルのみ
  *
- * parse.js — 画像セルは読み飛ばし、戻り値に画像URLを含めない。
+ * parse.js — 順位表の img が公開 usericon のときだけ URL を残す。ロゴなどは捨てる。
  */
 
 import { HTML_MAX_BYTES } from './constants.js';
+import { officialIconUrl } from './icon.js';
 import { parseOfficialUpdateAt } from './time.js';
 
 /** @type {Record<string, string>} */
@@ -55,7 +56,8 @@ export class RankingParseError extends Error {
  *   rank: number,
  *   userId: string,
  *   displayName: string,
- *   score: number
+ *   score: number,
+ *   iconUrl?: string|null
  * }} RankingEntry
  * @typedef {{
  *   officialUpdateLabel: string,
@@ -66,7 +68,16 @@ export class RankingParseError extends Error {
 
 const LABEL_RE = /※\s*(\d{1,2}月\d{1,2}日（[月火水木金土日]）\d{1,2}時\d{1,2}分頃更新分)/;
 const HEADING_RE = /<h3[^>]*>\s*(?:<span[^>]*>)?\s*(紅組|白組)\s*(?:<\/span>)?\s*<\/h3>/gi;
-const ROW_RE = /<tr>\s*<td>\s*(\d+)\s*<\/td>\s*<td>[\s\S]*?<\/td>\s*<td>\s*<a href="https:\/\/www\.nicovideo\.jp\/user\/(\d+)"[^>]*>\s*([\s\S]*?)\s*<\/a>\s*<\/td>\s*<td>\s*([\d,]+)\s*<\/td>\s*<\/tr>/gi;
+const ROW_RE = /<tr>\s*<td>\s*(\d+)\s*<\/td>\s*<td>([\s\S]*?)<\/td>\s*<td>\s*<a href="https:\/\/www\.nicovideo\.jp\/user\/(\d+)"[^>]*>\s*([\s\S]*?)\s*<\/a>\s*<\/td>\s*<td>\s*([\d,]+)\s*<\/td>\s*<\/tr>/gi;
+
+/**
+ * @param {string} cell
+ * @returns {string|null}
+ */
+function iconFromCell(cell) {
+  const match = String(cell || '').match(/<img\b[^>]*\bsrc="([^"]+)"/i);
+  return officialIconUrl(match && match[1]) || null;
+}
 
 /**
  * @param {string} html
@@ -101,16 +112,17 @@ export function parseRankingHtml(html, options) {
     const seen = new Set();
     for (const row of rows) {
       const rank = Number(row[1]);
-      const userId = row[2] || '';
-      const displayName = decodeHtml(row[3] || '').replace(/<[^>]+>/g, '').trim();
-      const score = Number(String(row[4] || '').replaceAll(',', ''));
+      const userId = row[3] || '';
+      const displayName = decodeHtml(row[4] || '').replace(/<[^>]+>/g, '').trim();
+      const score = Number(String(row[5] || '').replaceAll(',', ''));
+      const iconUrl = iconFromCell(row[2] || '');
       if (!Number.isInteger(rank) || rank < 1) continue;
       if (!/^\d{1,16}$/.test(userId)) continue;
       if (!displayName || displayName.length > 80) continue;
       if (!Number.isInteger(score) || score < 0) continue;
       if (seen.has(userId)) continue;
       seen.add(userId);
-      entries.push({ team, rank, userId, displayName, score });
+      entries.push({ team, rank, userId, displayName, score, iconUrl });
     }
   }
 
