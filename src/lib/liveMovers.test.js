@@ -37,7 +37,8 @@ describe('buildMoversHtml', () => {
     expect(h).toContain('&lt;b&gt;0&lt;/b&gt;');
     expect(h).toContain('+100pt');
     expect(h).toContain('直近 61 秒の増分');
-    expect(h).toContain(`ほか 2人`);
+    expect(h).toContain('（ほか 2人）');
+    expect(h).not.toContain('順位表');
     expect((h.match(/class="mover /g) || []).length).toBe(MOVERS_MAX);
   });
   it('コメントだけ動いたときは件数と集計時刻', () => {
