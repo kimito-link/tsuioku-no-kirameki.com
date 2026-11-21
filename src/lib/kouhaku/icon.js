@@ -34,6 +34,7 @@ export function officialIconUrl(value) {
  * @returns {string}
  */
 export function deriveKouhakuIconUrl(userId) {
+  if (typeof userId !== 'string' && typeof userId !== 'number') return '';
   return deriveAvatarUrlFromUid(userId, 's');
 }
 
