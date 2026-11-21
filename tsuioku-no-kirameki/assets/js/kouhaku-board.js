@@ -133,6 +133,7 @@
       if (column.color) section.style.setProperty('--team-color', column.color);
       if (column.background) section.style.setProperty('--team-bg', column.background);
       section.appendChild(el('h2', '', column.label || ''));
+      var rows = el('div', 'team-rows');
       (column.entries || []).forEach(function (entry) {
         var href = localPath(entry.pagePath);
         var row = el('div', 'row');
@@ -155,8 +156,9 @@
           cheer.rel = 'noopener noreferrer';
           row.appendChild(cheer);
         }
-        section.appendChild(row);
+        rows.appendChild(row);
       });
+      section.appendChild(rows);
       teams.appendChild(section);
     });
     root.appendChild(teams);
