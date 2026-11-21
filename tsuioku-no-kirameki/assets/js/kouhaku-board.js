@@ -2,7 +2,7 @@
  * 紅白の順位を、当サイトの /api/kouhaku-ranking だけから描く。
  * ニコニコのページは取りに行かない。アイコンは返ってきた公開URLをブラウザが見る。
  */
-/* global document, location, fetch */
+/* global document, location, fetch, navigator */
 (function () {
   'use strict';
   var BLANK_ICON = 'https://secure-dcdn.cdn.nimg.jp/nicoaccount/usericon/defaults/blank.jpg';
@@ -110,6 +110,22 @@
       teams.appendChild(section);
     });
     root.appendChild(teams);
+    appendAppCta(root);
+  }
+
+  function appendAppCta(parent) {
+    var api = globalThis.KouhakuAppCta;
+    if (!api) return;
+    var cta = api.appCtaForUserAgent(navigator.userAgent || '');
+    if (!cta || String(cta.href || '').indexOf('https://') !== 0) return;
+    var box = el('aside', 'app-cta');
+    box.appendChild(el('p', '', cta.text));
+    var link = el('a', 'btn btn--primary', cta.label);
+    link.href = cta.href;
+    link.target = '_blank';
+    link.rel = 'noopener noreferrer';
+    box.appendChild(link);
+    parent.appendChild(box);
   }
 
   function renderProfile(data) {
@@ -152,6 +168,7 @@
       actions.appendChild(user);
     }
     hero.appendChild(actions);
+    appendAppCta(hero);
     root.appendChild(hero);
   }
 

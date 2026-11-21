@@ -1222,7 +1222,7 @@
   - `src/extension/live-ranking-entry.js`
   - `tsuioku-no-kirameki/live/index.html`
   - `.github/workflows/live-ranking.yml`
-<details><summary>🗂 このカテゴリの全担当ファイル(自動分類) 358</summary>
+<details><summary>🗂 このカテゴリの全担当ファイル(自動分類) 359</summary>
 
 - `app/app.js` — スマホ閲覧用 status Web 版。
 - `app/live-view-block.js` — iPhone アプリの「🚩 見たくない人を隠す・報告する」(App Store の審査 1.2: ほかの人の書き込みを見せるアプリの決まり)。
@@ -1581,6 +1581,7 @@
 - `tools/audit-lp-overflow.mjs` — One-off LP overflow audit (run: node tools/audit-lp-overflow.mjs)
 - `tools/mcp-nicolive/server.mjs` — NicoLive Local MCP Bridge Phase1a (PoC) — stdio JSON-RPC server.
 - `tools/mcp-nicolive/store.mjs` — NicoLive Local MCP Bridge - Snapshot Store.
+- `tsuioku-no-kirameki/assets/js/kouhaku-app-cta.js` — global URL
 - `tsuioku-no-kirameki/assets/js/site-chrome-lp.js` — 追憶のきらめき サイト共通の「ヘッダー(ロゴ＋ハンバーガー)・ドロワーメニュー・フッター」。
 
 </details>
