@@ -1,13 +1,15 @@
 /**
  * 【層】L0 判定層(純粋関数・I/O禁止)
- * 【この箱に入るもの】紅白の配信者アイコンURL（公式HTMLに載っていたもの、またはユーザーIDからの公開CDN）
- * 【この箱に入らないもの】fetch / storage / DOM / chrome.* / 画像バイトの取得
+ * 【この箱に入るもの】紅白の配信者アイコンURL（公式HTMLに載っていたもの、または既存の公開CDN導出）
+ * 【この箱に入らないもの】fetch / storage / DOM / chrome.* / 画像バイトの取得 / usericon のバケット計算
  * 【書けるstorageキー】なし
- * 【正本宣言】紅白のアイコンURLの形はこのファイルのみ
+ * 【正本宣言】バケット付きURLの組み立ては deriveAvatarUrlFromUid のみ。ここは公式srcの選別と空白への落ち先
  *
- * icon.js — 公式ページの img を保存できるときだけ使い、無ければ公開の usericon を組み立てる。
+ * icon.js — 公式ページの img を保存できるときだけ使い、無ければ既存の導出を呼ぶ。
  * ブラウザが画像を読む。サーバーは追加でニコニコへ取りに行かない。
  */
+
+import { deriveAvatarUrlFromUid } from '../deriveAvatarUrlFromUid.js';
 
 const ICON_ORIGIN = 'https://secure-dcdn.cdn.nimg.jp/nicoaccount/usericon/';
 
@@ -27,16 +29,12 @@ export function officialIconUrl(value) {
 }
 
 /**
- * ユーザーIDから公開CDNのURLを作る。
- * https://secure-dcdn.cdn.nimg.jp/nicoaccount/usericon/{floor(id/10000)}/{id}.jpg
+ * ユーザーIDから公開CDNのURLを作る。組み立ては deriveAvatarUrlFromUid に委譲する。
  * @param {unknown} userId
  * @returns {string}
  */
 export function deriveKouhakuIconUrl(userId) {
-  const id = String(userId || '');
-  if (!/^\d{1,16}$/.test(id)) return '';
-  const dir = id.length > 4 ? String(Number(id.slice(0, -4))) : '0';
-  return `${ICON_ORIGIN}${dir}/${id}.jpg`;
+  return deriveAvatarUrlFromUid(userId, 's');
 }
 
 /**

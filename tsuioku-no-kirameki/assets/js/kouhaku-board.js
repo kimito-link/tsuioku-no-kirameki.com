@@ -79,7 +79,7 @@
     root.textContent = '';
     var teams = el('div', 'teams');
     [['aka', '紅組', data.aka], ['shiro', '白組', data.shiro]].forEach(function (part) {
-      var section = el('section', 'team team--' + part[0]);
+      var section = el('section', part[0] === 'shiro' ? 'team team--shiro' : 'team team--aka');
       section.appendChild(el('h2', '', part[1]));
       (part[2] || []).forEach(function (entry) {
         var href = localPath(entry.pagePath);

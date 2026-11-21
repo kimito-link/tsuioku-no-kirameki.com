@@ -4,13 +4,13 @@ import { BLANK_ICON_URL, deriveKouhakuIconUrl, iconUrlForEntry, officialIconUrl 
 describe('紅白の配信者アイコン', () => {
   it('ユーザーIDから公開CDNのURLを作る', () => {
     expect(deriveKouhakuIconUrl('41979749')).toBe(
-      'https://secure-dcdn.cdn.nimg.jp/nicoaccount/usericon/4197/41979749.jpg'
+      'https://secure-dcdn.cdn.nimg.jp/nicoaccount/usericon/s/4197/41979749.jpg'
     );
     expect(deriveKouhakuIconUrl('99')).toBe(
-      'https://secure-dcdn.cdn.nimg.jp/nicoaccount/usericon/0/99.jpg'
+      'https://secure-dcdn.cdn.nimg.jp/nicoaccount/usericon/s/0/99.jpg'
     );
     expect(deriveKouhakuIconUrl('10000')).toBe(
-      'https://secure-dcdn.cdn.nimg.jp/nicoaccount/usericon/1/10000.jpg'
+      'https://secure-dcdn.cdn.nimg.jp/nicoaccount/usericon/s/1/10000.jpg'
     );
   });
 
