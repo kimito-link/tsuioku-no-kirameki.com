@@ -479,6 +479,8 @@ function showErrorStage(text, showRetry) {
 // ── サポーター(有料)の関所(v0.1.1893・課金 第3段) ──
 //   SUPPORTER_GATE_ENFORCED=false のあいだは checkMarketingAccess が必ず allowed=true を返す=今の動きと同じ。
 //   判定に失敗したら開ける側に倒す(払った人を締め出さない)。
+//   v0.1.2176: 開発用の読み込みだけ checkMarketingAccess が reason=dev_build で通す。
+//   ストア提出ビルド(NL_STORE_BUILD=1)とストアから入れた版の関所は変わらない。
 
 const SUPPORTER_CODE_MESSAGES = Object.freeze({
   ok: 'ありがとうございます。サポーターとして確認できました。',
