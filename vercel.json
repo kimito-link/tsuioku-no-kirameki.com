@@ -61,6 +61,52 @@
       "destination": "/api/live-og"
     },
     {
+      "source": "/live/kouhaku/u/:userId/",
+      "has": [
+        { "type": "header", "key": "user-agent",
+          "value": ".*(Twitterbot|facebookexternalhit|Discordbot|Slackbot|LinkedInBot|TelegramBot|Mastodon|Bluesky|Misskey|SummalyBot|line-poker|Linespider).*" }
+      ],
+      "missing": [{ "type": "host", "value": "app.tsuioku-no-kirameki.com" }],
+      "destination": "/api/kouhaku-og?user=:userId"
+    },
+    {
+      "source": "/live/kouhaku/u/:userId",
+      "has": [
+        { "type": "header", "key": "user-agent",
+          "value": ".*(Twitterbot|facebookexternalhit|Discordbot|Slackbot|LinkedInBot|TelegramBot|Mastodon|Bluesky|Misskey|SummalyBot|line-poker|Linespider).*" }
+      ],
+      "missing": [{ "type": "host", "value": "app.tsuioku-no-kirameki.com" }],
+      "destination": "/api/kouhaku-og?user=:userId"
+    },
+    {
+      "source": "/live/kouhaku/",
+      "has": [
+        { "type": "header", "key": "user-agent",
+          "value": ".*(Twitterbot|facebookexternalhit|Discordbot|Slackbot|LinkedInBot|TelegramBot|Mastodon|Bluesky|Misskey|SummalyBot|line-poker|Linespider).*" }
+      ],
+      "missing": [{ "type": "host", "value": "app.tsuioku-no-kirameki.com" }],
+      "destination": "/api/kouhaku-og"
+    },
+    {
+      "source": "/live/kouhaku",
+      "has": [
+        { "type": "header", "key": "user-agent",
+          "value": ".*(Twitterbot|facebookexternalhit|Discordbot|Slackbot|LinkedInBot|TelegramBot|Mastodon|Bluesky|Misskey|SummalyBot|line-poker|Linespider).*" }
+      ],
+      "missing": [{ "type": "host", "value": "app.tsuioku-no-kirameki.com" }],
+      "destination": "/api/kouhaku-og"
+    },
+    {
+      "source": "/live/kouhaku/u/:userId/",
+      "missing": [{ "type": "host", "value": "app.tsuioku-no-kirameki.com" }],
+      "destination": "/tsuioku-no-kirameki/live/kouhaku/u/index.html"
+    },
+    {
+      "source": "/live/kouhaku/u/:userId",
+      "missing": [{ "type": "host", "value": "app.tsuioku-no-kirameki.com" }],
+      "destination": "/tsuioku-no-kirameki/live/kouhaku/u/index.html"
+    },
+    {
       "source": "/:path((?!tsuioku-no-kirameki/|app/|extension/|api/|_next/).*)",
       "missing": [{ "type": "host", "value": "app.tsuioku-no-kirameki.com" }],
       "destination": "/tsuioku-no-kirameki/:path"

@@ -1,0 +1,8 @@
+HTTP/2 200 
+date: Sat, 21 Nov 2026 13:59:10 GMT
+content-type: text/html; charset=UTF-8
+server: LiteSpeed
+etag: "195869-1795251984;;;"
+x-litespeed-cache: hit
+access-control-allow-origin: *
+access-control-allow-methods: GET
