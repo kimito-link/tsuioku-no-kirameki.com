@@ -31,7 +31,7 @@ import {
   buildStandingCardHtml,
   buildStandingListHtml,
   diffStandingRows,
-  noEventRankingNote,
+  buildNoEventRankingHtml,
   EVENT_STANDING_CSS,
 } from '../../src/lib/platform/eventStandingView.js';
 import { srRoomStatusUrl, parseSrRoomStatus, srRoomKeyOfStreamKey } from '../../src/lib/showroom/srParse.js';
@@ -92,7 +92,7 @@ export function createEventStandingController(opts = {}) {
     }
     el = doc.createElement('div');
     el.id = 'nlEventStanding';
-    el.className = 'nl-evs';
+    el.className = 'nl-evs nl-evb';
     el.setAttribute('aria-label', 'イベントの今の順位');
     el.hidden = true;
     row.insertAdjacentElement('afterend', el);
@@ -119,12 +119,16 @@ export function createEventStandingController(opts = {}) {
     el.innerHTML = html;
   };
 
+  /** @param {any} st */
+  const scopeKey = (st) => `${st.scope}:${st.group || ''}`;
+  /** @param {any} st */
+  const listLabel = (st) => (st.scope === 'group' ? `部門「${st.group || ''}」` : st.scope === 'block' ? `ブロック「${st.group || ''}」` : 'イベント全体');
+
   const render = () => {
     const el = box();
     if (!el) return;
     if (!READ_PLATFORMS.has(platform)) {
-      const note = noEventRankingNote(platform);
-      const html = note ? `<p class="nl-evs__note">${escapeHtml(note)}</p>` : '';
+      const html = buildNoEventRankingHtml(platform);
       if (html !== lastNoteHtml) {
         lastNoteHtml = html;
         el.innerHTML = html;
@@ -136,23 +140,27 @@ export function createEventStandingController(opts = {}) {
       lastNoteHtml = '';
       el.innerHTML = '';
     }
+    // 大きな1枚は先頭の部門。ほかの部門(ふわっちの「総合」など)はその2行目に小さく。
+    // 「参加者を見る」は部門ごと。部門の数が変わったときだけ外枠を作り直す(開いている一覧を閉じない)
     const show = cards.filter((c) => c.standing);
-    // 部門(カード)の数が変わったときだけ外枠を作り直す(開いている「参加者を見る」を閉じない)
-    const wraps = el.querySelectorAll(':scope > .nl-evs__item');
-    if (wraps.length !== show.length) {
-      el.innerHTML = show
-        .map(
-          (_, i) =>
-            `<div class="nl-evs__item"><div class="nl-evs__cardbox"></div>` +
-            `<details class="nl-evs__full" data-evs-i="${i}"><summary>参加者の順位を見る(開いている間だけ読みます)</summary><div class="nl-evs__listbox"></div></details></div>`,
-        )
-        .join('');
+    const sig = show.map((c) => scopeKey(c.standing)).join('|');
+    if (el.getAttribute('data-evs-sig') !== sig || !el.querySelector(':scope > .nl-evs__cardbox')) {
+      el.setAttribute('data-evs-sig', sig);
+      el.innerHTML =
+        `<div class="nl-evs__cardbox"></div>` +
+        show
+          .map(
+            (c) =>
+              `<details class="nl-evb__full" data-evs-i="${cards.indexOf(c)}"><summary>${escapeHtml(
+                show.length > 1 ? `${listLabel(c.standing)}の参加者を見る` : '参加者の順位を見る',
+              )}（開いている間だけ読みます）</summary><div class="nl-evs__listbox"></div></details>`,
+          )
+          .join('');
     }
-    show.forEach((c, i) => {
-      const item = el.querySelectorAll(':scope > .nl-evs__item')[i];
-      const cb = item && item.querySelector('.nl-evs__cardbox');
-      if (cb) setHtml(cb, buildStandingCardHtml(c.standing, { fetchedAt: c.fetchedAt, who: ctx.who || '' }));
-    });
+    const cb = el.querySelector(':scope > .nl-evs__cardbox');
+    if (cb && show[0]) {
+      setHtml(cb, buildStandingCardHtml(show[0].standing, { fetchedAt: show[0].fetchedAt, who: ctx.who || '', secondary: show.slice(1).map((c) => c.standing) }));
+    }
     el.hidden = show.length === 0;
   };
 
@@ -327,7 +335,7 @@ export function createEventStandingController(opts = {}) {
       const rows = [...byId.values()].sort((a, b) => a.rank - b.rank);
       applyRows(i, rows, {
         pointsVisible,
-        scope: c.blockId || isBlock ? `ブロックの中の順位${c.standing.group ? `(${c.standing.group})` : ''}` : 'イベント全体の順位',
+        scope: c.blockId || isBlock ? (c.standing.group ? `ブロック「${c.standing.group}」の中の順位` : 'ブロックの中の順位') : 'イベント全体の順位',
         note: lastPage > 1 ? `公式の一覧 ${lastPage}ページのうち ${[...pages].join('・')}ページ目` : '',
       });
       return;

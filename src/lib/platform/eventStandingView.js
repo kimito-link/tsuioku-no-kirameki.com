@@ -7,21 +7,21 @@
  *   その下に参加者全員(開いたときだけ)、各行に前回取得からの変化。
  * 数の出どころを必ず書く: 公式(サービスの値そのまま)/ 公式の数字から計算(2つの公式の pt の差)/ 推定(このモジュールでは使わない)。
  * 公式が隠している pt(SHOWROOM の is_point_visible_period=false の一覧)は出さない。最終取得の時刻(JST)を必ず出す。
- * ★ニコ生版のボードと見た目をそろえるため、クラス名は nl-evs__*(ニコ生版 nl-evb__* と同じ並び)。1つにまとめるのは両方が入ってから。
+ * ★見た目はニコ生のイベント💎ボード(eventLiveBoardHtml.js・v0.1.2171)と同じ nl-evb__* の形をそのまま使う:
+ *   見出しの小さなロゴ(cardHeadHtml)・大きな順位・2行目(ほかの部門など)・ゆっくりのひとこと(buildEventGuideLineHtml)・最終取得。
+ *   CSS も yt-sidepanel.html の .nl-evb__* を使い、ここで足すのは変化の印など少しだけ(EVENT_STANDING_CSS)。
+ *   ニコ生は 💎、ほかのサービスは pt なので、数字の組み立てだけはここで持つ。
  */
 import { escapeHtml } from '../htmlEscape.js';
+import { cardHeadHtml, buildEventGuideLineHtml } from '../eventLiveBoardHtml.js';
+import { formatJstHm } from '../eventLiveBoardModel.js';
+
+export { formatJstHm };
 
 /** @typedef {import('./eventStandingParsers.js').Standing} Standing */
 /** @typedef {import('./eventStandingParsers.js').StandingRow} StandingRow */
 
 const fmt = (/** @type {number} */ n) => Math.trunc(n).toLocaleString('en-US');
-
-/** ms → JST「HH:MM」 @param {number} ms */
-export function formatJstHm(ms) {
-  if (!Number.isFinite(ms) || ms <= 0) return '';
-  const d = new Date(ms + 9 * 3600 * 1000);
-  return `${String(d.getUTCHours()).padStart(2, '0')}:${String(d.getUTCMinutes()).padStart(2, '0')}`;
-}
 
 /** 数の出どころの札 */
 export const SOURCE_LABEL = Object.freeze({ official: '公式', derived: '公式の数字から計算', estimated: '推定' });
@@ -83,57 +83,85 @@ export function noEventRankingNote(platformId) {
 
 const PLATFORM_NAME = Object.freeze({ whowatch: 'ふわっち', showroom: 'SHOWROOM', mixch: 'ミクチャ' });
 
-/** @param {Standing} s */
-function scopeText(s) {
-  if (s.scope === 'block') return `ブロックの中の順位${s.group ? `(${s.group})` : ''}`;
-  if (s.scope === 'group') return s.group ? `部門「${s.group}」の順位` : '部門の中の順位';
-  return 'イベント全体の順位';
+/** 2行目などに出す短い範囲名 @param {Standing} s */
+function scopeShort(s) {
+  if (s.scope === 'block') return s.group ? `ブロック「${s.group}」` : 'ブロック';
+  if (s.scope === 'group') return s.group ? `部門「${s.group}」` : '部門';
+  return 'イベント全体';
 }
 
-/** @param {'official'|'derived'|'estimated'|''} src */
-function tag(src) {
-  if (!src) return '';
-  const cls = src === 'official' ? '' : src === 'derived' ? ' nl-evs__tag--calc' : ' nl-evs__tag--est';
-  return `<span class="nl-evs__tag${cls}">${escapeHtml(SOURCE_LABEL[src])}</span>`;
+/** 「次の◯位まで あと◯pt」/「1つ上(◯位)との差 ◯pt」(未エスケープの文。数字は fmt 済み) @param {Standing} s */
+function nextText(s) {
+  if (s.rank === 1) return 'いま1位';
+  if (s.toNext == null || s.nextRank == null) return '';
+  const calc = s.toNextSource === 'derived' ? '（公式の数字から計算）' : '';
+  return s.toNextKind === 'pass' ? `次の${s.nextRank}位まで あと ${fmt(s.toNext)}pt${calc}` : `1つ上の${s.nextRank}位との差 ${fmt(s.toNext)}pt${calc}`;
+}
+
+/** 大きな数字が何の順位かを、こん太がひとこと @param {Standing} s @param {string} pf */
+function guideFor(s, pf) {
+  if (s.platform === 'whowatch') return `大きな数字は${scopeShort(s)}の順位だよ。「あと◯pt」もふわっち公式の数字だよ。`;
+  if (s.platform === 'showroom') {
+    return s.scope === 'block'
+      ? `大きな数字は${scopeShort(s)}の中の順位で、イベント全体の順位とは違うよ。`
+      : '大きな数字はSHOWROOM公式のイベント順位だよ。';
+  }
+  if (s.platform === 'mixch') return '大きな数字はミクチャ公式のイベント順位。1つ上との差は、公式の一覧のptから計算したよ。';
+  return `大きな数字は${pf}公式の順位だよ。`;
 }
 
 /**
- * 自分(見ている配信者)の1枚。
- * @param {Standing} s @param {{ fetchedAt: number, who?: string }} meta
+ * 自分(見ている配信者)の1枚。ニコ生のカードと同じ形(nl-evb__)。
+ * ほかの部門(ふわっちの「総合」など)は2行目に小さく(secondary)。
+ * @param {Standing} s @param {{ fetchedAt: number, who?: string, secondary?: Standing[] }} meta
  */
 export function buildStandingCardHtml(s, meta) {
   if (!s) return '';
   const pf = /** @type {Record<string,string>} */ (PLATFORM_NAME)[s.platform] || '';
-  const title = s.eventName ? `<p class="nl-evs__title">🏆 ${escapeHtml(s.eventName)}</p>` : '';
+  const head = cardHeadHtml(s.eventName || '');
   const who = escapeHtml(String(meta.who || '').trim() || 'この配信者さん');
   const got = meta.fetchedAt ? `最終取得 ${formatJstHm(meta.fetchedAt)}` : '';
-  const rt = s.realtimeLabel ? `・${pf}の表示「${escapeHtml(s.realtimeLabel)}」` : '';
-  const src = `${pf}の公式の値`;
+  const rt = s.realtimeLabel ? `・${pf}の表示「${s.realtimeLabel}」` : '';
   if (s.rank == null) {
-    return `<section class="nl-evs__card">${title}<p class="nl-evs__muted">この配信者さんの順位は、まだ${escapeHtml(pf)}の公式に出ていません。${escapeHtml(got)}</p></section>`;
+    return `<section class="nl-evb__card" data-evs-platform="${escapeHtml(s.platform)}">${head}<p class="nl-evb__muted">この配信者さんの順位は、まだ${escapeHtml(pf)}の公式に出ていません。${escapeHtml(got)}</p></section>`;
   }
-  const pt = s.point != null ? `<p class="nl-evs__score">${tag('official')} イベント <strong>${fmt(s.point)}pt</strong></p>` : '';
+  const pt = s.point != null ? `<p class="nl-evb__score"><span class="nl-evb__tag">イベントpt（公式）</span> <strong>${fmt(s.point)}pt</strong></p>` : '';
   let next = '';
-  if (s.rank === 1) next = `<p class="nl-evs__next">🎉 いま<strong>1位</strong>です</p>`;
+  if (s.rank === 1) next = `<p class="nl-evb__next">🎉 いま<strong>1位</strong>です</p>`;
   else if (s.toNext != null && s.nextRank != null) {
+    const calc = s.toNextSource === 'derived' ? '<span class="nl-evb__tag nl-evs__tag--calc">公式の数字から計算</span> ' : '';
     next =
       s.toNextKind === 'pass'
-        ? `<p class="nl-evs__next">${tag(s.toNextSource)} 次の<strong>${s.nextRank}位</strong>まで あと <strong>${fmt(s.toNext)}pt</strong></p>`
-        : `<p class="nl-evs__next">${tag(s.toNextSource)} 1つ上(<strong>${s.nextRank}位</strong>)との差 <strong>${fmt(s.toNext)}pt</strong></p>`;
+        ? `<p class="nl-evb__next">${calc}次の<strong>${s.nextRank}位</strong>まで あと <strong>${fmt(s.toNext)}pt</strong></p>`
+        : `<p class="nl-evb__next">${calc}1つ上の<strong>${s.nextRank}位</strong>との差 <strong>${fmt(s.toNext)}pt</strong></p>`;
   }
+  const second = (meta.secondary || [])
+    .filter((x) => x && x.rank != null)
+    .map((x) => {
+      const nt = nextText(x);
+      return (
+        `<p class="nl-evb__annual"><span class="nl-evb__tag">${escapeHtml(scopeShort(x))}</span> <strong>${x.rank}位</strong>` +
+        (x.point != null ? `・<span class="nl-evb__nowrap">${fmt(x.point)}pt</span>` : '') +
+        (nt ? `・<span class="nl-evb__nowrap">${escapeHtml(nt)}</span>` : '') +
+        `</p>`
+      );
+    })
+    .join('');
   return (
-    `<section class="nl-evs__card nl-evs__card--self">` +
-    title +
-    `<div class="nl-evs__main">` +
-    `<div class="nl-evs__rank"><span class="nl-evs__rank-num">${s.rank}</span><span class="nl-evs__rank-suf">位</span></div>` +
-    `<div class="nl-evs__body"><p class="nl-evs__who">${who}さん</p>${pt}${next}</div></div>` +
-    `<p class="nl-evs__foot">${escapeHtml(scopeText(s))}・${escapeHtml(src)}・${escapeHtml(got)}${rt}</p>` +
+    `<section class="nl-evb__card nl-evb__card--self" data-evs-platform="${escapeHtml(s.platform)}" data-evb-big="event">` +
+    head +
+    `<div class="nl-evb__main">` +
+    `<div class="nl-evb__rank"><span class="nl-evb__tag nl-evb__tag--official">公式</span><span class="nl-evb__rank-num">${s.rank}</span><span class="nl-evb__rank-suf">位</span></div>` +
+    `<div class="nl-evb__body"><p class="nl-evb__who">${who}さん</p>${pt}${next}</div></div>` +
+    second +
+    buildEventGuideLineHtml('konta', guideFor(s, pf)) +
+    `<p class="nl-evb__foot">${escapeHtml(`${scopeShort(s)}の順位・${pf}の公式の値・${got}${rt}`)}</p>` +
     `</section>`
   );
 }
 
 /**
- * 参加者一覧(開いたときだけ作る)。自分の行は強調、前回取得からの変化を添える。
+ * 参加者一覧(開いたときだけ作る)。自分の行は強調、前回取得からの変化を添える。行の形はニコ生と同じ nl-evb__row。
  * @param {{ rows: StandingRow[], selfId: string, changes: ReturnType<typeof diffStandingRows>, pointsVisible: boolean,
  *   fetchedAt: number, prevFetchedAt: number, scope: string, note?: string, limit: number }} p
  */
@@ -153,50 +181,38 @@ export function buildStandingListHtml(p) {
     }
     const self = r.id === p.selfId;
     html +=
-      `<li class="nl-evs__row${self ? ' nl-evs__row--self' : ''}">` +
-      `<span class="nl-evs__row-rank">${r.rank}</span>` +
-      `<span class="nl-evs__row-name">${escapeHtml(r.name || '—')}${self ? '(この配信)' : ''}</span>` +
-      `<span class="nl-evs__row-score">${p.pointsVisible && r.point != null ? `${fmt(r.point)}pt` : ''}</span>` +
-      (bits.length ? `<span class="nl-evs__row-extra">${escapeHtml(bits.join('・'))}</span>` : '') +
+      `<li class="nl-evb__row${self ? ' nl-evb__row--self' : ''}"${self ? ' data-evb-self="1"' : ''}>` +
+      `<span class="nl-evb__row-rank">${r.rank}</span>` +
+      `<span class="nl-evb__row-name">${escapeHtml(r.name || '—')}${self ? '（この配信）' : ''}</span>` +
+      `<span class="nl-evb__row-score">${p.pointsVisible && r.point != null ? `${fmt(r.point)}pt` : ''}</span>` +
+      (bits.length ? `<span class="nl-evb__row-extra nl-evs__change">${escapeHtml(bits.join('・'))}</span>` : '') +
       `</li>`;
   }
   const head =
-    `<p class="nl-evs__muted">${escapeHtml(p.scope)}・${tag('official')}最終取得 ${escapeHtml(formatJstHm(p.fetchedAt))}` +
+    `<p class="nl-evb__muted">${escapeHtml(p.scope)}・公式・最終取得 ${escapeHtml(formatJstHm(p.fetchedAt))}` +
     `${p.prevFetchedAt ? `・変化は前回(${escapeHtml(formatJstHm(p.prevFetchedAt))})から` : ''}` +
     `・${fmt(Math.min(p.rows.length, shown.length))} / ${fmt(p.rows.length)}人を表示` +
-    `${p.pointsVisible ? '' : '・pt は公式が隠している期間なので出しません'}` +
-    `${p.note ? `・${escapeHtml(p.note)}` : ''}</p>`;
-  return head + `<ol class="nl-evs__list">${html}</ol>` + (p.rows.length > shown.length ? `<button type="button" class="nl-evs__more" data-evs-more="1">もっと見る</button>` : '');
+    `${p.note ? `・${escapeHtml(p.note)}` : ''}</p>` +
+    (p.pointsVisible ? '' : buildEventGuideLineHtml('tanu', 'いまは公式がptを隠している期間だから、一覧にptは出さないね。'));
+  return head + `<ol class="nl-evb__list">${html}</ol>` + (p.rows.length > shown.length ? `<button type="button" class="nl-evb__more" data-evs-more="1">もっと見る</button>` : '');
 }
 
-/** 見た目(ニコ生版 nl-evb__ と同じ形)。拡張の画面の <style> に1回だけ入れる。 */
+/** 順位を出せないサービスの一言(りんく) @param {string} platformId */
+export function buildNoEventRankingHtml(platformId) {
+  const note = noEventRankingNote(platformId);
+  return note ? `<div class="nl-evs__note">${buildEventGuideLineHtml('rink', note)}</div>` : '';
+}
+
+/**
+ * 見た目は yt-sidepanel.html の .nl-evb__*(ニコ生のボード)をそのまま使う。ここは足りない分だけ。
+ * 狭い横の欄では、大きな順位と本文を折り返す。
+ */
 export const EVENT_STANDING_CSS = `
-.nl-evs { margin: 6px 0 8px; display: flex; flex-direction: column; gap: 6px; }
+.nl-evs { margin: 6px 0 8px; grid-column: 1 / -1; flex: 1 1 100%; width: 100%; min-width: 0; box-sizing: border-box; }
 .nl-evs[hidden] { display: none !important; }
-.nl-evs__card { padding: 8px 10px; border-radius: 10px; border: 1px solid color-mix(in srgb, #056dff 35%, transparent); background: color-mix(in srgb, #056dff 8%, transparent); }
-.nl-evs__card--self { background: linear-gradient(135deg, color-mix(in srgb, #056dff 18%, transparent), transparent); }
-.nl-evs__title { margin: 0 0 4px; font-size: 11px; font-weight: 700; opacity: 0.9; overflow-wrap: anywhere; }
-.nl-evs__main { display: flex; flex-wrap: wrap; align-items: center; gap: 4px 10px; }
-.nl-evs__rank { flex: none; min-width: 56px; text-align: center; font-weight: 800; line-height: 1; }
-.nl-evs__rank-num { font-size: 30px; }
-.nl-evs__rank-suf { font-size: 13px; margin-inline-start: 2px; }
-.nl-evs__body { min-width: 0; flex: 1 1 150px; }
-.nl-evs__body p, .nl-evs__card > p, .nl-evs__note { margin: 0; line-height: 1.45; }
-.nl-evs__who { font-size: 12px; font-weight: 700; overflow-wrap: anywhere; }
-.nl-evs__score, .nl-evs__next { font-size: 12px; }
-.nl-evs__score strong, .nl-evs__next strong { font-size: 15px; }
-.nl-evs__muted, .nl-evs__foot, .nl-evs__note { font-size: 10.5px; opacity: 0.8; }
-.nl-evs__foot { margin-top: 4px !important; }
-.nl-evs__tag { display: inline-block; padding: 0 5px; border-radius: 6px; font-size: 10px; font-weight: 700; background: color-mix(in srgb, currentColor 12%, transparent); vertical-align: 1px; margin-inline-end: 3px; }
+.nl-evs .nl-evb__main { flex-wrap: wrap; gap: 4px 10px; }
+.nl-evs .nl-evb__body { flex: 1 1 150px; }
 .nl-evs__tag--calc { background: #dfeeff; color: #0b3d7a; }
-.nl-evs__tag--est { background: #ffe6a3; color: #6b4800; }
-.nl-evs__full > summary { cursor: pointer; font-size: 11.5px; font-weight: 700; }
-.nl-evs__list { list-style: none; margin: 4px 0 0; padding: 0; }
-.nl-evs__row { display: grid; grid-template-columns: 34px 1fr auto; gap: 2px 6px; padding: 3px 4px; border-bottom: 1px solid color-mix(in srgb, currentColor 10%, transparent); font-size: 11.5px; }
-.nl-evs__row--self { background: color-mix(in srgb, #ffcf5e 35%, transparent); font-weight: 700; border-radius: 6px; }
-.nl-evs__row-rank { text-align: end; opacity: 0.8; }
-.nl-evs__row-name { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.nl-evs__row-score { text-align: end; font-variant-numeric: tabular-nums; }
-.nl-evs__row-extra { grid-column: 2 / 4; font-size: 10.5px; opacity: 0.85; }
-.nl-evs__more { margin-top: 6px; font: inherit; font-size: 11px; padding: 3px 8px; border-radius: 8px; border: 1px solid currentColor; background: transparent; color: inherit; cursor: pointer; }
+.nl-evs__change { color: inherit; }
+.nl-evs__note .nl-evb__guide { margin-top: 0; }
 `;

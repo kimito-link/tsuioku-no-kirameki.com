@@ -325,3 +325,126 @@ export function normalizeAuditionVotingUserRankingResponse(json, options = {}) {
 
   return rows.length > 0 ? rows : null;
 }
+
+/**
+ * 2026-11-21 Phase 2: 1つの配信が【複数のイベント】に参加していることがある（実測: lv351837677 は
+ * 紅白・白組と鍋奉行祭の2つ）。従来は entry_items[0] だけを見ていたため2つ目以降が出なかった。
+ * SW が返す events[]（各イベントの rankings と、必要なら entry_items/<id> の詳細）を、ボード用の形に
+ * まとめる。壊れたイベントだけ捨てる（fail-soft）。
+ *
+ * @param {unknown} entryItemsJson entry_items API の生 JSON
+ * @param {Array<{ key?: string, rankingsJson?: unknown, entryDetailJson?: unknown }>|null|undefined} eventsResp
+ * @returns {Array<{
+ *   key: string, title: string, entryId: number|null,
+ *   self: { id: string, name: string, rank: number|null, score: number|null, scoreToNext: number|null },
+ *   rows: Array<{ id: string, name: string, rank: number, score: number, thumbnailUrl?: string }>,
+ *   totalCount: number
+ * }>}
+ */
+export function normalizeAuditionEventsFromResponses(entryItemsJson, eventsResp) {
+  const j = entryItemsJson && typeof entryItemsJson === 'object' ? /** @type {Record<string, any>} */ (entryItemsJson) : null;
+  const items = j && j.data && Array.isArray(j.data.entry_items) ? j.data.entry_items : [];
+  const resp = Array.isArray(eventsResp) ? eventsResp : [];
+  const out = [];
+  for (const e of items.slice(0, 4)) {
+    if (!e || typeof e !== 'object') continue;
+    const a = e.audition && typeof e.audition === 'object' ? e.audition : null;
+    const key = String((a && a.key) == null ? '' : a.key).trim();
+    if (!AUDITION_KEY_RE.test(key)) continue;
+    const item = e.item && typeof e.item === 'object' ? e.item : {};
+    const r = resp.find((x) => x && x.key === key) || null;
+    const norm = r ? normalizeAuditionRankingsResponse(r.rankingsJson, { max: 25 }) : null;
+    const rows = norm
+      ? norm.rows.map((x) => ({
+          id: x.userId || '',
+          name: x.name,
+          rank: x.rank,
+          score: x.score,
+          ...(x.thumbnailUrl ? { thumbnailUrl: x.thumbnailUrl } : {})
+        }))
+      : [];
+    let scoreToNext = null;
+    const det = r && r.entryDetailJson && typeof r.entryDetailJson === 'object' ? /** @type {any} */ (r.entryDetailJson) : null;
+    if (det && det.data && typeof det.data === 'object' && String(det.data.id) === String(e.id)) {
+      scoreToNext = numOrNull(det.data.score_to_next_rank);
+    }
+    const entryIdNum = Number(e.id);
+    out.push({
+      key,
+      title: String((a && a.title) == null ? '' : a.title).trim().slice(0, 80),
+      entryId: Number.isFinite(entryIdNum) && entryIdNum > 0 ? Math.trunc(entryIdNum) : null,
+      self: {
+        id: POSITIVE_INT_RE.test(String(item.id == null ? '' : item.id)) ? String(item.id) : '',
+        name: String(item.nickname == null ? '' : item.nickname).trim().slice(0, 80),
+        rank: numOrNull(e.rank),
+        score: numOrNull(e.total_score),
+        scoreToNext
+      },
+      rows: rows.filter((x) => x.id),
+      totalCount: norm ? norm.totalCount : 0
+    });
+  }
+  return out;
+}
+
+/**
+ * 全員一覧（rankings を page=1..N）の生 JSON 配列を行にまとめる。
+ * @param {unknown[]} pagesJson
+ * @returns {{ rows: Array<{ id: string, name: string, rank: number, score: number }>, totalCount: number }|null}
+ */
+export function normalizeAuditionFullRankingPages(pagesJson) {
+  const rows = [];
+  let total = 0;
+  const seen = new Set();
+  for (const pj of Array.isArray(pagesJson) ? pagesJson : []) {
+    const j = pj && typeof pj === 'object' ? /** @type {Record<string, any>} */ (pj) : null;
+    if (!j) continue;
+    if (j.meta && j.meta.status != null && Number(j.meta.status) !== 200) continue;
+    const list = j.data && Array.isArray(j.data.entry_items) ? j.data.entry_items : [];
+    const tc = Number(j.data && j.data.total_count);
+    if (Number.isFinite(tc) && tc > total) total = Math.trunc(tc);
+    for (const r of list) {
+      if (!r || typeof r !== 'object') continue;
+      const id = String(r.item_id == null ? '' : r.item_id).trim();
+      const rank = Number(r.rank);
+      const score = Number(r.total_score);
+      if (!POSITIVE_INT_RE.test(id) || seen.has(id)) continue;
+      if (!Number.isFinite(rank) || rank <= 0 || !Number.isFinite(score) || score < 0) continue;
+      seen.add(id);
+      rows.push({ id, name: String(r.name == null ? '' : r.name).trim().slice(0, 80) || id, rank: Math.trunc(rank), score: Math.trunc(score) });
+    }
+  }
+  if (rows.length === 0) return null;
+  rows.sort((x, y) => x.rank - y.rank);
+  return { rows, totalCount: total || rows.length };
+}
+
+/** popup → SW: 全員一覧の取得依頼（イベント欄を開いている間だけ・60秒に1回まで）。 */
+export const AUDITION_EVENT_FULL_LIST_MESSAGE_TYPE = 'NLS_AUDITION_EVENT_FULL_LIST_FETCH';
+/** popup → SW: サーバ側スナップショット（推定・公式更新以降 +X の起点）の取得依頼（5分に1回まで）。 */
+export const AUDITION_EVENT_ANNOTATION_MESSAGE_TYPE = 'NLS_AUDITION_EVENT_ANNOTATION_FETCH';
+
+/**
+ * 各イベントに「この画面で初めて取得したときのスコア」（lv|key ごと）を添える。サーバの起点が
+ * 使えないときの「HH:MM 以降 +X」用。map は呼び出し側（content）が持つ（上限16件）。
+ * @param {ReturnType<typeof normalizeAuditionEventsFromResponses>} events
+ * @param {Map<string, {at:number, score:number}>} firstSeen
+ * @param {string} liveId
+ * @param {number} now
+ */
+export function attachAuditionEventFirstSeen(events, firstSeen, liveId, now) {
+  return (Array.isArray(events) ? events : []).map((ev) => {
+    const fk = liveId + '|' + ev.key;
+    let first = firstSeen.get(fk);
+    if (!first && typeof ev.self.score === 'number') {
+      first = { at: now, score: ev.self.score };
+      firstSeen.set(fk, first);
+      while (firstSeen.size > 16) {
+        const oldest = firstSeen.keys().next().value;
+        if (oldest === undefined) break;
+        firstSeen.delete(oldest);
+      }
+    }
+    return { ...ev, gotAt: now, localFirstSeen: first || null };
+  });
+}

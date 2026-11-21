@@ -218,8 +218,9 @@
 
 - **応援レーン集約(誰が候補か)** — 保存コメント行を userId 単位に畳み込みレーン候補を作る唯一の集約正本(popup/venue 共通)
   - `src/lib/userLaneCandidatesFromStorage.js`
-<details><summary>🗂 このカテゴリの全担当ファイル(自動分類) 110</summary>
+<details><summary>🗂 このカテゴリの全担当ファイル(自動分類) 112</summary>
 
+- `api/event-ranking.js` — イベント💎ランキングの「公式更新以降 +X」「推定イベントpt」用のサーバ側スナップショット（2026-11-21）。
 - `scripts/council-trial.mjs` — 会議メンバー候補を「本番と同じ条件」で一斉に試す使い捨て計器。
 - `scripts/perf-ab/trace-summary.mjs` — Chrome のトレース(CDP Tracing)を取って、メインスレッドごとに「自分の時間(self time)」を名前別に集計する。
 - `src/domain/lane/aggregate.js` — 応援ユーザーレーンの per-row → per-user 集約（純関数）。
@@ -330,6 +331,7 @@
 - `src/lib/youtube/ytConcurrentViewers.js` — YouTube の同時視聴者数を、ページの埋め込みと updated_metadata から読む（純関数）
 - `src/lib/youtube/ytSupportRanking.js` — YouTube Live 配信ごとの応援者ランキング集計・差分更新（通貨別・純関数）
 - `src/lib/yukkuriBroadcastSummary.js` — 放送終了後の HTML レポート / マーケ分析の頭にくる「ゆっくり解説風」要約セクション。
+- `src/server/eventRankingSnapshot.js` — イベント💎ランキングの「サーバ側スナップショット」純関数群（2026-11-21 Phase 2）。
 
 </details>
 
@@ -353,7 +355,7 @@
   - `src/lib/giftThrowProjectile.js`
 - **吹き出し寿命管理** — 会場の吹き出しの表示上限・追い出し(eviction)ライフサイクル
   - `src/lib/venueBubbleLifecycle.js`
-<details><summary>🗂 このカテゴリの全担当ファイル(自動分類) 304</summary>
+<details><summary>🗂 このカテゴリの全担当ファイル(自動分類) 305</summary>
 
 - `app/live-view-sound.js` — v0.1.1737: スマホの WEB版でギフトの効果音を鳴らす(拡張の会場モードと同じ音・同じ金額帯の選び方)。
 - `app/live-view-venue.js` — v0.1.1739: スマホの「かんたん会場モード」。右下の 🎪 を押すと全画面の会場になる。
@@ -440,6 +442,7 @@
 - `src/lib/domHarvestScrollDefer.js` — 「ユーザーが今まさにスクロール中か」を判定して、コメントの DOM ハーベスト
 - `src/lib/effectDirector.js` — 「演出ディレクター」層(パチンコ的ゲーム性 Phase 1・Fable設計 2026-07-04)。
 - `src/lib/enrichmentAvatarFallback.js` — enrichRowsWithInterceptedUserIds 内で、全ソースにアバターURLがない場合に
+- `src/lib/eventLiveBoardModel.js` — イベント💎「いまの順位・pt・次の順位まで」ボードの表示モデル（純関数・2026-11-21 Phase 2）。
 - `src/lib/firstPaintGate.js` — 「最初の描画が済むまで」待つ関門(純粋寄り・時計と PerformanceObserver は deps で注入)。v0.1.1684
 - `src/lib/formatGiftSubAppHistory.js` — v0.1.198: gift sub-app DOM 由来の history / totalCounts を popup 表示用に
 - `src/lib/giftAdPicksCarry.js` — 【層】L0 判定層(純粋関数・I/O禁止)
@@ -767,7 +770,7 @@
   - `api/billing.js`
   - `app/supporter.html`
   - `tsuioku-no-kirameki/tokushoho.html`
-<details><summary>🗂 このカテゴリの全担当ファイル(自動分類) 58</summary>
+<details><summary>🗂 このカテゴリの全担当ファイル(自動分類) 59</summary>
 
 - `extension-youtube/marketing-export-guard.js` — マーケ分析タブ(marketing-export.html)の「何があっても開く」保険。
 - `extension-youtube/marketing-export.js` — ニコ生版 marketing-export-entry.js(本物)+ YouTube の記録を読む入口のバンドル
@@ -787,6 +790,7 @@
 - `src/lib/commentTimelineReport.js` — 状態速報に「応援コメント(最新N件・本文)」を出す整形 lib。
 - `src/lib/deepExportPolicy.js` — popup からの deep export 要求時に、仮想リスト走査を行うかを判定する。
 - `src/lib/devMonitorViz.js` — 開発・テスト用監視パネル向けの純粋 HTML 断片（DOM 非依存）。
+- `src/lib/eventLiveBoardHtml.js` — イベント💎ボードの HTML（純関数・2026-11-21 Phase 2）。モデルは eventLiveBoardModel.js。
 - `src/lib/exportDownloadFilename.js` — HTML / マーケ分析のダウンロードファイル名（配信開始日 + liveId）。
 - `src/lib/exportStageProfiler.js` — HTML / マーケ DL の段階計測（体感調査用）。chrome 非依存の純関数。
 - `src/lib/exportWaitNarration.js` — HTML / マーケ DL 待ち中の りんく・こん太・たぬ姉 セリフ（popup 吹き出し用）。
@@ -1196,7 +1200,7 @@
   - `src/extension/live-ranking-entry.js`
   - `tsuioku-no-kirameki/live/index.html`
   - `.github/workflows/live-ranking.yml`
-<details><summary>🗂 このカテゴリの全担当ファイル(自動分類) 345</summary>
+<details><summary>🗂 このカテゴリの全担当ファイル(自動分類) 346</summary>
 
 - `app/app.js` — スマホ閲覧用 status Web 版。
 - `app/live-view-block.js` — iPhone アプリの「🚩 見たくない人を隠す・報告する」(App Store の審査 1.2: ほかの人の書き込みを見せるアプリの決まり)。
@@ -1310,6 +1314,7 @@
 - `src/extension/cloak-failsafe-entry.js` — 幕(cloak)を外す【最速の保険】だけを担う極小エントリ。
 - `src/extension/offscreen-entry.js` — feat/multitab-scale-globalcap（2026-05-31）: コメント IDB の「常駐・単一書き手」を担う
 - `src/extension/orphanTabAutoReloadHost.js` — 放送ページ(content script の一番外側)で、拡張の入れ替え後に古い版のまま止まったページを自分で読み込み直す見回りを始める。
+- `src/extension/popup/eventLiveBoardPopup.js` — 2026-11-21 Phase 2: popup のイベント💎ボード（いまの順位・pt・次の順位まで）。popup-entry.js は
 - `src/extension/popup/init/frameTheme.js` — frameTheme — popup の「配色プリセット/枠テーマ」一式。
 - `src/extension/self-update-sw-entry.js` — 開発版の拡張が、拡張のフォルダの新しい版に自分で入れ替わる(v0.1.1802)。
 - `src/extension/self-update.d.ts` — self-update.js(キットの写し・無改変)の型。写しを型検査から外し、ここで形だけ示す。
@@ -1554,11 +1559,14 @@
 - `v0.1.2165` 2026-11-18 — 終わりの人数と書き出しの全件
 - `v0.1.2155` 2026-11-18 — 応援が届いた時刻を先頭に出す
 
+### 📥 コメント取得 (1版)
+- `v0.1.2170` 2026-11-21 — イベントの今の順位と次まで
+
 ### 🏟 会場・席 (4版)
+- `v0.1.2170` 2026-11-21 — イベントの今の順位と次まで
 - `v0.1.2154` 2026-11-18 — 横の欄と来場の記録をまとめた
 - `v0.1.2153` 2026-11-18 — Kickの絵文字を名前のまま出さない
 - `v0.1.2152` 2026-11-18 — 公式どうしの来場は1秒差でも残す
-- `v0.1.2150` 2026-11-17 — 来場は時刻で区別し、二重だけ畳む
 
 ### 🎈 吹き出し (1版)
 - `v0.1.2153` 2026-11-18 — Kickの絵文字を名前のまま出さない

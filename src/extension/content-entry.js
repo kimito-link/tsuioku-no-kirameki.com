@@ -409,6 +409,7 @@ import { shouldRunExternalFetchWhileHidden } from '../lib/hiddenTabExternalFetch
 import {
   pickAuditionContextFromEntryItems,
   normalizeAuditionRankingsResponse,
+  normalizeAuditionEventsFromResponses, attachAuditionEventFirstSeen,
   normalizeAuditionVotingUserRankingResponse,
   eventVotingRankingStorageKey,
   AUDITION_EVENT_RANKING_FETCH_MESSAGE_TYPE
@@ -15717,6 +15718,7 @@ function maybeFetchBroadcasterProfileMirrorOnce() {
 const AUDITION_EVENT_RANKING_API_MIN_GAP_MS = 12_000;
 /** @type {number} */
 let _auditionEventRankingApiLastAttemptAt = 0;
+/** @type {Map<string, {at:number, score:number}>} 2026-11-21: lv|key → この画面で初めて取得したときのスコア */ const _auditionEventFirstSeen = new Map();
 
 /**
  * 「対象の場所をひらかないとでない」（2026-06-01）: イベント💎ランキングを SW 経由（無認証
@@ -15788,12 +15790,15 @@ function maybeFetchAuditionEventRankingMirrorOnce() {
               broadcasterName: s.broadcasterName
             };
           }
+          let events = []; // 2026-11-21 Phase 2: 参加している全イベント（最大4つ）＋「この画面で初めて取得したときのスコア」
+          try { events = attachAuditionEventFirstSeen(normalizeAuditionEventsFromResponses(resp.entryItemsJson, resp.events), _auditionEventFirstSeen, lid, Date.now()); } catch { events = []; }
           try {
             chrome.storage.local
               .set({
                 [eventScoreRankingStorageKey(lid)]: {
                   rows: norm.rows.slice(0, 10),
                   selfStatus,
+                  events,
                   capturedAt: Date.now(),
                   liveId: lid,
                   source: 'capi'
