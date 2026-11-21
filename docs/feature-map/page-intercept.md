@@ -27,9 +27,11 @@ graph LR
   n_page_intercept --> n_src_lib_nicoAnonymousDisplay_js["lib/nicoAnonymousDisplay.js"]:::shared
   n_page_intercept --> n_src_lib_niconicoInterceptLearn_js["lib/niconicoInterceptLearn.js"]
   n_page_intercept --> n_src_lib_nlsInterceptAuth_js["lib/nlsInterceptAuth.js"]:::shared
+  n_page_intercept --> n_src_lib_parseArrivalComment_js["lib/parseArrivalComment.js"]:::shared
   n_page_intercept --> n_src_lib_parseGiftComment_js["lib/parseGiftComment.js"]:::shared
   n_page_intercept --> n_src_lib_protobufVarint_js["lib/protobufVarint.js"]:::shared
   n_page_intercept --> n_src_lib_supportGrowthTileSrc_js["lib/supportGrowthTileSrc.js"]:::shared
+  n_page_intercept --> n_src_lib_timeAuthority_js["lib/timeAuthority.js"]:::shared
   n_page_intercept --> n_src_lib_userIdPreference_js["lib/userIdPreference.js"]:::shared
   n_page_intercept --> n_src_shared_avatar_clampAvatarUrl_js["shared/avatar/clampAvatarUrl.js"]:::shared
   classDef shared fill:#eee,stroke:#999,color:#666;

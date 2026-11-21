@@ -26,6 +26,7 @@ graph LR
   n_popup --> n_src_domain_user_identity_js["domain/user/identity.js"]:::shared
   n_popup --> n_src_domain_user_nickname_js["domain/user/nickname.js"]:::shared
   n_popup --> n_src_extension_popup_attachAiDiagButtonHandler_js["extension/popup/attachAiDiagButtonHandler.js"]
+  n_popup --> n_src_extension_popup_eventLiveBoardPopup_js["extension/popup/eventLiveBoardPopup.js"]
   n_popup --> n_src_extension_popup_init_devMonitorExport_js["extension/popup/init/devMonitorExport.js"]
   n_popup --> n_src_extension_popup_init_frameTheme_js["extension/popup/init/frameTheme.js"]
   n_popup --> n_src_extension_popup_renderAcquisitionDashboard_js["extension/popup/renderAcquisitionDashboard.js"]
@@ -40,6 +41,7 @@ graph LR
   n_popup --> n_src_extension_statusPublisherHost_js["extension/statusPublisherHost.js"]
   n_popup --> n_src_extension_story_laneContentLod_js["extension/story/laneContentLod.js"]:::shared
   n_popup --> n_src_extension_story_renderStoryUserLaneDom_js["extension/story/renderStoryUserLaneDom.js"]:::shared
+  n_popup --> n_src_lib_abema_abParse_js["lib/abema/abParse.js"]:::shared
   n_popup --> n_src_lib_acquisitionDashboardChart_js["lib/acquisitionDashboardChart.js"]
   n_popup --> n_src_lib_adLanePicksFromRooms_js["lib/adLanePicksFromRooms.js"]
   n_popup --> n_src_lib_adMessageLines_js["lib/adMessageLines.js"]:::shared
@@ -51,9 +53,7 @@ graph LR
   n_popup --> n_src_lib_anomalyVerdict_js["lib/anomalyVerdict.js"]:::shared
   n_popup --> n_src_lib_anonymousIdenticon_js["lib/anonymousIdenticon.js"]:::shared
   n_popup --> n_src_lib_appliedEntriesMemo_js["lib/appliedEntriesMemo.js"]
-  n_popup --> n_src_lib_audienceEngagementGap_js["lib/audienceEngagementGap.js"]
-  n_popup --> n_src_lib_auditionEventRankingApi_js["lib/auditionEventRankingApi.js"]:::shared
   classDef shared fill:#eee,stroke:#999,color:#666;
 ```
 
-> ほか 492 ファイル省略（全件は storage-bus.md / metafile 参照）。
+> ほか 516 ファイル省略（全件は storage-bus.md / metafile 参照）。

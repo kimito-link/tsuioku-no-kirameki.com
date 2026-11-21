@@ -73,6 +73,7 @@
 - 🔵 **KEY_VOICE_READ_NAME_ENABLED** — 読む人だけ（書く経路が無い疑い）: src/extension/phoneVoicePublisher.js
 - 🔵 **KEY_VOICE_VOLUME_PERCENT** — 読む人だけ（書く経路が無い疑い）: src/extension/comeview-entry.js
 - 🔵 **fn:commentDbSummaryKey** — 読む人だけ（書く経路が無い疑い）: src/extension/popup-entry.js
+- 🔵 **fn:followerSamplesStorageKey** — 読む人だけ（書く経路が無い疑い）: src/extension/marketing-export-entry.js
 - 🔵 **fn:summaryStorageKey** — 読む人だけ（書く経路が無い疑い）: src/extension/popup-entry.js
 - 🔵 **fn:watchSnapshotStorageKey** — 読む人だけ（書く経路が無い疑い）: src/extension/popup/report/htmlReportDocument.js
 - 🔵 **nls_last_auto_tab_reload** — 読む人だけ（書く経路が無い疑い）: src/extension/status-entry.js
@@ -188,6 +189,7 @@
 | `fn:comeviewPinStorageKey` | extension/comeview-entry.js | — |
 | `fn:commentDbSummaryKey` | — | extension/popup-entry.js |
 | `fn:eventDomStorageKey` | extension/content-entry.js | — |
+| `fn:followerSamplesStorageKey` | — | extension/marketing-export-entry.js |
 | `fn:giftSubAppHistoryStorageKey` | extension/content-entry.js | — |
 | `fn:officialGiftPointsAggregateStorageKey` | extension/content-entry.js | — |
 | `fn:perfDiagStorageKey` | extension/popup-entry.js | — |

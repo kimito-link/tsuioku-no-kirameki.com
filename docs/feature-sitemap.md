@@ -128,12 +128,13 @@
   - `src/lib/monotonicCommentCount.js`
 - **storage キー定義** — chrome.storage のキー名の正本(nls_comments_<lv> 等)
   - `src/lib/storageKeys.js`
-<details><summary>🗂 このカテゴリの全担当ファイル(自動分類) 77</summary>
+<details><summary>🗂 このカテゴリの全担当ファイル(自動分類) 78</summary>
 
 - `extension-youtube/sidepanel.js` — ニコ生版 popup-entry.js(本物)+ YouTube の記録を読む入口のバンドル
 - `extension-youtube/src/pfEmoteStore.js` — Twitch/Kick の視聴ページ(content)で見た絵文字の「名前 → 画像」を storage に覚える。
 - `extension-youtube/src/ytIdbStore.js` — YouTube Live コメントを配信(videoId)ごとに全件 IndexedDB へ記録・差分取得するストア
 - `scripts/dump-panel-state.mjs` — 実機の chrome.storage.local を吸い出して
+- `scripts/kouhaku-og-bake.mjs` — 保存済みの紅白順位から共有 JPEG を焼き、/api/kouhaku-og-image へ置く。
 - `scripts/migrate-ext-storage.mjs` — 拡張の記録データを「旧ID配下フォルダ」→「新ID配下フォルダ」へコピーする(一度だけ・v0.1.1529)。
 - `scripts/record-improvement.mjs` — ★実測値を台帳に書き足す【1本の口】。
 - `src/extension/content-boot.js` — 記録エンジン(content.js・約1.5MB)を、配信の視聴フレームだけに載せる。
@@ -1167,6 +1168,19 @@
   - `src/lib/liveRecentHoverCard.js`
   - `src/extension/live-ranking-entry.js`
   - `tsuioku-no-kirameki/live/index.html`
+- **紅白歌枠合戦2026のイベントpt応援ランキング** — /live/kouhaku/ と /live/kouhaku/u/<ユーザーID>/。出典は公式15106だけ。サーバが JST 16:30、失敗時のみ 19:30 に最大2回取得し、ブラウザは /api/kouhaku-ranking だけを読む。画像は保存もホットリンクもしない。共有は X と LINE(https、openExternalBrowser=1)。定期実行は .github/workflows/kouhaku-ranking.yml。保存は Upstash の kouhaku:v1:*。無ければ同梱シード
+  - `src/lib/kouhaku/parse.js`
+  - `src/lib/kouhaku/policy.js`
+  - `src/lib/kouhaku/job.js`
+  - `src/server/kouhakuOfficialPage.js`
+  - `src/server/kouhakuRead.js`
+  - `api/kouhaku-ranking.js`
+  - `api/kouhaku-og.js`
+  - `api/kouhaku-og-image.js`
+  - `tsuioku-no-kirameki/live/kouhaku/index.html`
+  - `tsuioku-no-kirameki/assets/js/kouhaku-board.js`
+  - `.github/workflows/kouhaku-ranking.yml`
+  - `vercel.json`
 - **ランキング(/live/)の配信ごと OGP** — vercel.json が「?lv= あり∧カード用クローラー UA」だけ /api/live-og へ rewrite。api は live:ranking:latest から該当配信を引き、数字(来場・コメント・ギフト・広告)を description と焼いた JPEG に出す(0/欠落は省く)。焼き画像がある lv(HEXISTS)は og:image=/api/live-og-image?lv=(1200x630・配信サムネ＋数字帯)、無ければサムネ直。画像は GitHub Actions(og ジョブ)が live-og-bake.mjs→og-live-compose.py(Pillow)で焼き、base64 を Upstash(live:og:img・TTL 1h)へ POST(?ingest=og-image)。api はニコ生へ fetch しない・リダイレクト無し・no-store。人間は静的 /live/。支援者名・コメント本文・個別ポイントは出さない(v0.1.1519)
   - `api/live-og.js`
   - `api/live-og-image.js`
@@ -1205,7 +1219,7 @@
   - `src/extension/live-ranking-entry.js`
   - `tsuioku-no-kirameki/live/index.html`
   - `.github/workflows/live-ranking.yml`
-<details><summary>🗂 このカテゴリの全担当ファイル(自動分類) 349</summary>
+<details><summary>🗂 このカテゴリの全担当ファイル(自動分類) 359</summary>
 
 - `app/app.js` — スマホ閲覧用 status Web 版。
 - `app/live-view-block.js` — iPhone アプリの「🚩 見たくない人を隠す・報告する」(App Store の審査 1.2: ほかの人の書き込みを見せるアプリの決まり)。
@@ -1386,6 +1400,15 @@
 - `src/lib/initShadeFailsafe.js` — 初回ロード幕(.nl-init-shade)の CSS フェイルセーフとクラスの乖離を断つ純関数。
 - `src/lib/instrumentSpec.js` — 【層】L0 判定層(純粋関数・I/O禁止)
 - `src/lib/isInsideRecommendedLiveSection.js` — v0.1.200: ニコ生 watch ページの「おすすめ生放送」セクション内 DOM を識別する純関数。
+- `src/lib/kouhaku/board.js` — 【層】L0 判定層(純粋関数・I/O禁止)
+- `src/lib/kouhaku/calc.js` — 【層】L0 判定層(純粋関数・I/O禁止)
+- `src/lib/kouhaku/constants.js` — 【層】L0 判定層(純粋関数・I/O禁止)
+- `src/lib/kouhaku/format.js` — 【層】L0 判定層(純粋関数・I/O禁止)
+- `src/lib/kouhaku/model.js` — 【層】L0 判定層(純粋関数・I/O禁止)
+- `src/lib/kouhaku/ogHtml.js` — 【層】L0 判定層(純粋関数・I/O禁止)
+- `src/lib/kouhaku/ogSpec.js` — 【層】L0 判定層(純粋関数・I/O禁止)
+- `src/lib/kouhaku/share.js` — 【層】L0 判定層(純粋関数・I/O禁止)
+- `src/lib/kouhaku/time.js` — 【層】L0 判定層(純粋関数・I/O禁止)
 - `src/lib/lastWatchUrlAdoption.js` — 【層】L0 判定層(純粋関数・I/O禁止)
 - `src/lib/lengthDelimitedStream.js` — length-delimited（varint 長 + ペイロード）の連続を分割する。
 - `src/lib/liveElapsedExtrapolate.js` — v0.1.1738: スマホ(WEB版)で「経過」「最終取り込み」が止まって見えるのを防ぐ。
@@ -1544,6 +1567,7 @@
 - `src/lib/youtube/ytSuperChatTier.js` — YouTube のスーパーチャットは金額で色が決まる(青→水色→緑→黄→橙→赤紫→赤)。
 - `src/lib/youtube/ytSwitchLeakCleanup.js` — 配信を切り替えた瞬間に、前の配信のチャット欄に残っていたコメントが
 - `src/lib/youtube/ytWording.js` — ニコ生版の画面をそのまま使う YouTube 版で、画面に出る「ニコニコの言葉」を YouTube の言葉に直す。
+- `src/server/kouhakuSeed.js` — 2026-11-21 に公式15106を1回読んだ初期スナップショット。画像URLは含まない。
 - `src/server/liveEventsApi.js` — global process, Buffer -- サーバー(Vercel 関数)専用の部品。api/ と同じく env を読む
 - `src/shared/niconico/liveId.js` — ニコ生 放送 ID（`lv…` / `ch…`（チャンネル枠））の正規化ユーティリティ。
 - `src/speech-recognition-globals.d.ts` — Web Speech API（Chrome は webkit 接頭辞のことがある）

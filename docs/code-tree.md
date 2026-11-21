@@ -27,7 +27,7 @@
 
 > 値が次の段へ届かない「断線」(broadcaster バグ型)は `npm run feature-map -- --check` が機械検知。
 
-## ⚠️ 役割コメントが無いソース 13 / 1311 件
+## ⚠️ 役割コメントが無いソース 13 / 1331 件
 - `docs/handoff/bench/bench-interval.mjs`
 - `docs/handoff/bench/bench-lane.mjs`
 - `extension-youtube/cloak-failsafe.js`
@@ -60,10 +60,13 @@
   - `KB-stale-premise.md`
   - `TO-web-ios-android-ai-maze-pattern-2026-08-31.md`
   - `TO-web-ios-android-unnamed-bucket-2026-09-03.md`
-- 📁 **api/** (10)
+- 📁 **api/** (13)
   - `billing.js` — サポーター(有料=マーケ HTML)の受け口(v0.1.1893・課金 第2段)。中身は src/server/billingApi.js。
   - `device.js` — スマホ版の「利用者ごとの鍵」の受け口(v0.1.1730・スマホ化 利用者ごとの鍵 第a段)。
   - `event-ranking.js` — イベント💎ランキングの「公式更新以降 +X」「推定イベントpt」用のサーバ側スナップショット（2026-11-21）。
+  - `kouhaku-og-image.js` — 共有用 JPEG。焼いた画像が Redis にあればそれを返し、無ければ同梱の紅白カードを返す。
+  - `kouhaku-og.js` — 共有クローラー向けの HTML。保存済みの順位から見出しを作る。公式ページへは行かない。
+  - `kouhaku-ranking.js` — 紅白歌枠合戦2026の公式イベントpt順位。
   - `live-og-image.js` — /api/live-og-image — 焼いた OGP カード画像(配信サムネ＋数字帯)を返す薄い I/O 係(v0.1.1519)。
   - `live-og.js` — /api/live-og — 配信ごとの OGP カード用 HTML を返す薄い I/O 係(v0.1.1517)。
   - `live-platforms.js` — /api/live-platforms — /live/ の「ほかの配信サービス」セクション(Kick・後で YouTube)のデータ。
@@ -1044,7 +1047,7 @@
     - `verify-extension.mjs` — global Buffer, URL, chrome, console
     - `verify-host.mjs` — global process, Buffer, setTimeout, clearTimeout, URL, console
     - `verify-setup.ps1`
-- 📁 **scripts/** (118)
+- 📁 **scripts/** (119)
   - 📁 **audit/** (4)
     - `dead-selector-baseline.json`
     - `make-dead-selector-baseline.mjs` — 静的デッドセレクタ監査(static-dead-selectors.mjs)の基準値(dead-selector-baseline.json)を作る/更新する。
@@ -1123,6 +1126,7 @@
   - `inspect-nicolive-watch-stats.mjs` — ニコ生 watch ページの HTML から、来場・同接まわりの数値がどう埋め込まれているかを CLI で確認する。
   - `install-local-sounds.mjs` — マイ効果音「手動取込」を不要にするローカル自動同梱スクリプト。
   - `install-local-sounds.test.js`
+  - `kouhaku-og-bake.mjs` — 保存済みの紅白順位から共有 JPEG を焼き、/api/kouhaku-og-image へ置く。
   - `layer-config.mjs` — ★どのリポでも使えるように「設定」を読む部分だけを切り出す。
   - `layer-map-html.mjs` — ★`src/lib` の構成を【HTMLで見える】ようにする。
   - `live-comment-tally.mjs` — `/live/` の 3 枠目「💬 コメントで応援した人」を集める I/O 係。
@@ -1192,7 +1196,7 @@
   - `gift-coin-hq.wav`
   - `gift-register-hq.wav`
   - `gift-register.mp3`
-- 📁 **src/** (2563)
+- 📁 **src/** (2582)
   - 📁 **data/** (7)
     - 📁 **acquirers/** (2)
       - `laneFromStorage.js` — 応援レーン acquirer: chrome.storage.local(nls_comments) → laneStore の橋渡し。
@@ -1354,7 +1358,10 @@
     - `voiceTestHook.test.js`
     - `voiceTogglePanel.wiring.test.js`
     - `yt-page-boot.js` — 会場(yt-venue-inline.js・約800KB)を配信の視聴ページだけに載せる。
-  - 📁 **fixtures/** (1)
+  - 📁 **fixtures/** (3)
+    - 📁 **kouhaku/** (2)
+      - `niconews-15106.headers.txt`
+      - `niconews-15106.html`
     - `nicolive-comment-list.html`
   - 📁 **images/** (134)
     - 📁 **brand/** (29)
@@ -1532,7 +1539,7 @@
         - `logo_funlink_white_RGB_link_black.png`
         - `logo_funlink_white_RGB_maru_black.png`
     - `hero-connect-hub.svg`
-  - 📁 **lib/** (2253)
+  - 📁 **lib/** (2266)
     - 📁 **__snapshots__/** (4)
       - `marketing-abema-baseline.html`
       - `marketing-niconico.html`
@@ -1554,6 +1561,20 @@
       - `kickChatParse.test.js`
       - `kickRealtime.js` — Kick のチャットの「つなぎ先」を決めて、届いた1通を読む(純関数)
       - `kickRealtime.test.js`
+    - 📁 **kouhaku/** (13)
+      - `board.js` — 【層】L0 判定層(純粋関数・I/O禁止)
+      - `calc.js` — 【層】L0 判定層(純粋関数・I/O禁止)
+      - `constants.js` — 【層】L0 判定層(純粋関数・I/O禁止)
+      - `format.js` — 【層】L0 判定層(純粋関数・I/O禁止)
+      - `job.js` — 【層】L0 判定層(純粋関数・I/O禁止)
+      - `model.js` — 【層】L0 判定層(純粋関数・I/O禁止)
+      - `ogHtml.js` — 【層】L0 判定層(純粋関数・I/O禁止)
+      - `ogSpec.js` — 【層】L0 判定層(純粋関数・I/O禁止)
+      - `parse.js` — 【層】L0 判定層(純粋関数・I/O禁止)
+      - `policy.js` — 【層】L0 判定層(純粋関数・I/O禁止)
+      - `ranking.test.js`
+      - `share.js` — 【層】L0 判定層(純粋関数・I/O禁止)
+      - `time.js` — 【層】L0 判定層(純粋関数・I/O禁止)
     - 📁 **mcpBridge/** (11)
       - `buildLiveMcpSnapshot.js` — L0 Evidence（拡張の観測データ）→ L1 Canonical Snapshot 変換。
       - `buildLiveMcpSnapshot.test.js`
@@ -3800,7 +3821,7 @@
     - `yieldToBrowserPaint.js` — 【層】L0 判定層(依存ゼロ・chrome.* 非依存)
     - `yukkuriBroadcastSummary.js` — 放送終了後の HTML レポート / マーケ分析の頭にくる「ゆっくり解説風」要約セクション。
     - `yukkuriBroadcastSummary.test.js`
-  - 📁 **server/** (18)
+  - 📁 **server/** (22)
     - `billingApi.js` — global process, Buffer -- サーバー(Vercel 関数)専用の部品。api/ と同じく env を読む
     - `billingApi.test.js`
     - `deviceApi.test.js`
@@ -3811,6 +3832,10 @@
     - `fanLinkApi.test.js`
     - `kickApi.js` — Kick 公式 API(App Access Token)の I/O だけ(サーバ専用・npm 依存なし)。
     - `kickApi.test.js`
+    - `kouhakuOfficialPage.js` — 公式15106へ GET する唯一の場所。
+    - `kouhakuOfficialPage.test.js`
+    - `kouhakuRead.js` — 保存済みスナップショットを読む。公式ページへは行かない。
+    - `kouhakuSeed.js` — 2026-11-21 に公式15106を1回読んだ初期スナップショット。画像URLは含まない。
     - `liveEventsApi.js` — global process, Buffer -- サーバー(Vercel 関数)専用の部品。api/ と同じく env を読む
     - `liveEventsApi.test.js`
     - `liveRankingOne.test.js`
@@ -3941,16 +3966,17 @@
     - `laneCssSource.js` — laneCssSource — 応援レーン(タイル)CSS を3ファイル(popup.html / venueBar.js / app/live-view.html)から
     - `laneImportContract.js` — 応援レーンの「輸入契約」(テスト専用の定数・実装コードは import しない)。
     - `wiringTestSource.js` — wiringTestSource — wiring テストが「関数の本体」を、置き場所に依らず取得するための正本。
-- 📁 **tools/** (7)
+- 📁 **tools/** (8)
   - 📁 **mcp-nicolive/** (3)
     - `README.md`
     - `server.mjs` — NicoLive Local MCP Bridge Phase1a (PoC) — stdio JSON-RPC server.
     - `store.mjs` — NicoLive Local MCP Bridge - Snapshot Store.
   - `audit-lp-overflow.mjs` — One-off LP overflow audit (run: node tools/audit-lp-overflow.mjs)
   - `gen-og-live-ranking.py`
+  - `kouhaku_og.py`
   - `og-live-compose.py`
   - `render-og.js` — 追憶の煌めき LP 用 OG 画像（1200×630）を生成する。
-- 📁 **tsuioku-no-kirameki/** (70)
+- 📁 **tsuioku-no-kirameki/** (75)
   - 📁 **articles/** (14)
     - 📁 **role-separation-design/** (2)
       - 📁 **img/** (1)
@@ -3968,14 +3994,16 @@
     - `phase-gate-flow-canon.html`
     - `prewarm-coordinator-lease.html`
     - `reaction-template-classifier.html`
-  - 📁 **assets/** (4)
-    - 📁 **css/** (3)
+  - 📁 **assets/** (6)
+    - 📁 **css/** (4)
+      - `kouhaku-ranking.css`
       - `live-ranking.css`
       - `site-chrome-lp.css`
       - `yukkuri-thread.css`
-    - 📁 **js/** (1)
+    - 📁 **js/** (2)
+      - `kouhaku-board.js` — 紅白の順位を、当サイトの /api/kouhaku-ranking だけから描く。
       - `site-chrome-lp.js` — 追憶のきらめき サイト共通の「ヘッダー(ロゴ＋ハンバーガー)・ドロワーメニュー・フッター」。
-  - 📁 **images/** (40)
+  - 📁 **images/** (41)
     - 📁 **lp/** (7)
       - 📁 **phone/** (2)
         - `phone-start.webp`
@@ -4018,9 +4046,14 @@
     - `favicon.ico`
     - `og-image.jpg`
     - `og-image.png`
+    - `og-kouhaku.jpg`
     - `og-live-ranking.png`
     - `twitter-icon.png`
-  - 📁 **live/** (1)
+  - 📁 **live/** (3)
+    - 📁 **kouhaku/** (2)
+      - 📁 **u/** (1)
+        - `index.html`
+      - `index.html`
     - `index.html`
   - 📁 **sound/** (1)
     - `yozora-small-yell.mp3`

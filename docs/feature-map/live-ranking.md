@@ -31,6 +31,7 @@ graph LR
   n_live_ranking --> n_src_lib_liveGiftPulse_js["lib/liveGiftPulse.js"]:::shared
   n_live_ranking --> n_src_lib_liveLaneBuckets_js["lib/liveLaneBuckets.js"]:::shared
   n_live_ranking --> n_src_lib_liveMotion_js["lib/liveMotion.js"]
+  n_live_ranking --> n_src_lib_liveMovers_js["lib/liveMovers.js"]
   n_live_ranking --> n_src_lib_livePlatformsHtml_js["lib/livePlatformsHtml.js"]
   n_live_ranking --> n_src_lib_liveRankingView_js["lib/liveRankingView.js"]:::shared
   n_live_ranking --> n_src_lib_liveRecentHoverCard_js["lib/liveRecentHoverCard.js"]
@@ -39,6 +40,7 @@ graph LR
   n_live_ranking --> n_src_lib_nicoUserPage_js["lib/nicoUserPage.js"]:::shared
   n_live_ranking --> n_src_lib_nicoadContributionRankingApi_js["lib/nicoadContributionRankingApi.js"]:::shared
   n_live_ranking --> n_src_lib_nicoliveRankingPick_js["lib/nicoliveRankingPick.js"]
+  n_live_ranking --> n_src_lib_parseArrivalComment_js["lib/parseArrivalComment.js"]:::shared
   n_live_ranking --> n_src_lib_phoneBlocklist_js["lib/phoneBlocklist.js"]
   n_live_ranking --> n_src_lib_phoneVoice_js["lib/phoneVoice.js"]:::shared
   n_live_ranking --> n_src_lib_protobufVarint_js["lib/protobufVarint.js"]:::shared
