@@ -41,6 +41,10 @@ const board = {
  */
 function mapPath(pathname) {
   if (pathname === '/live' || pathname === '/live/') return 'tsuioku-no-kirameki/live/index.html';
+  if (pathname === '/live/kouhaku' || pathname === '/live/kouhaku/') return 'tsuioku-no-kirameki/live/kouhaku/index.html';
+  if (/^\/live\/kouhaku\/u\/\d+\/?$/.test(pathname)) return 'tsuioku-no-kirameki/live/kouhaku/u/index.html';
+  if (pathname === '/live/event/kouhaku-2026' || pathname === '/live/event/kouhaku-2026/') return 'tsuioku-no-kirameki/live/event/index.html';
+  if (/^\/live\/event\/kouhaku-2026\/u\/\d+\/?$/.test(pathname)) return 'tsuioku-no-kirameki/live/event/u/index.html';
   if (pathname.startsWith('/assets/') || pathname.startsWith('/images/')) return `tsuioku-no-kirameki${pathname}`;
   if (pathname.startsWith('/app/') || pathname.startsWith('/extension/')) return pathname.slice(1);
   return null;
@@ -51,8 +55,22 @@ function startServer() {
     const server = createServer(async (req, res) => {
       const url = new URL(req.url || '/', 'http://127.0.0.1');
       if (url.pathname === '/api/kouhaku-ranking') {
+        const user = url.searchParams.get('user');
+        const body = user
+          ? {
+            ok: true,
+            found: true,
+            officialUpdateLabel: board.officialUpdateLabel,
+            officialUserUrl: `https://www.nicovideo.jp/user/${user}`,
+            entry: board.aka[0],
+            share: {
+              xUrl: 'https://x.com/intent/post?text=hello',
+              lineUrl: 'https://social-plugins.line.me/lineit/share?url=https%3A%2F%2Fexample.com%2F'
+            }
+          }
+          : board;
         res.writeHead(200, { 'content-type': 'application/json; charset=utf-8' });
-        res.end(JSON.stringify(board));
+        res.end(JSON.stringify(body));
         return;
       }
       if (url.pathname.startsWith('/api/live-')) {
@@ -156,5 +174,77 @@ test.describe('/live/ の紅白は紅組と白組の両方', () => {
     expect(layout.shiroRow).toBe(true);
     expect(layout.stacked).toBe(true);
     expect(layout.sideBySide).toBe(false);
+  });
+
+  test('デスクトップの Chrome では順位の下に拡張の案内が出る', async ({ page }) => {
+    await page.setViewportSize({ width: 1280, height: 900 });
+    await page.goto(`${origin}/live/`, { waitUntil: 'domcontentloaded' });
+    const cta = page.locator('#kouhaku .app-cta');
+    await expect(cta).toContainText('推しの配信を見逃さない');
+    const href = await cta.locator('a').getAttribute('href');
+    expect(href.startsWith('https://chromewebstore.google.com/detail/cjbabignmmodaickpeckiojjabnlogdb?')).toBe(true);
+    expect(href).toContain('openExternalBrowser=1');
+    const row = await page.locator('#kouhaku .row').first().boundingBox();
+    const box = await cta.boundingBox();
+    expect(box.y).toBeGreaterThan(row.y + row.height);
+    await expect(page.locator('#kouhaku .app-cta a')).toHaveText('Chrome 拡張を入れる（無料）');
+  });
+
+  test('順位ページでも案内は表の下', async ({ page }) => {
+    await page.setViewportSize({ width: 1280, height: 900 });
+    await page.goto(`${origin}/live/kouhaku/`, { waitUntil: 'domcontentloaded' });
+    await expect(page.locator('#kouhaku-root .team--shiro h2')).toHaveText('白組');
+    const row = await page.locator('#kouhaku-root .row').first().boundingBox();
+    const box = await page.locator('#kouhaku-root .app-cta').boundingBox();
+    expect(box.y).toBeGreaterThan(row.y + row.height);
+  });
+
+  test('推しページでは応援ボタンの近く、順位より下', async ({ page }) => {
+    await page.setViewportSize({ width: 390, height: 844 });
+    await page.goto(`${origin}/live/kouhaku/u/1001/`, { waitUntil: 'domcontentloaded' });
+    await expect(page.locator('.hero h2')).toHaveText('紅1');
+    const name = await page.locator('.hero h2').boundingBox();
+    const share = await page.locator('a', { hasText: 'Xで応援を伝える' }).boundingBox();
+    const box = await page.locator('.hero .app-cta').boundingBox();
+    expect(box.y).toBeGreaterThan(name.y + name.height);
+    expect(box.y).toBeGreaterThan(share.y);
+    const href = await page.locator('.hero .app-cta a').getAttribute('href');
+    expect(href).toContain('openExternalBrowser=1');
+    expect(href.startsWith('https://')).toBe(true);
+  });
+
+  test.describe('店のリンクが無い端末', () => {
+    test.use({
+      userAgent: 'Mozilla/5.0 (iPhone; CPU iPhone OS 17_0 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/17.0 Mobile/15E148 Safari/604.1'
+    });
+
+    test('iPhone では案内を出さない', async ({ page }) => {
+      await page.setViewportSize({ width: 390, height: 844 });
+      await page.goto(`${origin}/live/`, { waitUntil: 'domcontentloaded' });
+      await expect(page.locator('#kouhaku .team--shiro h2')).toHaveText('白組');
+      await expect(page.locator('.app-cta')).toHaveCount(0);
+    });
+  });
+
+  test('イベント順位ページでも案内は表の下', async ({ page }) => {
+    await page.setViewportSize({ width: 1280, height: 900 });
+    await page.goto(`${origin}/live/event/kouhaku-2026/`, { waitUntil: 'domcontentloaded' });
+    await expect(page.locator('#kouhaku-root .team--shiro h2')).toHaveText('白組');
+    const row = await page.locator('#kouhaku-root .row').first().boundingBox();
+    const box = await page.locator('#kouhaku-root .app-cta').boundingBox();
+    expect(box.y).toBeGreaterThan(row.y + row.height);
+  });
+
+  test.describe('Android', () => {
+    test.use({
+      userAgent: 'Mozilla/5.0 (Linux; Android 14; Pixel 8) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Mobile Safari/537.36'
+    });
+
+    test('Android でも店の URL が無いので案内を出さない', async ({ page }) => {
+      await page.setViewportSize({ width: 390, height: 844 });
+      await page.goto(`${origin}/live/kouhaku/`, { waitUntil: 'domcontentloaded' });
+      await expect(page.locator('.team--aka h2')).toHaveText('紅組');
+      await expect(page.locator('.app-cta')).toHaveCount(0);
+    });
   });
 });

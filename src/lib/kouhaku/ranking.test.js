@@ -457,6 +457,7 @@ describe('画面は公式ページを取りに行かない', () => {
       ...walk('tsuioku-no-kirameki/live/event'),
       'tsuioku-no-kirameki/live/index.html',
       'tsuioku-no-kirameki/assets/js/kouhaku-board.js',
+      'tsuioku-no-kirameki/assets/js/kouhaku-app-cta.js',
       'tsuioku-no-kirameki/assets/css/kouhaku-ranking.css'
     ];
     for (const file of files) {
