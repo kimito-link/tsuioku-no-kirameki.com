@@ -355,3 +355,24 @@ footer.foot { margin-top: 26px; text-align: center; font-size: .8rem; color: var
 footer.foot a { color: var(--navy); text-decoration: none; }
 footer.foot a:hover { text-decoration: underline; }
 footer.foot img { width: 120px; height: auto; display: block; margin: 0 auto 6px; opacity: .95; }
+
+/* ── ⚡ いま動いた人(2026-11-21)。配信の名前のすぐ下。実測 2 点の差だけ(src/lib/liveMovers.js)。
+ *    ★動きの演出(アニメ)は付けない=低スペック・スマホでも描き直しは取得のとき(60 秒に 1 回)だけ。 ── */
+.movers { display: flex; flex-wrap: wrap; align-items: center; gap: 6px 8px; padding: 8px 14px; border-bottom: 1px solid var(--line); background: #fffaf2; font-size: .82rem; min-width: 0; }
+.movers__head { font-weight: 700; color: var(--navy-deep); white-space: nowrap; }
+.movers__count { color: var(--ink-sub); font-size: .76rem; }
+.movers__list { list-style: none; margin: 0; padding: 0; display: flex; flex-wrap: wrap; gap: 6px; flex-basis: 100%; min-width: 0; }
+.mover { min-width: 0; max-width: 100%; }
+.mover > a, .mover > span { display: inline-flex; align-items: center; gap: 5px; max-width: 100%; padding: 3px 9px 3px 3px; border: 1px solid var(--line); border-radius: 999px; background: #fff; color: var(--ink); text-decoration: none; }
+.mover > a:hover { border-color: var(--orange); }
+.mover .ava { width: 22px; height: 22px; border-radius: 50%; object-fit: cover; flex: 0 0 22px; background: #f1e6d6; display: inline-block; }
+.mover .mv-name { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; max-width: 9em; }
+.mover .mv-delta { font-weight: 700; color: var(--orange); white-space: nowrap; font-variant-numeric: tabular-nums; }
+.mover--comment .mv-delta { color: var(--navy); }
+.mover.tier-large > a, .mover.tier-large > span { border-color: var(--orange); background: #fff2df; }
+.mover.tier-mega > a, .mover.tier-mega > span { border-color: #c02a2a; background: #fff0ee; }
+.mover.tier-mega .mv-delta { color: #c02a2a; }
+.movers__when { margin: 0; flex-basis: 100%; font-size: .72rem; color: var(--ink-sub); }
+.movers--quiet { color: var(--ink-sub); }
+.movers__quiet { display: inline-flex; align-items: center; gap: 4px; min-width: 0; }
+.movers__quiet img { width: 22px; height: 22px; object-fit: contain; flex: 0 0 22px; }

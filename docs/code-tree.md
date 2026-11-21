@@ -27,7 +27,7 @@
 
 > 値が次の段へ届かない「断線」(broadcaster バグ型)は `npm run feature-map -- --check` が機械検知。
 
-## ⚠️ 役割コメントが無いソース 13 / 1306 件
+## ⚠️ 役割コメントが無いソース 13 / 1311 件
 - `docs/handoff/bench/bench-interval.mjs`
 - `docs/handoff/bench/bench-lane.mjs`
 - `extension-youtube/cloak-failsafe.js`
@@ -784,7 +784,7 @@
   - `yt-marketing-export.html`
   - `yt-sidepanel.html`
   - `yt-venue.html`
-- 📁 **extension-youtube/** (161)
+- 📁 **extension-youtube/** (162)
   - 📁 **data/** (1)
     - `ouen-banner.json`
   - 📁 **images/** (72)
@@ -908,7 +908,7 @@
     - `effect-rank-up.mp3`
     - `voice-complete.mp3`
     - `voice-watch.mp3`
-  - 📁 **src/** (32)
+  - 📁 **src/** (33)
     - `ab-content-entry.js` — ABEMA の放送ページで、ページが受け取ったコメントを記録に渡す入口。
     - `ab-main-entry.js` — ABEMA のページ自身の世界(MAIN)で動く小さな写し役。
     - `background-entry.js` — YouTube Live コメントの IndexedDB 全件記録・配信要約・Offscreen 読み上げ管理 Service Worker
@@ -935,6 +935,7 @@
     - `venue-nico-entry.js` — ニコ生版の会場モード(本物 venue-entry.js)を YouTube の記録で動かす入口。
     - `ww-content-entry.js` — ふわっちの視聴ページ(whowatch.tv/viewer/<配信の番号>)で、配信とコメントを読んで記録に渡す入口。
     - `ytDefaultIcon.js` — YouTube の「最初からの文字アイコン」(色付きの丸に1文字)を画像から見分ける。
+    - `ytEventStanding.js` — global document, setTimeout, clearTimeout, fetch
     - `ytGiftToNico.js` — YouTube の有料の応援(スーパーチャット・スーパーステッカー・メンバー加入・メンバーシップギフト)を、
     - `ytIdbStore.js` — YouTube Live コメントを配信(videoId)ごとに全件 IndexedDB へ記録・差分取得するストア
     - `ytLocalAssetUrls.js` — YouTube の視聴ページの中の会場(content script)で、拡張の中の画像・音を
@@ -1191,7 +1192,7 @@
   - `gift-coin-hq.wav`
   - `gift-register-hq.wav`
   - `gift-register.mp3`
-- 📁 **src/** (2554)
+- 📁 **src/** (2563)
   - 📁 **data/** (7)
     - 📁 **acquirers/** (2)
       - `laneFromStorage.js` — 応援レーン acquirer: chrome.storage.local(nls_comments) → laneStore の橋渡し。
@@ -1531,7 +1532,7 @@
         - `logo_funlink_white_RGB_link_black.png`
         - `logo_funlink_white_RGB_maru_black.png`
     - `hero-connect-hub.svg`
-  - 📁 **lib/** (2244)
+  - 📁 **lib/** (2253)
     - 📁 **__snapshots__/** (4)
       - `marketing-abema-baseline.html`
       - `marketing-niconico.html`
@@ -1570,9 +1571,15 @@
       - `mxGiftImages.test.js`
       - `mxParse.js` — ミクチャ(mixch.tv)の配信・コメント・ギフトを、YouTube 版の記録と同じ形にする(純関数)
       - `mxParse.test.js`
-    - 📁 **platform/** (40)
+    - 📁 **platform/** (45)
+      - 📁 **__fixtures__/** (1)
+        - `eventStanding.2026-11-21.json`
       - `diagTabShare.js` — 計器(yt_diag_*_chat)は1つの置き場を全タブで分け合う。
       - `diagTabShare.test.js`
+      - `eventStandingParsers.js` — 【層】L0 判定層(純粋関数・I/O禁止)
+      - `eventStandingParsers.test.js`
+      - `eventStandingView.js` — 【層】L0 判定層(純粋関数・I/O禁止)
+      - `eventStandingView.test.js`
       - `fetchTimeout.js` — 【層】L0 判定層(純粋関数・I/O禁止)
       - `fetchTimeout.test.js`
       - `followerCountSample.js` — 【層】L0 判定層(純粋関数・I/O禁止)
@@ -2631,6 +2638,8 @@
     - `liveLaneBuckets.wiring.test.js`
     - `liveMotion.js` — 補間する系列。MVP は 'comment' だけ使う(他は型として用意・後段で有効化)。
     - `liveMotion.test.js`
+    - `liveMovers.js` — /live/ の配信カード先頭「⚡ いま動いた人」の純ロジック(行の選び方と HTML)。
+    - `liveMovers.test.js`
     - `liveOgHtml.js` — 配信ごとの OGP カード用の最小 HTML を組み立てる純関数(v0.1.1517)。
     - `liveOgHtml.test.js`
     - `liveOgStats.js` — 配信ごと OGP カードの og:description に載せる「応援の数字」を組み立てる純関数(v0.1.1518)。
@@ -2646,6 +2655,8 @@
     - `liveRecentHoverCard.test.js`
     - `liveStatValuePlaceholder.js` — `.nl-live-stat-value` 向け: 数字表示かプレースホルダー文言かを判定（0.1.68 の極太フォント切替と共通）。
     - `liveStatValuePlaceholder.test.js`
+    - `liveTallyLoop.js` — コメント集計の「くり返しモード」(scripts/live-comment-tally.mjs --loop-seconds)の純ロジック。
+    - `liveTallyLoop.test.js`
     - `liveViewPublishSignature.js` — 状態速報「重さ根治 P4」: publishLiveViewPublishPayload(status-entry.js)は 3秒 min-gap を
     - `liveViewPublishSignature.test.js`
     - `livesCardSignature.js` — livesCardSignature — 配信カードを作り直すべきかの署名(v0.1.1320)。

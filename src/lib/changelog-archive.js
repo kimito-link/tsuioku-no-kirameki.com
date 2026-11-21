@@ -24,6 +24,14 @@
 /** @type {ChangelogEntry[]} */
 const ARCHIVE_ENTRIES = [
   Object.freeze({
+    version: '0.1.2153',
+    date: '2026-11-18',
+    summary: 'Kickの絵文字を名前のまま出さない',
+    items: Object.freeze([
+      'Kick の会場では、印が付いた絵文字を吹き出しの文字にせず画像のまま出します。チャンネルと全体の絵文字一覧、画面に出ている画像からも同じ名前を覚えます。知らない言葉は文字のままです。',
+    ])
+  }),
+  Object.freeze({
     version: '0.1.2152',
     date: '2026-11-18',
     summary: '公式どうしの来場は1秒差でも残す',
