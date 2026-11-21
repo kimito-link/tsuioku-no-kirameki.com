@@ -24,6 +24,15 @@
 /** @type {ChangelogEntry[]} */
 const ARCHIVE_ENTRIES = [
   Object.freeze({
+    version: '0.1.2152',
+    date: '2026-11-18',
+    summary: '公式どうしの来場は1秒差でも残す',
+    items: Object.freeze([
+      '来場の通知は、公式のメッセージが1秒違いでもそれぞれ数えます。同じ公式メッセージだけ1回です。',
+      '約2秒以内に1回に数えるのは、公式と画面の両方から入った同じ通知だけです。',
+    ])
+  }),
+  Object.freeze({
     version: '0.1.2151',
     date: '2026-11-17',
     summary: '記録テストは絵文字の名前を見ない',

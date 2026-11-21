@@ -157,7 +157,8 @@ export function parseMxLiveStats(json) {
     superfanBonus: rankOk ? sr?.superfan_bonus : null,
     eventName: ev?.title,
     eventRank: ev?.rank,
-    eventPoint: ev?.point,
+    // eventInfo.point は使わない: 2026-11-21 08:21〜08:46 JST の実測で、順位2位(公式の一覧で 1,088,728pt)の配信でも
+    //   ずっと 0 だった。本当の pt はイベントのランキング(eventStandingParsers.parseMxEventRanking)から読む。
   });
 }
 

@@ -1,0 +1,317 @@
+{
+  "note": "2026-11-21 JST 実測(公開の口・ログインなし)を短くしたもの。名前は置き換え、数はそのまま。",
+  "wwRanking": [
+    {
+      "title": "リアルタイム更新中",
+      "name": "ふわっちくんキューピー プラチナ",
+      "short_name": "前半 キューピー ふわっちくんキューピー プラチナ",
+      "ranking_type": "SHOWARETRO2026_1ST_DOLL_WHOWATCHKUN_PLATINUM",
+      "publisher_ranking": {
+        "rank": 12,
+        "point": 22940,
+        "next_rank": 11,
+        "ranking_up_point": 11,
+        "user": {
+          "id": 33401164,
+          "name": "配信者A"
+        }
+      },
+      "rankings": [
+        {
+          "rank": 10,
+          "point": 27800,
+          "user": {
+            "id": 62037240,
+            "name": "参加者10"
+          }
+        },
+        {
+          "rank": 11,
+          "point": 22950,
+          "user": {
+            "id": 100922,
+            "name": "参加者11"
+          }
+        },
+        {
+          "rank": 12,
+          "point": 22940,
+          "user": {
+            "id": 33401164,
+            "name": "参加者12"
+          }
+        },
+        {
+          "rank": 13,
+          "point": 19120,
+          "user": {
+            "id": 57726903,
+            "name": "参加者13"
+          }
+        }
+      ]
+    }
+  ],
+  "wwEventInfo": [
+    {
+      "event_key": "2026_11_showaretro2026",
+      "event_key_for_cheer_board": "2026_11_showaretro2026",
+      "rank": 12,
+      "event_name": "【昭和レトロ館】前半 キューピー ふわっちくんキューピー プラチナ",
+      "group_name": "前半 キューピー ふわっちくんキューピー プラチナ",
+      "fixed": false,
+      "buttons": [
+        {
+          "type": "RANKING",
+          "prefix": "SHOWARETRO2026",
+          "label": "ランキングを見る",
+          "ranking_type": "SHOWARETRO2026_1ST_DOLL_WHOWATCHKUN_PLATINUM"
+        },
+        {
+          "type": "EVENT_DETAIL",
+          "label": "イベント詳細",
+          "event_key": "2026_11_showaretro2026"
+        }
+      ]
+    },
+    {
+      "event_key": "2026_11_showaretro2026",
+      "event_key_for_cheer_board": "2026_11_showaretro2026",
+      "rank": 345,
+      "event_name": "【昭和レトロ館】前半 総合ランキング",
+      "group_name": "前半 総合ランキング",
+      "fixed": false,
+      "buttons": [
+        {
+          "type": "RANKING",
+          "prefix": "SHOWARETRO2026",
+          "label": "ランキングを見る",
+          "ranking_type": "SHOWARETRO2026_1ST_OVERALL"
+        },
+        {
+          "type": "EVENT_DETAIL",
+          "label": "イベント詳細",
+          "event_key": "2026_11_showaretro2026"
+        }
+      ]
+    }
+  ],
+  "srEasRank6": {
+    "event": {
+      "event_id": 44021,
+      "event_name": "【決勝】Pretty Chuu新メンバー/新アイドルグループオーディション[C-1~SS-5No Display]Bブロック",
+      "event_type": "ranking",
+      "event_url": "https://www.showroom-live.com/event/livep_prettychuu_f?block_id=259302",
+      "ranking": {
+        "before_rank": 6,
+        "event_block_division_id": 259302,
+        "gap": 1065286,
+        "is_animation": 1,
+        "large_rank": 0,
+        "lower_gap": 58474,
+        "lower_rank": 7,
+        "max_rank": 6,
+        "next_rank": 5,
+        "point": 959025,
+        "rank": 6,
+        "sequence_num": 1,
+        "text": ""
+      }
+    }
+  },
+  "srEasRank1": {
+    "event": {
+      "event_id": 43987,
+      "event_name": "【13th 3週連続SP 第2弾】チンアナゴ討伐戦 －砂の海に光を－[Gold]2",
+      "event_type": "quest",
+      "event_url": "https://www.showroom-live.com/event/chinanago_raid2026?block_id=245402",
+      "ranking": {
+        "before_rank": 1,
+        "event_block_division_id": 245402,
+        "gap": 510817,
+        "is_animation": 1,
+        "large_rank": 0,
+        "lower_gap": 510817,
+        "lower_rank": 2,
+        "max_rank": 1,
+        "next_rank": 0,
+        "point": 1520080,
+        "rank": 1,
+        "sequence_num": 1,
+        "text": ""
+      }
+    }
+  },
+  "srRankingPage": {
+    "current_page": 1,
+    "last_page": 3,
+    "total_entries": 64,
+    "is_point_visible_period": false,
+    "is_event_block": true,
+    "event_block_label": "C-1~SS-5・No Display",
+    "ranking": [
+      {
+        "rank": 1,
+        "point": 0,
+        "room_id": 578117,
+        "is_on_live": false,
+        "room_name": "部屋1"
+      },
+      {
+        "rank": 2,
+        "point": 0,
+        "room_id": 578080,
+        "is_on_live": false,
+        "room_name": "部屋2"
+      },
+      {
+        "rank": 3,
+        "point": 0,
+        "room_id": 578061,
+        "is_on_live": false,
+        "room_name": "部屋3"
+      }
+    ]
+  },
+  "mxRanking": {
+    "ranking": [
+      {
+        "id": 18713401,
+        "name": "ライバー1",
+        "score": 2037880
+      },
+      {
+        "id": 18865016,
+        "name": "ライバー2",
+        "score": 1088728
+      },
+      {
+        "id": 18458226,
+        "name": "ライバー3",
+        "score": 654959
+      },
+      {
+        "id": 18580359,
+        "name": "ライバー4",
+        "score": 575074
+      }
+    ],
+    "userScore": 0
+  },
+  "mxLive": {
+    "eventInfo": {
+      "id": 24746,
+      "kind": 0,
+      "rank": 2,
+      "title": "美少女歌祭2026_決勝",
+      "active": true,
+      "point": 0,
+      "target": 0
+    }
+  },
+  "srBlockRanking": {
+    "total_entries": 16,
+    "entries_per_page": 30,
+    "current_page": 1,
+    "block_ranking_list": [
+      {
+        "room_id": "900000",
+        "room_name": "ルーム1",
+        "rank": 1,
+        "point": 0,
+        "room_description": "(省略)"
+      },
+      {
+        "room_id": "900001",
+        "room_name": "ルーム2",
+        "rank": 2,
+        "point": 0,
+        "room_description": "(省略)"
+      },
+      {
+        "room_id": "900002",
+        "room_name": "ルーム3",
+        "rank": 3,
+        "point": 0,
+        "room_description": "(省略)"
+      },
+      {
+        "room_id": "900003",
+        "room_name": "ルーム4",
+        "rank": 4,
+        "point": 0,
+        "room_description": "(省略)"
+      },
+      {
+        "room_id": "900004",
+        "room_name": "ルーム5",
+        "rank": 5,
+        "point": 0,
+        "room_description": "(省略)"
+      },
+      {
+        "room_id": "900005",
+        "room_name": "ルーム6",
+        "rank": 6,
+        "point": 0,
+        "room_description": "(省略)"
+      },
+      {
+        "room_id": "900006",
+        "room_name": "ルーム7",
+        "rank": 7,
+        "point": 0,
+        "room_description": "(省略)"
+      },
+      {
+        "room_id": "900007",
+        "room_name": "ルーム8",
+        "rank": 8,
+        "point": 0,
+        "room_description": "(省略)"
+      },
+      {
+        "room_id": "900008",
+        "room_name": "ルーム9",
+        "rank": 9,
+        "point": 0,
+        "room_description": "(省略)"
+      },
+      {
+        "room_id": "900009",
+        "room_name": "ルーム10",
+        "rank": 10,
+        "point": 0,
+        "room_description": "(省略)"
+      },
+      {
+        "room_id": "900010",
+        "room_name": "ルーム11",
+        "rank": 11,
+        "point": 0,
+        "room_description": "(省略)"
+      },
+      {
+        "room_id": "900011",
+        "room_name": "ルーム12",
+        "rank": 12,
+        "point": 0,
+        "room_description": "(省略)"
+      },
+      {
+        "room_id": "288834",
+        "room_name": "自分の部屋",
+        "rank": 13,
+        "point": 0,
+        "room_description": "(省略)"
+      },
+      {
+        "room_id": "900013",
+        "room_name": "ルーム14",
+        "rank": 14,
+        "point": 0,
+        "room_description": "(省略)"
+      }
+    ]
+  }
+}

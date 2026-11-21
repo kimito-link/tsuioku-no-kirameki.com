@@ -21,8 +21,8 @@ export const EVB_FACE_SRC = Object.freeze({
   tanu: 'images/yukkuri-charactore-english/tanunee/tanuki-yukkuri-normal-mouth-closed.thumb128.png'
 });
 
-/** カード見出し（大会名＋小さなブランド）。 */
-function cardHeadHtml(/** @type {string} */ title) {
+/** カード見出し（大会名＋小さなブランド）。ほかのサービスのカード（platform/eventStandingView.js）も使う。 */
+export function cardHeadHtml(/** @type {string} */ title) {
   return (
     `<div class="nl-evb__head">` +
     (title ? `<p class="nl-evb__title">🏆 ${escapeHtml(title)}</p>` : '<span></span>') +
