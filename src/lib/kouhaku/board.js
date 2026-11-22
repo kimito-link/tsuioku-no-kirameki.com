@@ -8,7 +8,7 @@
  * board.js — 順位を先に出すためのデータ。説明文はページ側。
  */
 
-import { boardPath, eventCatalog, getEvent, groupLabel } from '../eventRanking/registry.js';
+import { boardPath, eventCatalog, getEvent, groupLabel, teamBoardClass } from '../eventRanking/registry.js';
 import { FEATURES, PUBLIC_SITE_URL, teamLabel } from './constants.js';
 import { rankEntries } from './calc.js';
 import { formatGrowthSinceOfficial, formatGap, formatPt } from './format.js';
@@ -83,6 +83,7 @@ export function presentEntry(entry, officialUpdateLabel, event) {
  *   boardPath: string,
  *   periodLabel: string,
  *   catalog: { id: string, name: string, path: string, fetchStart: string, fetchUntil: string }[],
+ *   layoutClass: 'teams teams--1'|'teams teams--2'|'teams teams--many',
  *   columns: { id: string, label: string, color: string, background: string, entries: PresentedEntry[] }[],
  *   aka: PresentedEntry[],
  *   shiro: PresentedEntry[]
@@ -109,6 +110,7 @@ export function presentBoard(snapshot, previous, confirmedAt, event) {
     eventName: known ? known.name : '',
     boardPath: known ? boardPath(known) : '',
     periodLabel: known ? known.periodLabel : '',
+    layoutClass: teamBoardClass(columns.length),
     catalog: eventCatalog(),
     officialUpdateLabel: snapshot.officialUpdateLabel,
     officialUpdateAt: snapshot.officialUpdateAt,

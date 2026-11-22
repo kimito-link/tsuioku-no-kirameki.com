@@ -7,8 +7,10 @@ import {
   getEvent,
   isRegisteredSource,
   personPath,
-  selectEvent
+  selectEvent,
+  teamBoardClass
 } from './registry.js';
+import { presentBoard } from '../kouhaku/board.js';
 import { decideFetch } from '../kouhaku/policy.js';
 import { emptyState } from '../kouhaku/model.js';
 import { parseRankingHtml } from '../kouhaku/parse.js';
@@ -24,6 +26,30 @@ describe('イベント順位のレジストリ', () => {
   it('期間のあとでも、終わったイベントを過去として残す', () => {
     const event = selectEvent(new Date('2026-12-10T00:00:00.000Z'));
     expect(event && event.id).toBe('kouhaku-2026');
+  });
+
+  it('列の数は組の数で決める', () => {
+    const kouhaku = getEvent('kouhaku-2026');
+    expect(kouhaku.groups).toHaveLength(2);
+    expect(kouhaku.groups.map((group) => group.color)).toEqual(['#9d2948', '#8a5a12']);
+    expect(teamBoardClass(kouhaku.groups.length)).toBe('teams teams--2');
+    expect(teamBoardClass(0)).toBe('teams teams--1');
+    expect(teamBoardClass(1)).toBe('teams teams--1');
+    expect(teamBoardClass(3)).toBe('teams teams--many');
+    const shown = presentBoard({
+      schemaVersion: 1,
+      id: 'id',
+      fetchedAt: '2026-11-21T07:30:00.000Z',
+      sourceUrl: 'https://blog.nicovideo.jp/niconews/15106',
+      officialUpdateLabel: '11月21日',
+      officialUpdateAt: null,
+      etag: null,
+      previousId: null,
+      origin: 'empty',
+      entries: []
+    }, null, null, kouhaku);
+    expect(shown.layoutClass).toBe('teams teams--2');
+    expect(shown.columns.map((column) => column.background)).toEqual(['#ffe4ea', '#fffdf8']);
   });
 
   it('取得してよいURLはレジストリの公式ページだけ', () => {

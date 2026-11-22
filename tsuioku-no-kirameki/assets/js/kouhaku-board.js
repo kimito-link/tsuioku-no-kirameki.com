@@ -121,13 +121,13 @@
     fillMeta(data.officialUpdateLabel);
     applyChrome(data);
     root.textContent = '';
-    var teams = el('div', 'teams');
     var columns = Array.isArray(data.columns) && data.columns.length
       ? data.columns
       : [
         { id: 'aka', label: '紅組', entries: data.aka || [] },
         { id: 'shiro', label: '白組', entries: data.shiro || [] }
       ];
+    var teams = el('div', teamsClass(columns.length, data.layoutClass));
     columns.forEach(function (column) {
       var section = el('section', teamClass(column.id));
       if (column.color) section.style.setProperty('--team-color', column.color);
@@ -147,7 +147,7 @@
         who.appendChild(body);
         row.appendChild(who);
         row.appendChild(el('p', 'sub', entry.gapLabel));
-        row.appendChild(el('p', 'sub', entry.deltaLabel));
+        row.appendChild(el('p', deltaClass(entry.deltaLabel), entry.deltaLabel));
         var shareUrl = httpsOnly(entry.shareUrl);
         if (shareUrl.indexOf('https://x.com/intent/post?') === 0) {
           var cheer = el('a', 'cheer', '応援');
@@ -163,6 +163,19 @@
     });
     root.appendChild(teams);
     appendAppCta(root);
+  }
+
+  function teamsClass(count, fromApi) {
+    if (fromApi === 'teams teams--many' || fromApi === 'teams teams--2' || fromApi === 'teams teams--1') return fromApi;
+    if (count >= 3) return 'teams teams--many';
+    if (count === 2) return 'teams teams--2';
+    return 'teams teams--1';
+  }
+
+  function deltaClass(text) {
+    var value = String(text || '');
+    if (!value || (value.indexOf('—') !== -1 && value.indexOf('pt') === -1)) return 'sub sub--quiet';
+    return 'sub';
   }
 
   function appendAppCta(parent) {
