@@ -51,8 +51,8 @@ export const EVENTS = [
       'https://blog.nicovideo.jp/niconews/15104'
     ],
     groups: [
-      { id: 'aka', label: '紅組', heading: '紅組', color: '#9d2948', background: '#fff1f4' },
-      { id: 'shiro', label: '白組', heading: '白組', color: '#8a5a12', background: '#fff7ec' }
+      { id: 'aka', label: '紅組', heading: '紅組', color: '#9d2948', background: '#ffe4ea' },
+      { id: 'shiro', label: '白組', heading: '白組', color: '#8a5a12', background: '#fffdf8' }
     ],
     periodLabel: '2026年11月16日 0:00 〜 11月29日 23:59（日本時間）',
     fetchStart: '2026-11-16',
@@ -84,6 +84,19 @@ export function getEvent(id) {
  */
 export function boardPath(event) {
   return `/live/event/${event.id}/`;
+}
+
+/**
+ * 画面の列の分け方。組の数だけを見る。紅白かどうかは見ない。
+ * 2組は左右2列。1組以下は1列。3組以上は横に並べ、狭い画面では横スクロール。
+ * @param {number} count
+ * @returns {'teams teams--1'|'teams teams--2'|'teams teams--many'}
+ */
+export function teamBoardClass(count) {
+  const n = Number(count);
+  if (n >= 3) return 'teams teams--many';
+  if (n === 2) return 'teams teams--2';
+  return 'teams teams--1';
 }
 
 /**

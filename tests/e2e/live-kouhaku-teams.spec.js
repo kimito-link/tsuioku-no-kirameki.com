@@ -1,5 +1,5 @@
 /**
- * /live/ に埋め込んだ紅白は、デスクトップでは紅組と白組が横並び、
+ * /live/ に埋め込んだ紅白は、デスクトップでも携帯幅でも紅組と白組が横並び。
  * 携帯幅では両方の見出しと先頭の順位が同じ画面に入る。
  * 拡張は使わない。順位 API はフィクスチャで返す。
  */
@@ -25,6 +25,27 @@ function entry(team, rank) {
     pagePath: `/live/kouhaku/u/${id}/`,
     iconUrl: 'https://secure-dcdn.cdn.nimg.jp/nicoaccount/usericon/defaults/blank.jpg',
     shareUrl: 'https://x.com/intent/post?text=test'
+  };
+}
+
+function fixtureBoard(asked) {
+  if (asked !== '1' && asked !== '3') return board;
+  const palette = [
+    { id: 'aka', label: '紅組', color: '#9d2948', background: '#ffe4ea' },
+    { id: 'shiro', label: '白組', color: '#8a5a12', background: '#fffdf8' },
+    { id: 'niji', label: '虹組', color: '#14375c', background: '#eef4fb' }
+  ];
+  const count = Number(asked);
+  return {
+    ok: true,
+    layoutClass: count >= 3 ? 'teams teams--many' : 'teams teams--1',
+    officialUpdateLabel: board.officialUpdateLabel,
+    columns: palette.slice(0, count).map((group) => ({
+      ...group,
+      entries: [entry(group.id === 'shiro' ? 'shiro' : 'aka', 1)]
+    })),
+    aka: [],
+    shiro: []
   };
 }
 
@@ -56,6 +77,7 @@ function startServer() {
       const url = new URL(req.url || '/', 'http://127.0.0.1');
       if (url.pathname === '/api/kouhaku-ranking') {
         const user = url.searchParams.get('user');
+        const asked = String(req.headers['x-fixture-teams'] || '');
         const body = user
           ? {
             ok: true,
@@ -68,7 +90,7 @@ function startServer() {
               lineUrl: 'https://social-plugins.line.me/lineit/share?url=https%3A%2F%2Fexample.com%2F'
             }
           }
-          : board;
+          : fixtureBoard(asked);
         res.writeHead(200, { 'content-type': 'application/json; charset=utf-8' });
         res.end(JSON.stringify(body));
         return;
@@ -106,28 +128,38 @@ function startServer() {
  * 見出しを画面の上に置いたあと、紅組と白組の見出しと先頭行が画面内にあるか。
  * @param {import('@playwright/test').Page} page
  */
-async function teamLayout(page) {
-  await page.locator('#kouhaku-title').evaluate((el) => el.scrollIntoView({ block: 'start' }));
-  return page.evaluate(() => {
+async function teamLayout(page, root = '#kouhaku') {
+  const title = page.locator('#kouhaku-title');
+  await (await title.count() ? title : page.locator('h1').first()).evaluate((el) => el.scrollIntoView({ block: 'start' }));
+  return page.evaluate((rootSelector) => {
     const seen = (selector) => {
       const el = document.querySelector(selector);
       if (!el) return false;
       const rect = el.getBoundingClientRect();
       return rect.height > 0 && rect.top >= -1 && rect.bottom <= window.innerHeight + 1;
     };
-    const aka = document.querySelector('#kouhaku .team--aka').getBoundingClientRect();
-    const shiro = document.querySelector('#kouhaku .team--shiro').getBoundingClientRect();
+    const aka = document.querySelector(`${rootSelector} .team--aka`).getBoundingClientRect();
+    const shiro = document.querySelector(`${rootSelector} .team--shiro`).getBoundingClientRect();
+    const teams = document.querySelector(`${rootSelector} .teams`);
+    const cheer = document.querySelector(`${rootSelector} .cheer`);
+    const cheerBox = cheer ? cheer.getBoundingClientRect() : { height: 0, width: 0 };
     return {
-      akaHead: seen('#kouhaku .team--aka h2'),
-      shiroHead: seen('#kouhaku .team--shiro h2'),
-      akaRow: seen('#kouhaku .team--aka .row'),
-      shiroRow: seen('#kouhaku .team--shiro .row'),
-      akaRows: document.querySelectorAll('#kouhaku .team--aka .row').length,
-      shiroRows: document.querySelectorAll('#kouhaku .team--shiro .row').length,
-      sideBySide: shiro.left > aka.left + 80,
-      stacked: shiro.top > aka.top + 40
+      akaHead: seen(`${rootSelector} .team--aka h2`),
+      shiroHead: seen(`${rootSelector} .team--shiro h2`),
+      akaRow: seen(`${rootSelector} .team--aka .row`),
+      shiroRow: seen(`${rootSelector} .team--shiro .row`),
+      akaRows: document.querySelectorAll(`${rootSelector} .team--aka .row`).length,
+      shiroRows: document.querySelectorAll(`${rootSelector} .team--shiro .row`).length,
+      sideBySide: shiro.left > aka.left + 40,
+      stacked: shiro.top > aka.top + 40,
+      columns: getComputedStyle(teams).gridTemplateColumns.split(' ').length,
+      cheerHeight: cheerBox.height,
+      cheerWidth: cheerBox.width,
+      quietHidden: document.querySelector(`${rootSelector} .sub--quiet`)
+        ? getComputedStyle(document.querySelector(`${rootSelector} .sub--quiet`)).display === 'none'
+        : false
     };
-  });
+  }, root);
 }
 
 test.describe('/live/ の紅白は紅組と白組の両方', () => {
@@ -161,7 +193,7 @@ test.describe('/live/ の紅白は紅組と白組の両方', () => {
     await expect(page.locator('#list')).toHaveCount(1);
   });
 
-  test('携帯幅でも白組が枠の外に隠れず、先頭同士を比べられる', async ({ page }) => {
+  test('幅390でも紅組と白組が左右2列', async ({ page }) => {
     await page.setViewportSize({ width: 390, height: 844 });
     await page.goto(`${origin}/live/`, { waitUntil: 'domcontentloaded' });
     await expect(page.locator('#kouhaku .team--aka h2')).toHaveText('紅組');
@@ -172,8 +204,28 @@ test.describe('/live/ の紅白は紅組と白組の両方', () => {
     expect(layout.shiroHead).toBe(true);
     expect(layout.akaRow).toBe(true);
     expect(layout.shiroRow).toBe(true);
-    expect(layout.stacked).toBe(true);
-    expect(layout.sideBySide).toBe(false);
+    expect(layout.sideBySide).toBe(true);
+    expect(layout.stacked).toBe(false);
+    expect(layout.columns).toBe(2);
+    expect(layout.cheerHeight).toBeGreaterThanOrEqual(40);
+    expect(layout.cheerWidth).toBeGreaterThanOrEqual(40);
+    expect(layout.quietHidden).toBe(true);
+    await expect(page.locator('#kouhaku .team--aka .sub').first()).toContainText('pt');
+  });
+
+  test('順位ページとイベントページも幅390で2列', async ({ page }) => {
+    await page.setViewportSize({ width: 390, height: 844 });
+    await page.goto(`${origin}/live/kouhaku/`, { waitUntil: 'domcontentloaded' });
+    const dedicated = await teamLayout(page, '#kouhaku-root');
+    expect(dedicated.sideBySide).toBe(true);
+    expect(dedicated.columns).toBe(2);
+    expect(dedicated.akaHead).toBe(true);
+    expect(dedicated.shiroHead).toBe(true);
+    await page.goto(`${origin}/live/event/kouhaku-2026/`, { waitUntil: 'domcontentloaded' });
+    const eventPage = await teamLayout(page, '#kouhaku-root');
+    expect(eventPage.sideBySide).toBe(true);
+    expect(eventPage.columns).toBe(2);
+    expect(eventPage.shiroHead).toBe(true);
   });
 
   test('デスクトップの Chrome では順位の下に拡張の案内が出る', async ({ page }) => {
@@ -233,6 +285,44 @@ test.describe('/live/ の紅白は紅組と白組の両方', () => {
     const row = await page.locator('#kouhaku-root .row').first().boundingBox();
     const box = await page.locator('#kouhaku-root .app-cta').boundingBox();
     expect(box.y).toBeGreaterThan(row.y + row.height);
+  });
+
+  test.describe('組が2つでないとき', () => {
+    test('1組は1列のまま', async ({ page }) => {
+      await page.setExtraHTTPHeaders({ 'x-fixture-teams': '1' });
+      await page.setViewportSize({ width: 390, height: 844 });
+      await page.goto(`${origin}/live/`, { waitUntil: 'domcontentloaded' });
+      await expect(page.locator('#kouhaku .teams')).toHaveClass(/teams--1/);
+      await expect(page.locator('#kouhaku .team')).toHaveCount(1);
+      const columns = await page.locator('#kouhaku .teams').evaluate((el) => getComputedStyle(el).gridTemplateColumns.split(' ').length);
+      expect(columns).toBe(1);
+    });
+
+    test('3組以上は狭い幅では横スクロール、PCでは横並び', async ({ page }) => {
+      await page.setExtraHTTPHeaders({ 'x-fixture-teams': '3' });
+      await page.setViewportSize({ width: 390, height: 844 });
+      await page.goto(`${origin}/live/`, { waitUntil: 'domcontentloaded' });
+      await expect(page.locator('#kouhaku .teams')).toHaveClass(/teams--many/);
+      await expect(page.locator('#kouhaku h2', { hasText: '虹組' })).toHaveCount(1);
+      const phone = await page.locator('#kouhaku .teams').evaluate((el) => ({
+        overflow: getComputedStyle(el).overflowX,
+        scrolls: el.scrollWidth > el.clientWidth + 8
+      }));
+      expect(phone.overflow).toBe('auto');
+      expect(phone.scrolls).toBe(true);
+      await page.setViewportSize({ width: 1280, height: 900 });
+      const wide = await page.locator('#kouhaku .team').evaluateAll((nodes) => {
+        const boxes = nodes.map((node) => node.getBoundingClientRect());
+        return {
+          count: boxes.length,
+          sameRow: Math.max(...boxes.map((box) => box.top)) - Math.min(...boxes.map((box) => box.top)) < 20,
+          spread: boxes[boxes.length - 1].left > boxes[0].left + 200
+        };
+      });
+      expect(wide.count).toBe(3);
+      expect(wide.sameRow).toBe(true);
+      expect(wide.spread).toBe(true);
+    });
   });
 
   test.describe('Android', () => {
