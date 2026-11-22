@@ -435,3 +435,10 @@ footer.foot img { width: 120px; height: auto; display: block; margin: 0 auto 6px
 .movers--quiet { color: var(--ink-sub); }
 .movers__quiet { display: inline-flex; align-items: center; gap: 4px; min-width: 0; }
 .movers__quiet img { width: 22px; height: 22px; object-fit: contain; flex: 0 0 22px; }
+
+/* ── (v0.1.2177) 貼られた配信(?lv=)が終わっているとき。「放送中」に見せない ── */
+.shot .onair--ended { background: #6b6259; }
+.now--ended b { color: var(--ink-sub); }
+.ended-note { display: flex; flex-wrap: wrap; align-items: center; gap: 4px 6px; padding: 8px 14px; border-bottom: 1px solid var(--line); background: #f4efe8; color: var(--ink-sub); font-size: .82rem; }
+.ended-note img { width: 22px; height: 22px; object-fit: contain; }
+.ended-note a { color: var(--navy); font-weight: 700; }
