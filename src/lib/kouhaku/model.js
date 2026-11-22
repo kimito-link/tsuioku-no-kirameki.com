@@ -11,7 +11,7 @@
 import { officialIconUrl } from './icon.js';
 
 /**
- * @typedef {'aka'|'shiro'} TeamId
+ * @typedef {string} TeamId
  * @typedef {{
  *   team: TeamId,
  *   rank: number,
@@ -20,7 +20,7 @@ import { officialIconUrl } from './icon.js';
  *   score: number,
  *   iconUrl?: string|null
  * }} RankingEntry
- * @typedef {'bootstrap'|'cron'} SnapshotOrigin
+ * @typedef {'bootstrap'|'cron'|'empty'} SnapshotOrigin
  * @typedef {{
  *   schemaVersion: 1,
  *   id: string,
@@ -90,7 +90,8 @@ export function isRankingEntry(value) {
   if (!value || typeof value !== 'object') return false;
   const entry = /** @type {RankingEntry} */ (value);
   return (
-    (entry.team === 'aka' || entry.team === 'shiro') &&
+    typeof entry.team === 'string' &&
+    /^[a-z0-9-]{1,24}$/.test(entry.team) &&
     Number.isInteger(entry.rank) &&
     entry.rank >= 1 &&
     typeof entry.userId === 'string' &&

@@ -359,20 +359,21 @@ graph LR
   f58 --> f58_3["extension/live-ranking-entry.js"]
   f58 --> f58_4["live/index.html"]
   HUB --> f59["紅白歌枠合戦2026のイベントpt応援ランキング"]
-  f59 --> f59_0["lib/kouhaku/parse.js"]
-  f59 --> f59_1["lib/kouhaku/icon.js"]
-  f59 --> f59_2["lib/kouhaku/policy.js"]
-  f59 --> f59_3["lib/kouhaku/job.js"]
-  f59 --> f59_4["server/kouhakuOfficialPage.js"]
-  f59 --> f59_5["server/kouhakuRead.js"]
-  f59 --> f59_6["kouhaku-ranking.js"]
-  f59 --> f59_7["kouhaku-og.js"]
-  f59 --> f59_8["kouhaku-og-image.js"]
-  f59 --> f59_9["live/index.html"]
-  f59 --> f59_10["live/kouhaku/index.html"]
-  f59 --> f59_11["assets/js/kouhaku-board.js"]
-  f59 --> f59_12["workflows/kouhaku-ranking.yml"]
-  f59 --> f59_13[""]
+  f59 --> f59_0["lib/eventRanking/registry.js"]
+  f59 --> f59_1["lib/kouhaku/parse.js"]
+  f59 --> f59_2["lib/kouhaku/icon.js"]
+  f59 --> f59_3["lib/kouhaku/policy.js"]
+  f59 --> f59_4["lib/kouhaku/job.js"]
+  f59 --> f59_5["server/kouhakuOfficialPage.js"]
+  f59 --> f59_6["server/kouhakuRead.js"]
+  f59 --> f59_7["kouhaku-ranking.js"]
+  f59 --> f59_8["kouhaku-og.js"]
+  f59 --> f59_9["kouhaku-og-image.js"]
+  f59 --> f59_10["live/index.html"]
+  f59 --> f59_11["live/event/index.html"]
+  f59 --> f59_12["assets/js/kouhaku-board.js"]
+  f59 --> f59_13["workflows/kouhaku-ranking.yml"]
+  f59 --> f59_14[""]
   HUB --> f60["ランキング(/live/)の配信ごと OGP"]
   f60 --> f60_0["live-og.js"]
   f60 --> f60_1["live-og-image.js"]
@@ -520,14 +521,14 @@ graph LR
 - `soundeffect-lab/`（19 件） — 効果音ラボ由来の素材候補(採否検討用)  〔音声 / 素材〕
 
 ## `src/` — LP 側 + 純粋関数ライブラリの源  〔ソース〕
-<sub>ファイル 2587 件</sub>
+<sub>ファイル 2590 件</sub>
 
 - `data/`（7 件） — 保存コメントからレーン候補を読む acquirer / source 層  〔コメント / 取得〕
 - `domain/`（20 件） — ドメイン正本(応援レーンの集約・列ポリシー等。識別子判定など)  〔応援 / 集約 / 識別子〕
 - `extension/`（120 件） — バンドル entry(content/popup/venue/status/offscreen/backfill-sw 等=機能境界)  〔entry / 記録 / 会場 / 応援〕
 - `fixtures/`（3 件） — テスト用フィクスチャ  〔テスト〕
 - `images/`（134 件） — LP / CWS 提出物のマスター画像  〔画像〕
-- `lib/`（2271 件） — 純粋関数ライブラリ(unit test 対象)。色・速度・コメント・レポート等の計算ロジックの大半  〔色 / 速度 / コメント / レポート / 純粋関数〕
+- `lib/`（2274 件） — 純粋関数ライブラリ(unit test 対象)。色・速度・コメント・レポート等の計算ロジックの大半  〔色 / 速度 / コメント / レポート / 純粋関数〕
 - `server/`（22 件） — Node 側 I/O 部品(fetch/WebSocket を実際に叩く。api と scripts が共用。lib には置けない)  〔API / 公開 / ランキング〕
 - `shared/`（7 件） — 複数機能で共有する小部品(アバター URL ガード等)  〔共有 / アバター〕
 - `sound/`（1 件） — 音声素材(src 側)  〔音声〕
@@ -545,12 +546,12 @@ graph LR
 - `mcp-nicolive/`（3 件） — ニコ生状態を読む MCP サーバ(司令塔の状態取得用)  〔MCP / 診断〕
 
 ## `tsuioku-no-kirameki/` — 本番 LP の配信ディレクトリ(Cloudflare Pages へ deploy)  〔LP / 公開〕
-<sub>ファイル 75 件</sub>
+<sub>ファイル 78 件</sub>
 
 - `articles/`（14 件） — 技術記事(防御的公開)。手法を再利用可能な形で解説  〔記事 / 公開〕
-- `assets/`（6 件） — 公開ページ群が共有する静的資産の置き場(2026-09-14)  〔LP / 共有〕
+- `assets/`（7 件） — 公開ページ群が共有する静的資産の置き場(2026-09-14)  〔LP / 共有〕
 - `images/`（41 件） — LP 用の favicon・OG 画像等  〔画像〕
-- `live/`（3 件） — /live/ 追憶のきらめき ランキング(描画は app/dist/live-ranking.js・収集は api/live-ranking.js)。/live/kouhaku/ は紅白歌枠合戦2026の公式イベントpt  〔LP / 公開 / ランキング〕
+- `live/`（5 件） — /live/ 追憶のきらめき ランキング(描画は app/dist/live-ranking.js・収集は api/live-ranking.js)。/live/event/<id>/ は公式イベントpt。古い /live/kouhaku/ は紅白へ転送  〔LP / 公開 / ランキング〕
 - `sound/`（1 件） — LP 公開用の音声素材(エール音等)  〔音声 / 公開〕
 
 ---
@@ -998,8 +999,9 @@ esbuild の import 到達グラフを逆引きし「このファイルを変え�
 - [`tsuioku-no-kirameki/live/index.html`](../tsuioku-no-kirameki/live/index.html)
 
 ### 紅白歌枠合戦2026のイベントpt応援ランキング  〔LP / 公開 / ランキング / 紅白〕
-/live/ の中と /live/kouhaku/、/live/kouhaku/u/<ユーザーID>/。出典は公式15106だけ。サーバが JST 16:30、失敗時のみ 19:30 に最大2回取得し、ブラウザは /api/kouhaku-ranking だけを読む。アイコンは公式HTMLの公開 usericon、無ければユーザーIDから組み立て、失敗時は blank.jpg。共有は X と LINE(https、openExternalBrowser=1)。定期実行は .github/workflows/kouhaku-ranking.yml。保存は Upstash の kouhaku:v1:*。無ければ同梱シード
+/live/ の中と /live/event/<id>/、/live/event/<id>/u/<ユーザーID>/。いまのイベントは日付で選ぶ。古い /live/kouhaku/ は紅白へ転送。出典はレジストリの公式ページだけ。サーバが JST 16:30、失敗時のみ 19:30 にイベントごと最大2回取得し、ブラウザは /api/kouhaku-ranking だけを読む。新しいイベントは src/lib/eventRanking/registry.js に1件足す。アイコンは公式HTMLの公開 usericon、無ければユーザーIDから組み立て、失敗時は blank.jpg。共有は X と LINE(https、openExternalBrowser=1)。定期実行は .github/workflows/kouhaku-ranking.yml。紅白の保存は Upstash の kouhaku:v1:*。無ければ同梱シード
 
+- [`src/lib/eventRanking/registry.js`](../src/lib/eventRanking/registry.js)
 - [`src/lib/kouhaku/parse.js`](../src/lib/kouhaku/parse.js)
 - [`src/lib/kouhaku/icon.js`](../src/lib/kouhaku/icon.js)
 - [`src/lib/kouhaku/policy.js`](../src/lib/kouhaku/policy.js)
@@ -1010,7 +1012,7 @@ esbuild の import 到達グラフを逆引きし「このファイルを変え�
 - [`api/kouhaku-og.js`](../api/kouhaku-og.js)
 - [`api/kouhaku-og-image.js`](../api/kouhaku-og-image.js)
 - [`tsuioku-no-kirameki/live/index.html`](../tsuioku-no-kirameki/live/index.html)
-- [`tsuioku-no-kirameki/live/kouhaku/index.html`](../tsuioku-no-kirameki/live/kouhaku/index.html)
+- [`tsuioku-no-kirameki/live/event/index.html`](../tsuioku-no-kirameki/live/event/index.html)
 - [`tsuioku-no-kirameki/assets/js/kouhaku-board.js`](../tsuioku-no-kirameki/assets/js/kouhaku-board.js)
 - [`.github/workflows/kouhaku-ranking.yml`](../.github/workflows/kouhaku-ranking.yml)
 - [`vercel.json`](../vercel.json)

@@ -50,12 +50,15 @@ export function backoffDelayMs(failedAttempts) {
 /**
  * @param {FetchState} state
  * @param {Date} now
+ * @param {{ fetchStart?: string, fetchUntil?: string }|null} [event]
  * @returns {FetchDecision}
  */
-export function decideFetch(state, now) {
+export function decideFetch(state, now, event) {
   const today = jstDateString(now);
-  if (today < EVENT_FETCH_START) return { action: 'skip', reason: 'event-not-started' };
-  if (today > EVENT_FETCH_UNTIL) return { action: 'skip', reason: 'event-closed' };
+  const fetchStart = event && event.fetchStart ? event.fetchStart : EVENT_FETCH_START;
+  const fetchUntil = event && event.fetchUntil ? event.fetchUntil : EVENT_FETCH_UNTIL;
+  if (today < fetchStart) return { action: 'skip', reason: 'event-not-started' };
+  if (today > fetchUntil) return { action: 'skip', reason: 'event-closed' };
 
   const current = viewState(state, now);
   const succeededToday = current.lastSuccessAt !== null && jstDateString(new Date(current.lastSuccessAt)) === today;

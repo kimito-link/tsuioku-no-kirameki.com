@@ -1169,7 +1169,8 @@
   - `src/lib/liveRecentHoverCard.js`
   - `src/extension/live-ranking-entry.js`
   - `tsuioku-no-kirameki/live/index.html`
-- **紅白歌枠合戦2026のイベントpt応援ランキング** — /live/ の中と /live/kouhaku/、/live/kouhaku/u/<ユーザーID>/。出典は公式15106だけ。サーバが JST 16:30、失敗時のみ 19:30 に最大2回取得し、ブラウザは /api/kouhaku-ranking だけを読む。アイコンは公式HTMLの公開 usericon、無ければユーザーIDから組み立て、失敗時は blank.jpg。共有は X と LINE(https、openExternalBrowser=1)。定期実行は .github/workflows/kouhaku-ranking.yml。保存は Upstash の kouhaku:v1:*。無ければ同梱シード
+- **紅白歌枠合戦2026のイベントpt応援ランキング** — /live/ の中と /live/event/<id>/、/live/event/<id>/u/<ユーザーID>/。いまのイベントは日付で選ぶ。古い /live/kouhaku/ は紅白へ転送。出典はレジストリの公式ページだけ。サーバが JST 16:30、失敗時のみ 19:30 にイベントごと最大2回取得し、ブラウザは /api/kouhaku-ranking だけを読む。新しいイベントは src/lib/eventRanking/registry.js に1件足す。アイコンは公式HTMLの公開 usericon、無ければユーザーIDから組み立て、失敗時は blank.jpg。共有は X と LINE(https、openExternalBrowser=1)。定期実行は .github/workflows/kouhaku-ranking.yml。紅白の保存は Upstash の kouhaku:v1:*。無ければ同梱シード
+  - `src/lib/eventRanking/registry.js`
   - `src/lib/kouhaku/parse.js`
   - `src/lib/kouhaku/icon.js`
   - `src/lib/kouhaku/policy.js`
@@ -1180,7 +1181,7 @@
   - `api/kouhaku-og.js`
   - `api/kouhaku-og-image.js`
   - `tsuioku-no-kirameki/live/index.html`
-  - `tsuioku-no-kirameki/live/kouhaku/index.html`
+  - `tsuioku-no-kirameki/live/event/index.html`
   - `tsuioku-no-kirameki/assets/js/kouhaku-board.js`
   - `.github/workflows/kouhaku-ranking.yml`
   - `vercel.json`
@@ -1222,7 +1223,7 @@
   - `src/extension/live-ranking-entry.js`
   - `tsuioku-no-kirameki/live/index.html`
   - `.github/workflows/live-ranking.yml`
-<details><summary>🗂 このカテゴリの全担当ファイル(自動分類) 358</summary>
+<details><summary>🗂 このカテゴリの全担当ファイル(自動分類) 359</summary>
 
 - `app/app.js` — スマホ閲覧用 status Web 版。
 - `app/live-view-block.js` — iPhone アプリの「🚩 見たくない人を隠す・報告する」(App Store の審査 1.2: ほかの人の書き込みを見せるアプリの決まり)。
@@ -1581,6 +1582,7 @@
 - `tools/audit-lp-overflow.mjs` — One-off LP overflow audit (run: node tools/audit-lp-overflow.mjs)
 - `tools/mcp-nicolive/server.mjs` — NicoLive Local MCP Bridge Phase1a (PoC) — stdio JSON-RPC server.
 - `tools/mcp-nicolive/store.mjs` — NicoLive Local MCP Bridge - Snapshot Store.
+- `tsuioku-no-kirameki/assets/js/kouhaku-app-cta.js` — global URL
 - `tsuioku-no-kirameki/assets/js/site-chrome-lp.js` — 追憶のきらめき サイト共通の「ヘッダー(ロゴ＋ハンバーガー)・ドロワーメニュー・フッター」。
 
 </details>

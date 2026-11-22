@@ -8,7 +8,7 @@
  * job.js — 失敗しても 200 相当の結果を返す。自動再試行で3回目の GET が走るのを避ける。
  */
 
-import { OFFICIAL_RANKING_URL } from './constants.js';
+import { getEvent } from '../eventRanking/registry.js';
 import { parseRankingHtml } from './parse.js';
 import { decideFetch, viewState } from './policy.js';
 
@@ -19,7 +19,7 @@ import { decideFetch, viewState } from './policy.js';
  * @typedef {{ ok: true, status: 200, etag: string|null, html: string }
  *   | { ok: true, status: 304, etag: string|null }
  *   | { ok: false, status: number, etag: string|null, error: string }} FetchPageResult
- * @typedef {(input: { etag: string|null, userAgent: string }) => Promise<FetchPageResult>} RankingFetcher
+ * @typedef {(input: { etag: string|null, userAgent: string, sourceUrl?: string }) => Promise<FetchPageResult>} RankingFetcher
  * @typedef {{
  *   status: 200,
  *   body: { ok: true, action: 'skipped', reason: string }
@@ -34,13 +34,16 @@ import { decideFetch, viewState } from './policy.js';
  *   now: Date,
  *   store: SnapshotStore,
  *   fetchPage: RankingFetcher,
- *   userAgent: string
+ *   userAgent: string,
+ *   event?: import('../eventRanking/registry.js').RankingEvent|null
  * }} deps
  * @returns {Promise<JobResult>}
  */
 export async function runScheduledFetch(deps) {
+  const event = deps.event || getEvent('kouhaku-2026');
+  const sourceUrl = event && event.sourceUrls[0];
   const current = viewState(await deps.store.getState(), deps.now);
-  const decision = decideFetch(current, deps.now);
+  const decision = decideFetch(current, deps.now, event);
   if (decision.action === 'skip') {
     return { status: 200, body: { ok: true, action: 'skipped', reason: decision.reason } };
   }
@@ -61,7 +64,7 @@ export async function runScheduledFetch(deps) {
   /** @type {FetchPageResult} */
   let page;
   try {
-    page = await deps.fetchPage({ etag: current.etag, userAgent: deps.userAgent });
+    page = await deps.fetchPage({ etag: current.etag, userAgent: deps.userAgent, sourceUrl: sourceUrl || '' });
   } catch (error) {
     const message = error instanceof Error ? error.name : 'fetch-error';
     await deps.store.saveState({ ...reserved, lastError: message, lastHttpStatus: 0 });
@@ -91,13 +94,13 @@ export async function runScheduledFetch(deps) {
   }
 
   try {
-    const parsed = parseRankingHtml(page.html, { fetchedAt: deps.now });
+    const parsed = parseRankingHtml(page.html, { fetchedAt: deps.now, groups: event ? event.groups : undefined });
     /** @type {Snapshot} */
     const snapshot = {
       schemaVersion: 1,
       id: deps.now.toISOString(),
       fetchedAt: deps.now.toISOString(),
-      sourceUrl: OFFICIAL_RANKING_URL,
+      sourceUrl: sourceUrl || '',
       officialUpdateLabel: parsed.officialUpdateLabel,
       officialUpdateAt: parsed.officialUpdateAt,
       etag: page.etag,

@@ -27,7 +27,7 @@
 
 > 値が次の段へ届かない「断線」(broadcaster バグ型)は `npm run feature-map -- --check` が機械検知。
 
-## ⚠️ 役割コメントが無いソース 14 / 1333 件
+## ⚠️ 役割コメントが無いソース 14 / 1335 件
 - `docs/handoff/bench/bench-interval.mjs`
 - `docs/handoff/bench/bench-lane.mjs`
 - `extension-youtube/cloak-failsafe.js`
@@ -1197,7 +1197,7 @@
   - `gift-coin-hq.wav`
   - `gift-register-hq.wav`
   - `gift-register.mp3`
-- 📁 **src/** (2587)
+- 📁 **src/** (2590)
   - 📁 **data/** (7)
     - 📁 **acquirers/** (2)
       - `laneFromStorage.js` — 応援レーン acquirer: chrome.storage.local(nls_comments) → laneStore の橋渡し。
@@ -1540,7 +1540,7 @@
         - `logo_funlink_white_RGB_link_black.png`
         - `logo_funlink_white_RGB_maru_black.png`
     - `hero-connect-hub.svg`
-  - 📁 **lib/** (2271)
+  - 📁 **lib/** (2274)
     - 📁 **__snapshots__/** (4)
       - `marketing-abema-baseline.html`
       - `marketing-niconico.html`
@@ -1552,6 +1552,9 @@
       - `abCommentPanelOwnUi.test.js`
       - `abParse.js` — ABEMA の放送ページが受け取ったコメント JSON を、YouTube 版の記録と同じ形にする(純関数)
       - `abParse.test.js`
+    - 📁 **eventRanking/** (2)
+      - `registry.js` — 【層】L0 判定層(純粋関数・I/O禁止)
+      - `registry.test.js`
     - 📁 **fixtures/** (2)
       - `interceptLearn.sample.json`
       - `nicoliveVisitorJoinSignal.placeholder.json`
@@ -1562,7 +1565,8 @@
       - `kickChatParse.test.js`
       - `kickRealtime.js` — Kick のチャットの「つなぎ先」を決めて、届いた1通を読む(純関数)
       - `kickRealtime.test.js`
-    - 📁 **kouhaku/** (15)
+    - 📁 **kouhaku/** (16)
+      - `appCta.test.js`
       - `board.js` — 【層】L0 判定層(純粋関数・I/O禁止)
       - `calc.js` — 【層】L0 判定層(純粋関数・I/O禁止)
       - `constants.js` — 【層】L0 判定層(純粋関数・I/O禁止)
@@ -3983,7 +3987,7 @@
   - `kouhaku_og.py`
   - `og-live-compose.py`
   - `render-og.js` — 追憶の煌めき LP 用 OG 画像（1200×630）を生成する。
-- 📁 **tsuioku-no-kirameki/** (75)
+- 📁 **tsuioku-no-kirameki/** (78)
   - 📁 **articles/** (14)
     - 📁 **role-separation-design/** (2)
       - 📁 **img/** (1)
@@ -4001,13 +4005,14 @@
     - `phase-gate-flow-canon.html`
     - `prewarm-coordinator-lease.html`
     - `reaction-template-classifier.html`
-  - 📁 **assets/** (6)
+  - 📁 **assets/** (7)
     - 📁 **css/** (4)
       - `kouhaku-ranking.css`
       - `live-ranking.css`
       - `site-chrome-lp.css`
       - `yukkuri-thread.css`
-    - 📁 **js/** (2)
+    - 📁 **js/** (3)
+      - `kouhaku-app-cta.js` — global URL
       - `kouhaku-board.js` — 紅白の順位を、当サイトの /api/kouhaku-ranking だけから描く。
       - `site-chrome-lp.js` — 追憶のきらめき サイト共通の「ヘッダー(ロゴ＋ハンバーガー)・ドロワーメニュー・フッター」。
   - 📁 **images/** (41)
@@ -4056,7 +4061,11 @@
     - `og-kouhaku.jpg`
     - `og-live-ranking.png`
     - `twitter-icon.png`
-  - 📁 **live/** (3)
+  - 📁 **live/** (5)
+    - 📁 **event/** (2)
+      - 📁 **u/** (1)
+        - `index.html`
+      - `index.html`
     - 📁 **kouhaku/** (2)
       - 📁 **u/** (1)
         - `index.html`

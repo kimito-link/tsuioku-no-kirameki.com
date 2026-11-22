@@ -8,6 +8,7 @@
  * ogHtml.js — クローラー向け。公式ページへは取りに行かない。
  */
 
+import { boardPath, getEvent, personPath } from '../eventRanking/registry.js';
 import { escapeHtml } from '../htmlText.js';
 import { PUBLIC_SITE_URL } from './constants.js';
 
@@ -58,41 +59,48 @@ export function buildKouhakuOgHtml(card) {
 <body>
 <p>${title}</p>
 <p>${description}</p>
-<p><a href="${escapeHtml(pageUrl)}">紅白歌枠合戦2026 イベントpt応援ランキング</a></p>
+<p><a href="${escapeHtml(pageUrl)}">${title}</a></p>
 </body>
 </html>`;
 }
 
 /**
- * @param {{ officialUpdateLabel?: string }} board
+ * @param {{ officialUpdateLabel?: string, eventId?: string, eventName?: string }} board
  * @returns {{ path: string, title: string, description: string, imagePath: string }}
  */
 export function boardOgCard(board) {
+  const event = getEvent((board && board.eventId) || 'kouhaku-2026') || getEvent('kouhaku-2026');
+  const name = (board && board.eventName) || (event && event.name) || '';
   const label = board && board.officialUpdateLabel ? board.officialUpdateLabel : '';
+  const groupText = event ? event.groups.map((group) => group.label).join('と') : '';
   return {
-    path: '/live/kouhaku/',
-    title: '紅白歌枠合戦2026 イベントpt応援ランキング',
+    path: event ? boardPath(event) : '/live/event/',
+    title: `${name} イベントpt応援ランキング`,
     description: label
-      ? `紅組と白組の公式順位です。最終の公式更新は${label}。公式は1日1回更新です。`
-      : '紅組と白組の公式順位です。公式は1日1回更新です。',
-    imagePath: '/api/kouhaku-og-image?kind=board'
+      ? `${groupText}の公式順位です。最終の公式更新は${label}。公式は1日1回更新です。`
+      : `${groupText}の公式順位です。公式は1日1回更新です。`,
+    imagePath: `/api/kouhaku-og-image?event=${encodeURIComponent(event ? event.id : 'kouhaku-2026')}&kind=board`
   };
 }
 
 /**
  * @param {{
  *   entry: { teamLabel: string, rank: number, displayName: string, scoreLabel: string, gapLabel: string, deltaLabel: string, userId: string },
- *   officialUpdateLabel?: string
+ *   officialUpdateLabel?: string,
+ *   eventId?: string,
+ *   eventName?: string
  * }} profile
  * @returns {{ path: string, title: string, description: string, imagePath: string }}
  */
 export function profileOgCard(profile) {
   const entry = profile.entry;
+  const event = getEvent(profile.eventId || 'kouhaku-2026') || getEvent('kouhaku-2026');
+  const name = profile.eventName || (event && event.name) || '';
   const label = profile.officialUpdateLabel ? `公式更新: ${profile.officialUpdateLabel}` : '公式は1日1回更新です';
   return {
-    path: `/live/kouhaku/u/${entry.userId}/`,
+    path: event ? personPath(event, entry.userId) : `/live/event/kouhaku-2026/u/${entry.userId}/`,
     title: `${entry.displayName} ${entry.teamLabel} ${entry.rank}位`,
-    description: `紅白歌枠合戦2026 ${entry.teamLabel} ${entry.rank}位。公式 ${entry.scoreLabel}。${entry.gapLabel}。${entry.deltaLabel}。${label}。公式は1日1回更新です。`,
-    imagePath: `/api/kouhaku-og-image?user=${encodeURIComponent(entry.userId)}`
+    description: `${name} ${entry.teamLabel} ${entry.rank}位。公式 ${entry.scoreLabel}。${entry.gapLabel}。${entry.deltaLabel}。${label}。公式は1日1回更新です。`,
+    imagePath: `/api/kouhaku-og-image?event=${encodeURIComponent(event ? event.id : 'kouhaku-2026')}&user=${encodeURIComponent(entry.userId)}`
   };
 }

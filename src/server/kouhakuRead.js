@@ -3,22 +3,49 @@
  * Redis が空、または鍵が無いときは、リポジトリの初期スナップショットを返す。
  */
 
+import { getEvent } from '../lib/eventRanking/registry.js';
 import seedJson from './kouhakuSeed.js';
 import { confirmedAt, presentBoard, presentProfile } from '../lib/kouhaku/board.js';
 import { sanitizeSnapshot, sanitizeState } from '../lib/kouhaku/model.js';
 
-const STATE_KEY = 'kouhaku:v1:state';
-const LATEST_KEY = 'kouhaku:v1:latest';
-const IDS_KEY = 'kouhaku:v1:ids';
 const TTL_SECONDS = 60 * 24 * 60 * 60;
 const MAX_SNAPSHOTS = 40;
+
+/**
+ * @param {import('../lib/eventRanking/registry.js').RankingEvent|null|undefined} event
+ * @returns {import('../lib/kouhaku/model.js').Snapshot|null}
+ */
+function seedFor(event) {
+  if (!event || event.storagePrefix !== 'kouhaku:v1') return null;
+  return loadSeed();
+}
+
+/**
+ * @param {import('../lib/eventRanking/registry.js').RankingEvent|null|undefined} event
+ */
+function emptyBoard(event) {
+  /** @type {import('../lib/kouhaku/model.js').Snapshot} */
+  const snapshot = {
+    schemaVersion: 1,
+    id: '1970-01-01T00:00:00.000Z',
+    fetchedAt: '1970-01-01T00:00:00.000Z',
+    officialUpdateLabel: '',
+    officialUpdateAt: null,
+    etag: null,
+    sourceUrl: event && event.sourceUrls[0] ? event.sourceUrls[0] : '',
+    origin: 'empty',
+    previousId: null,
+    entries: []
+  };
+  return presentBoard(snapshot, null, null, event || undefined);
+}
 
 /**
  * @param {string} id
  * @returns {string}
  */
-export function snapshotKey(id) {
-  return `kouhaku:v1:snap:${id}`;
+export function snapshotKey(id, prefix = 'kouhaku:v1') {
+  return `${prefix}:snap:${id}`;
 }
 
 /**
@@ -40,27 +67,33 @@ export function loadSeed() {
 
 /**
  * @param {(command: string[]) => Promise<unknown>} upstash
+ * @param {import('../lib/eventRanking/registry.js').RankingEvent|null} [event]
  * @returns {import('../lib/kouhaku/model.js').SnapshotStore}
  */
-export function createRedisStore(upstash) {
-  const seed = loadSeed();
+export function createRedisStore(upstash, event) {
+  const known = event || getEvent('kouhaku-2026');
+  const prefix = known ? known.storagePrefix : 'kouhaku:v1';
+  const seed = seedFor(known);
+  const stateKey = `${prefix}:state`;
+  const latestKey = `${prefix}:latest`;
+  const idsKey = `${prefix}:ids`;
 
   return {
     kind: 'redis',
     canWrite: () => true,
     async getState() {
-      const raw = await upstash(['GET', STATE_KEY]);
+      const raw = await upstash(['GET', stateKey]);
       const state = sanitizeState(typeof raw === 'string' ? JSON.parse(raw) : null);
-      if (!state.lastSnapshotId) return { ...state, lastSnapshotId: seed.id };
+      if (!state.lastSnapshotId && seed) return { ...state, lastSnapshotId: seed.id };
       return state;
     },
     async saveState(next) {
       const clean = sanitizeState(next);
-      await upstash(['SET', STATE_KEY, JSON.stringify(clean)]);
+      await upstash(['SET', stateKey, JSON.stringify(clean)]);
     },
     async getById(id) {
-      if (id === seed.id) return seed;
-      const raw = await upstash(['GET', snapshotKey(id)]);
+      if (seed && id === seed.id) return seed;
+      const raw = await upstash(['GET', snapshotKey(id, prefix)]);
       if (typeof raw !== 'string' || !raw) return null;
       try {
         return sanitizeSnapshot(JSON.parse(raw));
@@ -69,19 +102,19 @@ export function createRedisStore(upstash) {
       }
     },
     async getLatest() {
-      const id = await upstash(['GET', LATEST_KEY]);
-      if (typeof id !== 'string' || !id) return null;
+      const id = await upstash(['GET', latestKey]);
+      if (typeof id !== 'string' || !id) return seed;
       return this.getById(id);
     },
     async saveSnapshot(snapshot) {
       const clean = sanitizeSnapshot(snapshot);
       if (!clean) throw new Error('invalid-snapshot');
-      await upstash(['SET', snapshotKey(clean.id), JSON.stringify(clean), 'EX', String(TTL_SECONDS)]);
-      await upstash(['SET', LATEST_KEY, clean.id, 'EX', String(TTL_SECONDS)]);
+      await upstash(['SET', snapshotKey(clean.id, prefix), JSON.stringify(clean), 'EX', String(TTL_SECONDS)]);
+      await upstash(['SET', latestKey, clean.id, 'EX', String(TTL_SECONDS)]);
       /** @type {string[]} */
       let ids = [];
       try {
-        const raw = await upstash(['GET', IDS_KEY]);
+        const raw = await upstash(['GET', idsKey]);
         const parsed = typeof raw === 'string' ? JSON.parse(raw) : [];
         ids = Array.isArray(parsed) ? parsed.filter((item) => typeof item === 'string') : [];
       } catch {
@@ -90,9 +123,9 @@ export function createRedisStore(upstash) {
       const nextIds = [clean.id, ...ids.filter((item) => item !== clean.id)];
       const kept = nextIds.slice(0, MAX_SNAPSHOTS);
       const dropped = nextIds.slice(MAX_SNAPSHOTS);
-      await upstash(['SET', IDS_KEY, JSON.stringify(kept), 'EX', String(TTL_SECONDS)]);
+      await upstash(['SET', idsKey, JSON.stringify(kept), 'EX', String(TTL_SECONDS)]);
       for (const oldId of dropped) {
-        if (oldId !== seed.id) await upstash(['DEL', snapshotKey(oldId)]);
+        if (!seed || oldId !== seed.id) await upstash(['DEL', snapshotKey(oldId, prefix)]);
       }
     }
   };
@@ -100,33 +133,43 @@ export function createRedisStore(upstash) {
 
 /**
  * @param {import('../lib/kouhaku/model.js').SnapshotStore|null} store
+ * @param {import('../lib/eventRanking/registry.js').RankingEvent|null} [event]
  */
-export async function readBoard(store) {
-  const seed = loadSeed();
-  if (!store) return { ok: true, stored: false, ...presentBoard(seed, null, null) };
+export async function readBoard(store, event) {
+  const known = event || getEvent('kouhaku-2026');
+  const seed = seedFor(known);
+  if (!known) return { ok: false, found: false };
+  if (!seed && !store) return { ok: true, stored: false, ...emptyBoard(known) };
+  if (!store) return { ok: true, stored: false, ...presentBoard(seed, null, null, known) };
   try {
     const state = await store.getState();
     const latest = (await store.getLatest()) || seed;
+    if (!latest) return { ok: true, stored: false, ...emptyBoard(known) };
     const previous = latest.previousId ? await store.getById(latest.previousId) : null;
     return {
       ok: true,
-      stored: latest.origin !== 'bootstrap',
-      ...presentBoard(latest, previous, confirmedAt(latest, state.lastSuccessAt))
+      stored: latest.origin !== 'bootstrap' && latest.origin !== 'empty',
+      ...presentBoard(latest, previous, confirmedAt(latest, state.lastSuccessAt), known)
     };
   } catch {
-    return { ok: true, stored: false, ...presentBoard(seed, null, null) };
+    return seed
+      ? { ok: true, stored: false, ...presentBoard(seed, null, null, known) }
+      : { ok: true, stored: false, ...emptyBoard(known) };
   }
 }
 
 /**
  * @param {import('../lib/kouhaku/model.js').SnapshotStore|null} store
  * @param {string} userId
+ * @param {import('../lib/eventRanking/registry.js').RankingEvent|null} [event]
  */
-export async function readProfile(store, userId) {
-  const seed = loadSeed();
-  if (!/^\d{1,16}$/.test(userId)) return { ok: true, found: false };
+export async function readProfile(store, userId, event) {
+  const known = event || getEvent('kouhaku-2026');
+  const seed = seedFor(known);
+  if (!/^\d{1,16}$/.test(userId) || !known) return { ok: true, found: false };
   if (!store) {
-    const profile = presentProfile(seed, null, userId, null, true);
+    if (!seed) return { ok: true, found: false };
+    const profile = presentProfile(seed, null, userId, null, true, known);
     return profile || { ok: true, found: false };
   }
   try {
@@ -141,7 +184,8 @@ export async function readProfile(store, userId) {
           previous,
           userId,
           confirmedAt(current, state.lastSuccessAt),
-          inLatest
+          inLatest,
+          known
         );
         return profile ? { ok: true, ...profile } : { ok: true, found: false };
       }
@@ -153,7 +197,8 @@ export async function readProfile(store, userId) {
     }
     return { ok: true, found: false };
   } catch {
-    const profile = presentProfile(seed, null, userId, null, true);
+    if (!seed) return { ok: true, found: false };
+    const profile = presentProfile(seed, null, userId, null, true, known);
     return profile ? { ok: true, ...profile } : { ok: true, found: false };
   }
 }

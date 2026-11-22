@@ -8,6 +8,7 @@
  * share.js — LINE のアプリ内ブラウザ向けに openExternalBrowser=1 を付ける。
  */
 
+import { getEvent, groupLabel, personPath } from '../eventRanking/registry.js';
 import { teamLabel } from './constants.js';
 import { formatGap, formatPt, formatSigned } from './format.js';
 import { buildXIntentUrl } from '../xIntentUrl.js';
@@ -18,21 +19,24 @@ import { buildXIntentUrl } from '../xIntentUrl.js';
 
 /**
  * @param {string} userId
+ * @param {string} [eventId]
  * @returns {string}
  */
-export function pagePath(userId) {
-  return `/live/kouhaku/u/${userId}/`;
+export function pagePath(userId, eventId = 'kouhaku-2026') {
+  const event = getEvent(eventId) || getEvent('kouhaku-2026');
+  return event ? personPath(event, userId) : `/live/event/${eventId}/u/${userId}/`;
 }
 
 /**
  * LINE のアプリ内ブラウザから外部ブラウザへ出すための共有URL。
  * @param {string} siteUrl
  * @param {string} userId
+ * @param {string} [eventId]
  * @returns {string}
  */
-export function sharePageUrl(siteUrl, userId) {
+export function sharePageUrl(siteUrl, userId, eventId) {
   const origin = String(siteUrl || '').replace(/\/$/, '');
-  const url = new URL(`${origin}${pagePath(userId)}`);
+  const url = new URL(`${origin}${pagePath(userId, eventId)}`);
   url.searchParams.set('openExternalBrowser', '1');
   return url.toString();
 }
@@ -40,11 +44,16 @@ export function sharePageUrl(siteUrl, userId) {
 /**
  * @param {RankedEntry} entry
  * @param {string} officialUpdateLabel
+ * @param {import('../eventRanking/registry.js').RankingEvent|null} [event]
  * @returns {string}
  */
-export function buildShareText(entry, officialUpdateLabel) {
+export function buildShareText(entry, officialUpdateLabel, event) {
+  const named = event && typeof event === 'object' ? event : null;
+  const eventName = named && named.name ? named.name : '紅白歌枠合戦2026';
+  const known = named || getEvent('kouhaku-2026');
+  const label = (known && groupLabel(known, entry.team)) || teamLabel(entry.team);
   const lines = [
-    `紅白歌枠合戦2026 ${teamLabel(entry.team)} ${entry.rank}位`,
+    `${eventName} ${label} ${entry.rank}位`,
     entry.displayName,
     `公式スコア ${formatPt(entry.score)}pt`,
     formatGap(entry)
@@ -69,11 +78,12 @@ export function lineShareUrl(pageUrl) {
  * @param {RankedEntry} entry
  * @param {string} siteUrl
  * @param {string} officialUpdateLabel
+ * @param {import('../eventRanking/registry.js').RankingEvent|null} [event]
  * @returns {{ text: string, pageUrl: string, xUrl: string, lineUrl: string }}
  */
-export function buildShareLinks(entry, siteUrl, officialUpdateLabel) {
-  const pageUrl = sharePageUrl(siteUrl, entry.userId);
-  const text = buildShareText(entry, officialUpdateLabel);
+export function buildShareLinks(entry, siteUrl, officialUpdateLabel, event) {
+  const pageUrl = sharePageUrl(siteUrl, entry.userId, event && event.id);
+  const text = buildShareText(entry, officialUpdateLabel, event);
   return {
     text,
     pageUrl,
