@@ -238,6 +238,9 @@ function renderCommentCol(l, pulse = null) {
  * @param {number} nowMs
  */
 function renderHead(l, rankNo, capturedAt, nowMs) {
+  // ★(v0.1.2177) 貼られた配信(?lv=)が終わっているとき(onAir:false)は「放送中」に見せない。
+  //   LIVE・伸び続ける経過・推定同時視聴を出すと、昨夜の配信が「いま」に見える(2026-11-22 りんくさん「データが古い」)。
+  const ended = l.onAir === false;
   const wurl = watchUrlOf(l.liveId);
   const th = (l.thumbnail && typeof l.thumbnail === 'object') ? l.thumbnail : {};
   // ★サムネはニコ生が定期的に差し替える画像。収集時刻を付けてキャッシュを割る。
@@ -247,7 +250,8 @@ function renderHead(l, rankNo, capturedAt, nowMs) {
     : `<span class="noimg"><img src="${esc(FACE.linkBlink)}" alt=""></span>`;
   const rankCls = rankNo <= 3 ? ` r${rankNo}` : '';
   const shot = `<a class="shot" href="${esc(wurl)}" target="_blank" rel="noopener noreferrer" aria-label="配信ページを開く（新しいタブ）">`
-    + `${shotImg}<span class="rankno${rankCls}">${rankNo}</span><span class="onair">LIVE</span></a>`;
+    + `${shotImg}<span class="rankno${rankCls}">${rankNo}</span>`
+    + (ended ? '<span class="onair onair--ended">終了</span></a>' : '<span class="onair">LIVE</span></a>');
 
   const s = (l.streamer && typeof l.streamer === 'object') ? l.streamer : {};
   const sIcon = safeHttpUrl(s.icon50 || s.icon150);
@@ -262,16 +266,20 @@ function renderHead(l, rankNo, capturedAt, nowMs) {
 
   const begin = jstClock(l.beginTime);
   const end = jstClock(l.endTime);
-  const elapsed = elapsedText(l.beginTime, nowMs);
+  const endSec = Number(l.endTime) || 0;
+  const elapsed = elapsedText(l.beginTime, ended && endSec ? endSec * 1000 : nowMs);
   const times = '<div class="times">'
     + (begin ? `<span>▶ ${esc(begin)} 開始</span>` : '')
-    + (elapsed ? `<span>経過 <b>${esc(elapsed)}</b></span>` : '')
-    + (end ? `<span>〜${esc(end)} 予定</span>` : '')
+    + (ended
+      ? (end ? `<span>■ ${esc(end)} 終了</span>` : '') + (elapsed ? `<span>配信 <b>${esc(elapsed)}</b></span>` : '')
+      : (elapsed ? `<span>経過 <b>${esc(elapsed)}</b></span>` : '') + (end ? `<span>〜${esc(end)} 予定</span>` : ''))
     + '</div>';
   const urlHtml = wurl ? `<a class="url" href="${esc(wurl)}" target="_blank" rel="noopener noreferrer">${esc(wurl.replace(/^https?:\/\//, ''))}</a>` : '';
 
-  const now = estimateConcurrentForLive(l, nowMs);
-  const nowHtml = `<div class="now"><b>${now ? `約${num(now)}人` : '—'}</b><span>推定同時視聴</span></div>`;
+  const now = ended ? 0 : estimateConcurrentForLive(l, nowMs);
+  const nowHtml = ended
+    ? '<div class="now now--ended"><b>終了</b><span>この配信は終わっています</span></div>'
+    : `<div class="now"><b>${now ? `約${num(now)}人` : '—'}</b><span>推定同時視聴</span></div>`;
 
   return `<div class="live__head">${shot}<div class="live__info"><div class="streamer">${iconHtml}${nameHtml}</div>`
     + `<h2><a href="${esc(wurl)}" target="_blank" rel="noopener noreferrer">${esc(l.title || l.liveId)}</a></h2>`
@@ -346,15 +354,24 @@ function render(data) {
     const shownComment = track.valueAt('comment', receivedAt);
     const rate0 = track.ratePerMin('comment') ?? lifetimeCommentRatePerMin(l, receivedAt);
     const sx = shareHref(l);
-    return `<section class="live" data-lv="${esc(l.liveId)}">`
+    const ended = l.onAir === false;
+    // ★(v0.1.2177) 終わった配信には「いま動いた人」の代わりに、終わったことと「いま放送中」への道を出す。
+    const endedNote = ended
+      ? `<div class="ended-note"><img src="${esc(FACE.tanuHalf)}" alt="" width="22" height="22" loading="lazy" decoding="async">`
+        + `この配信は${jstClock(l.endTime) ? ` ${esc(jstClock(l.endTime))} に` : ''}終わっています。下は最後の順位表よ。`
+        + ' <a href="./">いま放送中のランキングを見る</a></div>'
+      : '';
+    return `<section class="live${ended ? ' is-ended' : ''}" data-lv="${esc(l.liveId)}">`
       + renderHead(l, i + 1, data.capturedAt, nowMs)
       // ★読む順(いちばん知りたいことを先に): 配信が何かが分かった直後に「いま誰が動いたか」。
-      + moversHtml
+      + (ended ? endedNote : moversHtml)
       + '<div class="stats">'
       + `<span>👥 来場 <b>${num(l.watchCount)}</b></span>`
-      + `<span>💬 コメント <b data-motion="comment" aria-hidden="true">${num(shownComment)}</b>`
-      + `<span class="visually-hidden">${num(l.commentCount)}</span>`
-      + `<span class="rate" data-rate="comment" title="直近の実測 2 回の差から求めた速度">${esc(formatRatePerMin(rate0))}</span></span>`
+      + (ended
+        ? `<span>💬 コメント <b>${num(l.commentCount)}</b></span>`
+        : `<span>💬 コメント <b data-motion="comment" aria-hidden="true">${num(shownComment)}</b>`
+          + `<span class="visually-hidden">${num(l.commentCount)}</span>`
+          + `<span class="rate" data-rate="comment" title="直近の実測 2 回の差から求めた速度">${esc(formatRatePerMin(rate0))}</span></span>`)
       + `<span>🎁 ギフト <b>${num(l.giftTotal)}pt</b></span>`
       + `<span>📣 広告 <b>${num(l.adTotal)}pt</b></span>`
       // ★本体(Chrome 拡張)への導線。配信ごとに「この配信を拡張で記録する」を置く。
@@ -364,7 +381,7 @@ function render(data) {
       + (sx ? `<a class="share-x" href="${esc(sx)}" target="_blank" rel="noopener noreferrer" title="X（旧 Twitter）の投稿画面が新しいタブで開くだけよ。押したことも含めて、当サイトは何も記録しないわ">X でシェア</a>` : '')
       + '</span>'
       + '</div>'
-      + (l.commentCount > 0
+      + (l.commentCount > 0 && !ended
         // ★data-fallback-rate: 実測2点が揃う前(開いた直後)は速度が null になり点が流れない。
         //   表示にも使っている rate0(実測 ?? 配信開始からの平均)を控え、motionFrame がそれで代用する。
         ? `<div class="pulse-lane${pulseIsBand(rate0) ? ' is-band' : ''}" data-lane="${esc(l.liveId)}" data-fallback-rate="${rate0 ?? ''}" aria-hidden="true"></div>`
