@@ -37,3 +37,43 @@ export function selectDisplayRecordedCount(summary) {
   const n = Number(/** @type {any} */ (summary).recordedCount);
   return Number.isFinite(n) && n > 0 ? Math.floor(n) : 0;
 }
+
+/**
+ * 会場帯・状態ページ向けに、表示用の件数文字列を数値へ戻す。
+ * 「1,956」「1956」を受け、プレースホルダー（— など）や非数は null。
+ * @param {unknown} text
+ * @returns {number|null}
+ */
+export function parseDisplayCountText(text) {
+  if (text == null) return null;
+  const s = String(text).trim();
+  if (!s || s === '—' || s === '-' || s === '–' || s === '…' || s === '...') return null;
+  const n = Number(s.replace(/[,，\s]/g, ''));
+  return Number.isFinite(n) && n >= 0 ? Math.floor(n) : null;
+}
+
+/**
+ * この配信の「記録件数」を、会場帯と状態ページで同じ値に揃える。
+ * 正本（panel_summary の recordedCount）と鏡/写しの数字があるときは大きい方を使う。
+ * （開いた瞬間の「記録 1」が鏡に凍ったまま正本を潰さない。同一配信内で件数が減って見えないようにする。）
+ * どれも無ければ null（未知を「0件」と出さない）。
+ *
+ * @param {{ recordedCount?: unknown, mirrorTexts?: unknown[] }} [input]
+ * @returns {number|null}
+ */
+export function resolveRecordsCountForDisplay(input = {}) {
+  /** @type {number[]} */
+  const xs = [];
+  const raw = input?.recordedCount;
+  if (raw != null && raw !== '') {
+    const rec = Number(raw);
+    if (Number.isFinite(rec) && rec >= 0) xs.push(Math.floor(rec));
+  }
+  const texts = Array.isArray(input?.mirrorTexts) ? input.mirrorTexts : [];
+  for (const t of texts) {
+    const n = parseDisplayCountText(t);
+    if (n != null) xs.push(n);
+  }
+  if (!xs.length) return null;
+  return Math.max(...xs);
+}

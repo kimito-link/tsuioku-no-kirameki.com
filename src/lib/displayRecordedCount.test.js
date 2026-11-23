@@ -2,7 +2,9 @@ import { describe, it, expect } from 'vitest';
 import {
   selectDisplayRecordedCount,
   DISPLAY_RECORDED_COUNT_FIELD,
-  DIAGNOSTIC_ONLY_COUNT_FIELDS
+  DIAGNOSTIC_ONLY_COUNT_FIELDS,
+  parseDisplayCountText,
+  resolveRecordsCountForDisplay
 } from './displayRecordedCount.js';
 
 describe('selectDisplayRecordedCount', () => {
@@ -43,5 +45,32 @@ describe('selectDisplayRecordedCount', () => {
     expect(DIAGNOSTIC_ONLY_COUNT_FIELDS).toContain('commentIngestBySource');
     // 正本フィールドが診断専用リストに混入していないこと(分離の保証)。
     expect(DIAGNOSTIC_ONLY_COUNT_FIELDS).not.toContain(DISPLAY_RECORDED_COUNT_FIELD);
+  });
+});
+
+describe('parseDisplayCountText / resolveRecordsCountForDisplay', () => {
+  it('ロケール付きの件数文字列を数値に戻す', () => {
+    expect(parseDisplayCountText('1,956')).toBe(1956);
+    expect(parseDisplayCountText('1')).toBe(1);
+    expect(parseDisplayCountText('5')).toBe(5);
+    expect(parseDisplayCountText('—')).toBe(null);
+    expect(parseDisplayCountText('')).toBe(null);
+    expect(parseDisplayCountText(-3)).toBe(null);
+  });
+
+  it('v0.1.2201 実機: 会場「記録 1件」と状態「記録 5」と保存 1,956 件が食い違わないよう、最大の正本を採用する', () => {
+    // 凍った鏡の「1」は、状態ページの正本 5 や保存件数 1956 を潰さない。
+    expect(resolveRecordsCountForDisplay({ recordedCount: 5, mirrorTexts: ['1'] })).toBe(5);
+    expect(resolveRecordsCountForDisplay({ recordedCount: 1956, mirrorTexts: ['1', '5'] })).toBe(1956);
+    expect(resolveRecordsCountForDisplay({ recordedCount: 5, mirrorTexts: ['1,956'] })).toBe(1956);
+  });
+
+  it('正本も鏡も無いときは null（未知を 0 件と出さない）', () => {
+    expect(resolveRecordsCountForDisplay({})).toBe(null);
+    expect(resolveRecordsCountForDisplay({ recordedCount: null, mirrorTexts: ['—'] })).toBe(null);
+  });
+
+  it('観測した 0 件はそのまま 0', () => {
+    expect(resolveRecordsCountForDisplay({ recordedCount: 0 })).toBe(0);
   });
 });

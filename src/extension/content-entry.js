@@ -11317,6 +11317,11 @@ async function seedTailFromMain(lid) {
   observedRecordedCommentCount = tailMainCount + tailRowsBuffer.length;
   lastTailCompactAt = Date.now();
   tailSeededLiveId = lid;
+  // シードで保存済み件数が分かった瞬間に、状態ページと会場帯の正本(panel_summary)へ書く。
+  //   書かないと、後続の incremental が過小な total で observed を上書きしても
+  //   表示用サマリが古い「記録 5」のまま残る（v0.1.2201 実機 lv351559154）。
+  _lastPanelSummaryRecordedWritten = recordedCountForDisplay(lid);
+  void persistPanelLiveSummaryIfDue(true);
 }
 
 const PANEL_SUMMARY_WRITE_MIN_MS = 2_000;
@@ -12579,11 +12584,21 @@ async function persistCommentRowsImpl(rows, opts = {}) {
         }
       : mergeNewComments(liveId, existing, enriched);
     let { next, storageTouched } = mergedRows;
-    const effectiveTotalCount = incrementalMode
+    const incrementalTotal = incrementalMode
       ? (liveChunkIndex ? Math.max(0, Number(liveChunkIndex.total) || 0) : 0) +
         (incrementalAdded || []).length
       : next.length;
+    const knownStored = Math.max(
+      Number(_savedCommentsUidStatsRunning && _savedCommentsUidStatsRunning.totalSaved) || 0,
+      Number(_lastSavedCommentsUidStats && _lastSavedCommentsUidStats.totalSaved) || 0,
+      (Number(tailMainCount) || 0) + (Array.isArray(tailRowsBuffer) ? tailRowsBuffer.length : 0)
+    );
+    const effectiveTotalCount = Math.max(incrementalTotal, knownStored);
     observedRecordedCommentCount = effectiveTotalCount;
+    if (recordedCountForDisplay(liveId) !== _lastPanelSummaryRecordedWritten) {
+      _lastPanelSummaryRecordedWritten = recordedCountForDisplay(liveId);
+      void persistPanelLiveSummaryIfDue(true);
+    }
     // テール compaction がメイン件数を受け取れるよう同期更新（次の早期 return でも有効）。
     lastImplMainCount = effectiveTotalCount;
     noteOfficialCommentSample(Date.now());

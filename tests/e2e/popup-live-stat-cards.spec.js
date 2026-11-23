@@ -16,7 +16,7 @@ const STORAGE_COMMENTS = 'nls_comments_lv888888888';
  * 記録件数はモック watch の仮想リスト行が content から取り込まれるため、3 件 seed より増えることがある。
  */
 test.describe('popup live stat cards', () => {
-  test('watch 解決後、来場・同接・記録が「—」固定にならない', async ({ context }) => {
+  test('watch 解決後、来場・記録は数値になり、同接は負数や ~0 にならない', async ({ context }) => {
     let sw = context.serviceWorkers()[0];
     if (!sw) {
       sw = await context.waitForEvent('serviceworker', { timeout: 60_000 });
@@ -80,9 +80,9 @@ test.describe('popup live stat cards', () => {
           const t = (await popup.locator('#watchConcurrentEst').innerText()).trim();
           return t;
         },
-        { timeout: 25_000, message: '推定同接カードが計測中／— から遷移するまで' }
+        { timeout: 25_000, message: '推定同接カードが負数や ~0 にならないまで' }
       )
-      .not.toMatch(/^(—|－|計測中…)$/u);
+      .toMatch(/^(—|－|計測中…?|[1-9][\d,，]*)$/u);
 
     await expect
       .poll(

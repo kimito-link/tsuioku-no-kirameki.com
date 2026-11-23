@@ -14,7 +14,9 @@ import {
   resolveConcurrentViewers,
   resolveDirectViewersThresholds,
   retentionRate,
-  DEFAULT_WINDOW_MS
+  DEFAULT_WINDOW_MS,
+  formatConcurrentEstimateText,
+  isInsufficientConcurrentEstimate
 } from './concurrentEstimate.js';
 
 describe('getPlatformProfile / プロファイル化', () => {
@@ -782,5 +784,44 @@ describe('resolveConcurrentViewers', () => {
       streamAgeMin: 30
     });
     expect(r.method).toBe(expected);
+  });
+});
+describe('formatConcurrentEstimateText / isInsufficientConcurrentEstimate', () => {
+  it('負数・非数は文字列にしない（~ も付けない）', () => {
+    expect(formatConcurrentEstimateText(-3143)).toBe(null);
+    expect(formatConcurrentEstimateText(Number.NaN)).toBe(null);
+    expect(formatConcurrentEstimateText(-0.9)).toBe(null);
+    expect(formatConcurrentEstimateText(Infinity)).toBe(null);
+    expect(formatConcurrentEstimateText(3143)).toBe('3,143');
+    expect(formatConcurrentEstimateText(0)).toBe('0');
+    expect(String(formatConcurrentEstimateText(3143))).not.toMatch(/[~-]/u);
+  });
+
+  it('v0.1.2201 実機: 5分内 0人×23.7 の滞留床だけなら材料不足（人数を捏造しない）', () => {
+    const resolved = resolveConcurrentViewers({
+      nowMs: 1_800_000_000_000,
+      recentActiveUsers: 0,
+      totalVisitors: 39289,
+      streamAgeMin: 19 * 60 + 20
+    });
+    expect(resolved.estimated).toBeGreaterThan(0);
+    expect(resolved.base.method).toBe('retention_only');
+    expect(resolved.base.multiplier).toBe(23.7);
+    expect(isInsufficientConcurrentEstimate(resolved)).toBe(true);
+    // 推定値自体は負にならない（表示のチルダがマイナスに見えていた）
+    expect(resolved.estimated).toBeGreaterThanOrEqual(0);
+    expect(formatConcurrentEstimateText(resolved.estimated)).not.toMatch(/^-/u);
+  });
+
+  it('直近の発言者がいれば fallback 推定は材料あり', () => {
+    const resolved = resolveConcurrentViewers({
+      nowMs: 1_800_000_000_000,
+      recentActiveUsers: 12,
+      totalVisitors: 800,
+      streamAgeMin: 40
+    });
+    expect(resolved.method).toBe('fallback');
+    expect(isInsufficientConcurrentEstimate(resolved)).toBe(false);
+    expect(formatConcurrentEstimateText(resolved.estimated)).toMatch(/^[\d,]+$/u);
   });
 });
