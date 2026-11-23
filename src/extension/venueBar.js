@@ -64,7 +64,7 @@ import { escapeHtml } from '../lib/htmlText.js';
 import { createVenueLiveCommentHandler } from '../lib/venueLiveCommentRoute.js';
 import { buildVenueHeadlessVoiceItem } from '../lib/venueHeadlessVoiceItem.js';
 import {
-  createVenueCrowdMotion, createVenuePaintSchedule, growVenueSeatNodes, isVenuePageHidden,
+  createVenueCrowdMotion, createVenueHiddenSpeechBuffer, createVenuePaintSchedule, growVenueSeatNodes, isVenuePageHidden,
   resolveVenueSpeechPaintSkip, shouldAnimateVenueCrowd, shouldSyncVenueSeatCommit,
   unusedSeatNeedsCleanup,
 } from '../lib/venuePaintSchedule.js';
@@ -3369,6 +3369,7 @@ export function mountVenueBarButton(options = {}) {
 
   const venueVoiceWarmup = createVoicevoxWarmup(); // 初めての声を合成前に読み込む(voiceWarmup.js)
   wireVoiceQualitySetting(); // 2026-10-29: 声の音質(既定16kHz・高音質24kHz)
+  const hiddenSpeechBuf = createVenueHiddenSpeechBuffer({ maxKeep: 3 });
   const voicePlayer = new VoicePlayer({
     storage: typeof chrome !== 'undefined' && chrome.storage ? chrome.storage.local : null,
     storageOnChanged: typeof chrome !== 'undefined' && chrome.storage ? chrome.storage.onChanged : null, // P2: 音量の追従
@@ -3377,6 +3378,7 @@ export function mountVenueBarButton(options = {}) {
       pickupVoice.noteWanted(enabled);
       if (!open) voicePlayer.diag.venueGate = enabled ? 'headless' : (voicePlayer.readingWanted ? 'headless-waiting-engine' : 'panel-closed');
       if (!enabled) updatePickupBanner(null);
+      if (!voicePlayer.readingWanted) hiddenSpeechBuf.clear();
       voiceBtn.disabled = false; voiceBtn.setAttribute('aria-busy', toggleBusy ? 'true' : 'false');
       voiceBtn.classList.toggle('is-on', enabled);
       voiceBtn.textContent = enabled ? '🔊 読み上げ: ON' : '🔈 読み上げ: OFF';
@@ -5278,6 +5280,7 @@ export function mountVenueBarButton(options = {}) {
     speechGeneration += 1;
     speechLiveId = nextLiveId;
     speechState = { seenKeys: null, primed: false, hiNo: 0 };
+    hiddenSpeechBuf.clear();
     speechStreaks.clear();
     // 前状態保持(lastGood)も破棄: 配信切替/閉じる時は前配信の参加者を持ち越さない(INV-3)。
     lastGoodRows = [];
@@ -6812,29 +6815,19 @@ export function mountVenueBarButton(options = {}) {
    * @param {string} [source] 計器用: 取り込み元(ndgr/ndgr_forward/backfill/deep…・live 経路のみ)
    */
   const processSpeechRows = (rows, path = 'unknown', source = '') => {
-    // primeEmit: 会場を開いた瞬間に直近3件を吹き出す(過疎番組でも会場が喋って見える)。
-    //   2回目以降は primed 済みなので新着だけ。過去ログ一斉飛びは起きない。
-    // v0.1.755 リアルタイム完璧化: maxEmit 8→24。洪水時に「9件目以降の新着を取りこぼす」のを防ぐ
-    //   (会議結論=取りこぼさず全部通す)。同時表示数は BUBBLE_MAX(12)+流速可変寿命で抑えるので
-    //   画面は埋まり続けない。24 は1ポーリング/1バーストの現実的上限(初回フラッシュは primeEmit で別管理)。
-    const speechReceivedAt = Date.now(); // v0.1.1803計器: ライブ経路の行は capturedAt が無いので受信→キューはこれで測る
-    // v0.1.1866: 開いた瞬間の直近3件(primeEmit)は開く前に届いた発言なので「受信→キュー」の遅れに数えない(数えると過疎配信で何分も「遅れ」が残った)。
+    const speechReceivedAt = Date.now();
     const primeBurst = !(speechState && speechState.primed === true);
-    // v0.1.1914: oldNoGap=過去ログ取り込みの古い番号は吹き出さない(既読にだけする・lib の venueSpeech.js)。
     const result = pickNewVenueSpeech(rows, speechState, { maxEmit: 24, primeEmit: 3, oldNoGap: VENUE_OLD_SPEECH_NO_GAP, emoteDict: venueEmoteDict });
-    speechState = {
-      seenKeys: result.seenKeys,
-      primed: result.primed,
-      hiNo: Number(result.hiNo) || 0
-    };
-    // 会場を閉じても「読み上げ ON」は実際に読み続ける。描画・席・吹き出しは一切起こさず、
-    // 同じ新着/dedup経路から音声だけを渡す(閉じた会場のCPU負荷を復活させない)。
+    speechState = { seenKeys: result.seenKeys, primed: result.primed, hiNo: Number(result.hiNo) || 0 };
     const pageHidden = isPageHidden();
     if (!open || tucked || pageHidden) {
       voicePlayer.diag.venueGate = resolveVenueSpeechPaintSkip({
         open, tucked, hidden: pageHidden, voiceEnabled: voicePlayer.enabled, readingWanted: voicePlayer.readingWanted,
       }).venueGate;
-      if (pageHidden) return;
+      if (pageHidden) {
+        if (voicePlayer.enabled || voicePlayer.readingWanted) hiddenSpeechBuf.push(result.speeches, { isPrimeBurst: primeBurst });
+        return;
+      }
       const liveId = liveIdFromPathname();
       const receivedAt = Date.now();
       for (const speech of result.speeches) {
@@ -7519,8 +7512,15 @@ export function mountVenueBarButton(options = {}) {
     if (document.visibilityState !== 'visible') { stopCrowdMotion(); return; }
     startCrowdMotion();
     venuePaint.kick();
-    if (!open || !voicePlayer.enabled) return;
-    try { voicePlayer.flushPendingQueue(); } catch { /* no-op */ }
+    if (!voicePlayer.readingWanted) { hiddenSpeechBuf.clear(); return; }
+    if (!voicePlayer.enabled) return;
+    if (open) try { voicePlayer.flushPendingQueue(); } catch { /* no-op */ }
+    const liveId = liveIdFromPathname();
+    const receivedAt = Date.now();
+    for (const sp of hiddenSpeechBuf.drain().voiceSpeeches) {
+      const voiceIt = () => voicePlayer.enqueue([buildVenueHeadlessVoiceItem(sp, { receivedAt, liveId, broadcasterUid: _lastBroadcasterUid })]);
+      if (!venueReaderLease) voiceIt(); else venueReaderLease.whenMine(liveId, voiceIt);
+    }
   });
 
   if (isStandalone) {

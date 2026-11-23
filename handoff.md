@@ -1,16 +1,16 @@
-# Handoff — P0-1: 6 入口移行 + bfcache 再接続 + Twitch IRC 無通信見張り (v0.1.2192)
+# Handoff — P0-A: 裏タブ中の未読コメント復帰読み上げ + VOICEVOX未接続時のバッファ保持 (v0.1.2195)
 
-STATUS: 追加レビュー指摘対応済み・push 待ち（PR #694 / v0.1.2192 commit 済み・未 push）
-ROOT_CAUSE: (1) Twitch・Kick・mixch・SHOWROOM で pagehide 時に current.stop() しても current = null にしていなかったため、pageshow や表示復帰で戻っても同じ key では startReader() が再実行されず記録・読み上げが止まったままになっていた。(2) Twitch IRC に Hermes 相当の無通信見張りがなく、サイレント切断時に再接続されなかった。
-FILES_CHANGED: src/lib/pageWatchScheduler.js, src/lib/pageWatchScheduler.test.js, src/lib/pageWatchScheduler.wiring.test.js, extension-youtube/src/tw-content-entry.js, extension-youtube/src/kick-content-entry.js, extension-youtube/src/mx-content-entry.js, extension-youtube/src/sr-content-entry.js, extension/manifest.json, package.json, src/lib/changelog.js, src/lib/changelog-archive.js, tsuioku-no-kirameki/index.html, extension/dist/*, app/dist/live-view.js, extension/background.js, .dist-fingerprint.json, docs/repo-tree-map.{md,html}, docs/code-tree.{md,html}, docs/feature-sitemap.{md,html}, handoff.md
-CHANGES: (1) Twitch・Kick・mixch・SHOWROOM 全 4 入口（mixch/SHOWROOM の 1s setInterval も pageWatchScheduler へ移行）で pagehide 時に current?.stop(); current = null; とゲートリセットを行い、pageshow(ev?.persisted || !current) および visibilitychange 表復帰で必ず同じ key でも再接続するように修正。(2) src/lib/pageWatchScheduler.js に L0 純関数 shouldReconnectSilentSocket を追加し、tw-content-entry.js の IRC（IRC_SILENCE_MS=330_000）と Hermes の無通信見張りを共通スケジューラ（表 10s / 裏 60s / 表復帰で即 kick()）へ統合（裸の hWatch setInterval も撤去）。(3) 単体テスト・配線テストを追加し、版を 0.1.2192 へ統一（権限追加なし）。
-TESTS_RUN: npm run test:cc -- src/lib/pageWatchScheduler.test.js src/lib/pageWatchScheduler.wiring.test.js src/lib/venuePaintSchedule.test.js src/lib/venuePaintSchedule.wiring.test.js src/lib/changelogBundleBudget.test.js src/lib/changelog.test.js src/lib/changelogConsistency.test.js / npm run verify:bump / npm run check:dist-fresh / npm run tree-map:check / npm run lint / npm run typecheck / verify:extension
-TEST_RESULT: 全合格（vitest 7 files / 63 passed、verify:bump 全7ステップOK 0.1.2192、dist-fresh OK 7397ec5204a9、tree-map up to date、eslint 0 errors、tsc 0 errors、verify:extension 合格［v0.1.2192 全13画面・全10差し込み先OK］）
-REMAINING_RISKS: 実配信ページ（グラフィック アクセラレーション OFF）での拡張 ON/OFF 比較計測（long task 回数・最長・CPU・スクリーンショット）はまだ未実施のため、PR 本文では「軽くなった」と断定せず、実測の追記待ちとして下書き PR にする。push・下書き PR 作成は Antigravity ルール（~/.gemini/AGENTS.md）により未実施。
-NEXT_ACTION: Claude Code / 手元で feat/lowspec-p0-1-page-watch を push して下書き PR を作成し、CI 確認＋グラフィック アクセラレーション OFF 実配信比較計測を追記する。次 PR は P0-2（content-chat-entry.js の Observer 4 つを mutationObserverHub へ統合）。
+STATUS: #695 レビュー指摘対応済み・push 待ち（commit 済み・未 push）
+ROOT_CAUSE: #695（0c25c84c1）の表復帰処理で !voicePlayer.enabled のときに hiddenSpeechBuf.clear() していたため、利用者が「読み上げ: ON」（readingWanted=true）のまま VOICEVOX 未接続の状態で戻るとバッファが捨てられていた。
+FILES_CHANGED: src/extension/venueBar.js, src/lib/venuePaintSchedule.wiring.test.js, extension/manifest.json, package.json, src/lib/changelog.js, src/lib/changelog-archive.js, tsuioku-no-kirameki/index.html, extension/dist/*, app/dist/live-view.js, extension/background.js, .dist-fingerprint.json, docs/repo-tree-map.{md,html}, docs/code-tree.{md,html}, docs/feature-sitemap.{md,html}, handoff.md
+CHANGES: (1) venueBar.js の hiddenSpeechBuf 宣言を voicePlayer 初期化直前へ移し、onToggle で !voicePlayer.readingWanted（利用者が読み上げを OFF にした瞬間）に hiddenSpeechBuf.clear() を呼ぶように修正。(2) visibilitychange の表復帰処理は !voicePlayer.readingWanted のときだけ clear() し、readingWanted=true かつ !voicePlayer.enabled（VOICEVOX 未接続）のときは捨てずに return するように修正（venueBar.js は 7543 行 <= 上限 7545 行）。(3) venuePaintSchedule.wiring.test.js に配線テストを追加し、版を 0.1.2195（P0-B の 0.1.2194 と非衝突）へ統一。
+TESTS_RUN: npm run test:cc -- src/lib/venuePaintSchedule.test.js src/lib/venuePaintSchedule.wiring.test.js src/lib/venueHeadlessVoice.wiring.test.js src/lib/venueHeadlessVoiceItem.test.js src/lib/changelogBundleBudget.test.js src/lib/changelog.test.js src/lib/changelogConsistency.test.js / npm run verify:bump / npm run check:dist-fresh / npm run tree-map:check / npm run lint / npm run typecheck / verify:extension
+TEST_RESULT: 全合格（vitest 7 files / 54 passed、verify:bump 全7ステップOK 0.1.2195、dist-fresh OK ac9e6f2d7108、tree-map up to date、eslint 0 errors［venueBar.js 行数上限クリア］、tsc 0 errors、verify:extension 合格［v0.1.2195 全13画面・全10差し込み先OK］）
+REMAINING_RISKS: 実配信ページ（グラフィック アクセラレーション OFF）での「裏に回す→コメントが来る→戻る」の実地確認は未実施のため、下書き PR として実配信確認待ちとする。push・PR 作成は Antigravity ルールにより未実施。
+NEXT_ACTION: 手元で fix/venue-hidden-speech-resume を push して下書き PR を作成し、実配信確認後にマージする。次の PR は P0-B（ww/tc/tt/ab の再接続漏れ修正＋pageWatchScheduler 移行）→ P0-2（mutationObserverHub＋YouTube チャット）。
 LAST_WORKED_ON: 2026-11-23
 WORKED_BY: antigravity / Gemini 4 Neon (Medium)
-MACHINE_NOTES: worktree=..\_worktrees\tsuioku-no-kirameki.com\lowspec-p0-1 (branch: feat/lowspec-p0-1-page-watch, base: origin/master 5c8f700c0)。本体チェックアウトの未コミット変更には一切触れていない。
+MACHINE_NOTES: worktree=..\_worktrees\tsuioku-no-kirameki.com\cleanup-p0-a (branch: fix/venue-hidden-speech-resume, base: origin/master 3617958a4)。本体チェックアウトの未コミット変更には一切触れていない。
 
 ## NEEDS_JUDGMENT（司令塔が判断する。ここを自動で直してはいけない）
 
