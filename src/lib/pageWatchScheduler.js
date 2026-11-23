@@ -89,6 +89,28 @@ export function evaluatePageWatchTask(s) {
 }
 
 /**
+ * 接続が開いたまま無通信（サイレント切断）になっていないかを判定する純関数。
+ * Twitch IRC / Hermes などの WebSocket 見張りで共有する。
+ *
+ * @param {{
+ *   open?: boolean,
+ *   lastActivityAt?: number,
+ *   now?: number,
+ *   silenceMs?: number
+ * }} s
+ * @returns {boolean} true なら無通信のため切断して再接続する
+ */
+export function shouldReconnectSilentSocket(s = {}) {
+  if (s.open !== true) return false;
+  const last = Number(s.lastActivityAt);
+  const now = Number(s.now);
+  const limit = Number(s.silenceMs);
+  if (!Number.isFinite(last) || last <= 0) return false;
+  if (!Number.isFinite(now) || !Number.isFinite(limit) || limit <= 0) return false;
+  return now - last > limit;
+}
+
+/**
  * 複数タスクの定期監視を 1 本のベースタイマーに集約するスケジューラ。
  *
  * @param {{

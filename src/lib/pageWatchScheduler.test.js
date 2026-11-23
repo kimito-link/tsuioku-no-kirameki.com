@@ -1,5 +1,9 @@
 import { describe, it, expect, vi } from 'vitest';
-import { evaluatePageWatchTask, createPageWatchScheduler } from './pageWatchScheduler.js';
+import {
+  evaluatePageWatchTask,
+  shouldReconnectSilentSocket,
+  createPageWatchScheduler,
+} from './pageWatchScheduler.js';
 
 function createFakeClock() {
   let now = 0;
@@ -293,6 +297,54 @@ describe('createPageWatchScheduler', () => {
     clock.advance(1000);
     expect(task).toHaveBeenCalledTimes(3);
     expect(clock.activeTimerCount()).toBe(1);
+    sched.stop();
+  });
+});
+
+describe('shouldReconnectSilentSocket', () => {
+  it('接続中かつ無通信時間が silenceMs を超えたら true、通信ありや閉鎖中は false', () => {
+    expect(shouldReconnectSilentSocket({ open: true, lastActivityAt: 1000, now: 332_000, silenceMs: 330_000 })).toBe(true);
+    expect(shouldReconnectSilentSocket({ open: true, lastActivityAt: 1000, now: 331_000, silenceMs: 330_000 })).toBe(false);
+    expect(shouldReconnectSilentSocket({ open: false, lastActivityAt: 1000, now: 999_999, silenceMs: 330_000 })).toBe(false);
+    expect(shouldReconnectSilentSocket({ open: true, lastActivityAt: 0, now: 999_999, silenceMs: 330_000 })).toBe(false);
+  });
+
+  it('pageWatchScheduler と組み合わせて裏タブでは 60s に粗く見張り、表復帰の kick() で即無通信を検知する', () => {
+    const clock = createFakeClock();
+    let hidden = true;
+    const closeSocket = vi.fn();
+    const lastActivityAt = 0;
+    const sched = createPageWatchScheduler({
+      baseTickMs: 10_000,
+      now: clock.now,
+      isHidden: () => hidden,
+      setIntervalFn: clock.setIntervalFn,
+      clearIntervalFn: clock.clearIntervalFn,
+      setTimeoutFn: clock.setTimeoutFn,
+      clearTimeoutFn: clock.clearTimeoutFn,
+    });
+    sched.register({
+      id: 'silence-watch',
+      intervalMs: 10_000,
+      hiddenMode: 'throttle',
+      hiddenIntervalMs: 60_000,
+      run: ({ now }) => {
+        if (shouldReconnectSilentSocket({ open: true, lastActivityAt: lastActivityAt || 1, now, silenceMs: 30_000 })) {
+          closeSocket();
+        }
+      },
+    });
+    sched.start();
+
+    // t=10s(初回実行: まだ 30s 未満) → t=40s(裏タブなので 60s 間隔の間引きでまだ未検査)
+    clock.advance(40_000);
+    expect(closeSocket).toHaveBeenCalledTimes(0);
+
+    // 表に戻った瞬間の kick() で即検査され、40s > 30s を検知して再接続トリガ
+    hidden = false;
+    sched.kick();
+    clock.advance(0);
+    expect(closeSocket).toHaveBeenCalledTimes(1);
     sched.stop();
   });
 });

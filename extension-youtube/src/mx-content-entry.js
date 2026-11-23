@@ -43,6 +43,9 @@ try {
   }
 } catch { /* 計器 */ }
 import { createInfoPollGate } from '../../src/lib/platform/infoPollGate.js';
+import { createPageWatchScheduler } from '../../src/lib/pageWatchScheduler.js';
+import { isVenuePageHidden } from '../../src/lib/venuePaintSchedule.js';
+import { isExtensionContextAlive } from '../../src/lib/reportSilentError.js';
 import { parseMxLiveStats } from '../../src/lib/platform/platformStats.js';
 import { followerSampleFromMixch } from '../../src/lib/platform/followerCountSample.js';
 import { makeDiagTabToken, shouldSkipDiagWrite } from '../../src/lib/platform/diagTabShare.js';
@@ -720,17 +723,43 @@ try {
   /* 拡張が入れ替わった直後 */
 }
 
-let lastHref = '';
-setInterval(() => {
-  if (location.href !== lastHref) {
-    lastHref = location.href;
+const mxWatchSched = createPageWatchScheduler({
+  baseTickMs: 1000,
+  getUrl: () => String(location.href || ''),
+  isHidden: () => isVenuePageHidden(document),
+  isAlive: () => isExtensionContextAlive(),
+  onUrlChange: () => {
     infoGate.reset();
-  }
-  void check();
-}, 1000);
+  },
+});
+mxWatchSched.register({
+  id: 'mx-watch',
+  intervalMs: 1000,
+  hiddenMode: 'throttle',
+  hiddenIntervalMs: 10_000,
+  runOnUrlChange: true,
+  run: () => {
+    void check();
+  },
+});
+mxWatchSched.start();
+const resumeMxWatch = () => {
+  if (!current) infoGate.reset();
+  mxWatchSched.start();
+  mxWatchSched.kick();
+};
+document.addEventListener('visibilitychange', () => {
+  if (!isVenuePageHidden(document)) resumeMxWatch();
+});
 window.addEventListener('pagehide', () => {
+  mxWatchSched.stop();
   if (current?.key && lastMxFollow) {
     safeSendMessage({ type: 'YT_STREAM_META', payload: { videoId: current.key, followerSample: { ...lastMxFollow, at: Date.now(), force: true } } });
   }
   current?.stop();
+  current = null;
+  infoGate.reset();
+});
+window.addEventListener('pageshow', (ev) => {
+  if (ev?.persisted || !current) resumeMxWatch();
 });

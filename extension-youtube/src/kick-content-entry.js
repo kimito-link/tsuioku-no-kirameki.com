@@ -914,16 +914,20 @@ kickWatchSched.register({
   },
 });
 kickWatchSched.start();
+const resumeKickWatch = () => {
+  if (!current) lastInfoAt = 0;
+  kickWatchSched.start();
+  kickWatchSched.kick();
+};
 document.addEventListener('visibilitychange', () => {
-  if (!isVenuePageHidden(document)) kickWatchSched.kick();
+  if (!isVenuePageHidden(document)) resumeKickWatch();
 });
 window.addEventListener('pagehide', () => {
   kickWatchSched.stop();
   current?.stop();
+  current = null;
+  lastInfoAt = 0;
 });
 window.addEventListener('pageshow', (ev) => {
-  if (ev?.persisted) {
-    kickWatchSched.start();
-    kickWatchSched.kick();
-  }
+  if (ev?.persisted || !current) resumeKickWatch();
 });
