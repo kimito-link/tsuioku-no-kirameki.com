@@ -24,6 +24,15 @@
 /** @type {ChangelogEntry[]} */
 const ARCHIVE_ENTRIES = [
   Object.freeze({
+    version: '0.1.2158',
+    date: '2026-11-18',
+    summary: '記録が無いときは応援の章を出さない',
+    items: Object.freeze([
+      '応援の記録も、増減に使える人数の標本も無いときは、「応援が届いた瞬間」の章を出さないようにしました。',
+      'Twitch・SHOWROOM・ふわっちの人数の読み取りは、返事が来ないときに時間切れで打ち切り、次の読み取りに進みます。',
+    ])
+  }),
+  Object.freeze({
     version: '0.1.2157',
     date: '2026-11-18',
     summary: 'Twitchなどの人数を低い頻度で取る',
