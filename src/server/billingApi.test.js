@@ -353,3 +353,116 @@ describe('api/billing: 受け口', () => {
     expect(res.code).toBe(405);
   });
 });
+
+describe('billingApi: 紹介料', () => {
+  function paidInvoice(over = {}) {
+    return {
+      id: 'in_abc123',
+      currency: 'jpy',
+      amount_paid: 980,
+      created: 1_763_600_000,
+      subscription: 'sub_1',
+      parent: { subscription_details: { metadata: { source: 'tsuioku', ref: 'RH-1' } } },
+      ...over
+    };
+  }
+
+  async function wired() {
+    const base = await setup();
+    const calls = [];
+    const fetchImpl = vi.fn(async (url, init) => {
+      calls.push(JSON.parse(init.body));
+      return { ok: true, status: 200, json: async () => ({ ok: true }) };
+    });
+    const svc = createBillingService({
+      upstash: base.up.fn,
+      stripe: base.stripe,
+      env: {
+        ...base.svc && {},
+        LICENSE_SIGNING_JWK: (await keyEnv()).env.LICENSE_SIGNING_JWK,
+        LICENSE_SIGNING_KID: 'k1',
+        STRIPE_PRICE_MONTHLY: 'price_m',
+        STRIPE_PRICE_YEARLY: 'price_y',
+        STRIPE_WEBHOOK_SECRET: WH_SECRET,
+        PARTNERSHIP_COMMISSION_URL: 'https://partner.example.test',
+        PARTNERSHIP_COMMISSION_SECRET: 'secret-tsuioku'
+      },
+      nowMs: () => NOW,
+      fetchImpl
+    });
+    return { ...base, svc, fetchImpl, calls };
+  }
+
+  it('Checkout は Subscription metadata に source と ref を載せ、client_reference_id は付けない', async () => {
+    const { svc, stripe } = await setup();
+    const r = await svc.checkout({ plan: 'yearly', ref: ' RH-1 ' });
+    expect(r.status).toBe(200);
+    const params = stripe.createCheckout.mock.calls[0][0];
+    expect(params.subscription_data.metadata).toEqual({ source: 'tsuioku', ref: 'RH-1' });
+    expect(params.client_reference_id).toBeUndefined();
+    expect(stripeForm(params).get('subscription_data[metadata][source]')).toBe('tsuioku');
+    expect(stripeForm(params).get('subscription_data[metadata][ref]')).toBe('RH-1');
+    expect(stripeForm(params).has('client_reference_id')).toBe(false);
+    const bare = await svc.checkout({ plan: 'yearly', ref: '壊れたコード' });
+    expect(bare.status).toBe(200);
+    expect(stripe.createCheckout.mock.calls[1][0].subscription_data.metadata).toEqual({ source: 'tsuioku' });
+  });
+
+  it('支払った請求を1回送り、0円と紹介なしは送らない', async () => {
+    const { svc, fetchImpl, calls } = await wired();
+    const raw = JSON.stringify({ id: 'evt_paid', type: 'invoice.paid', data: { object: paidInvoice() } });
+    expect((await svc.webhook({ rawBody: raw, signature: signed(raw) })).status).toBe(200);
+    expect(calls).toHaveLength(1);
+    expect(calls[0].eventId).toBe('in_abc123');
+    const again = JSON.stringify({ id: 'evt_paid', type: 'invoice.paid', data: { object: paidInvoice() } });
+    expect((await svc.webhook({ rawBody: again, signature: signed(again) })).body.duplicate).toBe(true);
+    expect(fetchImpl).toHaveBeenCalledTimes(1);
+
+    const zero = JSON.stringify({ id: 'evt_zero', type: 'invoice.payment_succeeded', data: { object: paidInvoice({ id: 'in_zero', amount_paid: 0 }) } });
+    expect((await svc.webhook({ rawBody: zero, signature: signed(zero) })).status).toBe(200);
+    const none = JSON.stringify({
+      id: 'evt_none',
+      type: 'invoice.paid',
+      data: { object: paidInvoice({ id: 'in_none', parent: { subscription_details: { metadata: { source: 'tsuioku' } } } }) }
+    });
+    expect((await svc.webhook({ rawBody: none, signature: signed(none) })).status).toBe(200);
+    expect(fetchImpl).toHaveBeenCalledTimes(1);
+  });
+
+  it('紹介料の送信に失敗したら印を消して再送できる', async () => {
+    const { svc, up, fetchImpl } = await wired();
+    fetchImpl.mockResolvedValueOnce({ ok: false, status: 500, json: async () => ({ ok: false }) });
+    const raw = JSON.stringify({ id: 'evt_retry', type: 'invoice.paid', data: { object: paidInvoice() } });
+    await expect(svc.webhook({ rawBody: raw, signature: signed(raw) })).rejects.toThrow('commission_http_500');
+    expect(up.store.has(billingKeys.event('evt_retry'))).toBe(false);
+    fetchImpl.mockResolvedValueOnce({ ok: true, status: 200, json: async () => ({ ok: true }) });
+    expect((await svc.webhook({ rawBody: raw, signature: signed(raw) })).status).toBe(200);
+  });
+
+  it('返金は同じ webhook から台帳へ届く', async () => {
+    const { svc, stripe, calls } = await wired();
+    stripe.getInvoice = vi.fn(async () => paidInvoice());
+    const raw = JSON.stringify({
+      id: 'evt_refund',
+      type: 'charge.refunded',
+      data: { object: { invoice: 'in_abc123', amount_refunded: 980 } }
+    });
+    expect((await svc.webhook({ rawBody: raw, signature: signed(raw) })).status).toBe(200);
+    expect(calls.map((c) => c.refundedAmountYen)).toEqual([undefined, 980]);
+  });
+
+  it('受け口は checkout の ref をそのまま渡す', async () => {
+    const { env } = await keyEnv();
+    const stripe = fakeStripe({ sub: sub('active') });
+    const res = { code: 0, body: undefined, headers: {}, setHeader() {}, status(c) { this.code = c; return { json: (b) => { this.body = b; } }; } };
+    const log = vi.spyOn(console, 'log').mockImplementation(() => {});
+    await billingHandler(
+      { method: 'POST', query: { action: 'checkout' }, headers: {}, body: JSON.stringify({ plan: 'monthly', ref: 'RH-9' }) },
+      res,
+      { stripe, service: { env, upstash: memUpstash().fn } }
+    );
+    log.mockRestore();
+    expect(res.code).toBe(200);
+    expect(stripe.createCheckout.mock.calls[0][0].subscription_data.metadata).toEqual({ source: 'tsuioku', ref: 'RH-9' });
+  });
+});

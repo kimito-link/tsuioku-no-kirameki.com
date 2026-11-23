@@ -76,6 +76,19 @@
       }
       .msg { font-size: 13px; color: var(--nl-text-soft); }
       .err { color: #c4314b; }
+      .ref-label { display: block; font-size: 14px; font-weight: 700; }
+      .ref-input {
+        width: 100%;
+        padding: 8px;
+        border-radius: 8px;
+        border: 1px solid var(--nl-border);
+        margin: 6px 0 0;
+        font: inherit;
+        color: var(--nl-text);
+        background: #fff;
+      }
+      .ref-input::placeholder { color: #6b564c; }
+      .ref-hint { color: var(--nl-text); }
       footer { text-align: center; font-size: 12px; color: var(--nl-text-soft); margin-top: 18px; }
       footer a { color: inherit; }
       [hidden] { display: none !important; }
@@ -100,6 +113,9 @@
         </div>
         <div class="card">
           <h2>料金</h2>
+          <label class="ref-label" for="refCode">紹介コード（任意）</label>
+          <input id="refCode" class="ref-input" type="text" inputmode="text" autocomplete="off" spellcheck="false" maxlength="32" placeholder="RH-XXXX" aria-describedby="refHint" />
+          <p class="msg ref-hint" id="refHint">紹介リンクから開いた人は入っています。別の端末で申し込むときはここに入れてください。入れても料金は変わりません。</p>
           <div class="plans">
             <button class="plan is-best" type="button" data-plan="yearly">
               <span class="badge">おすすめ</span>
@@ -151,6 +167,6 @@
         <a href="https://tsuioku-no-kirameki.com/privacy.html">プライバシーポリシー</a>
       </footer>
     </main>
-    <script src="/app/supporter.js"></script>
+    <script type="module" src="/app/supporter.js"></script>
   </body>
 </html>

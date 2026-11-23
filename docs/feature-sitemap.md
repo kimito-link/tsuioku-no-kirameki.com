@@ -762,14 +762,18 @@
 
 - **HTMLレポート生成** — マーケ/イベント順位/タイムライン等を1枚の HTML レポートに組み立てる(popup-entry 内)
   - `src/extension/popup-entry.js`
-- **サポーター課金(マーケ HTML だけ有料)** — 有料はマーケ分析レポート(マーケ HTML)だけ=レポート全体に関所1つ(全サービス共通)。それ以外は無料。方針の正本は docs/policies/MONETIZATION.md(価格・お試し14日・1コード1台・猶予7日・やらないこと)。関所は marketing-export-entry.js の passSupporterGate→supporterAccess.checkMarketingAccess→supporterLicense.decideFeatureAccess。証明書は Ed25519・サーバーは api/billing.js(Stripe・Upstash)
+- **サポーター課金(マーケ HTML だけ有料)** — 有料はマーケ分析レポート(マーケ HTML)だけ=レポート全体に関所1つ(全サービス共通)。それ以外は無料。方針の正本は docs/policies/MONETIZATION.md(価格・お試し14日・1コード1台・猶予7日・やらないこと)。関所は marketing-export-entry.js の passSupporterGate→supporterAccess.checkMarketingAccess→supporterLicense.decideFeatureAccess。証明書は Ed25519・サーバーは api/billing.js(Stripe・Upstash)。紹介コードはウェブのサポーターページと LP だけで90日覚え、新しい契約の Stripe metadata(source=tsuioku と ref)に載せる。0円より大きい invoice.paid と charge.refunded を partnership の commission-events へ最小項目だけ送る(拡張は送らない)。詳細は docs/referral-commission.md
   - `docs/policies/MONETIZATION.md`
+  - `docs/referral-commission.md`
   - `src/lib/supporterLicense.js`
   - `src/lib/supporterAccess.js`
+  - `src/lib/referralAttribution.js`
   - `src/extension/marketing-export-entry.js`
   - `src/server/billingApi.js`
+  - `src/server/partnershipCommission.js`
   - `api/billing.js`
   - `app/supporter.html`
+  - `app/referral-passthrough.js`
   - `tsuioku-no-kirameki/tokushoho.html`
 <details><summary>🗂 このカテゴリの全担当ファイル(自動分類) 60</summary>
 
@@ -1223,7 +1227,7 @@
   - `src/extension/live-ranking-entry.js`
   - `tsuioku-no-kirameki/live/index.html`
   - `.github/workflows/live-ranking.yml`
-<details><summary>🗂 このカテゴリの全担当ファイル(自動分類) 359</summary>
+<details><summary>🗂 このカテゴリの全担当ファイル(自動分類) 361</summary>
 
 - `app/app.js` — スマホ閲覧用 status Web 版。
 - `app/live-view-block.js` — iPhone アプリの「🚩 見たくない人を隠す・報告する」(App Store の審査 1.2: ほかの人の書き込みを見せるアプリの決まり)。
@@ -1233,6 +1237,7 @@
 - `app/live-view-phone-fit.js` — v0.1.1741: スマホの WEB版で「押しても黙って何も起きない」拡張専用のボタンを片付ける。
 - `app/live-view-realtime.js` — v0.1.1758: スマホの WEB版で、PC が3秒ごとに送る新着コメントを Ably の SSE で受け取る。
 - `app/live-view.js` — global NL_BUILD_ID
+- `app/referral-attribution.js` — 【層】L0 判定層(純粋関数・I/O禁止)
 - `app/supporter.js` — 追憶のきらめき サポーター(v0.1.1893・課金 第1段)。素の JS(ビルドなし)。受け口は /api/billing。
 - `extension-youtube/content-chat-main.js` — YouTube のチャット欄(ページ自身の世界)で動く小さな手伝い。
 - `extension-youtube/src/content-chat-main-entry.js` — ページ自身の世界に入る束の入口。
@@ -1582,6 +1587,7 @@
 - `tools/audit-lp-overflow.mjs` — One-off LP overflow audit (run: node tools/audit-lp-overflow.mjs)
 - `tools/mcp-nicolive/server.mjs` — NicoLive Local MCP Bridge Phase1a (PoC) — stdio JSON-RPC server.
 - `tools/mcp-nicolive/store.mjs` — NicoLive Local MCP Bridge - Snapshot Store.
+- `tsuioku-no-kirameki/assets/js/app-store-badges.js` — global document, window
 - `tsuioku-no-kirameki/assets/js/kouhaku-app-cta.js` — global URL
 - `tsuioku-no-kirameki/assets/js/site-chrome-lp.js` — 追憶のきらめき サイト共通の「ヘッダー(ロゴ＋ハンバーガー)・ドロワーメニュー・フッター」。
 

@@ -1,5 +1,8 @@
 // 追憶のきらめき サポーター(v0.1.1893・課金 第1段)。素の JS(ビルドなし)。受け口は /api/billing。
 //   価格の表示は SUPPORTER_PRICES だけを直す(Stripe の価格と必ずそろえる)。
+//   紹介コードはブラウザに90日だけ覚え、Checkout の Subscription metadata に載せる。
+import { normalizeReferralCode, rememberReferralCode, resolveReferralCode } from './referral-attribution.js';
+
 (function () {
   'use strict';
   /** ★りんくさんが価格を決めたらここを直す(Stripe 側の価格と同じ値)。 */
@@ -8,6 +11,9 @@
 
   function $(id) { return document.getElementById(id); }
   function show(el, text) { if (!el) return; el.textContent = text; el.hidden = !text; }
+  function storage() {
+    try { return globalThis.localStorage; } catch { return null; }
+  }
   function post(action, body, code) {
     const headers = { 'Content-Type': 'application/json' };
     if (code) headers['x-supporter-code'] = code;
@@ -28,17 +34,33 @@
   $('priceYearly').textContent = SUPPORTER_PRICES.yearly;
   $('priceMonthly').textContent = SUPPORTER_PRICES.monthly;
 
+  const params = new URLSearchParams(location.search);
+  const remembered = resolveReferralCode(storage(), params.get('ref'));
+  if (remembered && $('refCode')) $('refCode').value = remembered;
+
+  function referralForCheckout() {
+    const raw = ($('refCode') && $('refCode').value || '').trim();
+    if (!raw) return { ref: undefined };
+    const code = normalizeReferralCode(raw);
+    if (!code) return { error: '紹介コードは英数字とハイフンで32文字までです。空欄でも申し込めます。' };
+    rememberReferralCode(storage(), code);
+    return { ref: code };
+  }
+
   Array.prototype.forEach.call(document.querySelectorAll('[data-plan]'), function (btn) {
     btn.addEventListener('click', function () {
       show($('joinErr'), '');
-      post('checkout', { plan: btn.getAttribute('data-plan') }).then(function (j) {
+      const ref = referralForCheckout();
+      if (ref.error) { show($('joinErr'), ref.error); return; }
+      const body = { plan: btn.getAttribute('data-plan') };
+      if (ref.ref) body.ref = ref.ref;
+      post('checkout', body).then(function (j) {
         if (j && j.url && /^https:\/\/checkout\.stripe\.com\//.test(j.url)) location.href = j.url;
         else show($('joinErr'), errorText(j));
       }, function () { show($('joinErr'), errorText(null)); });
     });
   });
 
-  const params = new URLSearchParams(location.search);
   const sessionId = params.get('session_id');
   if (sessionId) {
     $('joinView').hidden = true;

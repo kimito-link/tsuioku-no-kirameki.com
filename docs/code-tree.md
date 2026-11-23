@@ -27,7 +27,7 @@
 
 > 値が次の段へ届かない「断線」(broadcaster バグ型)は `npm run feature-map -- --check` が機械検知。
 
-## ⚠️ 役割コメントが無いソース 14 / 1335 件
+## ⚠️ 役割コメントが無いソース 14 / 1340 件
 - `docs/handoff/bench/bench-interval.mjs`
 - `docs/handoff/bench/bench-lane.mjs`
 - `extension-youtube/cloak-failsafe.js`
@@ -75,7 +75,7 @@
   - `live-recent-comments.js` — /api/live-recent-comments — `/live/` の「コメントで応援した人」にホバーしたとき、
   - `post.js` — スマホからのコメントの受け渡し口(v0.1.1734・スマホからコメントを届ける)。
   - `status.js` — status 受け口 Vercel Serverless Function。
-- 📁 **app/** (122)
+- 📁 **app/** (124)
   - 📁 **audio-test/** (7)
     - `t-opus.mp4`
     - `t.caf`
@@ -212,6 +212,8 @@
   - `live.html`
   - `phone.html`
   - `phone.js` — スマホの開始画面(/phone・iPhone アプリが最初に開くページ)。
+  - `referral-attribution.js` — 【層】L0 判定層(純粋関数・I/O禁止)
+  - `referral-passthrough.js` — LP（tsuioku-no-kirameki.com）で ?ref= を90日覚え、サポーターページへのリンクに足す。
   - `supporter.html`
   - `supporter.js` — 追憶のきらめき サポーター(v0.1.1893・課金 第1段)。素の JS(ビルドなし)。受け口は /api/billing。
 - 📁 **council-scout/** (26)
@@ -242,7 +244,7 @@
     - `2026-10-06.md`
     - `2026-10-12.md`
     - `2026-10-14.md`
-- 📁 **docs/** (371)
+- 📁 **docs/** (388)
   - 📁 **article-assets/** (87)
     - 📁 **venue-frames/** (12)
       - `f01.png`
@@ -564,6 +566,10 @@
   - `backfill-complete-loading-flow.html`
   - `bug-investigation-loading-scroll-2026-07-10.html`
   - `code-tree.html`
+  - `code-tree.html`
+  - `code-tree.html`
+  - `code-tree.md`
+  - `code-tree.md`
   - `code-tree.md`
   - `codex-commenter-follow-analytics-v0535.md`
   - `codex-event-lane-stuck-fix-v0613.md`
@@ -586,12 +592,18 @@
   - `dist-fingerprint-gate-IMPLEMENTATION-HANDOFF.md`
   - `extension-bump-checklist.md`
   - `feature-sitemap.html`
+  - `feature-sitemap.html`
+  - `feature-sitemap.html`
+  - `feature-sitemap.md`
+  - `feature-sitemap.md`
   - `feature-sitemap.md`
   - `inline-popup-sync.md`
   - `investigation-prompt-popup-not-appearing.md`
   - `kb-web-perf-diagnosis.md`
   - `koken-contrib-hidden-tab-stuck-fix-v0616.md`
   - `lane-architecture-redesign.md`
+  - `layer-map.html`
+  - `layer-map.html`
   - `layer-map.html`
   - `live-comment-heat-chips-DESIGN.md`
   - `live-comment-heat-chips-IMPLEMENTATION-HANDOFF.md`
@@ -617,11 +629,18 @@
   - `refactor-instructions-2026-08-29.md`
   - `refactor-instructions.md`
   - `reference_deterministic_backfill.md`
+  - `referral-commission.md`
   - `reliability-backlog-phase-b.md`
   - `repo-tree-map.html`
+  - `repo-tree-map.html`
+  - `repo-tree-map.html`
+  - `repo-tree-map.md`
+  - `repo-tree-map.md`
   - `repo-tree-map.md`
   - `research-nicolive-pc-comments.md`
   - `self-improvement-loop-DESIGN.md`
+  - `site-health.md`
+  - `site-health.md`
   - `site-health.md`
   - `story-user-lane-pipeline.md`
   - `surechigai-lite-improvement-plan.md`
@@ -1197,7 +1216,7 @@
   - `gift-coin-hq.wav`
   - `gift-register-hq.wav`
   - `gift-register.mp3`
-- 📁 **src/** (2590)
+- 📁 **src/** (2595)
   - 📁 **data/** (7)
     - 📁 **acquirers/** (2)
       - `laneFromStorage.js` — 応援レーン acquirer: chrome.storage.local(nls_comments) → laneStore の橋渡し。
@@ -1540,7 +1559,7 @@
         - `logo_funlink_white_RGB_link_black.png`
         - `logo_funlink_white_RGB_maru_black.png`
     - `hero-connect-hub.svg`
-  - 📁 **lib/** (2274)
+  - 📁 **lib/** (2277)
     - 📁 **__snapshots__/** (4)
       - `marketing-abema-baseline.html`
       - `marketing-niconico.html`
@@ -1808,6 +1827,7 @@
     - `anonLabelSingleSource.test.js`
     - `anonymousIdenticon.js` — 匿名 userId 向けの決定論的アバター（SVG data URL）。
     - `anonymousIdenticon.test.js`
+    - `appStoreBadges.test.js`
     - `appliedEntriesMemo.js` — 大きな記録で「同じ行・同じ控え」なら、正規化と名前・顔の重ね直しの結果を使い回す(v0.1.2023)。
     - `appliedEntriesMemo.test.js`
     - `arrivalEffect.js` — ニコ生「来場」システムメッセージ(parseArrivalComment.js でパース済み)を、パチンコの
@@ -3116,6 +3136,8 @@
     - `recordRate.test.js`
     - `recordingStallWatchdog.js` — 記録停止ウォッチドッグの純粋判定ロジック。
     - `recordingStallWatchdog.test.js`
+    - `referralAttribution.js` — 【層】L0 判定層(純粋関数・I/O禁止)
+    - `referralAttribution.test.js`
     - `refreshCoalescer.js` — 描き直し(refresh)の「実行中に来た要求は、あとで1回にまとめる」合流器(時計は deps で注入)。v0.1.1687
     - `refreshCoalescer.test.js`
     - `refreshCoalescerWiring.wiring.test.js`
@@ -3831,7 +3853,7 @@
     - `yieldToBrowserPaint.js` — 【層】L0 判定層(依存ゼロ・chrome.* 非依存)
     - `yukkuriBroadcastSummary.js` — 放送終了後の HTML レポート / マーケ分析の頭にくる「ゆっくり解説風」要約セクション。
     - `yukkuriBroadcastSummary.test.js`
-  - 📁 **server/** (22)
+  - 📁 **server/** (24)
     - `billingApi.js` — global process, Buffer -- サーバー(Vercel 関数)専用の部品。api/ と同じく env を読む
     - `billingApi.test.js`
     - `deviceApi.test.js`
@@ -3851,6 +3873,8 @@
     - `liveRankingOne.test.js`
     - `nicoliveGuest.js` — ニコ生の「ゲスト視聴」で必要な素の I/O だけを持つ Node 側の共有部品。
     - `nicoliveGuest.test.js`
+    - `partnershipCommission.js` — サポーターの支払い・返金を partnership の紹介料台帳へ送る。
+    - `partnershipCommission.test.js`
     - `phonePostApi.test.js`
     - `phoneVoiceApi.js` — global process -- サーバー(Vercel 関数)専用の部品。api/ と同じく env を読む
     - `phoneVoiceApi.test.js`
@@ -3987,7 +4011,7 @@
   - `kouhaku_og.py`
   - `og-live-compose.py`
   - `render-og.js` — 追憶の煌めき LP 用 OG 画像（1200×630）を生成する。
-- 📁 **tsuioku-no-kirameki/** (78)
+- 📁 **tsuioku-no-kirameki/** (82)
   - 📁 **articles/** (14)
     - 📁 **role-separation-design/** (2)
       - 📁 **img/** (1)
@@ -4005,17 +4029,19 @@
     - `phase-gate-flow-canon.html`
     - `prewarm-coordinator-lease.html`
     - `reaction-template-classifier.html`
-  - 📁 **assets/** (7)
-    - 📁 **css/** (4)
+  - 📁 **assets/** (9)
+    - 📁 **css/** (5)
+      - `app-download.css`
       - `kouhaku-ranking.css`
       - `live-ranking.css`
       - `site-chrome-lp.css`
       - `yukkuri-thread.css`
-    - 📁 **js/** (3)
+    - 📁 **js/** (4)
+      - `app-store-badges.js` — global document, window
       - `kouhaku-app-cta.js` — global URL
       - `kouhaku-board.js` — 紅白の順位を、当サイトの /api/kouhaku-ranking だけから描く。
       - `site-chrome-lp.js` — 追憶のきらめき サイト共通の「ヘッダー(ロゴ＋ハンバーガー)・ドロワーメニュー・フッター」。
-  - 📁 **images/** (41)
+  - 📁 **images/** (43)
     - 📁 **lp/** (7)
       - 📁 **phone/** (2)
         - `phone-start.webp`
@@ -4025,6 +4051,9 @@
       - `kimito-maru-black.webp`
       - `nc321221_creatorcross.webp`
       - `twitter-icon.webp`
+    - 📁 **store-badges/** (2)
+      - `apple-appstore-ja.svg`
+      - `google-play-ja.png`
     - 📁 **venue/** (6)
       - `venue-living-overview.jpg`
       - `venue-living-overview.mp4`
