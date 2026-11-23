@@ -24,6 +24,15 @@
 /** @type {ChangelogEntry[]} */
 const ARCHIVE_ENTRIES = [
   Object.freeze({
+    version: '0.1.2166',
+    date: '2026-11-18',
+    summary: 'メディアキットのサービス名',
+    items: Object.freeze([
+      'メディアキットのサービス名・応援の種類・人数の呼び方は、書き出している配信のサービスから作ります。別の配信を記録していても、その名前は出ません。',
+      'YouTube の出所はチャンネル登録者数です。他のサービスも、それぞれの人数の呼び方で書きます。',
+    ])
+  }),
+  Object.freeze({
     version: '0.1.2165',
     date: '2026-11-18',
     summary: '終わりの人数と書き出しの全件',

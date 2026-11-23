@@ -18,6 +18,14 @@
 /** @type {readonly ChangelogEntry[]} */
 export const EXTENSION_CHANGELOG = Object.freeze([
   Object.freeze({
+    version: '0.1.2188',
+    date: '2026-11-23',
+    summary: '会場の本体ファイルを行数の上限内に収める',
+    items: Object.freeze([
+      '拡張の動きは 0.1.2186 と同じです。会場モードの本体ファイルが行数の上限を超えて試験が落ちていたので、送りの通過印を外す処理を小さな部品に移し、上限内に収めました。',
+    ])
+  }),
+  Object.freeze({
     version: '0.1.2187',
     date: '2026-11-23',
     summary: '会場の Esc と部品の層の地図を今の実装に合わせる',
@@ -196,15 +204,6 @@ export const EXTENSION_CHANGELOG = Object.freeze([
     items: Object.freeze([
       '配信ページを開いたまま書き出しても、保存したコメントをそのまま読みます。コメントが多くても、画面用の組み立てを待たずに最後まで出します。',
       'YouTube のチャンネル登録者数は、ページの概数（8.43万人など）をそのまま出します。',
-    ])
-  }),
-  Object.freeze({
-    version: '0.1.2166',
-    date: '2026-11-18',
-    summary: 'メディアキットのサービス名',
-    items: Object.freeze([
-      'メディアキットのサービス名・応援の種類・人数の呼び方は、書き出している配信のサービスから作ります。別の配信を記録していても、その名前は出ません。',
-      'YouTube の出所はチャンネル登録者数です。他のサービスも、それぞれの人数の呼び方で書きます。',
     ])
   })
 ]);

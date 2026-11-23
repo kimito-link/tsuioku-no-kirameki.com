@@ -15,3 +15,11 @@ export function venueToggleShouldUntuck(tuckedFlag, root) {
   if (!root || !root.classList) return false;
   return root.classList.contains(VENUE_TUCK_CLASS) || root.classList.contains(VENUE_COMPOSER_PASS_CLASS);
 }
+
+/**
+ * 送りの通過印を外す。失敗しても、会場を閉じない側の処理は続ける。
+ * @param {Element | null | undefined} root
+ */
+export function clearVenueComposerPass(root) {
+  try { root?.classList?.remove(VENUE_COMPOSER_PASS_CLASS); } catch { /* 閉じないことが先 */ }
+}

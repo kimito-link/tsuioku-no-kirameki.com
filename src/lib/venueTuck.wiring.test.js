@@ -47,7 +47,9 @@ describe('CSS: しまう中は箱だけ隠し、トグルのピルを出す', ()
     expect(a).toBeGreaterThan(0);
     const body = src.slice(a, src.indexOf('\n  }\n', a));
     expect(body).not.toContain('visibility: hidden');
-    expect(src).toContain("import { venueToggleShouldUntuck } from '../lib/venueTuckState.js';");
+    expect(src).toContain("from '../lib/venueTuckState.js'");
+    expect(src).toContain('venueToggleShouldUntuck');
+    expect(src).toContain('clearVenueComposerPass');
   });
 
   it('★通常時のトグルは従来どおり開いている間は隠す(既存の契約)', () => {

@@ -1,6 +1,6 @@
 // @vitest-environment happy-dom
 import { describe, expect, it } from 'vitest';
-import { VENUE_COMPOSER_PASS_CLASS, VENUE_TUCK_CLASS, venueToggleShouldUntuck } from './venueTuckState.js';
+import { VENUE_COMPOSER_PASS_CLASS, VENUE_TUCK_CLASS, clearVenueComposerPass, venueToggleShouldUntuck } from './venueTuckState.js';
 
 describe('venueToggleShouldUntuck', () => {
   it('js の tucked が true なら戻す(閉じない)', () => {
@@ -19,5 +19,15 @@ describe('venueToggleShouldUntuck', () => {
   it('開いていて印も無いときは通常の開閉', () => {
     const root = document.createElement('div');
     expect(venueToggleShouldUntuck(false, root)).toBe(false);
+  });
+});
+
+describe('clearVenueComposerPass', () => {
+  it('送りの通過印だけ外す', () => {
+    const root = document.createElement('div');
+    root.classList.add(VENUE_COMPOSER_PASS_CLASS, VENUE_TUCK_CLASS);
+    clearVenueComposerPass(root);
+    expect(root.classList.contains(VENUE_COMPOSER_PASS_CLASS)).toBe(false);
+    expect(root.classList.contains(VENUE_TUCK_CLASS)).toBe(true);
   });
 });
