@@ -219,7 +219,7 @@
 
 - **応援レーン集約(誰が候補か)** — 保存コメント行を userId 単位に畳み込みレーン候補を作る唯一の集約正本(popup/venue 共通)
   - `src/lib/userLaneCandidatesFromStorage.js`
-<details><summary>🗂 このカテゴリの全担当ファイル(自動分類) 112</summary>
+<details><summary>🗂 このカテゴリの全担当ファイル(自動分類) 114</summary>
 
 - `api/event-ranking.js` — イベント💎ランキングの「公式更新以降 +X」「推定イベントpt」用のサーバ側スナップショット（2026-11-21）。
 - `scripts/council-trial.mjs` — 会議メンバー候補を「本番と同じ条件」で一斉に試す使い捨て計器。
@@ -227,6 +227,7 @@
 - `src/domain/lane/aggregate.js` — 応援ユーザーレーンの per-row → per-user 集約（純関数）。
 - `src/domain/observations/observationStore.js` — observationStore - StatObservation のメモリ常駐リングバッファ。
 - `src/domain/user/identity.js` — ニコ生ユーザー ID の「匿名性」判定と関連アイデンティティ・ユーティリティ。
+- `src/extension/popup/nicoEstimatedSpendChip.js` — ニコ生横欄（.nl-official-nico-stats__row）へ「推定（視聴者の購入額）」チップを同期する。
 - `src/lib/auditionEventRankingApi.js` — audition 公式「イベント💎ランキング」無認証 JSON API の URL 組立 & 正規化（純関数）。
 - `src/lib/broadcastContext.js` — v0.1.793: 「この配信の配信者(broadcaster)情報」を 1 か所で型定義し、storage キー・
 - `src/lib/broadcastCrossCompare.js` — 0.1.24 (Y): 横断比較系の純粋関数群。
@@ -267,6 +268,7 @@
 - `src/lib/devMonitorGiftRankingExtrasHtml.js` — dev monitor「取得状況サマリ」(#devMonitorGiftRankingExtras)の HTML を組む純関数。
 - `src/lib/diagChannelRegistry.js` — 計器チャンネルの台帳。HANDOFF-instrument-channels-2026-08-12.md §3。
 - `src/lib/effectSoundPlayer.js` — ギフト/広告/応援者ランキング順位変動に鳴らす短い効果音の再生ロジック(純関数+再生本体)。
+- `src/lib/estimatedViewerSpend.js` — 【層】L0 判定層(純粋関数・I/O禁止)
 - `src/lib/eventRankingReportModel.js` — イベントランキングの「レポート用 正規化モデル」純関数（Phase A・2026-05-26 会議）。
 - `src/lib/eventRankingSectionHtml.js` — v0.1.810(星野ロミ式コンポーネント化・第3弾): popup-entry.js の巨大 HTML ビルダー
 - `src/lib/eventScoreRankingRelay.js` — audition richview 由来のイベント💎順位リストを親へ relay するときの
@@ -1613,6 +1615,7 @@
 - `v0.1.2193` 2026-11-23 — 裏タブ中に届いたコメントを復帰時に直近3件と件数告知で読み上げ
 
 ### 🏟 会場・席 (12版)
+- `v0.1.2201` 2026-11-23 — 会場・横欄・マーケレポートに「推定（視聴者の購入額）」を追加
 - `v0.1.2199` 2026-11-23 — 全サービスへ孤児タブ自動復帰・診断間引き・会場負荷抑制を横展開
 - `v0.1.2193` 2026-11-23 — 裏タブ中に届いたコメントを復帰時に直近3件と件数告知で読み上げ
 - `v0.1.2191` 2026-11-23 — 戻る・進むで復帰した視聴ページでも監視を再開するように修正
@@ -1624,12 +1627,12 @@
 - `v0.1.2184` 2026-11-23 — ミクチャの公式コメント欄を、今の入力の形でも見つけられるように
 - `v0.1.2183` 2026-11-23 — 会場から全サービスで発言でき、ミクチャの新着を読む
 - `v0.1.2179` 2026-11-23 — 会場の発言を全サービスで通し、ミクチャの新着を読む
-- `v0.1.2178` 2026-11-23 — 会場の描画を軽くしミクチャでも発言
 
 ### 🎈 吹き出し (1版)
 - `v0.1.2199` 2026-11-23 — 全サービスへ孤児タブ自動復帰・診断間引き・会場負荷抑制を横展開
 
-### 🎁 ギフト (1版)
+### 🎁 ギフト (2版)
+- `v0.1.2201` 2026-11-23 — 会場・横欄・マーケレポートに「推定（視聴者の購入額）」を追加
 - `v0.1.2184` 2026-11-23 — ミクチャの公式コメント欄を、今の入力の形でも見つけられるように
 
 ### 🔊 読み上げ (7版)
@@ -1651,11 +1654,10 @@
 ### 🧊 storage安定 (1版)
 - `v0.1.2200` 2026-11-23 — 状態ダンプ（JSON）にニコ生以外のサービス計器・タブ一覧を追加
 
-### ⚡ 描画・性能 (4版)
+### ⚡ 描画・性能 (3版)
 - `v0.1.2198` 2026-11-23 — ニコ生の常駐タイマーを共通スケジューラへ集約し裏タブを間引き
 - `v0.1.2197` 2026-11-23 — YouTube チャットの監視を共通 Observer ハブへ統合
 - `v0.1.2183` 2026-11-23 — 会場から全サービスで発言でき、ミクチャの新着を読む
-- `v0.1.2178` 2026-11-23 — 会場の描画を軽くしミクチャでも発言
 
 ### その他 (2版)
 - `v0.1.2189` 2026-11-23 — ミクチャの欄を探す部品の型を直す
