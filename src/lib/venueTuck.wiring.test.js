@@ -42,6 +42,16 @@ describe('CSS: しまう中は箱だけ隠し、トグルのピルを出す', ()
     expect(src).not.toContain('nlsb-venue-tucked');
   });
 
+  it('★コメント送信中の通過印は会場を visibility:hidden にしない', () => {
+    const a = src.indexOf('  .nlsb-root.nlsb-is-open.nlsb-is-composer-pass .nlsb-stage {');
+    expect(a).toBeGreaterThan(0);
+    const body = src.slice(a, src.indexOf('\n  }\n', a));
+    expect(body).not.toContain('visibility: hidden');
+    expect(src).toContain("from '../lib/venueTuckState.js'");
+    expect(src).toContain('venueToggleShouldUntuck');
+    expect(src).toContain('clearVenueComposerPass');
+  });
+
   it('★通常時のトグルは従来どおり開いている間は隠す(既存の契約)', () => {
     const a = src.indexOf('  html.nlsb-venue-open .nlsb-toggle {');
     expect(a).toBeGreaterThan(0);
@@ -74,9 +84,9 @@ describe('JS: setTucked とボタン・トグルの配線', () => {
     expect(src).toContain('...(tuckBtn ? [tuckBtn] : []), rosterBtn,'); // v0.1.1870 前に「🎁 ギフト」が並ぶ
   });
 
-  it('★トグルを押したとき、しまい中なら戻す(会場の開閉より優先)', () => {
+  it('★トグルを押したとき、しまい中・送りの通過中なら戻す(会場の開閉より優先)', () => {
     const body = slice("toggle.addEventListener('click', () => {", "close.addEventListener('click'");
-    const tuckAt = body.indexOf('if (tucked)');
+    const tuckAt = body.indexOf('venueToggleShouldUntuck(tucked, root)');
     const setOpenAt = body.indexOf('setOpen(');
     expect(tuckAt).toBeGreaterThan(-1);
     expect(setOpenAt).toBeGreaterThan(tuckAt);
@@ -92,7 +102,7 @@ describe('JS: setTucked とボタン・トグルの配線', () => {
     const body = slice('const onEscapeKey = (event) =>', 'const addEscapeListener');
     // 入力中の Esc は奪わない=ガードが tucked の判定より前にある。
     expect(body.indexOf('isEditableOutsideVenue(event.target)')).toBeGreaterThan(0);
-    expect(body.indexOf('isEditableOutsideVenue(event.target)')).toBeLessThan(body.indexOf('if (tucked)'));
+    expect(body.indexOf('isEditableOutsideVenue(event.target)')).toBeLessThan(body.indexOf('venueToggleShouldUntuck(tucked, root)'));
     // しまい中の Esc は会場を閉じず戻すだけ(閉じると記録の表示が捨てられる)。
     expect(body).toContain('setTucked(false)');
   });

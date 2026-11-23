@@ -48,7 +48,7 @@ import { followerSampleFromMixch } from '../../src/lib/platform/followerCountSam
 import { makeDiagTabToken, shouldSkipDiagWrite } from '../../src/lib/platform/diagTabShare.js';
 import { platformFetchTimeoutSignal } from '../../src/lib/platform/fetchTimeout.js';
 import { findPageButton } from '../../src/lib/platform/pageControlPick.js';
-import { findMxCommentInput, findMxSendButton } from '../../src/lib/mixch/mxCommentInput.js';
+import { describeMxCommentInputLookup, findMxCommentComposerToReveal, findMxCommentInput, findMxSendButton } from '../../src/lib/mixch/mxCommentInput.js';
 import { withRevealedVenueOfficialComposer } from '../../src/lib/venueRevealOfficialComposer.js';
 
 const META_EVERY_MS = 30_000;
@@ -641,10 +641,10 @@ function findSendButton(near) {
   return findPageButton(document, /送信/, near);
 }
 
-/** @param {string} reason */
-function noteSendFail(reason) {
+/** @param {string} reason @param {Record<string, unknown>} [extra] */
+function noteSendFail(reason, extra) {
   try {
-    void chrome.storage.local.set({ yt_diag_mx_send_fail: { at: Date.now(), reason, userId: diag.userId } });
+    void chrome.storage.local.set({ yt_diag_mx_send_fail: { at: Date.now(), reason, userId: diag.userId, ...(extra && typeof extra === 'object' ? extra : {}) } });
   } catch {
     /* no-op */
   }
@@ -663,17 +663,26 @@ try {
       // 公式の欄は form に入っていない textarea(placeholder「コメントする...」)。会場が覆って欄が外れていたら、
       //   会場を一時的にしまって出してから探す。サイドパネルも会場も同じ MX_SEND_COMMENT を使う。
       return await withRevealedVenueOfficialComposer(document, async () => {
+      // 送り方は SHOWROOM / YouTube と同じ(探す→間隔を置いて再探→値を入れて送信)。
+      //   欄がまだ出ていなければ公式の枠を1回だけ押す。待ちに新しい MutationObserver は作らない。
+      //   探した欄は覚えず、毎回 findMxCommentInput で今の DOM を見る(高さや位置が変わっても古い節を使わない)。
+      if (!findMxCommentInput(document)) {
+        const reveal = findMxCommentComposerToReveal(document);
+        if (reveal) {
+          try { reveal.click(); } catch { /* 出せなくても探すのは続ける */ }
+        }
+      }
       let input = findMxCommentInput(document);
       for (let i = 0; !input && i < 6; i += 1) {
         await sleep(250);
         input = findMxCommentInput(document);
       }
       if (!input) {
-        noteSendFail('no-input');
+        noteSendFail('no-input', describeMxCommentInputLookup(document));
         return { ok: false, reason: 'no-input' };
       }
       try { input.scrollIntoView({ block: 'nearest', inline: 'nearest' }); } catch { /* 送れればよい */ }
-      // 窓が狭いとミクチャがコメント欄を隠す(りんく「広くするとコメントうてるっぽい」)。隠れていても入れて押してみて、見えていたかを記録に残す
+      // 窓が狭いとミクチャがコメント欄を小さくする。小さくても隠れていても、見えているかの閾値では落とさない。
       const inputShown = input.getClientRects().length > 0;
       input.focus();
       const proto = input instanceof HTMLTextAreaElement ? HTMLTextAreaElement.prototype : HTMLInputElement.prototype;

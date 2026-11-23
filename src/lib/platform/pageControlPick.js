@@ -13,7 +13,13 @@ const OWN_UI_SEL = '#nlsb-venue-root, [id^="nlsb-"], [class^="nlsb-"], [class*="
 export function isOwnExtensionUi(el) {
   if (!el || typeof el.closest !== 'function') return false;
   try {
-    return !!el.closest(OWN_UI_SEL);
+    const hit = el.closest(OWN_UI_SEL);
+    if (!hit) return false;
+    // html には会場が開いている印 `nlsb-venue-open` が付く。[class^="nlsb-"] が html 自身に
+    //   当たると、公式の欄まで追憶の部品と誤る。会場を開いたまま送ると入力欄が無いになる。
+    const doc = el.ownerDocument || (typeof document !== 'undefined' ? document : null);
+    if (doc && (hit === doc.documentElement || hit === doc.body)) return false;
+    return true;
   } catch {
     return false;
   }

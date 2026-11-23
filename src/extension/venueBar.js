@@ -390,6 +390,7 @@ import { chromeVoiceEngineLink, createVoicevoxWarmup, wireVoiceWarmupHooks, with
 import { startVoiceReaderLease } from '../lib/voiceReaderLease.js';
 import { createBrowserStreamedAudio } from './voiceStreamAudio.js';
 import { createVenueComposeBox, createVenueGiftButton, createVenueGiftStrip } from '../lib/venueComposeBox.js';
+import { clearVenueComposerPass, venueToggleShouldUntuck } from '../lib/venueTuckState.js';
 import { createVenueBubbleVoiceSyncState, startVenueSpeechBubbleVoice, summarizeBubbleVoiceSync } from '../lib/venueBubbleVoiceSync.js';
 // 2026-11-09 りんく「これを会場モードでもいれたほうが利便性たかい」: パネルの数字カード(記録・推定同時接続ほか)を会場のヘッダーにも出す。
 import { KEY_STAT_CARDS_MIRROR } from '../lib/statCardsMirrorKey.js';
@@ -645,6 +646,7 @@ const VENUE_CSS = `
   html.nlsb-venue-open .nlsb-root.nlsb-is-tucked .nlsb-toggle {
     display: inline-block;
   }
+  .nlsb-root.nlsb-is-open.nlsb-is-composer-pass .nlsb-stage { pointer-events: none; }
   /* 動きを減らす設定の人には拡大アニメを出さない(a11y)。 */
   @media (prefers-reduced-motion: reduce) {
     .nlsb-toggle {
@@ -7259,9 +7261,8 @@ export function mountVenueBarButton(options = {}) {
     // v0.1.1657: 日本語入力の変換取消の Esc や、コメント欄での Esc で会場ごと閉じない。
     if (event.isComposing || event.keyCode === 229 || isEditableOutsideVenue(event.target)) return;
     // v0.1.1657: 「しまう」中の Esc は戻すだけ(記録と表示を保ったまま、コメントを打つための機能なので閉じない)。
-    if (tucked) {
-      setTucked(false);
-      return;
+    if (venueToggleShouldUntuck(tucked, root)) {
+      setTucked(false); clearVenueComposerPass(root); return;
     }
     // v0.1.738: 診断パネルが開いていれば、まずそれだけ閉じる(会場ごと閉じない)。
     //   × が反応しない時の確実な代替手段(ユーザー報告対策)。
@@ -7433,9 +7434,8 @@ export function mountVenueBarButton(options = {}) {
 
   toggle.addEventListener('click', () => {
     // v0.1.1654: しまい中のトグルは『会場に戻る』(会場は開いたまま・閉じない)。
-    if (tucked) {
-      setTucked(false);
-      return;
+    if (venueToggleShouldUntuck(tucked, root)) {
+      setTucked(false); clearVenueComposerPass(root); return;
     }
     userChangedOpen = true;
     setOpen(!open, true);

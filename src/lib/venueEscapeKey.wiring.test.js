@@ -26,7 +26,8 @@ describe('onEscapeKey の入口', () => {
   });
 
   it('★しまい中の Esc は「戻す」だけで、会場を閉じない(パネル判定より前)', () => {
-    const iTuck = body.indexOf('if (tucked)');
+    // v0.1.2185 以降は JS の tucked だけでなく、送信中の class 退避(nlsb-is-tucked / composer-pass)も戻す。
+    const iTuck = body.indexOf('venueToggleShouldUntuck(tucked, root)');
     const iSpeech = body.indexOf('if (!speechPanel.hidden)');
     expect(iTuck).toBeGreaterThan(0);
     expect(iSpeech).toBeGreaterThan(iTuck);

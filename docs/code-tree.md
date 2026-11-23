@@ -27,7 +27,7 @@
 
 > 値が次の段へ届かない「断線」(broadcaster バグ型)は `npm run feature-map -- --check` が機械検知。
 
-## ⚠️ 役割コメントが無いソース 14 / 1352 件
+## ⚠️ 役割コメントが無いソース 14 / 1348 件
 - `docs/handoff/bench/bench-interval.mjs`
 - `docs/handoff/bench/bench-lane.mjs`
 - `extension-youtube/cloak-failsafe.js`
@@ -245,7 +245,7 @@
     - `2026-10-06.md`
     - `2026-10-12.md`
     - `2026-10-14.md`
-- 📁 **docs/** (386)
+- 📁 **docs/** (372)
   - 📁 **article-assets/** (87)
     - 📁 **venue-frames/** (12)
       - `f01.png`
@@ -567,10 +567,6 @@
   - `backfill-complete-loading-flow.html`
   - `bug-investigation-loading-scroll-2026-07-10.html`
   - `code-tree.html`
-  - `code-tree.html`
-  - `code-tree.html`
-  - `code-tree.md`
-  - `code-tree.md`
   - `code-tree.md`
   - `codex-commenter-follow-analytics-v0535.md`
   - `codex-event-lane-stuck-fix-v0613.md`
@@ -593,18 +589,12 @@
   - `dist-fingerprint-gate-IMPLEMENTATION-HANDOFF.md`
   - `extension-bump-checklist.md`
   - `feature-sitemap.html`
-  - `feature-sitemap.html`
-  - `feature-sitemap.html`
-  - `feature-sitemap.md`
-  - `feature-sitemap.md`
   - `feature-sitemap.md`
   - `inline-popup-sync.md`
   - `investigation-prompt-popup-not-appearing.md`
   - `kb-web-perf-diagnosis.md`
   - `koken-contrib-hidden-tab-stuck-fix-v0616.md`
   - `lane-architecture-redesign.md`
-  - `layer-map.html`
-  - `layer-map.html`
   - `layer-map.html`
   - `live-comment-heat-chips-DESIGN.md`
   - `live-comment-heat-chips-IMPLEMENTATION-HANDOFF.md`
@@ -633,10 +623,6 @@
   - `referral-commission.md`
   - `reliability-backlog-phase-b.md`
   - `repo-tree-map.html`
-  - `repo-tree-map.html`
-  - `repo-tree-map.html`
-  - `repo-tree-map.md`
-  - `repo-tree-map.md`
   - `repo-tree-map.md`
   - `research-nicolive-pc-comments.md`
   - `self-improvement-loop-DESIGN.md`
@@ -647,7 +633,7 @@
   - `venue-pop-parity-loop-flow.html`
   - `visual-explainer.md`
   - `voice-quality-pipeline-flow.html`
-- 📁 **extension/** (149)
+- 📁 **extension/** (145)
   - 📁 **data/** (1)
     - `ouen-banner.json`
   - 📁 **images/** (87)
@@ -789,12 +775,8 @@
     - `voice-complete.mp3`
     - `voice-watch.mp3`
   - `background.js` — MV3 Service Worker
-  - `background.js` — MV3 Service Worker
-  - `background.js` — MV3 Service Worker
   - `comeview.html`
   - `live-view.html`
-  - `manifest.json`
-  - `manifest.json`
   - `manifest.json`
   - `marketing-export-guard.js` — マーケ分析タブ(marketing-export.html)の「何があっても開く」保険。
   - `marketing-export.html`
@@ -1219,7 +1201,7 @@
   - `gift-coin-hq.wav`
   - `gift-register-hq.wav`
   - `gift-register.mp3`
-- 📁 **src/** (2612)
+- 📁 **src/** (2615)
   - 📁 **data/** (7)
     - 📁 **acquirers/** (2)
       - `laneFromStorage.js` — 応援レーン acquirer: chrome.storage.local(nls_comments) → laneStore の橋渡し。
@@ -1562,7 +1544,7 @@
         - `logo_funlink_white_RGB_link_black.png`
         - `logo_funlink_white_RGB_maru_black.png`
     - `hero-connect-hub.svg`
-  - 📁 **lib/** (2294)
+  - 📁 **lib/** (2297)
     - 📁 **__snapshots__/** (4)
       - `marketing-abema-baseline.html`
       - `marketing-niconico.html`
@@ -1616,13 +1598,14 @@
       - `schema.test.js`
       - `validateAndMerge.test.js`
       - `validateLiveMcpSnapshot.js` — Canonical Snapshot の構造検証。schema.js の isCanonicalLiveSnapshot より詳細な
-    - 📁 **mixch/** (6)
+    - 📁 **mixch/** (7)
       - `mxCommentInput.js` — ミクチャの公式コメント欄を探す(会場の「ここから発言」は拾わない)。
       - `mxCommentInput.test.js`
       - `mxGiftImages.js` — ミクチャのギフトの絵を resource_id から引く(バックグラウンドで使う・council/mixch-support-PLAN.md)。
       - `mxGiftImages.test.js`
       - `mxParse.js` — ミクチャ(mixch.tv)の配信・コメント・ギフトを、YouTube 版の記録と同じ形にする(純関数)
       - `mxParse.test.js`
+      - `mxSendPath.wiring.test.js`
     - 📁 **platform/** (46)
       - 📁 **__fixtures__/** (1)
         - `eventStanding.2026-11-21.json`
@@ -2013,10 +1996,6 @@
     - `censusWatch.js` — 状態速報の「拡張プロセスの忙しさ(文書別)」を、数字だけで機械的に読む純関数(2026-10-20)。
     - `censusWatch.test.js`
     - `changelog-archive.js` — 追憶のきらめき 更新履歴アーカイブ（popup のバンドル外）。
-    - `changelog-archive.js` — 追憶のきらめき 更新履歴アーカイブ（popup のバンドル外）。
-    - `changelog-archive.js` — 追憶のきらめき 更新履歴アーカイブ（popup のバンドル外）。
-    - `changelog.js` — 拡張の更新履歴データと semver 比較ヘルパ。
-    - `changelog.js` — 拡張の更新履歴データと semver 比較ヘルパ。
     - `changelog.js` — 拡張の更新履歴データと semver 比較ヘルパ。
     - `changelog.test.js`
     - `changelogBundleBudget.test.js`
@@ -3675,7 +3654,7 @@
     - `venuePresenceNote.test.js`
     - `venueResidents.js` — 会場モードの常駐3キャラ(りんく・こん太・たぬ姉)の描画モデル(純関数)。
     - `venueResidents.test.js`
-    - `venueRevealOfficialComposer.js` — 会場モードから公式のコメント欄へ送るとき、会場が欄を覆っていたら一時的にしまう。
+    - `venueRevealOfficialComposer.js` — 会場モードから公式のコメント欄へ送るとき、公式の欄へ操作を通す。
     - `venueRevealOfficialComposer.test.js`
     - `venueRoster.js` — 2026-06-14 ユーザー要望「今会場にいるメンバーを視覚的に確認できるボタン・AIも人間も検証
     - `venueRoster.test.js`
@@ -3689,6 +3668,7 @@
     - `venueSeatsDiag.js` — 会場モード(venueBar.js)の「座席健全度」診断。会場が描いている席の純観測値を組み立てる純関数群。
     - `venueSeatsDiag.test.js`
     - `venueSeatsDiagKey.js` — 会場モードの「座席健全度」観測値を会場(venueBar.js)が書き、status が読む storage キー。
+    - `venueSendDoesNotClose.test.js`
     - `venueSpeech.js` — v0.1.711: ライブ会場モードの「発言→吹き出し」純関数。
     - `venueSpeech.test.js`
     - `venueSpeechCensus.js` — 【層】L0 判定層(純粋関数・I/O禁止)
@@ -3712,8 +3692,13 @@
     - `venueTileCountCensus.test.js`
     - `venueTileCountCensusWiring.wiring.test.js`
     - `venueTuck.wiring.test.js`
+    - `venueTuckState.js` — 会場の「しまう」と「送りのあいだ公式へ通す」の印を見分ける。
+    - `venueTuckState.test.js`
     - `venueViewport.js` — v0.1.715: 会場モードの「映像セーフエリア」と「同時表示人数」を決める純関数。
     - `venueViewport.test.js`
+    - `venueWatchPageVisibility.js` — 視聴ページ判定が一瞬でも外れると会場を閉じていたのを防ぐ。
+    - `venueWatchPageVisibility.test.js`
+    - `venueWatchPageVisibility.wiring.test.js`
     - `venueYukkuriNamedCensus.js` — 「名前ありゆっくり顔」実害確定計器(診断先行アプローチ)。
     - `venueYukkuriNamedCensus.test.js`
     - `vercelCsp.test.js`
@@ -3913,17 +3898,18 @@
     - `yozora-small-yell.mp3`
   - `build-globals.d.ts` — ビルド時に esbuild の `define` で注入される定数の型宣言。
   - `speech-recognition-globals.d.ts` — Web Speech API（Chrome は webkit 接頭辞のことがある）
-- 📁 **tests/** (101)
+- 📁 **tests/** (102)
   - 📁 **contract/** (4)
     - `contentEntryFunctionBudget.test.js`
     - `layer-dependency.test.js`
     - `popupEntryFunctionBudget.test.js`
     - `wiringTestSource.test.js`
-  - 📁 **e2e/** (94)
-    - 📁 **fixtures/** (1)
+  - 📁 **e2e/** (95)
+    - 📁 **fixtures/** (2)
       - 📁 **watch/** (1)
         - 📁 **lv888888888/** (1)
           - `index.html`
+      - `mx-official-composer.html`
     - `abema-caster-thumb.spec.js`
     - `abema-column-pickup.spec.js`
     - `acquisition-dashboard-render.spec.js`
@@ -4031,7 +4017,7 @@
   - `kouhaku_og.py`
   - `og-live-compose.py`
   - `render-og.js` — 追憶の煌めき LP 用 OG 画像（1200×630）を生成する。
-- 📁 **tsuioku-no-kirameki/** (84)
+- 📁 **tsuioku-no-kirameki/** (82)
   - 📁 **articles/** (14)
     - 📁 **role-separation-design/** (2)
       - 📁 **img/** (1)
@@ -4125,8 +4111,6 @@
   - `.htaccess`
   - `google7e3e79636d884c2.html`
   - `google7e3e79636d884c2f.html`
-  - `index.html`
-  - `index.html`
   - `index.html`
   - `privacy.html`
   - `robots.txt`
