@@ -1,16 +1,16 @@
-# Handoff — P0-A: 裏タブ中の未読コメント復帰読み上げ + VOICEVOX未接続時のバッファ保持 (v0.1.2195)
+# Handoff — P0-B: 残サービス（ふわっち・ツイキャス・TikTok・ABEMA）の復帰再接続とスケジューラ移行 (v0.1.2196)
 
-STATUS: #695 レビュー指摘対応済み・push 待ち（commit 済み・未 push）
-ROOT_CAUSE: #695（0c25c84c1）の表復帰処理で !voicePlayer.enabled のときに hiddenSpeechBuf.clear() していたため、利用者が「読み上げ: ON」（readingWanted=true）のまま VOICEVOX 未接続の状態で戻るとバッファが捨てられていた。
-FILES_CHANGED: src/extension/venueBar.js, src/lib/venuePaintSchedule.wiring.test.js, extension/manifest.json, package.json, src/lib/changelog.js, src/lib/changelog-archive.js, tsuioku-no-kirameki/index.html, extension/dist/*, app/dist/live-view.js, extension/background.js, .dist-fingerprint.json, docs/repo-tree-map.{md,html}, docs/code-tree.{md,html}, docs/feature-sitemap.{md,html}, handoff.md
-CHANGES: (1) venueBar.js の hiddenSpeechBuf 宣言を voicePlayer 初期化直前へ移し、onToggle で !voicePlayer.readingWanted（利用者が読み上げを OFF にした瞬間）に hiddenSpeechBuf.clear() を呼ぶように修正。(2) visibilitychange の表復帰処理は !voicePlayer.readingWanted のときだけ clear() し、readingWanted=true かつ !voicePlayer.enabled（VOICEVOX 未接続）のときは捨てずに return するように修正（venueBar.js は 7543 行 <= 上限 7545 行）。(3) venuePaintSchedule.wiring.test.js に配線テストを追加し、版を 0.1.2195（P0-B の 0.1.2194 と非衝突）へ統一。
-TESTS_RUN: npm run test:cc -- src/lib/venuePaintSchedule.test.js src/lib/venuePaintSchedule.wiring.test.js src/lib/venueHeadlessVoice.wiring.test.js src/lib/venueHeadlessVoiceItem.test.js src/lib/changelogBundleBudget.test.js src/lib/changelog.test.js src/lib/changelogConsistency.test.js / npm run verify:bump / npm run check:dist-fresh / npm run tree-map:check / npm run lint / npm run typecheck / verify:extension
-TEST_RESULT: 全合格（vitest 7 files / 54 passed、verify:bump 全7ステップOK 0.1.2195、dist-fresh OK ac9e6f2d7108、tree-map up to date、eslint 0 errors［venueBar.js 行数上限クリア］、tsc 0 errors、verify:extension 合格［v0.1.2195 全13画面・全10差し込み先OK］）
-REMAINING_RISKS: 実配信ページ（グラフィック アクセラレーション OFF）での「裏に回す→コメントが来る→戻る」の実地確認は未実施のため、下書き PR として実配信確認待ちとする。push・PR 作成は Antigravity ルールにより未実施。
-NEXT_ACTION: 手元で fix/venue-hidden-speech-resume を push して下書き PR を作成し、実配信確認後にマージする。次の PR は P0-B（ww/tc/tt/ab の再接続漏れ修正＋pageWatchScheduler 移行）→ P0-2（mutationObserverHub＋YouTube チャット）。
+STATUS: origin/master (c77f60c2c / #695 0.1.2195) へ rebase 済み・push・下書きPR作成待ち（commit 済み・未 push）
+ROOT_CAUSE: ふわっち（ww）・ツイキャス（tc）・TikTok（tt）・ABEMA（ab）の視聴ページ入口に 1 秒の裸 setInterval が残っており、さらに ww/tc/tt は pagehide で current?.stop() のみで current = null にせず pageshow / 表示復帰での再接続が無く、戻っても記録・読み上げが止まったままになる問題が残っていた。YouTube チャット（content-chat-entry.js:672）の pagehide はフォロワー送信のみで接続を止めないため同種の穴は無いことを確認済み。
+FILES_CHANGED: extension-youtube/src/ww-content-entry.js, extension-youtube/src/tc-content-entry.js, extension-youtube/src/tt-content-entry.js, extension-youtube/src/ab-content-entry.js, src/lib/pageWatchScheduler.wiring.test.js, extension/manifest.json, package.json, src/lib/changelog.js, src/lib/changelog-archive.js, tsuioku-no-kirameki/index.html, extension/dist/*, app/dist/live-view.js, extension/background.js, .dist-fingerprint.json, docs/repo-tree-map.{md,html}, docs/code-tree.{md,html}, docs/feature-sitemap.{md,html}, handoff.md
+CHANGES: ww/tc/tt/ab の 4 入口すべてを既存 L0 共通部品 pageWatchScheduler.js と venuePaintSchedule.js（isVenuePageHidden 再利用）へ移行（表 1s / 裏 10s 間引き）。ww/tc/tt は pagehide で current = null とゲートリセットを行い、ab は endStream() 後、4 入口すべてで pageshow(ev?.persisted || !current/!streamKey) および visibilitychange 表復帰時に start()+kick() で同じ配信でも確実に再接続するよう統一。全 10 入口の配線テストを pageWatchScheduler.wiring.test.js に追加し、#695 マージ後の origin/master (0.1.2195) へ rebase して版を 0.1.2196 へ統一（権限追加なし）。
+TESTS_RUN: npm run test:cc -- src/lib/pageWatchScheduler.test.js src/lib/pageWatchScheduler.wiring.test.js src/lib/venuePaintSchedule.test.js src/lib/venuePaintSchedule.wiring.test.js src/lib/changelogBundleBudget.test.js src/lib/changelog.test.js src/lib/changelogConsistency.test.js / npm run verify:bump / npm run check:dist-fresh / npm run tree-map:check / npm run lint / npm run typecheck / verify:extension
+TEST_RESULT: 全合格（vitest 7 files / 64 passed、verify:bump 全7ステップOK 0.1.2196、dist-fresh OK、tree-map up to date、eslint 0 errors、tsc 0 errors、verify:extension 合格［v0.1.2196 全13画面・全10差し込み先OK］）
+REMAINING_RISKS: 実配信ページ（アクセラレーション OFF）での復帰確認は未実施のため下書き PR として実測追記待ち。push・PR 作成は Antigravity ルールにより未実施。
+NEXT_ACTION: 手元で fix/remaining-services-reconnect を push して下書き PR を作成する。次の PR は P0-2（#692 から mutationObserverHub.js と試験を取り込み、YouTube チャット content-chat-entry.js の 4 Observer をハブへ移行）。
 LAST_WORKED_ON: 2026-11-23
 WORKED_BY: antigravity / Gemini 4 Neon (Medium)
-MACHINE_NOTES: worktree=..\_worktrees\tsuioku-no-kirameki.com\cleanup-p0-a (branch: fix/venue-hidden-speech-resume, base: origin/master 3617958a4)。本体チェックアウトの未コミット変更には一切触れていない。
+MACHINE_NOTES: worktree=..\_worktrees\tsuioku-no-kirameki.com\cleanup-p0-b (branch: fix/remaining-services-reconnect, rebased onto origin/master c77f60c2c)。本体チェックアウトの未コミット変更には一切触れていない。
 
 ## NEEDS_JUDGMENT（司令塔が判断する。ここを自動で直してはいけない）
 

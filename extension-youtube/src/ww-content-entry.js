@@ -1,5 +1,5 @@
 // ww-content-entry.js — ふわっちの視聴ページ(whowatch.tv/viewer/<配信の番号>)で、配信とコメントを読んで記録に渡す入口。
-/* global chrome, location, setTimeout, clearTimeout, setInterval, window, fetch, document, HTMLTextAreaElement, HTMLInputElement, Event, KeyboardEvent */
+/* global chrome, location, setTimeout, clearTimeout, window, fetch, document, HTMLTextAreaElement, HTMLInputElement, Event, KeyboardEvent */
 //
 // ★設計(council/whowatch-support-PLAN.md・Kick の kick-content-entry.js と同じ形)
 //   - 読むのはふわっちのページ自身が使う API(GET api.whowatch.tv/lives/<番号>?last_updated_at=<前回>)。ログイン不要の推定。
@@ -16,6 +16,9 @@ import { platformFetchTimeoutSignal } from '../../src/lib/platform/fetchTimeout.
 import { startPageStallWatch } from '../../src/lib/stallTrace.js';
 import { isOwnExtensionUi } from '../../src/lib/platform/pageControlPick.js';
 import { withRevealedVenueOfficialComposer } from '../../src/lib/venueRevealOfficialComposer.js';
+import { createPageWatchScheduler } from '../../src/lib/pageWatchScheduler.js';
+import { isVenuePageHidden } from '../../src/lib/venuePaintSchedule.js';
+import { isExtensionContextAlive } from '../../src/lib/reportSilentError.js';
 try {
   const stallRoot = /** @type {any} */ (globalThis);
   if (!stallRoot.__nlStallWatch) {
@@ -515,10 +518,37 @@ try {
   /* 拡張が入れ替わった直後 */
 }
 
-// ふわっちも1枚のページの中で URL だけ変わるかもしれないので、URL を見張る
-setInterval(check, 1000);
-check();
+// ふわっちも1枚のページの中で URL だけ変わるかもしれないので、共通スケジューラで見張り、裏タブでは 10 秒に間引く
+const wwWatchSched = createPageWatchScheduler({
+  baseTickMs: 1000,
+  getUrl: () => String(location.href || ''),
+  isHidden: () => isVenuePageHidden(document),
+  isAlive: () => isExtensionContextAlive(),
+});
+wwWatchSched.register({
+  id: 'ww-watch',
+  intervalMs: 1000,
+  hiddenMode: 'throttle',
+  hiddenIntervalMs: 10_000,
+  runOnUrlChange: true,
+  run: () => {
+    void check();
+  },
+});
+wwWatchSched.start({ runImmediately: true });
+const resumeWwWatch = () => {
+  wwWatchSched.start();
+  wwWatchSched.kick();
+};
+document.addEventListener('visibilitychange', () => {
+  if (!isVenuePageHidden(document)) resumeWwWatch();
+});
 window.addEventListener('pagehide', () => {
+  wwWatchSched.stop();
   current?.stop();
+  current = null;
   leaveWwFollowerEnd();
+});
+window.addEventListener('pageshow', (ev) => {
+  if (ev?.persisted || !current) resumeWwWatch();
 });
