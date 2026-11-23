@@ -14,6 +14,7 @@ const wwEntry = readFileSync(join(root, '../../extension-youtube/src/ww-content-
 const tcEntry = readFileSync(join(root, '../../extension-youtube/src/tc-content-entry.js'), 'utf8');
 const ttEntry = readFileSync(join(root, '../../extension-youtube/src/tt-content-entry.js'), 'utf8');
 const abEntry = readFileSync(join(root, '../../extension-youtube/src/ab-content-entry.js'), 'utf8');
+const nicoEntry = readFileSync(join(root, '../extension/content-entry.js'), 'utf8');
 
 describe('P0-1: ページ監視スケジューラの各入口への配線', () => {
   it('venue-inline-entry.js は pageWatchScheduler と venuePaintSchedule.isVenuePageHidden を使い、裸の 1s setInterval を持たない', () => {
@@ -82,5 +83,17 @@ describe('P0-1: ページ監視スケジューラの各入口への配線', () =
     expect(twEntry).toContain('ircLastAt = Date.now()');
     expect(twEntry).toContain("id: 'tw-socket-silence'");
     expect(twEntry).toContain('hiddenIntervalMs: 60_000');
+  });
+
+  it('P0-3: ニコ生 content-entry.js の常駐 6 本タイマーが pageWatchScheduler へ移行されている', () => {
+    expect(nicoEntry).toContain("from '../lib/pageWatchScheduler.js'");
+    expect(nicoEntry).toContain("from '../lib/venuePaintSchedule.js'");
+    expect(nicoEntry).toContain("id: 'nico-page-frame'");
+    expect(nicoEntry).toContain("id: 'nico-live-id-poll'");
+    expect(nicoEntry).toContain("id: 'nico-panel-scan'");
+    expect(nicoEntry).toContain("id: 'nico-deep-harvest'");
+    expect(nicoEntry).toContain("id: 'nico-stats-poll'");
+    expect(nicoEntry).toContain("id: 'nico-official-event-dom'");
+    expect(nicoEntry).toContain('shouldDeferDomHarvestDuringScroll');
   });
 });

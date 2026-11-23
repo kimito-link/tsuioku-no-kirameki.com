@@ -7,6 +7,8 @@ import {
   isNicoVideoJpHost
 } from '../lib/broadcastUrl.js';
 import { mountVenueBarButton } from './venueBar.js';
+import { createPageWatchScheduler } from '../lib/pageWatchScheduler.js';
+import { isVenuePageHidden } from '../lib/venuePaintSchedule.js';
 import { openOfficialGiftPanel, GIFT_ITEMS_TAB_REQ_KEY, startGiftItemsTabResponder } from '../lib/venueComposeBox.js';
 import { startGiftPanelRecorder } from '../lib/giftPanelShape.js';
 import { startGiftItemsPublisher, subscribeGiftItems, requestGiftItemPress, chromeGiftStore, waitGiftPressResult, giftPressOutcome } from '../lib/giftItemsMirror.js';
@@ -3216,12 +3218,8 @@ let inlinePlayerResizeObserver = null;
 let inlinePlayerIntersectionObserver = null;
 /** @type {Element|null} */
 let inlineObservedPlayerTarget = null;
-/** 非可視時 livePanelScan の間引き位相（0..stride-1 で 0 のときだけ実行） */
-let hiddenLivePanelScanPhase = 0;
 /** 非可視時 pageFrame メンテ（ended 検知・診断書き込み等）の間引き位相 */
 let hiddenPageFrameMaintenancePhase = 0;
-/** 非可視時 liveId 同期の間引き位相（SPA 切替は可視復帰で補正される想定） */
-let hiddenLiveIdPollPhase = 0;
 let aiShareFastDiagLastPersistAt = 0;
 
 /** @param {string} id */
@@ -8176,9 +8174,7 @@ function startPageFrameLoop() {
       pageFrameLayoutDebounceTimer = null;
     }
     if (document.visibilityState === 'visible') {
-      hiddenLivePanelScanPhase = 0;
       hiddenPageFrameMaintenancePhase = 0;
-      hiddenLiveIdPollPhase = 0;
       // タブ復帰時は形状が変わっている可能性が高いので、要再描画フラグを立てて
       // 次の tick で確実にフル描画させる。
       inlineLayoutDirty = true;
@@ -8194,13 +8190,30 @@ function startPageFrameLoop() {
     }
   }
 
-  pageFrameLoopTimer = setInterval(tickFromInterval, PAGE_FRAME_LOOP_MS);
+  const pageFrameSched = createPageWatchScheduler({
+    baseTickMs: PAGE_FRAME_LOOP_MS,
+    getUrl: () => String(window.location.href || ''),
+    isHidden: () => isVenuePageHidden(typeof document !== 'undefined' ? document : null),
+    isAlive: () => hasExtensionContext(),
+  });
+  pageFrameSched.register({
+    id: 'nico-page-frame',
+    intervalMs: PAGE_FRAME_LOOP_MS,
+    hiddenMode: 'throttle',
+    hiddenIntervalMs: PAGE_FRAME_LOOP_MS * 8,
+    runOnUrlChange: true,
+    run: () => tickFromInterval(),
+  });
+  pageFrameSched.start({ runImmediately: true });
+  pageFrameLoopTimer = pageFrameSched;
   window.addEventListener('scroll', scheduleScrollThrottledPageFrameLayout, {
     passive: true
   });
   window.addEventListener('resize', scheduleResizeDebouncedPageFrameLayout);
-  document.addEventListener('visibilitychange', onPageFrameVisibilityChange);
-  tickFromInterval();
+  document.addEventListener('visibilitychange', () => {
+    onPageFrameVisibilityChange();
+    if (!isVenuePageHidden(typeof document !== 'undefined' ? document : null)) pageFrameSched.kick();
+  });
   // 0.1.17 (S): kon-ta 押下時の体感遅延を縮めるため、watch ページ表示から
   // ~2 秒経ったら裏で popup.html iframe を boot しておく。host は display:none
   // のまま append するので画面には出ないが、iframe は読み込みを進めてくれる。
@@ -14808,31 +14821,13 @@ async function start() {
   // 各 setInterval が「early return するだけの空 tick」を永続的に走らせ続ける。
   // タブを閉じない限り CPU を食うので、id を保持して invalidate 時に
   // clearInterval する（ML1: 0.1.9-5 で popup 側だけ修正したのを content にも揃える）。
-  /** @type {number|null} */
-  let liveIdPollIntervalId = null;
-  /** @type {number|null} */
-  let livePanelScanIntervalId = null;
-  /** @type {number|null} */
-  let deepHarvestPeriodicIntervalId = null;
-  /** @type {number|null} */
-  let statsPollIntervalId = null;
+  /** @type {ReturnType<typeof createPageWatchScheduler>|null} */
+  let nicoWatchHub = null;
   const stopContentIntervalsIfContextInvalidated = () => {
     if (hasExtensionContext()) return false;
-    if (liveIdPollIntervalId != null) {
-      clearInterval(liveIdPollIntervalId);
-      liveIdPollIntervalId = null;
-    }
-    if (livePanelScanIntervalId != null) {
-      clearInterval(livePanelScanIntervalId);
-      livePanelScanIntervalId = null;
-    }
-    if (deepHarvestPeriodicIntervalId != null) {
-      clearInterval(deepHarvestPeriodicIntervalId);
-      deepHarvestPeriodicIntervalId = null;
-    }
-    if (statsPollIntervalId != null) {
-      clearInterval(statsPollIntervalId);
-      statsPollIntervalId = null;
+    if (nicoWatchHub) {
+      nicoWatchHub.stop();
+      nicoWatchHub = null;
     }
     if (officialEventDomScrapeIntervalId != null) {
       clearInterval(officialEventDomScrapeIntervalId);
@@ -14894,7 +14889,8 @@ async function start() {
     // slot と CPU が tab 寿命まで消費され続ける問題があった。
     if (pageFrameLoopTimer != null) {
       try {
-        clearInterval(pageFrameLoopTimer);
+        if (typeof pageFrameLoopTimer.stop === 'function') pageFrameLoopTimer.stop();
+        else clearInterval(pageFrameLoopTimer);
       } catch {
         // no-op
       }
@@ -14903,129 +14899,98 @@ async function start() {
     return true;
   };
 
-  liveIdPollIntervalId = /** @type {number} */ (
-    /** @type {unknown} */ (
-      setInterval(() => {
-        if (stopContentIntervalsIfContextInvalidated()) return;
-        if (
-          typeof document !== 'undefined' &&
-          document.visibilityState === 'hidden' &&
-          isNicoLiveWatchUrl(window.location.href)
-        ) {
-          hiddenLiveIdPollPhase =
-            (hiddenLiveIdPollPhase + 1) % HIDDEN_LIVE_PANEL_SCAN_STRIDE;
-          if (hiddenLiveIdPollPhase !== 0) return;
-        } else {
-          hiddenLiveIdPollPhase = 0;
-        }
-        syncLiveIdFromLocation();
-      }, LIVE_POLL_MS)
-    )
-  );
-
-  livePanelScanIntervalId = /** @type {number} */ (
-    /** @type {unknown} */ (
-      setInterval(() => {
-        if (stopContentIntervalsIfContextInvalidated()) return;
-        if (
-          !recording ||
-          !liveId ||
-          !locationAllowsCommentRecording()
-        ) {
-          return;
-        }
-        if (
-          typeof document !== 'undefined' &&
-          document.visibilityState === 'hidden'
-        ) {
-          hiddenLivePanelScanPhase =
-            (hiddenLivePanelScanPhase + 1) % HIDDEN_LIVE_PANEL_SCAN_STRIDE;
-          if (hiddenLivePanelScanPhase !== 0) return;
-        } else {
-          hiddenLivePanelScanPhase = 0;
-        }
-        // ⚡ スクロール重さ対策（v0.1.495）: 本物のユーザー操作（wheel/touch/キー）でスクロール
-        //   している最中は、この定期スキャンを丸ごと見送る。scanVisibleCommentsNow は
-        //   extractCommentsFromNode（パネル全 DOM 走査）＋ persistCommentRows（全コメント配列の
-        //   read-merge）を行い、probeAndRestoreCommentPanelHealth も走るため、スクロール中に
-        //   挟まると 1.6 万件級の配列処理がフレームを奪って「重すぎて動かない」主因になる。
-        //   一次取得は NDGR 傍受が担い、見送った回収はスクロール静止後の次 tick が拾うので
-        //   記録は欠落しない。lastGenuineUserScrollAt はコメント欄の自動スクロール（scroll
-        //   イベント）では汚染されない＝新着追従では誤って見送らない。
-        if (
-          shouldDeferDomHarvestDuringScroll(
-            Date.now(),
-            lastGenuineUserScrollAt,
-            DOM_HARVEST_SCROLL_DEFER_MS
-          )
-        ) {
-          scheduleVisibleScanAfterScrollQuiet();
-          return;
-        }
-        scanVisibleCommentsNow();
-        void probeAndRestoreCommentPanelHealth();
-      }, LIVE_PANEL_SCAN_MS)
-    )
-  );
-
-  deepHarvestPeriodicIntervalId = /** @type {number} */ (
-    /** @type {unknown} */ (
-      setInterval(() => {
-        if (stopContentIntervalsIfContextInvalidated()) return;
-        tryPeriodicQuietDeepHarvest();
-      }, DEEP_HARVEST_PERIODIC_MS)
-    )
-  );
-
-  document.addEventListener('visibilitychange', onTabVisibleForCommentHarvest);
-
+  // P0-3: ニコ生視聴ページの常駐タイマー 5 本を共通 pageWatchScheduler 1 本へ統合（表は既存間隔、裏は間引き/停止）
+  nicoWatchHub = createPageWatchScheduler({
+    baseTickMs: LIVE_PANEL_SCAN_MS,
+    getUrl: () => String(window.location.href || ''),
+    isHidden: () => isVenuePageHidden(typeof document !== 'undefined' ? document : null),
+    isAlive: () => !stopContentIntervalsIfContextInvalidated(),
+  });
+  nicoWatchHub.register({
+    id: 'nico-live-id-poll',
+    intervalMs: LIVE_POLL_MS,
+    hiddenMode: 'throttle',
+    hiddenIntervalMs: LIVE_POLL_MS * HIDDEN_LIVE_PANEL_SCAN_STRIDE,
+    runOnUrlChange: true,
+    run: () => {
+      syncLiveIdFromLocation();
+    },
+  });
+  nicoWatchHub.register({
+    id: 'nico-panel-scan',
+    intervalMs: LIVE_PANEL_SCAN_MS,
+    hiddenMode: 'throttle',
+    hiddenIntervalMs: LIVE_PANEL_SCAN_MS * HIDDEN_LIVE_PANEL_SCAN_STRIDE,
+    run: () => {
+      if (!recording || !liveId || !locationAllowsCommentRecording()) return;
+      if (
+        shouldDeferDomHarvestDuringScroll(
+          Date.now(),
+          lastGenuineUserScrollAt,
+          DOM_HARVEST_SCROLL_DEFER_MS
+        )
+      ) {
+        scheduleVisibleScanAfterScrollQuiet();
+        return;
+      }
+      scanVisibleCommentsNow();
+      void probeAndRestoreCommentPanelHealth();
+    },
+  });
+  nicoWatchHub.register({
+    id: 'nico-deep-harvest',
+    intervalMs: DEEP_HARVEST_PERIODIC_MS,
+    hiddenMode: 'pause',
+    run: () => {
+      tryPeriodicQuietDeepHarvest();
+    },
+  });
   pollStatsFromPage();
-  statsPollIntervalId = /** @type {number} */ (
-    /** @type {unknown} */ (
-      setInterval(() => {
-        if (stopContentIntervalsIfContextInvalidated()) return;
-        if (
-          typeof document !== 'undefined' &&
-          document.visibilityState === 'hidden'
-        ) {
-          return;
-        }
-        pollStatsFromPage();
-      }, STATS_POLL_MS)
-    )
-  );
-
-  // niconico DOM の正本値（program-statistics-menu / グリーンバナー / バルーン /
-  // 貢献度ランキング）を 8 秒間隔で掬って `nls_event_dom_<lv>` に保存する。
-  // モーダルが閉まっていて取れないフィールドは前回値で温存（mergeOfficialEventDomBundle）。
-  // popup・HTML レポート・マーケ分析の 3 経路がここを正本として読む。
+  nicoWatchHub.register({
+    id: 'nico-stats-poll',
+    intervalMs: STATS_POLL_MS,
+    hiddenMode: 'pause',
+    run: () => {
+      pollStatsFromPage();
+    },
+  });
   void persistOfficialEventDomBundleNow();
-  officialEventDomScrapeIntervalId = /** @type {number} */ (
-    /** @type {unknown} */ (
-      setInterval(() => {
-        if (stopContentIntervalsIfContextInvalidated()) return;
-        if (!recording || !liveId) return;
-        if (
-          typeof document !== 'undefined' &&
-          document.visibilityState === 'hidden'
-        ) {
-          return;
-        }
-        // PR3（多タブ集約）: 公式 DOM scrape（5s毎・programStats/eventBanner 等）は同一 liveId
-        //   で全タブ同じ結果＝共有可能。書込先 nls_event_dom_<lv> は全タブが読むので、リーダー
-        //   1タブだけ scrape すれば十分。fail-open（Web Locks 非対応は全タブ）。初回 1 発は
-        //   gate せず各タブが即イベントデータを得る（下の init 直後呼び出し）。
-        const lid = String(liveId || '').trim().toLowerCase();
-        if (!/^lv\d{1,15}$/.test(lid)) {
-          void persistOfficialEventDomBundleNow();
-          return;
-        }
-        void runIfTabLeader('nls-domscrape-' + lid, () => {
-          void persistOfficialEventDomBundleNow();
-        });
-      }, OFFICIAL_EVENT_DOM_SCRAPE_MS)
-    )
-  );
+  nicoWatchHub.register({
+    id: 'nico-official-event-dom',
+    intervalMs: OFFICIAL_EVENT_DOM_SCRAPE_MS,
+    hiddenMode: 'pause',
+    run: () => {
+      if (!recording || !liveId) return;
+      const lid = String(liveId || '').trim().toLowerCase();
+      if (!/^lv\d{1,15}$/.test(lid)) {
+        void persistOfficialEventDomBundleNow();
+        return;
+      }
+      void runIfTabLeader('nls-domscrape-' + lid, () => {
+        void persistOfficialEventDomBundleNow();
+      });
+    },
+  });
+  nicoWatchHub.start();
+
+  document.addEventListener('visibilitychange', () => {
+    onTabVisibleForCommentHarvest();
+    if (!isVenuePageHidden(typeof document !== 'undefined' ? document : null)) nicoWatchHub?.kick();
+  });
+  window.addEventListener('pagehide', () => {
+    nicoWatchHub?.stop();
+    if (pageFrameLoopTimer && typeof pageFrameLoopTimer.stop === 'function') pageFrameLoopTimer.stop();
+  });
+  window.addEventListener('pageshow', (ev) => {
+    if (ev?.persisted) {
+      nicoWatchHub?.start();
+      nicoWatchHub?.kick();
+      if (pageFrameLoopTimer && typeof pageFrameLoopTimer.start === 'function') {
+        pageFrameLoopTimer.start();
+        pageFrameLoopTimer.kick();
+      }
+    }
+  });
 
   // 核心: koken 公式貢献度ランキング無認証 API の鏡（officialEventDomScrape の
   // sibling。NDGR/gift hotpath 非干渉・SW 経由・専用キー・rows>0 のみ書込）。
