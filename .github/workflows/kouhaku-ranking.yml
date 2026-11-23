@@ -1,0 +1,97 @@
+name: kouhaku ranking
+
+# レジストリの公式イベント順位を、イベントごとに1日最大2回読む。
+# 16:30 JST = 07:30 UTC。失敗したときだけ 19:30 JST = 10:30 UTC。
+# 取得してよいかはサーバ(api/kouhaku-ranking.js)が決める。この workflow は1回叩くだけ。
+# Vercel Hobby の cron は1日1回までなので、ライブランキングと同じく GitHub Actions を使う。
+# 保存先(Upstash)が無いときはサーバが公式ページへ行かずに 503 を返す。
+
+on:
+  schedule:
+    - cron: "30 7 * * *"
+    - cron: "30 10 * * *"
+  workflow_dispatch:
+    inputs:
+      slot:
+        description: primary (16:30 JST) or retry (19:30 JST)
+        type: choice
+        options:
+          - primary
+          - retry
+        default: primary
+
+permissions:
+  contents: read
+
+concurrency:
+  group: kouhaku-ranking
+  cancel-in-progress: false
+
+jobs:
+  fetch:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 8
+    steps:
+      - name: 公式ランキングを読む
+        env:
+          INGEST_KEY: ${{ secrets.STATUS_INGEST_KEY }}
+          EVENT_NAME: ${{ github.event_name }}
+          EVENT_SCHEDULE: ${{ github.event.schedule }}
+          INPUT_SLOT: ${{ inputs.slot }}
+        run: |
+          if [ -z "$INGEST_KEY" ]; then
+            echo "::error::secrets.STATUS_INGEST_KEY が未登録です。"
+            exit 1
+          fi
+          slot="primary"
+          if [ "$EVENT_NAME" = "schedule" ] && [ "$EVENT_SCHEDULE" = "30 10 * * *" ]; then
+            slot="retry"
+          fi
+          if [ "$EVENT_NAME" = "workflow_dispatch" ] && [ -n "$INPUT_SLOT" ]; then
+            slot="$INPUT_SLOT"
+          fi
+          echo "slot=$slot"
+          code=$(curl -sS -o /tmp/kouhaku.json -w '%{http_code}' --max-time 40 \
+            -H "x-share-key: $INGEST_KEY" \
+            "https://app.tsuioku-no-kirameki.com/api/kouhaku-ranking?refresh=1&slot=${slot}")
+          echo "HTTP $code"
+          cat /tmp/kouhaku.json || true
+          echo ""
+          if [ "$code" = "404" ]; then
+            echo "::notice::/api/kouhaku-ranking はまだ公開されていません"
+            exit 0
+          fi
+          if [ "$code" != "200" ]; then
+            echo "::error::取得に失敗しました (HTTP $code)"
+            exit 1
+          fi
+          if grep -q '"ok":false' /tmp/kouhaku.json; then
+            echo "::error::サーバが取得を失敗として返しました"
+            exit 1
+          fi
+
+      - uses: actions/checkout@v7
+        if: success()
+      - uses: actions/setup-node@v7
+        if: success()
+        with:
+          node-version: 22
+      - name: 共有画像を焼く
+        if: success()
+        env:
+          INGEST_KEY: ${{ secrets.STATUS_INGEST_KEY }}
+          KOUHAKU_RESULT: /tmp/kouhaku.json
+          KOUHAKU_API: https://app.tsuioku-no-kirameki.com
+        run: |
+          if [ ! -f /tmp/kouhaku.json ]; then
+            echo "結果が無いので画像は焼きません"
+            exit 0
+          fi
+          if ! grep -q '"action":"saved"' /tmp/kouhaku.json; then
+            echo "新しい順位は無いので画像はそのまま"
+            exit 0
+          fi
+          sudo apt-get update
+          sudo apt-get install -y fonts-noto-cjk
+          python3 -m pip install --user pillow
+          node scripts/kouhaku-og-bake.mjs

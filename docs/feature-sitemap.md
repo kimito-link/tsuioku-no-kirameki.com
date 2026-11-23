@@ -128,12 +128,13 @@
   - `src/lib/monotonicCommentCount.js`
 - **storage キー定義** — chrome.storage のキー名の正本(nls_comments_<lv> 等)
   - `src/lib/storageKeys.js`
-<details><summary>🗂 このカテゴリの全担当ファイル(自動分類) 77</summary>
+<details><summary>🗂 このカテゴリの全担当ファイル(自動分類) 78</summary>
 
 - `extension-youtube/sidepanel.js` — ニコ生版 popup-entry.js(本物)+ YouTube の記録を読む入口のバンドル
 - `extension-youtube/src/pfEmoteStore.js` — Twitch/Kick の視聴ページ(content)で見た絵文字の「名前 → 画像」を storage に覚える。
 - `extension-youtube/src/ytIdbStore.js` — YouTube Live コメントを配信(videoId)ごとに全件 IndexedDB へ記録・差分取得するストア
 - `scripts/dump-panel-state.mjs` — 実機の chrome.storage.local を吸い出して
+- `scripts/kouhaku-og-bake.mjs` — 保存済みの紅白順位から共有 JPEG を焼き、/api/kouhaku-og-image へ置く。
 - `scripts/migrate-ext-storage.mjs` — 拡張の記録データを「旧ID配下フォルダ」→「新ID配下フォルダ」へコピーする(一度だけ・v0.1.1529)。
 - `scripts/record-improvement.mjs` — ★実測値を台帳に書き足す【1本の口】。
 - `src/extension/content-boot.js` — 記録エンジン(content.js・約1.5MB)を、配信の視聴フレームだけに載せる。
@@ -218,8 +219,9 @@
 
 - **応援レーン集約(誰が候補か)** — 保存コメント行を userId 単位に畳み込みレーン候補を作る唯一の集約正本(popup/venue 共通)
   - `src/lib/userLaneCandidatesFromStorage.js`
-<details><summary>🗂 このカテゴリの全担当ファイル(自動分類) 110</summary>
+<details><summary>🗂 このカテゴリの全担当ファイル(自動分類) 112</summary>
 
+- `api/event-ranking.js` — イベント💎ランキングの「公式更新以降 +X」「推定イベントpt」用のサーバ側スナップショット（2026-11-21）。
 - `scripts/council-trial.mjs` — 会議メンバー候補を「本番と同じ条件」で一斉に試す使い捨て計器。
 - `scripts/perf-ab/trace-summary.mjs` — Chrome のトレース(CDP Tracing)を取って、メインスレッドごとに「自分の時間(self time)」を名前別に集計する。
 - `src/domain/lane/aggregate.js` — 応援ユーザーレーンの per-row → per-user 集約（純関数）。
@@ -330,6 +332,7 @@
 - `src/lib/youtube/ytConcurrentViewers.js` — YouTube の同時視聴者数を、ページの埋め込みと updated_metadata から読む（純関数）
 - `src/lib/youtube/ytSupportRanking.js` — YouTube Live 配信ごとの応援者ランキング集計・差分更新（通貨別・純関数）
 - `src/lib/yukkuriBroadcastSummary.js` — 放送終了後の HTML レポート / マーケ分析の頭にくる「ゆっくり解説風」要約セクション。
+- `src/server/eventRankingSnapshot.js` — イベント💎ランキングの「サーバ側スナップショット」純関数群（2026-11-21 Phase 2）。
 
 </details>
 
@@ -353,7 +356,7 @@
   - `src/lib/giftThrowProjectile.js`
 - **吹き出し寿命管理** — 会場の吹き出しの表示上限・追い出し(eviction)ライフサイクル
   - `src/lib/venueBubbleLifecycle.js`
-<details><summary>🗂 このカテゴリの全担当ファイル(自動分類) 304</summary>
+<details><summary>🗂 このカテゴリの全担当ファイル(自動分類) 305</summary>
 
 - `app/live-view-sound.js` — v0.1.1737: スマホの WEB版でギフトの効果音を鳴らす(拡張の会場モードと同じ音・同じ金額帯の選び方)。
 - `app/live-view-venue.js` — v0.1.1739: スマホの「かんたん会場モード」。右下の 🎪 を押すと全画面の会場になる。
@@ -440,6 +443,7 @@
 - `src/lib/domHarvestScrollDefer.js` — 「ユーザーが今まさにスクロール中か」を判定して、コメントの DOM ハーベスト
 - `src/lib/effectDirector.js` — 「演出ディレクター」層(パチンコ的ゲーム性 Phase 1・Fable設計 2026-07-04)。
 - `src/lib/enrichmentAvatarFallback.js` — enrichRowsWithInterceptedUserIds 内で、全ソースにアバターURLがない場合に
+- `src/lib/eventLiveBoardModel.js` — イベント💎「いまの順位・pt・次の順位まで」ボードの表示モデル（純関数・2026-11-21 Phase 2）。
 - `src/lib/firstPaintGate.js` — 「最初の描画が済むまで」待つ関門(純粋寄り・時計と PerformanceObserver は deps で注入)。v0.1.1684
 - `src/lib/formatGiftSubAppHistory.js` — v0.1.198: gift sub-app DOM 由来の history / totalCounts を popup 表示用に
 - `src/lib/giftAdPicksCarry.js` — 【層】L0 判定層(純粋関数・I/O禁止)
@@ -771,7 +775,7 @@
   - `app/supporter.html`
   - `app/referral-passthrough.js`
   - `tsuioku-no-kirameki/tokushoho.html`
-<details><summary>🗂 このカテゴリの全担当ファイル(自動分類) 58</summary>
+<details><summary>🗂 このカテゴリの全担当ファイル(自動分類) 60</summary>
 
 - `extension-youtube/marketing-export-guard.js` — マーケ分析タブ(marketing-export.html)の「何があっても開く」保険。
 - `extension-youtube/marketing-export.js` — ニコ生版 marketing-export-entry.js(本物)+ YouTube の記録を読む入口のバンドル
@@ -790,7 +794,9 @@
 - `src/lib/broadcastReportSummary.js` — HTML レポート / マーケ分析の双方で使う「放送全体の純粋集計」。
 - `src/lib/commentTimelineReport.js` — 状態速報に「応援コメント(最新N件・本文)」を出す整形 lib。
 - `src/lib/deepExportPolicy.js` — popup からの deep export 要求時に、仮想リスト走査を行うかを判定する。
+- `src/lib/devMarketingUnlock.js` — 【層】L0 判定層(ビルド旗と manifest を見るだけ。新しい権限は使わない)
 - `src/lib/devMonitorViz.js` — 開発・テスト用監視パネル向けの純粋 HTML 断片（DOM 非依存）。
+- `src/lib/eventLiveBoardHtml.js` — イベント💎ボードの HTML（純関数・2026-11-21 Phase 2）。モデルは eventLiveBoardModel.js。
 - `src/lib/exportDownloadFilename.js` — HTML / マーケ分析のダウンロードファイル名（配信開始日 + liveId）。
 - `src/lib/exportStageProfiler.js` — HTML / マーケ DL の段階計測（体感調査用）。chrome 非依存の純関数。
 - `src/lib/exportWaitNarration.js` — HTML / マーケ DL 待ち中の りんく・こん太・たぬ姉 セリフ（popup 吹き出し用）。
@@ -1145,8 +1151,9 @@
   - `src/extension/live-ranking-entry.js`
   - `tsuioku-no-kirameki/live/index.html`
   - `tools/gen-og-live-ranking.py`
-- **ランキング(/live/)のコメント件数集計** — 3枠目「コメントで応援した人」。GitHub Actions(live-ranking.yml の tally ジョブ)が watch HTML→視聴セッション握手→NDGR を crawlNdgrBackward で遡り、ndgrChatsToMergeRows→createCommentTally で【件数だけ】数えて POST(?ingest=comments)。本文・時刻は保存しない。匿名(184)も件数順にそのまま(匿名NNN＋identicon)。GET 側は attachComments が lives[i].comment に合流(v0.1.1511)
+- **ランキング(/live/)のコメント件数集計** — 3枠目「コメントで応援した人」。GitHub Actions(live-ranking.yml の tally ジョブ)が watch HTML→視聴セッション握手→NDGR を crawlNdgrBackward で遡り、ndgrChatsToMergeRows→createCommentTally で【件数だけ】数えて POST(?ingest=comments)。本文・時刻は保存しない。匿名(184)も件数順にそのまま(匿名NNN＋identicon)。GET 側は attachComments が lives[i].comment に合流(v0.1.1511)。v0.1.2173 から --loop-seconds 390 で 1 run の中で約60秒ごとに新しい側だけ数えて保存(新しく一覧に入った配信を先に・前の結果は持ち越す・viewUri はメモリだけ・state は最後の回だけ POST・純ロジックは liveTallyLoop.js)。v0.1.2174: 前回の高水位より新しい行だけを別に数えた recent(前回の集計から増えたコメント)を entry に載せる・未集計の配信は短い上限で先に数えて表示用だけ先に POST
   - `src/lib/liveCommentTally.js`
+  - `src/lib/liveTallyLoop.js`
   - `scripts/live-comment-tally.mjs`
   - `api/live-ranking.js`
   - `src/lib/liveRankingView.js`
@@ -1166,6 +1173,22 @@
   - `src/lib/liveRecentHoverCard.js`
   - `src/extension/live-ranking-entry.js`
   - `tsuioku-no-kirameki/live/index.html`
+- **紅白歌枠合戦2026のイベントpt応援ランキング** — /live/ の中と /live/event/<id>/、/live/event/<id>/u/<ユーザーID>/。いまのイベントは日付で選ぶ。古い /live/kouhaku/ は紅白へ転送。出典はレジストリの公式ページだけ。サーバが JST 16:30、失敗時のみ 19:30 にイベントごと最大2回取得し、ブラウザは /api/kouhaku-ranking だけを読む。新しいイベントは src/lib/eventRanking/registry.js に1件足す。アイコンは公式HTMLの公開 usericon、無ければユーザーIDから組み立て、失敗時は blank.jpg。共有は X と LINE(https、openExternalBrowser=1)。定期実行は .github/workflows/kouhaku-ranking.yml。紅白の保存は Upstash の kouhaku:v1:*。無ければ同梱シード
+  - `src/lib/eventRanking/registry.js`
+  - `src/lib/kouhaku/parse.js`
+  - `src/lib/kouhaku/icon.js`
+  - `src/lib/kouhaku/policy.js`
+  - `src/lib/kouhaku/job.js`
+  - `src/server/kouhakuOfficialPage.js`
+  - `src/server/kouhakuRead.js`
+  - `api/kouhaku-ranking.js`
+  - `api/kouhaku-og.js`
+  - `api/kouhaku-og-image.js`
+  - `tsuioku-no-kirameki/live/index.html`
+  - `tsuioku-no-kirameki/live/event/index.html`
+  - `tsuioku-no-kirameki/assets/js/kouhaku-board.js`
+  - `.github/workflows/kouhaku-ranking.yml`
+  - `vercel.json`
 - **ランキング(/live/)の配信ごと OGP** — vercel.json が「?lv= あり∧カード用クローラー UA」だけ /api/live-og へ rewrite。api は live:ranking:latest から該当配信を引き、数字(来場・コメント・ギフト・広告)を description と焼いた JPEG に出す(0/欠落は省く)。焼き画像がある lv(HEXISTS)は og:image=/api/live-og-image?lv=(1200x630・配信サムネ＋数字帯)、無ければサムネ直。画像は GitHub Actions(og ジョブ)が live-og-bake.mjs→og-live-compose.py(Pillow)で焼き、base64 を Upstash(live:og:img・TTL 1h)へ POST(?ingest=og-image)。api はニコ生へ fetch しない・リダイレクト無し・no-store。人間は静的 /live/。支援者名・コメント本文・個別ポイントは出さない(v0.1.1519)
   - `api/live-og.js`
   - `api/live-og-image.js`
@@ -1192,6 +1215,10 @@
   - `src/lib/liveGiftPulse.js`
   - `src/extension/live-ranking-entry.js`
   - `tsuioku-no-kirameki/live/index.html`
+- **/live/ ⚡ いま動いた人** — 配信カードの名前のすぐ下に、前回の取得からギフトptが増えた人と前回の集計からコメントが増えた人だけを最大6人(ギフト優先)、取得/集計の時刻と間隔つきで出す。差は既存の createGiftPulseRegistry の結果だけ(コメントは commentsCapturedAt どうしで比べる)。増えた人がいなければ「いない」、初回は「次の取得と比べる」と正直に出す。演出なし・描き直しは取得時のみ(v0.1.2173)
+  - `src/lib/liveMovers.js`
+  - `src/extension/live-ranking-entry.js`
+  - `tsuioku-no-kirameki/assets/css/live-ranking.css`
 - **/live/ Kick セクション(ほかの配信サービス)** — ニコ生とは別セクション・別データ(/api/live-platforms・Redis live:kick:latest)で、Kick 公式 API(App Access Token)の日本語配信を同時視聴数の多い順に最大20件。値は Kick が返したものをそのまま表示し推定・増分・順位推移は作らない(YouTube を同じ枠に乗せるため・規約)。収集は Actions の kick ジョブ(リポジトリ変数 KICK_COLLECT=1 で有効)だけで、閲覧者の操作では Kick へ問い合わせない。成人向けは既定で非表示(件数は表示)。live:platforms:off で再デプロイなしに停止
   - `api/live-platforms.js`
   - `src/server/kickApi.js`
@@ -1200,7 +1227,7 @@
   - `src/extension/live-ranking-entry.js`
   - `tsuioku-no-kirameki/live/index.html`
   - `.github/workflows/live-ranking.yml`
-<details><summary>🗂 このカテゴリの全担当ファイル(自動分類) 346</summary>
+<details><summary>🗂 このカテゴリの全担当ファイル(自動分類) 361</summary>
 
 - `app/app.js` — スマホ閲覧用 status Web 版。
 - `app/live-view-block.js` — iPhone アプリの「🚩 見たくない人を隠す・報告する」(App Store の審査 1.2: ほかの人の書き込みを見せるアプリの決まり)。
@@ -1218,6 +1245,7 @@
 - `extension-youtube/src/sidepanel-nico-entry.js` — YouTube 版サイドパネル = ニコ生版の本物 popup-entry.js をそのまま動かす。
 - `extension-youtube/src/sidepanelNicoView.js` — ニコ生版 popup.html を丸写ししたサイドパネルに、YouTube のデータを流し込む。
 - `extension-youtube/src/ytDefaultIcon.js` — YouTube の「最初からの文字アイコン」(色付きの丸に1文字)を画像から見分ける。
+- `extension-youtube/src/ytEventStanding.js` — global document, setTimeout, clearTimeout, fetch
 - `extension-youtube/src/ytMergedIsolationBoot.js` — 本体に同梱した YouTube 版の画面・視聴ページの入口で、いちばん先に動く仕切り。
 - `extension/background.js` — MV3 Service Worker
 - `mobile/capacitor.config.ts` — server.url リモート読込型の Capacitor 設定(web-ios-android キットの金型に準拠)。
@@ -1315,6 +1343,7 @@
 - `src/extension/cloak-failsafe-entry.js` — 幕(cloak)を外す【最速の保険】だけを担う極小エントリ。
 - `src/extension/offscreen-entry.js` — feat/multitab-scale-globalcap（2026-05-31）: コメント IDB の「常駐・単一書き手」を担う
 - `src/extension/orphanTabAutoReloadHost.js` — 放送ページ(content script の一番外側)で、拡張の入れ替え後に古い版のまま止まったページを自分で読み込み直す見回りを始める。
+- `src/extension/popup/eventLiveBoardPopup.js` — 2026-11-21 Phase 2: popup のイベント💎ボード（いまの順位・pt・次の順位まで）。popup-entry.js は
 - `src/extension/popup/init/frameTheme.js` — frameTheme — popup の「配色プリセット/枠テーマ」一式。
 - `src/extension/self-update-sw-entry.js` — 開発版の拡張が、拡張のフォルダの新しい版に自分で入れ替わる(v0.1.1802)。
 - `src/extension/self-update.d.ts` — self-update.js(キットの写し・無改変)の型。写しを型検査から外し、ここで形だけ示す。
@@ -1380,6 +1409,15 @@
 - `src/lib/initShadeFailsafe.js` — 初回ロード幕(.nl-init-shade)の CSS フェイルセーフとクラスの乖離を断つ純関数。
 - `src/lib/instrumentSpec.js` — 【層】L0 判定層(純粋関数・I/O禁止)
 - `src/lib/isInsideRecommendedLiveSection.js` — v0.1.200: ニコ生 watch ページの「おすすめ生放送」セクション内 DOM を識別する純関数。
+- `src/lib/kouhaku/board.js` — 【層】L0 判定層(純粋関数・I/O禁止)
+- `src/lib/kouhaku/calc.js` — 【層】L0 判定層(純粋関数・I/O禁止)
+- `src/lib/kouhaku/constants.js` — 【層】L0 判定層(純粋関数・I/O禁止)
+- `src/lib/kouhaku/format.js` — 【層】L0 判定層(純粋関数・I/O禁止)
+- `src/lib/kouhaku/model.js` — 【層】L0 判定層(純粋関数・I/O禁止)
+- `src/lib/kouhaku/ogHtml.js` — 【層】L0 判定層(純粋関数・I/O禁止)
+- `src/lib/kouhaku/ogSpec.js` — 【層】L0 判定層(純粋関数・I/O禁止)
+- `src/lib/kouhaku/share.js` — 【層】L0 判定層(純粋関数・I/O禁止)
+- `src/lib/kouhaku/time.js` — 【層】L0 判定層(純粋関数・I/O禁止)
 - `src/lib/lastWatchUrlAdoption.js` — 【層】L0 判定層(純粋関数・I/O禁止)
 - `src/lib/lengthDelimitedStream.js` — length-delimited（varint 長 + ペイロード）の連続を分割する。
 - `src/lib/liveElapsedExtrapolate.js` — v0.1.1738: スマホ(WEB版)で「経過」「最終取り込み」が止まって見えるのを防ぐ。
@@ -1437,6 +1475,8 @@
 - `src/lib/phoneNativeCues.js` — iPhone アプリ(mobile/)だけの「ギフトが届いたら通知・振動」の判定(純関数)。
 - `src/lib/phoneSoundCues.js` — v0.1.1737: スマホの WEB版でギフトの効果音を鳴らす「どれが新しく来たか」の判定(純関数)。
 - `src/lib/pickLatestComment.js` — ストレージ上のコメント配列の並びは一定でないため、
+- `src/lib/platform/eventStandingParsers.js` — 【層】L0 判定層(純粋関数・I/O禁止)
+- `src/lib/platform/eventStandingView.js` — 【層】L0 判定層(純粋関数・I/O禁止)
 - `src/lib/platform/fetchTimeout.js` — 【層】L0 判定層(純粋関数・I/O禁止)
 - `src/lib/platform/infoPollGate.js` — 配信の情報の口を何秒おきに読むかを決める小さな門(純関数)
 - `src/lib/platform/noWatchHint.js` — 配信ページが開いていないときにパネルへ出す「配信を探す」案内を、そのサービスの言葉と行き先にする。
@@ -1547,6 +1587,8 @@
 - `tools/audit-lp-overflow.mjs` — One-off LP overflow audit (run: node tools/audit-lp-overflow.mjs)
 - `tools/mcp-nicolive/server.mjs` — NicoLive Local MCP Bridge Phase1a (PoC) — stdio JSON-RPC server.
 - `tools/mcp-nicolive/store.mjs` — NicoLive Local MCP Bridge - Snapshot Store.
+- `tsuioku-no-kirameki/assets/js/app-store-badges.js` — global document, window
+- `tsuioku-no-kirameki/assets/js/kouhaku-app-cta.js` — global URL
 - `tsuioku-no-kirameki/assets/js/site-chrome-lp.js` — 追憶のきらめき サイト共通の「ヘッダー(ロゴ＋ハンバーガー)・ドロワーメニュー・フッター」。
 
 </details>
@@ -1556,25 +1598,27 @@
 > changelog 全 20 版を「バグ系統」で束ねた枝。同系統をまた触るとき、過去の修正と「なぜ毎回触るか」を辿る(再発防止)。新しい順。
 
 ### 💾 記録件数 (2版)
+- `v0.1.2174` 2026-11-21 — ランキングページの「いま動いた人」にコメントも
 - `v0.1.2165` 2026-11-18 — 終わりの人数と書き出しの全件
-- `v0.1.2155` 2026-11-18 — 応援が届いた時刻を先頭に出す
 
-### 🏟 会場・席 (4版)
-- `v0.1.2154` 2026-11-18 — 横の欄と来場の記録をまとめた
-- `v0.1.2153` 2026-11-18 — Kickの絵文字を名前のまま出さない
-- `v0.1.2152` 2026-11-18 — 公式どうしの来場は1秒差でも残す
-- `v0.1.2150` 2026-11-17 — 来場は時刻で区別し、二重だけ畳む
+### 📥 コメント取得 (3版)
+- `v0.1.2173` 2026-11-21 — ランキングページのコメント集計を約1分ごとに
+- `v0.1.2172` 2026-11-21 — 各サービスのイベント今の順位と次まで
+- `v0.1.2170` 2026-11-21 — イベントの今の順位と次まで
 
-### 🎈 吹き出し (1版)
-- `v0.1.2153` 2026-11-18 — Kickの絵文字を名前のまま出さない
+### 🏟 会場・席 (2版)
+- `v0.1.2172` 2026-11-21 — 各サービスのイベント今の順位と次まで
+- `v0.1.2170` 2026-11-21 — イベントの今の順位と次まで
 
-### 🎁 ギフト (1版)
+### 🎁 ギフト (2版)
+- `v0.1.2173` 2026-11-21 — ランキングページのコメント集計を約1分ごとに
 - `v0.1.2159` 2026-11-18 — 概数の登録者と長い応援一覧を直す
 
-### 🪟 応援レーン・タイル (1版)
-- `v0.1.2157` 2026-11-18 — Twitchなどの人数を低い頻度で取る
-
-### その他 (12版)
+### その他 (14版)
+- `v0.1.2177` 2026-11-22 — ランキングページで終わった配信を「放送中」に見せない
+- `v0.1.2176` 2026-11-21 — 開発モードではマーケHTMLを自由に保存
+- `v0.1.2175` 2026-11-21 — ランキングページ「いま動いた人」の人数の書き方を直しました
+- `v0.1.2171` 2026-11-21 — イベントptの順位を大きく表示
 - `v0.1.2169` 2026-11-18 — 引き継ぎノートの公開版表記を最新に
 - `v0.1.2168` 2026-11-18 — ストア提出記録の版表記を最新に
 - `v0.1.2167` 2026-11-18 — 開いたままの書き出しと概数
@@ -1585,5 +1629,3 @@
 - `v0.1.2161` 2026-11-18 — フォロワー数の正本を一つにする
 - `v0.1.2160` 2026-11-18 — 保存したフォロワー数を書き出しに出す
 - `v0.1.2158` 2026-11-18 — 記録が無いときは応援の章を出さない
-- `v0.1.2156` 2026-11-18 — フォロワーの増えた時刻を出す
-- `v0.1.2151` 2026-11-17 — 記録テストは絵文字の名前を見ない

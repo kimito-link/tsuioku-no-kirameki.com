@@ -11,7 +11,7 @@
     <link rel="apple-touch-icon" sizes="180x180" href="images/apple-touch-icon.png">
     <link rel="icon" type="image/png" sizes="192x192" href="images/favicon-192.png">
 
-    <meta name="description" content="ニコ生・YouTube・Twitch・Kick・SHOWROOM・ふわっち・ミクチャ・TikTok LIVE・ツイキャス・ABEMA の10サービスに対応。応援コメントを取りこぼしにくく、あとから育つコメント記録へ。会場モード・OBS 透過のコメビュ・人ごとに違う声の読み上げ（VOICEVOX 連携）・マーケ分析レポートまで備えた Chrome 拡張（v0.1.2169）。">
+    <meta name="description" content="ニコ生・YouTube・Twitch・Kick・SHOWROOM・ふわっち・ミクチャ・TikTok LIVE・ツイキャス・ABEMA の10サービスに対応。応援コメントを取りこぼしにくく、あとから育つコメント記録へ。会場モード・OBS 透過のコメビュ・人ごとに違う声の読み上げ（VOICEVOX 連携）・マーケ分析レポートまで備えた Chrome 拡張（v0.1.2177）。">
     <meta name="theme-color" content="#0a1228">
     <link rel="manifest" href="site.webmanifest">
     <meta name="mobile-web-app-capable" content="yes">
@@ -25,7 +25,7 @@
       {"@context":"https://schema.org","@type":"WebSite","name":"君斗りんくの追憶のきらめき","url":"https://tsuioku-no-kirameki.com/","description":"ニコ生・YouTube・Twitch・Kick・SHOWROOM・ふわっち・ミクチャ・TikTok LIVE・ツイキャス・ABEMA の10サービスに対応。応援コメントを取りこぼしにくく、あとから育つコメント記録へ。会場モード・コメビュ（OBS 透過）・人ごとに違う声の読み上げ（VOICEVOX 連携）まで備えた Chrome 拡張。","inLanguage":"ja-JP","publisher":{"@type":"Organization","name":"Kimito-Link Project","url":"https://kimito-link.com/"}}
     </script>
     <script type="application/ld+json">
-      {"@context":"https://schema.org","@type":"SoftwareApplication","name":"君斗りんくの追憶のきらめき","alternateName":"追憶のきらめき","operatingSystem":"Google Chrome","applicationCategory":"BrowserApplication","softwareVersion":"0.1.2169","url":"https://tsuioku-no-kirameki.com/","inLanguage":"ja-JP","description":"ニコ生・YouTube・Twitch・Kick・SHOWROOM・ふわっち・ミクチャ・TikTok LIVE・ツイキャス・ABEMA の10サービスで応援コメントを取りこぼしにくく記録する Chrome 拡張。会場モード・コメビュ（OBS 透過）・人ごとに違う声の読み上げ（VOICEVOX 連携）まで無料、配信後のマーケ分析レポート（サポーター）も搭載。","publisher":{"@type":"Organization","name":"Kimito-Link Project","url":"https://kimito-link.com/"},"offers":{"@type":"Offer","price":"0","priceCurrency":"JPY"},"license":"https://opensource.org/licenses/MIT"}
+      {"@context":"https://schema.org","@type":"SoftwareApplication","name":"君斗りんくの追憶のきらめき","alternateName":"追憶のきらめき","operatingSystem":"Google Chrome","applicationCategory":"BrowserApplication","softwareVersion":"0.1.2177","url":"https://tsuioku-no-kirameki.com/","inLanguage":"ja-JP","description":"ニコ生・YouTube・Twitch・Kick・SHOWROOM・ふわっち・ミクチャ・TikTok LIVE・ツイキャス・ABEMA の10サービスで応援コメントを取りこぼしにくく記録する Chrome 拡張。会場モード・コメビュ（OBS 透過）・人ごとに違う声の読み上げ（VOICEVOX 連携）まで無料、配信後のマーケ分析レポート（サポーター）も搭載。","publisher":{"@type":"Organization","name":"Kimito-Link Project","url":"https://kimito-link.com/"},"offers":{"@type":"Offer","price":"0","priceCurrency":"JPY"},"license":"https://opensource.org/licenses/MIT"}
     </script>
 
     <meta property="og:type" content="website">
@@ -42,7 +42,7 @@
 
     <meta name="twitter:card" content="summary_large_image">
     <meta name="twitter:title" content="君斗りんくの追憶のきらめき ― 取りこぼしにくく、あとから育つコメント記録へ">
-    <meta name="twitter:description" content="10の配信サービスに対応。応援コメントを取りこぼしにくく、あとから育つ記録へ。ライブ会場モード + OBS 透過コメビュ + VOICEVOX 読み上げ + マーケ分析（v0.1.2169）。">
+    <meta name="twitter:description" content="10の配信サービスに対応。応援コメントを取りこぼしにくく、あとから育つ記録へ。ライブ会場モード + OBS 透過コメビュ + VOICEVOX 読み上げ + マーケ分析（v0.1.2177）。">
     <meta name="twitter:image" content="https://tsuioku-no-kirameki.com/images/og-image.png">
     <meta name="twitter:image:alt" content="追憶のきらめき ― 流れ星みたいに消えていくコメントを、星座みたいに、つながりが残る世界へ。">
     <style>
@@ -120,6 +120,7 @@
     <!-- ★ヘッダー/ドロワー/フッターの見た目は共有コンポーネント(assets/css/site-chrome-lp.css)。/live/ と共用。
          ★元の inline 定義と同じ位置で読む(前後の同じ詳細度のセレクタとの勝ち負けを変えないため)。 -->
     <link rel="stylesheet" href="assets/css/site-chrome-lp.css">
+    <link rel="stylesheet" href="assets/css/app-download.css">
     <style>
       .nav{display:flex;gap:10px 16px;flex-wrap:wrap;font-size:.93rem;row-gap:10px}
       .nav a{text-decoration:none;color:var(--text-secondary)}
@@ -6379,8 +6380,10 @@
               <a class="btn primary" href="#difference">ほかのツールとの違い</a>
               <a class="btn secondary" href="#record-foundation">なぜ強いかを見る</a>
               <a class="btn secondary" href="#record-cta">導入・試用へ進む</a>
-              <a class="btn secondary" href="#smartphone">📱 スマホアプリ（申請中）</a>
+              <a class="btn secondary" href="#smartphone">📱 スマホアプリ（Android 配信中）</a>
             </div>
+            <!-- ★スマホアプリのストアへの導線（2026-11-22・15_APP_LINK_FROM_WEB）。公開中のストアだけ・端末に合うものだけ・アプリ内では出さない（assets/js/app-store-badges.js） -->
+            <div data-app-store-badges data-lead="📱 スマホアプリ「ライブビュー」"></div>
             <div class="stats lp-record-hero-stats" aria-label="記録改善の3つの要点">
               <div class="stat">
                 <strong>記録安定</strong>
@@ -6870,7 +6873,7 @@
       <section class="section" id="smartphone" aria-labelledby="smartphone-heading" data-lp-feature="smartphone">
         <div class="shell">
           <div class="section-head fade">
-            <h2 id="smartphone-heading">📱 スマホアプリ「追憶のきらめき ライブビュー」（Android は Google Play で審査中）</h2>
+            <h2 id="smartphone-heading">📱 スマホアプリ「追憶のきらめき ライブビュー」（Android は Google Play で配信中）</h2>
             <p>
               PC の拡張が記録している配信の様子を、<strong>スマホでも同じ画面のまま</strong>見られるようになりました。
               PC を持っていない人も、<strong>ニコ生の放送 URL を貼るだけ</strong>で、その配信を応援している人の顔ぶれを見られます。
@@ -6878,7 +6881,8 @@
           </div>
           <div class="board fade d1" aria-labelledby="smartphone-status-heading">
             <h3 id="smartphone-status-heading">いまの状況</h3>
-            <p><strong>Android 版: 申請中</strong> — 2026年11月1日に Google Play へ申請し、いま審査を待っています。公開されたら、このページに入手ボタンを置きます。</p>
+            <p><strong>Android 版: 配信中</strong> — Google Play から無料で入れられます。</p>
+            <div data-app-store-badges></div>
             <p><strong>iPhone 版: 準備中</strong> — テスト配信で動作を確かめているところです。</p>
             <p><strong>アプリが出るまでも使えます</strong> — スマホのブラウザで <a href="https://app.tsuioku-no-kirameki.com/phone" target="_blank" rel="noopener noreferrer">app.tsuioku-no-kirameki.com/phone</a> を開くと、同じ画面を使えます（下の「アプリだけ」と書いた機能を除きます）。</p>
           </div>
@@ -7006,6 +7010,7 @@
               <a class="btn secondary" href="#extension-visual">導入イメージを見る</a>
               <a class="btn secondary" href="#extension-guide">試用前に記録の流れを見る</a>
             </div>
+            <div data-app-store-badges data-lead="スマホでは、アプリ「ライブビュー」で見られます"></div>
             <p class="lp-record-cta__note">
               価格ページのようなディレクトリ導線を増やす前でも、LP 内で
               「何が強くなったか」「どこがまだ改善中か」「どこから試すか」を迷わず追える構成です。
@@ -10841,7 +10846,8 @@
       </section>
     </main>
 
-    <script src="assets/js/site-chrome-lp.js" data-part="footer" data-base="" data-version="0.1.2169"></script>
+    <script src="assets/js/app-store-badges.js"></script>
+    <script src="assets/js/site-chrome-lp.js" data-part="footer" data-base="" data-version="0.1.2177"></script>
 
     <button type="button" id="lp-bgm-toggle" aria-label="音を再生">&#9835;</button>
 

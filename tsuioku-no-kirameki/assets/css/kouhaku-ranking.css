@@ -1,0 +1,114 @@
+/*
+ * 紅白歌枠合戦2026の応援ランキング。/live/ と同じ温かい地。
+ * 共有ヘッダーが使う変数は live-ranking.css と同じ名前・値。
+ */
+:root {
+  --gold: #c98e2b;
+  --shell-pad: 16px;
+  --maxw: 1160px;
+  --lp-yoz-petal-mid: rgba(220, 150, 185, .32);
+  --lp-yoz-mist: rgba(140, 95, 150, .1);
+  --bg: #fff7ec;
+  --bg-soft: #fff1f4;
+  --line: #e3c9b5;
+  --ink: #4a3b34;
+  --ink-sub: #7a6458;
+  --navy: #1c4b7d;
+  --navy-deep: #14375c;
+  --orange: #c8721c;
+  --card: #fffdf9;
+  --rose: #c4476a;
+  --lh-body: 1.7;
+  --text-secondary: var(--ink-sub);
+}
+* { box-sizing: border-box; }
+html, body { margin: 0; padding: 0; }
+.shell { width: min(calc(100% - 2 * var(--shell-pad)), var(--maxw)); margin: 0 auto; }
+body {
+  background:
+    radial-gradient(ellipse 70% 28% at 50% -8%, rgba(255, 217, 230, .7), transparent 70%),
+    var(--bg);
+  color: var(--ink);
+  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Hiragino Sans', 'Yu Gothic', sans-serif;
+  font-size: 16px;
+  line-height: 1.6;
+}
+a { color: var(--navy); }
+.wrap { width: min(100% - 24px, 880px); margin: 0 auto; padding: 12px 0 48px; }
+.home { display: inline-block; margin: 4px 0 10px; color: var(--ink-sub); text-decoration: none; font-size: .9rem; }
+.home:hover { text-decoration: underline; }
+.rank-top h1 { margin: 0; font-size: clamp(1.25rem, 5vw, 1.7rem); line-height: 1.35; color: var(--navy-deep); }
+.rank-top h1 small { display: block; margin-top: 4px; font-size: .86rem; font-weight: 600; color: var(--ink-sub); }
+.meta { display: flex; align-items: flex-start; gap: 8px; margin: 10px 0 0; color: var(--ink-sub); font-size: .92rem; }
+.meta .face { width: 36px; height: 36px; object-fit: contain; flex: none; }
+.meta b { color: var(--navy-deep); }
+.teams { display: grid; gap: 16px; margin-top: 14px; }
+.teams--2 { grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); align-items: start; }
+.teams--1 { grid-template-columns: minmax(0, 1fr); }
+.teams--many { display: flex; gap: 8px; overflow-x: auto; scroll-snap-type: x mandatory; }
+.teams--many .team { flex: 0 0 78%; scroll-snap-align: start; }
+.team { background: var(--card); border: 1px solid var(--line); border-top: 4px solid var(--team-color, var(--line)); border-radius: 16px; box-shadow: 0 1px 6px rgba(120, 80, 50, .08); overflow: hidden; }
+.team--aka { --team-color: #9d2948; --team-bg: #ffe4ea; }
+.team--shiro { --team-color: #8a5a12; --team-bg: #fffdf8; }
+.team h2 { margin: 0; padding: 12px 14px; font-size: 1.05rem; background: var(--team-bg, transparent); color: var(--team-color, #14375c); }
+.row { display: grid; grid-template-columns: 2.2rem minmax(0, 1fr) auto; gap: 2px 8px; align-items: center; padding: 10px 12px; border-top: 1px solid var(--line); color: inherit; }
+.row:hover { background: #fff7ec; }
+.who { display: flex; align-items: center; gap: 8px; min-width: 0; color: inherit; text-decoration: none; }
+.who-text { min-width: 0; }
+.ava { width: 28px; height: 28px; border-radius: 50%; object-fit: cover; background: var(--bg-soft); border: 1px solid var(--line); flex: none; display: block; }
+.ava--lg { width: 72px; height: 72px; }
+.rank { font-size: 1.25rem; font-weight: 800; color: var(--navy-deep); font-variant-numeric: tabular-nums; }
+.name { display: -webkit-box; -webkit-box-orient: vertical; -webkit-line-clamp: 2; line-clamp: 2; overflow: hidden; font-weight: 700; color: var(--navy-deep); word-break: break-word; }
+.score { display: block; font-variant-numeric: tabular-nums; font-weight: 700; }
+.sub { grid-column: 2; margin: 0; color: var(--ink-sub); font-size: .88rem; }
+.cheer { grid-column: 3; grid-row: 1 / span 3; align-self: center; display: inline-flex; align-items: center; justify-content: center; min-width: 4.5rem; min-height: 44px; padding: 6px 12px; border-radius: 999px; background: var(--navy-deep); color: #fff7ec; text-decoration: none; font-weight: 700; font-size: .92rem; }
+.hero { margin-top: 12px; padding: 16px; border-radius: 16px; background: var(--card); border: 1px solid var(--line); box-shadow: 0 4px 16px rgba(120, 80, 50, .12); }
+.hero .team-name { margin: 0; font-weight: 800; }
+.hero--aka .team-name { color: #9d2948; }
+.hero--shiro .team-name { color: #8a5a12; }
+.hero .big { margin: 4px 0; font-size: clamp(2.4rem, 12vw, 3.4rem); line-height: 1.1; color: var(--navy-deep); }
+.hero h2 { margin: 0 0 8px; font-size: clamp(1.3rem, 6vw, 1.8rem); line-height: 1.3; }
+.hero p { margin: 6px 0; }
+.actions { display: grid; gap: 8px; margin-top: 14px; }
+.app-cta { margin-top: 14px; }
+.app-cta p { margin: 0 0 8px; }
+.hero .app-cta .btn { width: 100%; }
+.btn { display: flex; align-items: center; justify-content: center; min-height: 48px; padding: 10px 14px; border-radius: 999px; text-decoration: none; font-weight: 700; border: 1px solid var(--line); background: var(--card); color: var(--navy-deep); }
+.btn--primary { background: var(--navy-deep); border-color: var(--navy-deep); color: #fff7ec; }
+.note { margin-top: 22px; padding: 14px; border-radius: 16px; background: #fffdf9; border: 1px solid var(--line); color: var(--ink-sub); font-size: .9rem; }
+.note p { margin: 0 0 8px; }
+.note p:last-child { margin-bottom: 0; }
+.empty { padding: 16px 4px; }
+@media (max-width: 759px) {
+  .teams--2 { gap: 6px; }
+  .teams--2 .team h2,
+  .teams--many .team h2 { padding: 8px; font-size: .92rem; }
+  .teams--2 .row,
+  .teams--many .row,
+  .teams--1 .row { grid-template-columns: 1.35rem minmax(0, 1fr); gap: 1px 4px; padding: 6px; }
+  .teams--2 .who,
+  .teams--many .who { gap: 4px; }
+  .teams--2 .ava,
+  .teams--many .ava { width: 22px; height: 22px; }
+  .teams--2 .name,
+  .teams--2 .score,
+  .teams--many .name,
+  .teams--many .score { font-size: .78rem; line-height: 1.25; }
+  .teams--2 .sub,
+  .teams--many .sub { font-size: .72rem; }
+  .sub--quiet { display: none; }
+  .teams--2 .cheer,
+  .teams--many .cheer,
+  .teams--1 .cheer {
+    grid-column: 1 / -1; grid-row: auto; min-width: 40px; min-height: 40px; width: 100%;
+    margin-top: 2px; padding: 4px 8px; font-size: .78rem;
+  }
+}
+@media (min-width: 760px) {
+  .wrap { width: min(100% - 40px, 960px); }
+  .teams--2 { gap: 16px; }
+  .teams--many { display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); overflow: visible; }
+  .teams--many .team { flex: none; }
+  .actions { grid-template-columns: 1fr 1fr; }
+  .actions .btn--block { grid-column: 1 / -1; }
+}

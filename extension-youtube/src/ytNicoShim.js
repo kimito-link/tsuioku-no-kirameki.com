@@ -55,6 +55,7 @@ import {
 } from '../../src/lib/youtube/ytLiveRowOrder.js';
 import { tallySupportItems } from '../../src/lib/platform/platformMetrics.js';
 import { watchPlatformMetricChrome } from '../../src/lib/platform/platformMetricChrome.js';
+import { createEventStandingController } from './ytEventStanding.js';
 import { SUB_BOARD_KEY_PREFIX, subBoardToNicoadApiValue, subBoardLaneWording, subBoardCelebrationWording } from '../../src/lib/platform/platformSubBoard.js';
 
 const KEY_YT_SUMMARIES = 'yt_stream_summaries';
@@ -2339,6 +2340,9 @@ function screenPlatformBase() {
   return platformOfStreamKey(newestVideoIdOf(knownSummaries));
 }
 
+/** @type {ReturnType<typeof createEventStandingController> | null} */
+let eventStanding = null;
+
 /** 横の欄の数字を、今の配信のサービスに合わせる。視聴ページの中(会場)にはニコ生のチップが無いので何もしない。 */
 function installPlatformMetricChromeOnce() {
   if (YT_SHIM_IN_PAGE || typeof document === 'undefined') return;
@@ -2352,6 +2356,9 @@ function installPlatformMetricChromeOnce() {
       const id = base?.id || 'youtube';
       const vid = lastAskedLv ? videoIdForPseudoLv(lastAskedLv) : '';
       const sum = vid ? knownSummaries?.[vid] : null;
+      // イベントの今の順位(ふわっち・SHOWROOM・ミクチャ)/ イベント順位の無いサービスの一言(ytEventStanding.js)。同じ配信なら何もしない
+      if (!eventStanding) eventStanding = createEventStandingController();
+      eventStanding.setTarget(vid ? id : '', vid);
       const facts = sum
         ? ytSummaryToNicoSnapshot(sum, vid, '', knownSummaries).platformFacts
         : { viewers: null, support: vid ? supportTallyByVid.get(vid) || null : null };

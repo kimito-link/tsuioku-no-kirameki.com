@@ -48,12 +48,12 @@ graph LR
   n_comeview --> n_src_lib_nicoAnonymousDisplay_js["lib/nicoAnonymousDisplay.js"]:::shared
   n_comeview --> n_src_lib_nicoUserPage_js["lib/nicoUserPage.js"]:::shared
   n_comeview --> n_src_lib_noSpeechNote_js["lib/noSpeechNote.js"]
+  n_comeview --> n_src_lib_parseArrivalComment_js["lib/parseArrivalComment.js"]:::shared
   n_comeview --> n_src_lib_parseGiftComment_js["lib/parseGiftComment.js"]:::shared
   n_comeview --> n_src_lib_storageKeys_js["lib/storageKeys.js"]:::shared
   n_comeview --> n_src_lib_storageOpTimeout_js["lib/storageOpTimeout.js"]:::shared
   n_comeview --> n_src_lib_storageRefreshTriggerKey_js["lib/storageRefreshTriggerKey.js"]:::shared
-  n_comeview --> n_src_lib_supportActivityTimeline_js["lib/supportActivityTimeline.js"]:::shared
   classDef shared fill:#eee,stroke:#999,color:#666;
 ```
 
-> ほか 48 ファイル省略（全件は storage-bus.md / metafile 参照）。
+> ほか 49 ファイル省略（全件は storage-bus.md / metafile 参照）。

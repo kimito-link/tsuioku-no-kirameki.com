@@ -166,3 +166,32 @@ describe('supporterAccess: 1コード1台(v0.1.1896)', () => {
     expect(r.allowed).toBe(false);
   });
 });
+
+describe('supporterAccess: 開発ビルドのマーケ HTML', () => {
+  it('開発用の読み込みでは、お試しが終わってコードが無くても開ける', async () => {
+    const st = memStorage({ [KEY_SUPPORTER_FIRST_SEEN_AT]: T0 });
+    const f = vi.fn();
+    const r = await checkMarketingAccess({
+      storage: st,
+      nowMs: T0 + TRIAL_MS + 1,
+      enforced: true,
+      devUnlock: true,
+      fetchImpl: f
+    });
+    expect(r.allowed).toBe(true);
+    expect(r.reason).toBe('dev_build');
+    expect(f).not.toHaveBeenCalled();
+  });
+
+  it('ストア提出ビルド相当(devUnlock=false)では、お試し後も関所が閉じる', async () => {
+    const st = memStorage({ [KEY_SUPPORTER_FIRST_SEEN_AT]: T0 });
+    const r = await checkMarketingAccess({
+      storage: st,
+      nowMs: T0 + TRIAL_MS + 1,
+      enforced: true,
+      devUnlock: false
+    });
+    expect(r.allowed).toBe(false);
+    expect(r.reason).toBe('locked');
+  });
+});

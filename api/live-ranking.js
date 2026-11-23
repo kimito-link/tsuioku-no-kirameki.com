@@ -474,8 +474,26 @@ function sanitizeCommentEntry(v) {
       anon: r.anon === true
     });
   }
+  // ★(v0.1.2174) 前回の集計から増えたコメント(新しい側だけ数えた件数)。無ければ載せない。
+  const recentIn = Array.isArray(src.recent) ? src.recent.slice(0, COMMENT_RANKERS_MAX) : null;
+  const recent = [];
+  if (recentIn) {
+    for (const r of recentIn) {
+      if (!r || typeof r !== 'object') continue;
+      const uid = str(r.uid, 64);
+      const count = nonNegInt(r.count);
+      if (!uid || !count) continue;
+      recent.push({ uid, name: str(r.name, COMMENT_NAME_MAX), count, anon: r.anon === true });
+    }
+  }
   return {
     rankers,
+    ...(recentIn ? {
+      recent,
+      recentComments: nonNegInt(src.recentComments),
+      recentAt: nonNegInt(src.recentAt),
+      recentSince: nonNegInt(src.recentSince)
+    } : {}),
     commenters: nonNegInt(src.commenters),
     comments: nonNegInt(src.comments),
     anonCommenters: nonNegInt(src.anonCommenters),

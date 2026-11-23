@@ -1,5 +1,8 @@
 import { describe, it, expect } from 'vitest';
 import {
+  normalizeAuditionEventsFromResponses,
+  normalizeAuditionFullRankingPages,
+  attachAuditionEventFirstSeen,
   AUDITION_EVENT_RANKING_FETCH_MESSAGE_TYPE,
   AUDITION_KEY_RE,
   EVENT_VOTING_RANKING_STORAGE_PREFIX,
@@ -221,5 +224,56 @@ describe('normalizeAuditionVotingUserRankingResponse', () => {
     expect(normalizeAuditionVotingUserRankingResponse({ meta: { status: 404 } }, {})).toBeNull();
     expect(normalizeAuditionVotingUserRankingResponse({ data: { users: 'x' } }, {})).toBeNull();
     expect(normalizeAuditionVotingUserRankingResponse(null, {})).toBeNull();
+  });
+});
+
+
+describe('Phase 2: 複数イベント・全員一覧', () => {
+  const entry = {
+    meta: { status: 200 },
+    data: {
+      entry_items: [
+        { id: 187425, rank: 19, total_score: 1165204, audition: { key: '202611-kohaku-shiro', title: '白組' }, item: { id: '11525592', nickname: 'fumiya' } },
+        { id: 186272, rank: 122, total_score: 222600, audition: { key: '202611-nicoadevent-nabe', title: '鍋' }, item: { id: '11525592', nickname: 'fumiya' } },
+        { id: 1, audition: { key: '../bad' } }
+      ]
+    }
+  };
+  it('すべての entry_items をイベントごとに（壊れたものは捨てる）', () => {
+    const ev = normalizeAuditionEventsFromResponses(entry, [
+      {
+        key: '202611-kohaku-shiro',
+        rankingsJson: { meta: { status: 200 }, data: { total_count: 136, entry_items: [{ item_type: 'user', item_id: '9', name: 'a', rank: 18, total_score: 1251795 }] } }
+      },
+      { key: '202611-nicoadevent-nabe', entryDetailJson: { data: { id: 186272, score_to_next_rank: 4300 } } }
+    ]);
+    expect(ev.map((e) => e.key)).toEqual(['202611-kohaku-shiro', '202611-nicoadevent-nabe']);
+    expect(ev[0].self).toEqual({ id: '11525592', name: 'fumiya', rank: 19, score: 1165204, scoreToNext: null });
+    expect(ev[0].rows).toEqual([{ id: '9', name: 'a', rank: 18, score: 1251795 }]);
+    expect(ev[0].totalCount).toBe(136);
+    expect(ev[1].self.scoreToNext).toBe(4300);
+    expect(ev[1].rows).toEqual([]);
+  });
+  it('全員一覧: ページをまとめ、重複と壊れた行を捨てる', () => {
+    const p = (items, tc = 3) => ({ meta: { status: 200 }, data: { total_count: tc, entry_items: items } });
+    const r = normalizeAuditionFullRankingPages([
+      p([{ item_id: '1', rank: 1, total_score: 10, name: 'a' }, { item_id: '2', rank: 2, total_score: 5, name: '' }]),
+      p([{ item_id: '2', rank: 2, total_score: 5 }, { item_id: 'x', rank: 3, total_score: 1 }]),
+      { meta: { status: 500 } }
+    ]);
+    expect(r).toEqual({ rows: [{ id: '1', name: 'a', rank: 1, score: 10 }, { id: '2', name: '2', rank: 2, score: 5 }], totalCount: 3 });
+    expect(normalizeAuditionFullRankingPages([])).toBeNull();
+  });
+});
+
+describe('attachAuditionEventFirstSeen', () => {
+  it('最初に見たスコアを覚え、以後は変えない', () => {
+    const m = new Map();
+    const ev = (score) => [{ key: 'k-1', self: { score } }];
+    const a = attachAuditionEventFirstSeen(ev(100), m, 'lv1', 1000);
+    expect(a[0].localFirstSeen).toEqual({ at: 1000, score: 100 });
+    const b = attachAuditionEventFirstSeen(ev(150), m, 'lv1', 2000);
+    expect(b[0].localFirstSeen).toEqual({ at: 1000, score: 100 });
+    expect(b[0].gotAt).toBe(2000);
   });
 });

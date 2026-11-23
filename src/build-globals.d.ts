@@ -37,4 +37,7 @@ declare global {
 
   /** 配布(release)ビルドか。status の生診断JSON等を出し分ける。popup/status のみ注入。 */
   const NL_RELEASE: boolean;
+
+  /** ストア提出ビルドか。NL_STORE_BUILD=1 のときだけ true。マーケ HTML の関所を開発用の読み込みだけ通す(v0.1.2176)。 */
+  const NL_STORE_BUILD: boolean;
 }

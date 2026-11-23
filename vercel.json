@@ -3,6 +3,12 @@
   "buildCommand": null,
   "installCommand": null,
   "outputDirectory": ".",
+  "redirects": [
+    { "source": "/live/kouhaku/u/:userId/", "destination": "/live/event/kouhaku-2026/u/:userId/", "permanent": true },
+    { "source": "/live/kouhaku/u/:userId", "destination": "/live/event/kouhaku-2026/u/:userId/", "permanent": true },
+    { "source": "/live/kouhaku/", "destination": "/live/event/kouhaku-2026/", "permanent": true },
+    { "source": "/live/kouhaku", "destination": "/live/event/kouhaku-2026/", "permanent": true }
+  ],
   "ignoreCommand": "bash scripts/vercel-ignore-build.sh",
   "headers": [
     {
@@ -59,6 +65,108 @@
       ],
       "missing": [{ "type": "host", "value": "app.tsuioku-no-kirameki.com" }],
       "destination": "/api/live-og"
+    },
+    {
+      "source": "/live/kouhaku/u/:userId/",
+      "has": [
+        { "type": "header", "key": "user-agent",
+          "value": ".*(Twitterbot|facebookexternalhit|Discordbot|Slackbot|LinkedInBot|TelegramBot|Mastodon|Bluesky|Misskey|SummalyBot|line-poker|Linespider).*" }
+      ],
+      "missing": [{ "type": "host", "value": "app.tsuioku-no-kirameki.com" }],
+      "destination": "/api/kouhaku-og?user=:userId"
+    },
+    {
+      "source": "/live/kouhaku/u/:userId",
+      "has": [
+        { "type": "header", "key": "user-agent",
+          "value": ".*(Twitterbot|facebookexternalhit|Discordbot|Slackbot|LinkedInBot|TelegramBot|Mastodon|Bluesky|Misskey|SummalyBot|line-poker|Linespider).*" }
+      ],
+      "missing": [{ "type": "host", "value": "app.tsuioku-no-kirameki.com" }],
+      "destination": "/api/kouhaku-og?user=:userId"
+    },
+    {
+      "source": "/live/kouhaku/",
+      "has": [
+        { "type": "header", "key": "user-agent",
+          "value": ".*(Twitterbot|facebookexternalhit|Discordbot|Slackbot|LinkedInBot|TelegramBot|Mastodon|Bluesky|Misskey|SummalyBot|line-poker|Linespider).*" }
+      ],
+      "missing": [{ "type": "host", "value": "app.tsuioku-no-kirameki.com" }],
+      "destination": "/api/kouhaku-og"
+    },
+    {
+      "source": "/live/kouhaku",
+      "has": [
+        { "type": "header", "key": "user-agent",
+          "value": ".*(Twitterbot|facebookexternalhit|Discordbot|Slackbot|LinkedInBot|TelegramBot|Mastodon|Bluesky|Misskey|SummalyBot|line-poker|Linespider).*" }
+      ],
+      "missing": [{ "type": "host", "value": "app.tsuioku-no-kirameki.com" }],
+      "destination": "/api/kouhaku-og"
+    },
+    {
+      "source": "/live/kouhaku/u/:userId/",
+      "missing": [{ "type": "host", "value": "app.tsuioku-no-kirameki.com" }],
+      "destination": "/tsuioku-no-kirameki/live/kouhaku/u/index.html"
+    },
+    {
+      "source": "/live/kouhaku/u/:userId",
+      "missing": [{ "type": "host", "value": "app.tsuioku-no-kirameki.com" }],
+      "destination": "/tsuioku-no-kirameki/live/kouhaku/u/index.html"
+    },
+    {
+      "source": "/live/event/:eventId/u/:userId/",
+      "has": [
+        { "type": "header", "key": "user-agent",
+          "value": ".*(Twitterbot|facebookexternalhit|Discordbot|Slackbot|LinkedInBot|TelegramBot|Mastodon|Bluesky|Misskey|SummalyBot|line-poker|Linespider).*" }
+      ],
+      "missing": [{ "type": "host", "value": "app.tsuioku-no-kirameki.com" }],
+      "destination": "/api/kouhaku-og?event=:eventId&user=:userId"
+    },
+    {
+      "source": "/live/event/:eventId/u/:userId",
+      "has": [
+        { "type": "header", "key": "user-agent",
+          "value": ".*(Twitterbot|facebookexternalhit|Discordbot|Slackbot|LinkedInBot|TelegramBot|Mastodon|Bluesky|Misskey|SummalyBot|line-poker|Linespider).*" }
+      ],
+      "missing": [{ "type": "host", "value": "app.tsuioku-no-kirameki.com" }],
+      "destination": "/api/kouhaku-og?event=:eventId&user=:userId"
+    },
+    {
+      "source": "/live/event/:eventId/",
+      "has": [
+        { "type": "header", "key": "user-agent",
+          "value": ".*(Twitterbot|facebookexternalhit|Discordbot|Slackbot|LinkedInBot|TelegramBot|Mastodon|Bluesky|Misskey|SummalyBot|line-poker|Linespider).*" }
+      ],
+      "missing": [{ "type": "host", "value": "app.tsuioku-no-kirameki.com" }],
+      "destination": "/api/kouhaku-og?event=:eventId"
+    },
+    {
+      "source": "/live/event/:eventId",
+      "has": [
+        { "type": "header", "key": "user-agent",
+          "value": ".*(Twitterbot|facebookexternalhit|Discordbot|Slackbot|LinkedInBot|TelegramBot|Mastodon|Bluesky|Misskey|SummalyBot|line-poker|Linespider).*" }
+      ],
+      "missing": [{ "type": "host", "value": "app.tsuioku-no-kirameki.com" }],
+      "destination": "/api/kouhaku-og?event=:eventId"
+    },
+    {
+      "source": "/live/event/:eventId/u/:userId/",
+      "missing": [{ "type": "host", "value": "app.tsuioku-no-kirameki.com" }],
+      "destination": "/tsuioku-no-kirameki/live/event/u/index.html"
+    },
+    {
+      "source": "/live/event/:eventId/u/:userId",
+      "missing": [{ "type": "host", "value": "app.tsuioku-no-kirameki.com" }],
+      "destination": "/tsuioku-no-kirameki/live/event/u/index.html"
+    },
+    {
+      "source": "/live/event/:eventId/",
+      "missing": [{ "type": "host", "value": "app.tsuioku-no-kirameki.com" }],
+      "destination": "/tsuioku-no-kirameki/live/event/index.html"
+    },
+    {
+      "source": "/live/event/:eventId",
+      "missing": [{ "type": "host", "value": "app.tsuioku-no-kirameki.com" }],
+      "destination": "/tsuioku-no-kirameki/live/event/index.html"
     },
     {
       "source": "/:path((?!tsuioku-no-kirameki/|app/|extension/|api/|_next/).*)",

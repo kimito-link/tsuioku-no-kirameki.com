@@ -27,7 +27,7 @@
 
 > 値が次の段へ届かない「断線」(broadcaster バグ型)は `npm run feature-map -- --check` が機械検知。
 
-## ⚠️ 役割コメントが無いソース 13 / 1305 件
+## ⚠️ 役割コメントが無いソース 14 / 1340 件
 - `docs/handoff/bench/bench-interval.mjs`
 - `docs/handoff/bench/bench-lane.mjs`
 - `extension-youtube/cloak-failsafe.js`
@@ -41,6 +41,7 @@
 - `src/lib/reportPreviewPublish.js`
 - `src/lib/venueLaneBuckets.js`
 - `src/lib/venueStoryDiagMirrorPanel.js`
+- `src/server/kouhakuSeed.js`
 
 ## 全ファイルツリー
 
@@ -60,9 +61,13 @@
   - `KB-stale-premise.md`
   - `TO-web-ios-android-ai-maze-pattern-2026-08-31.md`
   - `TO-web-ios-android-unnamed-bucket-2026-09-03.md`
-- 📁 **api/** (9)
+- 📁 **api/** (13)
   - `billing.js` — サポーター(有料=マーケ HTML)の受け口(v0.1.1893・課金 第2段)。中身は src/server/billingApi.js。
   - `device.js` — スマホ版の「利用者ごとの鍵」の受け口(v0.1.1730・スマホ化 利用者ごとの鍵 第a段)。
+  - `event-ranking.js` — イベント💎ランキングの「公式更新以降 +X」「推定イベントpt」用のサーバ側スナップショット（2026-11-21）。
+  - `kouhaku-og-image.js` — 共有用 JPEG。焼いた画像が Redis にあればそれを返し、無ければ同梱の紅白カードを返す。
+  - `kouhaku-og.js` — 共有クローラー向けの HTML。保存済みの順位から見出しを作る。公式ページへは行かない。
+  - `kouhaku-ranking.js` — 紅白歌枠合戦2026の公式イベントpt順位。
   - `live-og-image.js` — /api/live-og-image — 焼いた OGP カード画像(配信サムネ＋数字帯)を返す薄い I/O 係(v0.1.1519)。
   - `live-og.js` — /api/live-og — 配信ごとの OGP カード用 HTML を返す薄い I/O 係(v0.1.1517)。
   - `live-platforms.js` — /api/live-platforms — /live/ の「ほかの配信サービス」セクション(Kick・後で YouTube)のデータ。
@@ -239,7 +244,7 @@
     - `2026-10-06.md`
     - `2026-10-12.md`
     - `2026-10-14.md`
-- 📁 **docs/** (372)
+- 📁 **docs/** (388)
   - 📁 **article-assets/** (87)
     - 📁 **venue-frames/** (12)
       - `f01.png`
@@ -561,6 +566,10 @@
   - `backfill-complete-loading-flow.html`
   - `bug-investigation-loading-scroll-2026-07-10.html`
   - `code-tree.html`
+  - `code-tree.html`
+  - `code-tree.html`
+  - `code-tree.md`
+  - `code-tree.md`
   - `code-tree.md`
   - `codex-commenter-follow-analytics-v0535.md`
   - `codex-event-lane-stuck-fix-v0613.md`
@@ -583,12 +592,18 @@
   - `dist-fingerprint-gate-IMPLEMENTATION-HANDOFF.md`
   - `extension-bump-checklist.md`
   - `feature-sitemap.html`
+  - `feature-sitemap.html`
+  - `feature-sitemap.html`
+  - `feature-sitemap.md`
+  - `feature-sitemap.md`
   - `feature-sitemap.md`
   - `inline-popup-sync.md`
   - `investigation-prompt-popup-not-appearing.md`
   - `kb-web-perf-diagnosis.md`
   - `koken-contrib-hidden-tab-stuck-fix-v0616.md`
   - `lane-architecture-redesign.md`
+  - `layer-map.html`
+  - `layer-map.html`
   - `layer-map.html`
   - `live-comment-heat-chips-DESIGN.md`
   - `live-comment-heat-chips-IMPLEMENTATION-HANDOFF.md`
@@ -617,9 +632,15 @@
   - `referral-commission.md`
   - `reliability-backlog-phase-b.md`
   - `repo-tree-map.html`
+  - `repo-tree-map.html`
+  - `repo-tree-map.html`
+  - `repo-tree-map.md`
+  - `repo-tree-map.md`
   - `repo-tree-map.md`
   - `research-nicolive-pc-comments.md`
   - `self-improvement-loop-DESIGN.md`
+  - `site-health.md`
+  - `site-health.md`
   - `site-health.md`
   - `story-user-lane-pipeline.md`
   - `surechigai-lite-improvement-plan.md`
@@ -786,7 +807,7 @@
   - `yt-marketing-export.html`
   - `yt-sidepanel.html`
   - `yt-venue.html`
-- 📁 **extension-youtube/** (161)
+- 📁 **extension-youtube/** (162)
   - 📁 **data/** (1)
     - `ouen-banner.json`
   - 📁 **images/** (72)
@@ -910,7 +931,7 @@
     - `effect-rank-up.mp3`
     - `voice-complete.mp3`
     - `voice-watch.mp3`
-  - 📁 **src/** (32)
+  - 📁 **src/** (33)
     - `ab-content-entry.js` — ABEMA の放送ページで、ページが受け取ったコメントを記録に渡す入口。
     - `ab-main-entry.js` — ABEMA のページ自身の世界(MAIN)で動く小さな写し役。
     - `background-entry.js` — YouTube Live コメントの IndexedDB 全件記録・配信要約・Offscreen 読み上げ管理 Service Worker
@@ -937,6 +958,7 @@
     - `venue-nico-entry.js` — ニコ生版の会場モード(本物 venue-entry.js)を YouTube の記録で動かす入口。
     - `ww-content-entry.js` — ふわっちの視聴ページ(whowatch.tv/viewer/<配信の番号>)で、配信とコメントを読んで記録に渡す入口。
     - `ytDefaultIcon.js` — YouTube の「最初からの文字アイコン」(色付きの丸に1文字)を画像から見分ける。
+    - `ytEventStanding.js` — global document, setTimeout, clearTimeout, fetch
     - `ytGiftToNico.js` — YouTube の有料の応援(スーパーチャット・スーパーステッカー・メンバー加入・メンバーシップギフト)を、
     - `ytIdbStore.js` — YouTube Live コメントを配信(videoId)ごとに全件 IndexedDB へ記録・差分取得するストア
     - `ytLocalAssetUrls.js` — YouTube の視聴ページの中の会場(content script)で、拡張の中の画像・音を
@@ -1045,7 +1067,7 @@
     - `verify-extension.mjs` — global Buffer, URL, chrome, console
     - `verify-host.mjs` — global process, Buffer, setTimeout, clearTimeout, URL, console
     - `verify-setup.ps1`
-- 📁 **scripts/** (118)
+- 📁 **scripts/** (119)
   - 📁 **audit/** (4)
     - `dead-selector-baseline.json`
     - `make-dead-selector-baseline.mjs` — 静的デッドセレクタ監査(static-dead-selectors.mjs)の基準値(dead-selector-baseline.json)を作る/更新する。
@@ -1124,6 +1146,7 @@
   - `inspect-nicolive-watch-stats.mjs` — ニコ生 watch ページの HTML から、来場・同接まわりの数値がどう埋め込まれているかを CLI で確認する。
   - `install-local-sounds.mjs` — マイ効果音「手動取込」を不要にするローカル自動同梱スクリプト。
   - `install-local-sounds.test.js`
+  - `kouhaku-og-bake.mjs` — 保存済みの紅白順位から共有 JPEG を焼き、/api/kouhaku-og-image へ置く。
   - `layer-config.mjs` — ★どのリポでも使えるように「設定」を読む部分だけを切り出す。
   - `layer-map-html.mjs` — ★`src/lib` の構成を【HTMLで見える】ようにする。
   - `live-comment-tally.mjs` — `/live/` の 3 枠目「💬 コメントで応援した人」を集める I/O 係。
@@ -1193,7 +1216,7 @@
   - `gift-coin-hq.wav`
   - `gift-register-hq.wav`
   - `gift-register.mp3`
-- 📁 **src/** (2552)
+- 📁 **src/** (2595)
   - 📁 **data/** (7)
     - 📁 **acquirers/** (2)
       - `laneFromStorage.js` — 応援レーン acquirer: chrome.storage.local(nls_comments) → laneStore の橋渡し。
@@ -1230,8 +1253,8 @@
       - `avatarResolver.test.js`
       - `identity.js` — ニコ生ユーザー ID の「匿名性」判定と関連アイデンティティ・ユーティリティ。
       - `nickname.js` — 表示名（ニックネーム）の「強弱」判定。
-  - 📁 **extension/** (119)
-    - 📁 **popup/** (21)
+  - 📁 **extension/** (120)
+    - 📁 **popup/** (22)
       - 📁 **init/** (4)
         - `devMonitorExport.js` — devMonitorExport — 開発モニタの「エクスポート/ダウンロード/較正データ消去」一式。
         - `devMonitorExport.test.js`
@@ -1242,6 +1265,7 @@
         - `htmlReportDocument.test.js`
       - `attachAiDiagButtonHandler.js` — attachAiDiagButtonHandler — 「AIで診断」ボタンの delegated listener を張る。
       - `attachAiDiagButtonHandler.test.js`
+      - `eventLiveBoardPopup.js` — 2026-11-21 Phase 2: popup のイベント💎ボード（いまの順位・pt・次の順位まで）。popup-entry.js は
       - `renderAcquisitionDashboard.js` — renderAcquisitionDashboard — 開発者モニタの「データ取得率」ダッシュボードを描く。
       - `renderAcquisitionDashboard.test.js`
       - `wireLaneUserDetailOpen.js` — 応援レーン(story user lane)のタイルを押したら、その人の「この配信での発言一覧」を
@@ -1354,7 +1378,10 @@
     - `voiceTestHook.test.js`
     - `voiceTogglePanel.wiring.test.js`
     - `yt-page-boot.js` — 会場(yt-venue-inline.js・約800KB)を配信の視聴ページだけに載せる。
-  - 📁 **fixtures/** (1)
+  - 📁 **fixtures/** (3)
+    - 📁 **kouhaku/** (2)
+      - `niconews-15106.headers.txt`
+      - `niconews-15106.html`
     - `nicolive-comment-list.html`
   - 📁 **images/** (134)
     - 📁 **brand/** (29)
@@ -1532,7 +1559,7 @@
         - `logo_funlink_white_RGB_link_black.png`
         - `logo_funlink_white_RGB_maru_black.png`
     - `hero-connect-hub.svg`
-  - 📁 **lib/** (2243)
+  - 📁 **lib/** (2277)
     - 📁 **__snapshots__/** (4)
       - `marketing-abema-baseline.html`
       - `marketing-niconico.html`
@@ -1544,6 +1571,9 @@
       - `abCommentPanelOwnUi.test.js`
       - `abParse.js` — ABEMA の放送ページが受け取ったコメント JSON を、YouTube 版の記録と同じ形にする(純関数)
       - `abParse.test.js`
+    - 📁 **eventRanking/** (2)
+      - `registry.js` — 【層】L0 判定層(純粋関数・I/O禁止)
+      - `registry.test.js`
     - 📁 **fixtures/** (2)
       - `interceptLearn.sample.json`
       - `nicoliveVisitorJoinSignal.placeholder.json`
@@ -1554,6 +1584,23 @@
       - `kickChatParse.test.js`
       - `kickRealtime.js` — Kick のチャットの「つなぎ先」を決めて、届いた1通を読む(純関数)
       - `kickRealtime.test.js`
+    - 📁 **kouhaku/** (16)
+      - `appCta.test.js`
+      - `board.js` — 【層】L0 判定層(純粋関数・I/O禁止)
+      - `calc.js` — 【層】L0 判定層(純粋関数・I/O禁止)
+      - `constants.js` — 【層】L0 判定層(純粋関数・I/O禁止)
+      - `format.js` — 【層】L0 判定層(純粋関数・I/O禁止)
+      - `icon.js` — 【層】L0 判定層(純粋関数・I/O禁止)
+      - `icon.test.js`
+      - `job.js` — 【層】L0 判定層(純粋関数・I/O禁止)
+      - `model.js` — 【層】L0 判定層(純粋関数・I/O禁止)
+      - `ogHtml.js` — 【層】L0 判定層(純粋関数・I/O禁止)
+      - `ogSpec.js` — 【層】L0 判定層(純粋関数・I/O禁止)
+      - `parse.js` — 【層】L0 判定層(純粋関数・I/O禁止)
+      - `policy.js` — 【層】L0 判定層(純粋関数・I/O禁止)
+      - `ranking.test.js`
+      - `share.js` — 【層】L0 判定層(純粋関数・I/O禁止)
+      - `time.js` — 【層】L0 判定層(純粋関数・I/O禁止)
     - 📁 **mcpBridge/** (11)
       - `buildLiveMcpSnapshot.js` — L0 Evidence（拡張の観測データ）→ L1 Canonical Snapshot 変換。
       - `buildLiveMcpSnapshot.test.js`
@@ -1571,9 +1618,15 @@
       - `mxGiftImages.test.js`
       - `mxParse.js` — ミクチャ(mixch.tv)の配信・コメント・ギフトを、YouTube 版の記録と同じ形にする(純関数)
       - `mxParse.test.js`
-    - 📁 **platform/** (40)
+    - 📁 **platform/** (45)
+      - 📁 **__fixtures__/** (1)
+        - `eventStanding.2026-11-21.json`
       - `diagTabShare.js` — 計器(yt_diag_*_chat)は1つの置き場を全タブで分け合う。
       - `diagTabShare.test.js`
+      - `eventStandingParsers.js` — 【層】L0 判定層(純粋関数・I/O禁止)
+      - `eventStandingParsers.test.js`
+      - `eventStandingView.js` — 【層】L0 判定層(純粋関数・I/O禁止)
+      - `eventStandingView.test.js`
       - `fetchTimeout.js` — 【層】L0 判定層(純粋関数・I/O禁止)
       - `fetchTimeout.test.js`
       - `followerCountSample.js` — 【層】L0 判定層(純粋関数・I/O禁止)
@@ -1774,6 +1827,7 @@
     - `anonLabelSingleSource.test.js`
     - `anonymousIdenticon.js` — 匿名 userId 向けの決定論的アバター（SVG data URL）。
     - `anonymousIdenticon.test.js`
+    - `appStoreBadges.test.js`
     - `appliedEntriesMemo.js` — 大きな記録で「同じ行・同じ控え」なら、正規化と名前・顔の重ね直しの結果を使い回す(v0.1.2023)。
     - `appliedEntriesMemo.test.js`
     - `arrivalEffect.js` — ニコ生「来場」システムメッセージ(parseArrivalComment.js でパース済み)を、パチンコの
@@ -2152,6 +2206,9 @@
     - `deriveAvatarUrlFromUid.equivalence.test.js`
     - `deriveAvatarUrlFromUid.js` — v0.1.203 Patch 1: niconico ユーザー UID から avatar URL を確定パターンで生成する純関数。
     - `deriveAvatarUrlFromUid.test.js`
+    - `devMarketingUnlock.js` — 【層】L0 判定層(ビルド旗と manifest を見るだけ。新しい権限は使わない)
+    - `devMarketingUnlock.test.js`
+    - `devMarketingUnlock.wiring.test.js`
     - `devMonitorAvatarStats.js` — 開発者向け監視: storage コメント配列からアバター／userId の集計（PII なし・件数のみ）
     - `devMonitorAvatarStats.test.js`
     - `devMonitorDebugSubset.js` — ポップアップ「開発・テスト用 監視」用: watch スナップショット _debug から
@@ -2224,6 +2281,9 @@
     - `enrichmentAvatarFallback.test.js`
     - `errorAutoDiagnosis.js` — v0.1.205 Phase D: 既存の診断データ（consoleErrors / networkErrors / diagWarnings）から
     - `errorAutoDiagnosis.test.js`
+    - `eventLiveBoardHtml.js` — イベント💎ボードの HTML（純関数・2026-11-21 Phase 2）。モデルは eventLiveBoardModel.js。
+    - `eventLiveBoardModel.js` — イベント💎「いまの順位・pt・次の順位まで」ボードの表示モデル（純関数・2026-11-21 Phase 2）。
+    - `eventLiveBoardModel.test.js`
     - `eventLoopStallSummary.js` — 観測列の「予定時刻 vs 実発火時刻」から
     - `eventLoopStallSummary.test.js`
     - `eventParticipationProgramsApi.js` — ニコ生「企画イベント参加番組一覧」公式 JSON API の URL 組立 & 正規化（純関数）。
@@ -2629,6 +2689,8 @@
     - `liveLaneBuckets.wiring.test.js`
     - `liveMotion.js` — 補間する系列。MVP は 'comment' だけ使う(他は型として用意・後段で有効化)。
     - `liveMotion.test.js`
+    - `liveMovers.js` — /live/ の配信カード先頭「⚡ いま動いた人」の純ロジック(行の選び方と HTML)。
+    - `liveMovers.test.js`
     - `liveOgHtml.js` — 配信ごとの OGP カード用の最小 HTML を組み立てる純関数(v0.1.1517)。
     - `liveOgHtml.test.js`
     - `liveOgStats.js` — 配信ごと OGP カードの og:description に載せる「応援の数字」を組み立てる純関数(v0.1.1518)。
@@ -2644,6 +2706,8 @@
     - `liveRecentHoverCard.test.js`
     - `liveStatValuePlaceholder.js` — `.nl-live-stat-value` 向け: 数字表示かプレースホルダー文言かを判定（0.1.68 の極太フォント切替と共通）。
     - `liveStatValuePlaceholder.test.js`
+    - `liveTallyLoop.js` — コメント集計の「くり返しモード」(scripts/live-comment-tally.mjs --loop-seconds)の純ロジック。
+    - `liveTallyLoop.test.js`
     - `liveViewPublishSignature.js` — 状態速報「重さ根治 P4」: publishLiveViewPublishPayload(status-entry.js)は 3秒 min-gap を
     - `liveViewPublishSignature.test.js`
     - `livesCardSignature.js` — livesCardSignature — 配信カードを作り直すべきかの署名(v0.1.1320)。
@@ -3789,15 +3853,21 @@
     - `yieldToBrowserPaint.js` — 【層】L0 判定層(依存ゼロ・chrome.* 非依存)
     - `yukkuriBroadcastSummary.js` — 放送終了後の HTML レポート / マーケ分析の頭にくる「ゆっくり解説風」要約セクション。
     - `yukkuriBroadcastSummary.test.js`
-  - 📁 **server/** (18)
+  - 📁 **server/** (24)
     - `billingApi.js` — global process, Buffer -- サーバー(Vercel 関数)専用の部品。api/ と同じく env を読む
     - `billingApi.test.js`
     - `deviceApi.test.js`
     - `deviceStore.js` — global process -- サーバー(Vercel 関数)専用の部品。api/ と同じく env を読む
+    - `eventRankingSnapshot.js` — イベント💎ランキングの「サーバ側スナップショット」純関数群（2026-11-21 Phase 2）。
+    - `eventRankingSnapshot.test.js`
     - `fanLinkApi.js` — global process -- サーバー(Vercel 関数)専用の部品。api/ と同じく env を読む
     - `fanLinkApi.test.js`
     - `kickApi.js` — Kick 公式 API(App Access Token)の I/O だけ(サーバ専用・npm 依存なし)。
     - `kickApi.test.js`
+    - `kouhakuOfficialPage.js` — 公式15106へ GET する唯一の場所。
+    - `kouhakuOfficialPage.test.js`
+    - `kouhakuRead.js` — 保存済みスナップショットを読む。公式ページへは行かない。
+    - `kouhakuSeed.js` — ⚠️ 役割コメント無し
     - `liveEventsApi.js` — global process, Buffer -- サーバー(Vercel 関数)専用の部品。api/ と同じく env を読む
     - `liveEventsApi.test.js`
     - `liveRankingOne.test.js`
@@ -3823,13 +3893,13 @@
     - `yozora-small-yell.mp3`
   - `build-globals.d.ts` — ビルド時に esbuild の `define` で注入される定数の型宣言。
   - `speech-recognition-globals.d.ts` — Web Speech API（Chrome は webkit 接頭辞のことがある）
-- 📁 **tests/** (100)
+- 📁 **tests/** (101)
   - 📁 **contract/** (4)
     - `contentEntryFunctionBudget.test.js`
     - `layer-dependency.test.js`
     - `popupEntryFunctionBudget.test.js`
     - `wiringTestSource.test.js`
-  - 📁 **e2e/** (93)
+  - 📁 **e2e/** (94)
     - 📁 **fixtures/** (1)
       - 📁 **watch/** (1)
         - 📁 **lv888888888/** (1)
@@ -3871,6 +3941,7 @@
     - `kick-recording.spec.js`
     - `lane-wait-honest.spec.js`
     - `live-chat-check.spec.js`
+    - `live-kouhaku-teams.spec.js`
     - `lp-preview.spec.js`
     - `mixch-recording.spec.js`
     - `multitab-inline-panel-not-blank.spec.js`
@@ -3930,16 +4001,17 @@
     - `laneCssSource.js` — laneCssSource — 応援レーン(タイル)CSS を3ファイル(popup.html / venueBar.js / app/live-view.html)から
     - `laneImportContract.js` — 応援レーンの「輸入契約」(テスト専用の定数・実装コードは import しない)。
     - `wiringTestSource.js` — wiringTestSource — wiring テストが「関数の本体」を、置き場所に依らず取得するための正本。
-- 📁 **tools/** (7)
+- 📁 **tools/** (8)
   - 📁 **mcp-nicolive/** (3)
     - `README.md`
     - `server.mjs` — NicoLive Local MCP Bridge Phase1a (PoC) — stdio JSON-RPC server.
     - `store.mjs` — NicoLive Local MCP Bridge - Snapshot Store.
   - `audit-lp-overflow.mjs` — One-off LP overflow audit (run: node tools/audit-lp-overflow.mjs)
   - `gen-og-live-ranking.py`
+  - `kouhaku_og.py`
   - `og-live-compose.py`
   - `render-og.js` — 追憶の煌めき LP 用 OG 画像（1200×630）を生成する。
-- 📁 **tsuioku-no-kirameki/** (70)
+- 📁 **tsuioku-no-kirameki/** (82)
   - 📁 **articles/** (14)
     - 📁 **role-separation-design/** (2)
       - 📁 **img/** (1)
@@ -3957,14 +4029,19 @@
     - `phase-gate-flow-canon.html`
     - `prewarm-coordinator-lease.html`
     - `reaction-template-classifier.html`
-  - 📁 **assets/** (4)
-    - 📁 **css/** (3)
+  - 📁 **assets/** (9)
+    - 📁 **css/** (5)
+      - `app-download.css`
+      - `kouhaku-ranking.css`
       - `live-ranking.css`
       - `site-chrome-lp.css`
       - `yukkuri-thread.css`
-    - 📁 **js/** (1)
+    - 📁 **js/** (4)
+      - `app-store-badges.js` — global document, window
+      - `kouhaku-app-cta.js` — global URL
+      - `kouhaku-board.js` — 紅白の順位を、当サイトの /api/kouhaku-ranking だけから描く。
       - `site-chrome-lp.js` — 追憶のきらめき サイト共通の「ヘッダー(ロゴ＋ハンバーガー)・ドロワーメニュー・フッター」。
-  - 📁 **images/** (40)
+  - 📁 **images/** (43)
     - 📁 **lp/** (7)
       - 📁 **phone/** (2)
         - `phone-start.webp`
@@ -3974,6 +4051,9 @@
       - `kimito-maru-black.webp`
       - `nc321221_creatorcross.webp`
       - `twitter-icon.webp`
+    - 📁 **store-badges/** (2)
+      - `apple-appstore-ja.svg`
+      - `google-play-ja.png`
     - 📁 **venue/** (6)
       - `venue-living-overview.jpg`
       - `venue-living-overview.mp4`
@@ -4007,9 +4087,18 @@
     - `favicon.ico`
     - `og-image.jpg`
     - `og-image.png`
+    - `og-kouhaku.jpg`
     - `og-live-ranking.png`
     - `twitter-icon.png`
-  - 📁 **live/** (1)
+  - 📁 **live/** (5)
+    - 📁 **event/** (2)
+      - 📁 **u/** (1)
+        - `index.html`
+      - `index.html`
+    - 📁 **kouhaku/** (2)
+      - 📁 **u/** (1)
+        - `index.html`
+      - `index.html`
     - `index.html`
   - 📁 **sound/** (1)
     - `yozora-small-yell.mp3`

@@ -1,0 +1,48 @@
+/* ===== スマホアプリのストアへの導線（公式バッジ） =====
+   金型: web-ios-android templates/web/app-download.css（色はこのサイトの --ink / --muted に合わせた）
+   描くのは assets/js/app-store-badges.js。 */
+
+.app-download {
+    text-align: center;
+    margin: var(--space-sm, 16px) 0 0;
+}
+
+.app-download__lead {
+    font-size: .9rem;
+    font-weight: 700;
+    color: var(--ink, #2c2117);
+    margin: 0 0 10px;
+}
+
+.app-download__badges {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 12px;
+    justify-content: center;
+    align-items: center;
+}
+
+/* バッジは高さ48pxで統一 → Google Play のバッジが App Store のバッジより小さくならない
+   （Google ブランドガイドラインの「同寸以上」）。画像そのものは改変しない。 */
+.store-badge {
+    display: inline-flex;
+    line-height: 0;
+    transition: transform .15s ease, opacity .15s ease;
+}
+
+.store-badge img {
+    height: 48px;
+    width: auto;
+    display: block;
+}
+
+.store-badge:hover {
+    transform: translateY(-1px);
+    opacity: .9;
+}
+
+.app-download__note {
+    font-size: .75rem;
+    color: var(--muted, #4f4338);
+    margin: 10px 0 0;
+}
