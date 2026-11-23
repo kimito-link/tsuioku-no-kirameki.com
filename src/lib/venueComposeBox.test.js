@@ -126,3 +126,26 @@ describe('会場のギフトボタン', () => {
     expect(btn.textContent).toBe('ログインすると使えます');
   });
 });
+
+describe('会場から発言するとき公式の欄を出す', () => {
+  it('送っているあいだ会場をしまい、終わったら戻す(どのサービスでも同じ)', async () => {
+    document.documentElement.classList.add('nlsb-venue-open');
+    const root = document.createElement('div');
+    root.id = 'nlsb-venue-root';
+    document.body.append(root);
+    let tuckedDuringPost = false;
+    const post = async () => {
+      tuckedDuringPost = root.classList.contains('nlsb-is-tucked');
+      return { ok: true };
+    };
+    const form = createVenueComposeBox(post);
+    document.body.append(form);
+    const input = /** @type {HTMLInputElement} */ (form.querySelector('input'));
+    input.value = 'こんにちは';
+    input.dispatchEvent(new Event('input'));
+    form.dispatchEvent(new Event('submit', { cancelable: true }));
+    await tick();
+    expect(tuckedDuringPost).toBe(true);
+    expect(root.classList.contains('nlsb-is-tucked')).toBe(false);
+  });
+});

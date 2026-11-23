@@ -54,6 +54,7 @@ import {
 } from '../../src/lib/kick/kickRealtime.js';
 import { createEmoteSaver } from './pfEmoteStore.js';
 import { platformFetchTimeoutSignal } from '../../src/lib/platform/fetchTimeout.js';
+import { withRevealedVenueOfficialComposer } from '../../src/lib/venueRevealOfficialComposer.js';
 // 視聴者数をページに合わせるため 10 秒おき(30 秒だとページの数から遅れていた・2026-11-11 PC 計測の Twitch と同じ)
 const META_EVERY_MS = 10_000;
 const FLUSH_MS = 150;
@@ -833,6 +834,7 @@ try {
         noteSendFail('not-signed-in');
         return { ok: false, reason: 'not-signed-in' };
       }
+      return await withRevealedVenueOfficialComposer(document, async () => {
       let input = /** @type {HTMLElement | null} */ (document.querySelector(KK_INPUT_SEL));
       for (let i = 0; !input && i < 6; i += 1) {
         await sleep(250);
@@ -878,6 +880,7 @@ try {
       }
       if (!ok) noteSendFail('still-in-box');
       return { ok, reason: ok ? '' : 'still-in-box' };
+      });
     })()
       .then((r) => sendResponse(r))
       .catch((e) => sendResponse({ ok: false, reason: String(e) }));

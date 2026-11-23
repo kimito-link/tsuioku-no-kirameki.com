@@ -4,6 +4,7 @@
 //   ★キー入力は会場の外へ伝えない(ページ側のショートカットや会場の Esc で閉じるに食われないように)。
 
 import { findGiftSidebarItemsTabElement } from './giftSidebarRankTabPick.js';
+import { withRevealedVenueOfficialComposer } from './venueRevealOfficialComposer.js';
 
 /** @typedef {{ ok?: boolean, error?: unknown, reason?: unknown, note?: unknown }} VenuePostResult */
 
@@ -90,7 +91,10 @@ export function createVenueComposeBox(post, opts = {}) {
     /** @type {VenuePostResult | null} */
     let res = null;
     try {
-      res = await post(text);
+      // 公式の欄が会場の箱に覆われていると、入力できても送信が届かず文字が残ることがある
+      //   (SHOWROOM 実測:「送信ボタンを押しましたが、文字が入力欄に残っています」)。
+      //   どのサービスでも、送っているあいだだけ会場をしまう。
+      res = await withRevealedVenueOfficialComposer(doc, () => post(text));
     } catch (e) {
       res = { ok: false, error: e && typeof e === 'object' && 'message' in e ? String(/** @type {any} */ (e).message) : String(e) };
     }

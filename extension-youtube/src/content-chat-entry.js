@@ -17,6 +17,7 @@ import { ytVideoIdFromChatFrameUrl } from '../../src/lib/youtube/ytChatContinuat
 import { relativeStreamStartedAtMs, startMsFromTimestampBlob } from '../../src/lib/youtube/ytStreamStart.js';
 import { followerSampleFromDom } from '../../src/lib/platform/followerCountSample.js';
 import { startPageStallWatch } from '../../src/lib/stallTrace.js';
+import { withRevealedVenueOfficialComposer } from '../../src/lib/venueRevealOfficialComposer.js';
 try {
   const stallRoot = /** @type {any} */ (globalThis);
   if (!stallRoot.__nlStallWatch && isYtWatchLikeUrl(String(location.href || ''))) {
@@ -1055,6 +1056,7 @@ function setupCommentSendBridge() {
         if (!text) return { ok: false, reason: 'empty' };
         const INPUT_SEL =
           'yt-live-chat-text-input-field-renderer #input[contenteditable], #input.yt-live-chat-text-input-field-renderer, yt-live-chat-message-input-renderer #input[contenteditable]';
+      return await withRevealedVenueOfficialComposer(document, async () => {
         let input = /** @type {HTMLElement | null} */ (document.querySelector(INPUT_SEL));
         // 0.1.1912: チャット欄を読み込み直した直後は入力欄がまだ無いことがある。少しだけ待ってから理由を判定する。
         for (let i = 0; !input && i < 6; i += 1) {
@@ -1109,6 +1111,7 @@ function setupCommentSendBridge() {
         await sleep(400);
         const left = String(input.textContent || '').trim();
         return { ok: left === '' || left !== text, reason: left === text ? 'still-in-box' : '' };
+      });
       })()
         .then((r) => sendResponse(r))
         .catch((e) => sendResponse({ ok: false, reason: String(e) }));
