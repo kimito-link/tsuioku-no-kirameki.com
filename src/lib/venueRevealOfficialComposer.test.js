@@ -26,17 +26,30 @@ describe('revealVenueOfficialComposer', () => {
     expect(root.classList.contains('nlsb-is-tucked')).toBe(false);
   });
 
-  it('閉じていれば触らない。既にしまっていれば二重に外さない', () => {
+  it('閉じていれば触らない', () => {
     const closed = mountVenue(false);
     const r1 = revealVenueOfficialComposer(document);
     expect(closed.classList.contains('nlsb-is-tucked')).toBe(false);
     r1();
-    closed.remove();
-    document.documentElement.classList.remove('nlsb-venue-open');
+  });
+
+  it('前回の失敗で残った印は、戻す関数が外す', () => {
     const tucked = mountVenue(true, true);
     const r2 = revealVenueOfficialComposer(document);
-    r2();
     expect(tucked.classList.contains('nlsb-is-tucked')).toBe(true);
+    r2();
+    expect(tucked.classList.contains('nlsb-is-tucked')).toBe(false);
+  });
+
+  it('入れ子でしまっても、一番外側の戻しで印を外す', () => {
+    const root = mountVenue(true);
+    const outer = revealVenueOfficialComposer(document);
+    const inner = revealVenueOfficialComposer(document);
+    expect(root.classList.contains('nlsb-is-tucked')).toBe(true);
+    inner();
+    expect(root.classList.contains('nlsb-is-tucked')).toBe(true);
+    outer();
+    expect(root.classList.contains('nlsb-is-tucked')).toBe(false);
   });
 
   it('送り終わったら必ず戻す(途中で失敗しても)', async () => {

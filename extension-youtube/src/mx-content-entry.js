@@ -48,7 +48,7 @@ import { followerSampleFromMixch } from '../../src/lib/platform/followerCountSam
 import { makeDiagTabToken, shouldSkipDiagWrite } from '../../src/lib/platform/diagTabShare.js';
 import { platformFetchTimeoutSignal } from '../../src/lib/platform/fetchTimeout.js';
 import { findPageButton } from '../../src/lib/platform/pageControlPick.js';
-import { findMxCommentInput, findMxSendButton } from '../../src/lib/mixch/mxCommentInput.js';
+import { describeMxCommentInputLookup, findMxCommentComposerToReveal, findMxCommentInput, findMxSendButton } from '../../src/lib/mixch/mxCommentInput.js';
 import { withRevealedVenueOfficialComposer } from '../../src/lib/venueRevealOfficialComposer.js';
 
 const META_EVERY_MS = 30_000;
@@ -641,10 +641,10 @@ function findSendButton(near) {
   return findPageButton(document, /送信/, near);
 }
 
-/** @param {string} reason */
-function noteSendFail(reason) {
+/** @param {string} reason @param {Record<string, unknown>} [extra] */
+function noteSendFail(reason, extra) {
   try {
-    void chrome.storage.local.set({ yt_diag_mx_send_fail: { at: Date.now(), reason, userId: diag.userId } });
+    void chrome.storage.local.set({ yt_diag_mx_send_fail: { at: Date.now(), reason, userId: diag.userId, ...(extra && typeof extra === 'object' ? extra : {}) } });
   } catch {
     /* no-op */
   }
@@ -663,22 +663,61 @@ try {
       // 公式の欄は form に入っていない textarea(placeholder「コメントする...」)。会場が覆って欄が外れていたら、
       //   会場を一時的にしまって出してから探す。サイドパネルも会場も同じ MX_SEND_COMMENT を使う。
       return await withRevealedVenueOfficialComposer(document, async () => {
-      let input = findMxCommentInput(document);
-      for (let i = 0; !input && i < 6; i += 1) {
-        await sleep(250);
-        input = findMxCommentInput(document);
+      /** @param {number} [timeoutMs] */
+      const waitForInput = (timeoutMs = 2000) => {
+        const now = findMxCommentInput(document);
+        if (now) return Promise.resolve(now);
+        return new Promise((resolve) => {
+          let done = false;
+          /** @type {MutationObserver | null} */
+          let obs = null;
+          /** @type {ReturnType<typeof setTimeout> | 0} */
+          let tid = 0;
+          const finish = (/** @type {any} */ el) => {
+            if (done) return;
+            done = true;
+            try { obs?.disconnect(); } catch { /* no-op */ }
+            if (tid) clearTimeout(tid);
+            resolve(el);
+          };
+          try {
+            obs = new MutationObserver(() => {
+              const el = findMxCommentInput(document);
+              if (el) finish(el);
+            });
+            obs.observe(document.documentElement || document, { childList: true, subtree: true });
+          } catch {
+            finish(findMxCommentInput(document));
+            return;
+          }
+          tid = setTimeout(() => finish(findMxCommentInput(document)), timeoutMs);
+        });
+      };
+      let input = await waitForInput(2000);
+      if (!input) {
+        const reveal = findMxCommentComposerToReveal(document);
+        if (reveal) {
+          try { reveal.click(); } catch { /* 出せなくても探すのは続ける */ }
+          input = await waitForInput(1500);
+        }
       }
       if (!input) {
-        noteSendFail('no-input');
+        noteSendFail('no-input', describeMxCommentInputLookup(document));
         return { ok: false, reason: 'no-input' };
       }
       try { input.scrollIntoView({ block: 'nearest', inline: 'nearest' }); } catch { /* 送れればよい */ }
       // 窓が狭いとミクチャがコメント欄を隠す(りんく「広くするとコメントうてるっぽい」)。隠れていても入れて押してみて、見えていたかを記録に残す
       const inputShown = input.getClientRects().length > 0;
-      input.focus();
-      const proto = input instanceof HTMLTextAreaElement ? HTMLTextAreaElement.prototype : HTMLInputElement.prototype;
-      Object.getOwnPropertyDescriptor(proto, 'value')?.set?.call(input, text);
-      input.dispatchEvent(new Event('input', { bubbles: true }));
+      try { input.focus(); } catch { /* 焦点が取れなくても入れる */ }
+      const proto = input instanceof HTMLTextAreaElement ? HTMLTextAreaElement.prototype : input instanceof HTMLInputElement ? HTMLInputElement.prototype : null;
+      if (proto && Object.getOwnPropertyDescriptor(proto, 'value')?.set) {
+        Object.getOwnPropertyDescriptor(proto, 'value')?.set?.call(input, text);
+      } else if (/** @type {any} */ (input).isContentEditable) {
+        input.textContent = text;
+      } else {
+        try { /** @type {any} */ (input).value = text; } catch { /* 入れられなければ後で no-input 以外で分かる */ }
+      }
+      try { input.dispatchEvent(new InputEvent('input', { bubbles: true, cancelable: true, inputType: 'insertText', data: text })); } catch { input.dispatchEvent(new Event('input', { bubbles: true })); }
       input.dispatchEvent(new Event('change', { bubbles: true }));
       await sleep(150);
       const btn = findMxSendButton(document, input) || findSendButton(input);
