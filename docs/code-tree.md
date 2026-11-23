@@ -27,7 +27,7 @@
 
 > 値が次の段へ届かない「断線」(broadcaster バグ型)は `npm run feature-map -- --check` が機械検知。
 
-## ⚠️ 役割コメントが無いソース 14 / 1354 件
+## ⚠️ 役割コメントが無いソース 14 / 1358 件
 - `docs/handoff/bench/bench-interval.mjs`
 - `docs/handoff/bench/bench-lane.mjs`
 - `extension-youtube/cloak-failsafe.js`
@@ -808,7 +808,7 @@
   - `yt-marketing-export.html`
   - `yt-sidepanel.html`
   - `yt-venue.html`
-- 📁 **extension-youtube/** (162)
+- 📁 **extension-youtube/** (164)
   - 📁 **data/** (1)
     - `ouen-banner.json`
   - 📁 **images/** (72)
@@ -932,12 +932,14 @@
     - `effect-rank-up.mp3`
     - `voice-complete.mp3`
     - `voice-watch.mp3`
-  - 📁 **src/** (33)
+  - 📁 **src/** (35)
     - `ab-content-entry.js` — ABEMA の放送ページで、ページが受け取ったコメントを記録に渡す入口。
     - `ab-main-entry.js` — ABEMA のページ自身の世界(MAIN)で動く小さな写し役。
     - `background-entry.js` — YouTube Live コメントの IndexedDB 全件記録・配信要約・Offscreen 読み上げ管理 Service Worker
     - `background-nico-relay.js` — ニコ生版 extension/background.js の、会場とコメビュが頼る受け口の写し(手を加えない)。
     - `comeview-nico-entry.js` — ニコ生版のコメビュ(本物 comeview-entry.js)を YouTube の記録で動かす入口。
+    - `content-chat-entry.js` — YouTube Live チャット欄 DOM の監視・コメント取得 Content Script
+    - `content-chat-entry.js` — YouTube Live チャット欄 DOM の監視・コメント取得 Content Script
     - `content-chat-entry.js` — YouTube Live チャット欄 DOM の監視・コメント取得 Content Script
     - `content-chat-main-entry.js` — ページ自身の世界に入る束の入口。
     - `kick-content-entry.js` — Kick の視聴ページ(kick.com/<チャンネル>)で、チャットを読んで記録に渡す入口。
@@ -1217,7 +1219,7 @@
   - `gift-coin-hq.wav`
   - `gift-register-hq.wav`
   - `gift-register.mp3`
-- 📁 **src/** (2623)
+- 📁 **src/** (2626)
   - 📁 **data/** (7)
     - 📁 **acquirers/** (2)
       - `laneFromStorage.js` — 応援レーン acquirer: chrome.storage.local(nls_comments) → laneStore の橋渡し。
@@ -1560,7 +1562,7 @@
         - `logo_funlink_white_RGB_link_black.png`
         - `logo_funlink_white_RGB_maru_black.png`
     - `hero-connect-hub.svg`
-  - 📁 **lib/** (2305)
+  - 📁 **lib/** (2308)
     - 📁 **__snapshots__/** (4)
       - `marketing-abema-baseline.html`
       - `marketing-niconico.html`
@@ -2011,6 +2013,8 @@
     - `celebrationPika.test.js`
     - `censusWatch.js` — 状態速報の「拡張プロセスの忙しさ(文書別)」を、数字だけで機械的に読む純関数(2026-10-20)。
     - `censusWatch.test.js`
+    - `changelog-archive.js` — 追憶のきらめき 更新履歴アーカイブ（popup のバンドル外）。
+    - `changelog-archive.js` — 追憶のきらめき 更新履歴アーカイブ（popup のバンドル外）。
     - `changelog-archive.js` — 追憶のきらめき 更新履歴アーカイブ（popup のバンドル外）。
     - `changelog.js` — 拡張の更新履歴データと semver 比較ヘルパ。
     - `changelog.js` — 拡張の更新履歴データと semver 比較ヘルパ。
@@ -2970,6 +2974,7 @@
     - `overlayShown.test.js`
     - `ownPostedUserIdSet.js` — v0.1.773: 「自分が投稿した userId」の集合を1パスで作る純関数。
     - `ownPostedUserIdSet.test.js`
+    - `p1LowSpec.wiring.test.js`
     - `pageColorSchemeGate.test.js`
     - `pageWatchScheduler.js` — 全配信サービスの視聴ページで共有する「ページ監視・定期チェック」スケジューラ。
     - `pageWatchScheduler.test.js`

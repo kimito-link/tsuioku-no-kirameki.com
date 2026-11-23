@@ -5269,6 +5269,7 @@ export function mountVenueBarButton(options = {}) {
 
   /** 表示中の全吹き出しを席座標へ再追従(スクロール/リサイズ/段再描画後)。 */
   const repositionAllBubbles = () => {
+    if (!open || tucked || isPageHidden()) return;
     for (const b of [...activeBubbles]) positionBubble(b);
   };
 
@@ -7231,6 +7232,7 @@ export function mountVenueBarButton(options = {}) {
     if (speechTimer) return;
     void pollSpeech();
     speechTimer = window.setInterval(() => {
+      if (isPageHidden() && !voicePlayer.readingWanted) return;
       void pollSpeech();
     }, SPEECH_INTERVAL_MS);
     if (typeof chrome !== 'undefined' && chrome.storage && chrome.storage.onChanged) {

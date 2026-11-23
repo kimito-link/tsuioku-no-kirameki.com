@@ -1,5 +1,5 @@
 // mx-content-entry.js — ミクチャの配信ページ(mixch.tv/u/<番号>/live)で、コメントとギフトを読んで記録に渡す入口。
-/* global chrome, WebSocket, location, setTimeout, clearTimeout, setInterval, clearInterval, window, fetch, document, HTMLInputElement, HTMLTextAreaElement, Event, KeyboardEvent */
+/* global chrome, WebSocket, location, setTimeout, clearTimeout, window, fetch, document, HTMLInputElement, HTMLTextAreaElement, Event, KeyboardEvent */
 //
 // ★設計(council/mixch-support-PLAN.md・SHOWROOM の sr-content-entry.js と同じ形)
 //   - 形は 2026-11-08 の PC 実測(本物・ログインなし)から。ページ自身と同じ口を読む:
@@ -46,6 +46,7 @@ import { createInfoPollGate } from '../../src/lib/platform/infoPollGate.js';
 import { createPageWatchScheduler } from '../../src/lib/pageWatchScheduler.js';
 import { isVenuePageHidden } from '../../src/lib/venuePaintSchedule.js';
 import { isExtensionContextAlive } from '../../src/lib/reportSilentError.js';
+import { startOrphanTabAutoReloadInPage } from '../../src/extension/orphanTabAutoReloadHost.js';
 import { parseMxLiveStats } from '../../src/lib/platform/platformStats.js';
 import { followerSampleFromMixch } from '../../src/lib/platform/followerCountSample.js';
 import { makeDiagTabToken, shouldSkipDiagWrite } from '../../src/lib/platform/diagTabShare.js';
@@ -460,9 +461,20 @@ function startReader(userId, sessionId, key, socketUrl, onViewers) {
     }, backoff);
     backoff = Math.min(backoff * 2, 60_000);
   };
-  const boardTimer = setInterval(() => {
-    if (!stopped && Date.now() - boardAt >= BOARD_EVERY_MS) void loadBoard();
-  }, 15_000);
+  const boardSched = createPageWatchScheduler({
+    baseTickMs: 15_000,
+    isHidden: () => isVenuePageHidden(document),
+    isAlive: () => !stopped && isExtensionContextAlive(),
+  });
+  boardSched.register({
+    id: 'mx-board',
+    intervalMs: 15_000,
+    hiddenMode: 'pause',
+    run: ({ now }) => {
+      if (!stopped && now - boardAt >= BOARD_EVERY_MS) void loadBoard();
+    },
+  });
+  boardSched.start();
 
   void (async () => {
     await loadItems();
@@ -481,7 +493,7 @@ function startReader(userId, sessionId, key, socketUrl, onViewers) {
     releaseHeld();
     stopped = true;
     if (reconnectTimer) clearTimeout(reconnectTimer);
-    clearInterval(boardTimer);
+    boardSched.stop();
     flush();
     try {
       ws?.close();
@@ -763,3 +775,4 @@ window.addEventListener('pagehide', () => {
 window.addEventListener('pageshow', (ev) => {
   if (ev?.persisted || !current) resumeMxWatch();
 });
+if (window.top === window) startOrphanTabAutoReloadInPage(() => isExtensionContextAlive());

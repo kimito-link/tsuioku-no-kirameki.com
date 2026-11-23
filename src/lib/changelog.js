@@ -18,6 +18,16 @@
 /** @type {readonly ChangelogEntry[]} */
 export const EXTENSION_CHANGELOG = Object.freeze([
   Object.freeze({
+    version: '0.1.2199',
+    date: '2026-11-23',
+    summary: '全サービスへ孤児タブ自動復帰・診断間引き・会場負荷抑制を横展開',
+    items: Object.freeze([
+      'Twitch・Kick・ミクチャ・SHOWROOM・ふわっち・ツイキャス・TikTok・ABEMA・YouTube チャットに拡張更新後の自動復帰（orphanTabAutoReload）を配線しました。',
+      'Kick・ミクチャ・SHOWROOM のランキング定期タイマーを共通スケジューラ（裏タブ停止）へ移行し、Twitch・Kick の診断書き込みを差分・間隔抑制つき書き手へ統一しました。',
+      '会場モードで閉鎖中・しまい中・裏タブの吹き出し位置再計算と読み上げ OFF 時の裏タブ発言ポーリングを抑止しました。',
+    ])
+  }),
+  Object.freeze({
     version: '0.1.2198',
     date: '2026-11-23',
     summary: 'ニコ生の常駐タイマーを共通スケジューラへ集約し裏タブを間引き',
@@ -186,15 +196,6 @@ export const EXTENSION_CHANGELOG = Object.freeze([
       '拡張そのものの動きは変わりません。ウェブのランキングページ（/live/）の更新です。',
       '配信を指定したリンク（?lv=）で開いたとき、その配信が終わっていたら、LIVE の代わりに「終了」と出し、経過時間ではなく配信時間と終了時刻を出します。推定同時視聴とコメントの速さは出しません。',
       '終わった配信のカードには「いま動いた人」の代わりに、終わったことと「いま放送中のランキングを見る」への案内を出します。',
-    ])
-  }),
-  Object.freeze({
-    version: '0.1.2176',
-    date: '2026-11-21',
-    summary: '開発モードではマーケHTMLを自由に保存',
-    items: Object.freeze([
-      'りんくさんの開発用の読み込み（フォルダから読み込んだ版／ストア提出ではないビルド）では、コードがなくてもマーケレポートのHTMLを保存できます。',
-      'Chromeウェブストアから入れた版と、提出用のZIPの関所・14日のお試しは、今までどおりです。',
     ])
   })
 ]);

@@ -30,6 +30,7 @@ import { followerSampleFromTcDocument } from '../../src/lib/platform/followerCou
 import { withRevealedVenueOfficialComposer } from '../../src/lib/venueRevealOfficialComposer.js';
 import { createPageWatchScheduler } from '../../src/lib/pageWatchScheduler.js';
 import { isVenuePageHidden } from '../../src/lib/venuePaintSchedule.js';
+import { startOrphanTabAutoReloadInPage } from '../../src/extension/orphanTabAutoReloadHost.js';
 
 const META_EVERY_MS = 30_000;
 const FLUSH_MS = 200;
@@ -618,3 +619,4 @@ window.addEventListener('pagehide', () => {
 window.addEventListener('pageshow', (ev) => {
   if (ev?.persisted || !current) resumeTcWatch();
 });
+if (window.top === window) startOrphanTabAutoReloadInPage(() => !contextGone());

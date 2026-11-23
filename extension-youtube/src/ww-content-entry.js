@@ -19,6 +19,7 @@ import { withRevealedVenueOfficialComposer } from '../../src/lib/venueRevealOffi
 import { createPageWatchScheduler } from '../../src/lib/pageWatchScheduler.js';
 import { isVenuePageHidden } from '../../src/lib/venuePaintSchedule.js';
 import { isExtensionContextAlive } from '../../src/lib/reportSilentError.js';
+import { startOrphanTabAutoReloadInPage } from '../../src/extension/orphanTabAutoReloadHost.js';
 try {
   const stallRoot = /** @type {any} */ (globalThis);
   if (!stallRoot.__nlStallWatch) {
@@ -552,3 +553,4 @@ window.addEventListener('pagehide', () => {
 window.addEventListener('pageshow', (ev) => {
   if (ev?.persisted || !current) resumeWwWatch();
 });
+if (window.top === window) startOrphanTabAutoReloadInPage(() => isExtensionContextAlive());

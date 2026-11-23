@@ -1,16 +1,16 @@
-# Handoff — P0-3: ニコ生 content-entry.js の常駐タイマー 6 本を pageWatchScheduler へ統合 (v0.1.2198)
+# Handoff — P1: 孤児タブ自動復帰の全サービス展開・残タイマー移行・会場位置計算/診断の間引き (v0.1.2199)
 
-STATUS: 検品・push・下書きPR作成待ち（commit 済み・未 push）
-ROOT_CAUSE: ニコ生視聴ページ（src/extension/content-entry.js）で 360ms 枠更新・550ms パネルスキャン・4s 配信ID監視・5s 公式DOM・45s 統計・120s deep harvest の 6 本が個別の setInterval で常駐していた。
-FILES_CHANGED: src/extension/content-entry.js, src/lib/pageWatchScheduler.wiring.test.js, extension/manifest.json, package.json, src/lib/changelog.js, src/lib/changelog-archive.js, tsuioku-no-kirameki/index.html, extension/dist/*, app/dist/live-view.js, extension/background.js, .dist-fingerprint.json, docs/repo-tree-map.{md,html}, docs/code-tree.{md,html}, docs/feature-sitemap.{md,html}, handoff.md
-CHANGES: content-entry.js の 6 本の常駐 setInterval を共通 pageWatchScheduler.js（pageFrameSched + nicoWatchHub）と venuePaintSchedule.js（isVenuePageHidden 再利用）へ移行。表タブは既存間隔とスクロール見送り保護（shouldDeferDomHarvestDuringScroll）を維持し、裏タブでは間引き（panel-scan / live-id-poll / page-frame）または停止（deep-harvest / stats-poll / official-event-dom）、bfcache 復帰時は pageshow で再開。配線テストを追加し、版を 0.1.2198 へ統一（権限追加なし）。
-TESTS_RUN: npm run test:cc -- src/lib/pageWatchScheduler.test.js src/lib/pageWatchScheduler.wiring.test.js src/lib/domHarvestScrollDefer.test.js src/lib/changelogBundleBudget.test.js src/lib/changelog.test.js src/lib/changelogConsistency.test.js / npm run verify:bump / npm run check:dist-fresh / npm run tree-map:check / npm run lint / npm run typecheck / verify:extension
-TEST_RESULT: 全合格（vitest 6 files / 58 passed、verify:bump 全7ステップOK 0.1.2198、dist-fresh OK 45e2ccbdc212、tree-map up to date、eslint 0 errors、tsc 0 errors、verify:extension 合格［v0.1.2198 全13画面・全10差し込み先OK］）
-REMAINING_RISKS: アクセラレーション OFF の実ニコ生配信での long task 比較計測は未実施のため下書き PR として実測追記待ち。push・PR 作成は Antigravity ルールにより未実施。
-NEXT_ACTION: 手元で feat/lowspec-p0-3-nico-timers を push して下書き PR を作成。次は ② P1（0.1.2199）→ ③ P2（0.1.2200）→ ④ 推定購入額（0.1.2201）。
+STATUS: コミット済み・push・下書きPR作成待ち（未 push）
+ROOT_CAUSE: ニコ生以外の9入口（YouTube・Twitch・Kick・ミクチャ・SHOWROOM・ふわっち・ツイキャス・TikTok・ABEMA）に孤児タブ自動復帰（orphanTabAutoReloadHost）が未接続だった。また Kick/ミクチャ/SHOWROOM の公式順位取得 boardTimer が裏タブでも裸 setInterval で回り続け、Twitch/Kick の診断保存 saveDiagSoon が同一スナップショットでも毎回 chrome.storage.local へ書き込んでおり、会場（venueBar.js）でも非表示/裏タブ中の吹き出し再配置と読み上げ OFF 時の裏ポーリングが走っていた。
+FILES_CHANGED: src/extension/orphanTabAutoReloadHost.js, src/lib/diagFlushThrottle.js, src/extension/venueBar.js, extension-youtube/src/content-chat-entry.js, extension-youtube/src/tw-content-entry.js, extension-youtube/src/kick-content-entry.js, extension-youtube/src/mx-content-entry.js, extension-youtube/src/sr-content-entry.js, extension-youtube/src/ww-content-entry.js, extension-youtube/src/tc-content-entry.js, extension-youtube/src/tt-content-entry.js, extension-youtube/src/ab-content-entry.js, src/lib/p1LowSpec.wiring.test.js, extension/manifest.json, package.json, src/lib/changelog.js, src/lib/changelog-archive.js, tsuioku-no-kirameki/index.html, extension/dist/*, app/dist/live-view.js, extension/background.js, .dist-fingerprint.json, docs/repo-tree-map.{md,html}, docs/code-tree.{md,html}, docs/feature-sitemap.{md,html}, handoff.md
+CHANGES: (1) orphanTabAutoReloadHost.js に多重起動防止ガードを追加し、ニコ生以外の全9入口へ接続。(2) Kick/ミクチャ/SHOWROOM の boardTimer を pageWatchScheduler（裏タブ pause）へ移行。(3) diagFlushThrottle.js に L0 関数 createThrottledSnapshotWriter を追加し、Twitch/Kick の診断スナップショット保存を同一内容スキップ＋表/裏最小間隔で間引き。(4) venueBar.js の repositionAllBubbles に非表示・収納・裏タブ時スキップを、startSpeechPolling に裏タブかつ読み上げ OFF 時スキップを追加。権限・価格・関所・UI 文言・VOICEVOX CPU 基準は未変更。
+TESTS_RUN: npm run test:cc -- src/lib/p1LowSpec.wiring.test.js src/lib/diagFlushThrottle.test.js src/lib/pageWatchScheduler.wiring.test.js src/lib/venuePaintSchedule.wiring.test.js src/lib/changelogBundleBudget.test.js src/lib/changelog.test.js src/lib/changelogConsistency.test.js / npm run verify:bump / npm run check:dist-fresh / npm run tree-map:check / npm run check:layer / npm run lint / npm run typecheck / verify:extension
+TEST_RESULT: 全合格（vitest 7 files / 57 passed、verify:bump 全7ステップOK 0.1.2199、dist-fresh OK、tree-map up to date、check:layer 合格、eslint 0 errors、tsc 0 errors、verify:extension 合格［v0.1.2199 全13画面・全10差し込み先OK］）
+REMAINING_RISKS: アクセラレーション OFF の実配信ページでの拡張更新後復帰・裏タブ負荷の実測は未実施のため下書き PR として実測追記待ち。push・PR 作成は Antigravity ルールにより未実施。
+NEXT_ACTION: 手元で feat/lowspec-p1-orphan-timers-diag を push して下書き PR を作成する。次は ③ P2（status.html / status-latest.json ダンプへの他サービス追加・v0.1.2200）。
 LAST_WORKED_ON: 2026-11-23
 WORKED_BY: antigravity / Gemini 4 Neon (Medium)
-MACHINE_NOTES: worktree=..\_worktrees\tsuioku-no-kirameki.com\cleanup-p0-3 (branch: feat/lowspec-p0-3-nico-timers, base: origin/master a7290164a)。本体チェックアウトの未コミット変更には一切触れていない。
+MACHINE_NOTES: worktree=..\_worktrees\tsuioku-no-kirameki.com\cleanup-p1 (branch: feat/lowspec-p1-orphan-timers-diag, base: origin/master a7290164a)。本体チェックアウトの未コミット変更には一切触れていない。
 
 ## NEEDS_JUDGMENT（司令塔が判断する。ここを自動で直してはいけない）
 

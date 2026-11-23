@@ -21,6 +21,7 @@ import { withRevealedVenueOfficialComposer } from '../../src/lib/venueRevealOffi
 import { createMutationObserverHub } from '../../src/lib/mutationObserverHub.js';
 import { createPageWatchScheduler } from '../../src/lib/pageWatchScheduler.js';
 import { isVenuePageHidden } from '../../src/lib/venuePaintSchedule.js';
+import { startOrphanTabAutoReloadInPage } from '../../src/extension/orphanTabAutoReloadHost.js';
 import { isExtensionContextAlive } from '../../src/lib/reportSilentError.js';
 try {
   const stallRoot = /** @type {any} */ (globalThis);
@@ -1651,6 +1652,7 @@ function init() {
     // 縦長の配信(ショートのライブ)などでは、トップファンの画面がチャット欄の中ではなく最上位のページに出る
     //   (2026-11-04 実機 JaZeZj3hZhE: トップファンが出ているのに「スパチャの合計順」になっていた)。こちらでも読む。
     setupLeaderboardReader();
+    startOrphanTabAutoReloadInPage(() => isExtensionContextAlive());
   }
 }
 
