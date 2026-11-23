@@ -24,6 +24,15 @@
 /** @type {ChangelogEntry[]} */
 const ARCHIVE_ENTRIES = [
   Object.freeze({
+    version: '0.1.2167',
+    date: '2026-11-18',
+    summary: '開いたままの書き出しと概数',
+    items: Object.freeze([
+      '配信ページを開いたまま書き出しても、保存したコメントをそのまま読みます。コメントが多くても、画面用の組み立てを待たずに最後まで出します。',
+      'YouTube のチャンネル登録者数は、ページの概数（8.43万人など）をそのまま出します。',
+    ])
+  }),
+  Object.freeze({
     version: '0.1.2166',
     date: '2026-11-18',
     summary: 'メディアキットのサービス名',

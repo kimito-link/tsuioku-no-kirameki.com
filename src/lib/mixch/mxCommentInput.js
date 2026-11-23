@@ -55,6 +55,10 @@ export function isMxDummyAutosizeField(el) {
   return false;
 }
 
+/**
+ * @param {Element | null | undefined} el
+ * @returns {boolean}
+ */
 export function isMxVisibleField(el) {
   if (!el || typeof el.getClientRects !== 'function') return false;
   return el.getClientRects().length > 0;
@@ -168,7 +172,7 @@ function queryFieldsIn(scope) {
 
 /**
  * @param {Element} el
- * @returns {number}
+ * @returns {boolean}
  */
 function isNearOfficialSend(el) {
   let n = el;
@@ -193,6 +197,10 @@ function nearbyOfficialText(el) {
   return t;
 }
 
+/**
+ * @param {Element} el
+ * @returns {boolean}
+ */
 function isLikelyOfficialField(el) {
   if (!isTypeableField(el)) return false;
   if (el.closest && el.closest('#tab-boxes, .gift-menu-header, .icon-list')) return false;
@@ -203,6 +211,10 @@ function isLikelyOfficialField(el) {
   return false;
 }
 
+/**
+ * @param {Element} el
+ * @returns {number}
+ */
 function scoreField(el) {
   let score = 0;
   const label = fieldLabel(el);

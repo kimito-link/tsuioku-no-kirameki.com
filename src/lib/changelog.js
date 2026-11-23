@@ -18,6 +18,14 @@
 /** @type {readonly ChangelogEntry[]} */
 export const EXTENSION_CHANGELOG = Object.freeze([
   Object.freeze({
+    version: '0.1.2189',
+    date: '2026-11-23',
+    summary: 'ミクチャの欄を探す部品の型を直す',
+    items: Object.freeze([
+      '拡張の動きは 0.1.2186 と同じです。ミクチャの公式コメント欄を探す部品に型の注釈が足りず、型検査が落ちていたので注釈だけ足しました。欄の探し方は変えていません。',
+    ])
+  }),
+  Object.freeze({
     version: '0.1.2188',
     date: '2026-11-23',
     summary: '会場の本体ファイルを行数の上限内に収める',
@@ -195,15 +203,6 @@ export const EXTENSION_CHANGELOG = Object.freeze([
     summary: 'ストア提出記録の版表記を最新に',
     items: Object.freeze([
       'ストア提出の記録を、公開中 0.1.2139・審査中 0.1.2167 に直しました。拡張の動きは変わりません。',
-    ])
-  }),
-  Object.freeze({
-    version: '0.1.2167',
-    date: '2026-11-18',
-    summary: '開いたままの書き出しと概数',
-    items: Object.freeze([
-      '配信ページを開いたまま書き出しても、保存したコメントをそのまま読みます。コメントが多くても、画面用の組み立てを待たずに最後まで出します。',
-      'YouTube のチャンネル登録者数は、ページの概数（8.43万人など）をそのまま出します。',
     ])
   })
 ]);
