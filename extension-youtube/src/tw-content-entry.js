@@ -947,3 +947,9 @@ window.addEventListener('pagehide', () => {
   twWatchSched.stop();
   current?.stop();
 });
+window.addEventListener('pageshow', (ev) => {
+  if (ev?.persisted) {
+    twWatchSched.start();
+    twWatchSched.kick();
+  }
+});

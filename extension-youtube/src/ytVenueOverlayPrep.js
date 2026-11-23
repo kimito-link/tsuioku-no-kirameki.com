@@ -75,4 +75,10 @@ if (YT_VENUE_OVERLAY && typeof window !== 'undefined' && window.parent !== windo
     if (!isVenuePageHidden(document)) overlaySched.kick();
   });
   window.addEventListener('pagehide', () => overlaySched.stop());
+  window.addEventListener('pageshow', (ev) => {
+    if (ev?.persisted) {
+      overlaySched.start();
+      overlaySched.kick();
+    }
+  });
 }

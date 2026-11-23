@@ -40,4 +40,14 @@ describe('P0-1: ページ監視スケジューラの各入口への配線', () =
     expect(kickEntry).toContain("id: 'kick-watch'");
     expect(kickEntry).toContain("hiddenMode: 'throttle'");
   });
+
+  it('4 入口とも bfcache 復元（pageshow の persisted）で start()/kick() を呼んで再開する', () => {
+    for (const src of [venueInline, overlayPrep, twEntry, kickEntry]) {
+      expect(src).toContain("addEventListener('pagehide'");
+      expect(src).toContain("addEventListener('pageshow'");
+      expect(src).toContain('persisted');
+      expect(src).toMatch(/\.start\(\)/);
+      expect(src).toMatch(/\.kick\(\)/);
+    }
+  });
 });

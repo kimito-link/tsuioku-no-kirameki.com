@@ -921,3 +921,9 @@ window.addEventListener('pagehide', () => {
   kickWatchSched.stop();
   current?.stop();
 });
+window.addEventListener('pageshow', (ev) => {
+  if (ev?.persisted) {
+    kickWatchSched.start();
+    kickWatchSched.kick();
+  }
+});

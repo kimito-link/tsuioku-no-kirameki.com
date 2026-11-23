@@ -168,6 +168,12 @@ void ytPrefetchLocalAssets(PREFETCH).then(() => {
       if (!isVenuePageHidden(document)) venueSyncSched.kick();
     });
     window.addEventListener('pagehide', () => venueSyncSched.stop());
+    window.addEventListener('pageshow', (ev) => {
+      if (ev?.persisted) {
+        venueSyncSched.start();
+        venueSyncSched.kick();
+      }
+    });
   } catch { /* 古い DOM でも継続 */ }
   // 仮キーで開いた会場を、同じ部屋の本物の配信キーが来た瞬間に切り替える
   //   (1秒待ちだと、その間の新着が会場の liveId と合わず読み上げに入らない)。

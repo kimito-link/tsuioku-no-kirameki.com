@@ -256,4 +256,43 @@ describe('createPageWatchScheduler', () => {
     expect(clock.activeTimerCount()).toBe(0);
     expect(okTask).toHaveBeenCalledTimes(1);
   });
+
+  it('pagehide 相当の stop() 後、pageshow(persisted) 相当の start()+kick() で監視が再開する', () => {
+    const clock = createFakeClock();
+    const task = vi.fn();
+    const sched = createPageWatchScheduler({
+      baseTickMs: 1000,
+      now: clock.now,
+      setIntervalFn: clock.setIntervalFn,
+      clearIntervalFn: clock.clearIntervalFn,
+      setTimeoutFn: clock.setTimeoutFn,
+      clearTimeoutFn: clock.clearTimeoutFn,
+    });
+    sched.register({ id: 'watch', intervalMs: 1000, run: task });
+    sched.start();
+
+    clock.advance(1000);
+    expect(task).toHaveBeenCalledTimes(1);
+
+    // pagehide で停止
+    sched.stop();
+    expect(sched.isRunning()).toBe(false);
+    expect(clock.activeTimerCount()).toBe(0);
+    clock.advance(5000);
+    expect(task).toHaveBeenCalledTimes(1);
+
+    // bfcache から pageshow(persisted=true) で再開
+    sched.start();
+    expect(sched.isRunning()).toBe(true);
+    expect(sched.kick()).toBe('scheduled');
+    clock.advance(0);
+    expect(task).toHaveBeenCalledTimes(2);
+    expect(task.mock.calls[1][0].reason).toBe('kick');
+
+    // 以後も定期監視が 1 本のタイマーで継続する
+    clock.advance(1000);
+    expect(task).toHaveBeenCalledTimes(3);
+    expect(clock.activeTimerCount()).toBe(1);
+    sched.stop();
+  });
 });
