@@ -27,7 +27,7 @@
 
 > 値が次の段へ届かない「断線」(broadcaster バグ型)は `npm run feature-map -- --check` が機械検知。
 
-## ⚠️ 役割コメントが無いソース 14 / 1340 件
+## ⚠️ 役割コメントが無いソース 14 / 1341 件
 - `docs/handoff/bench/bench-interval.mjs`
 - `docs/handoff/bench/bench-lane.mjs`
 - `extension-youtube/cloak-failsafe.js`
@@ -75,7 +75,7 @@
   - `live-recent-comments.js` — /api/live-recent-comments — `/live/` の「コメントで応援した人」にホバーしたとき、
   - `post.js` — スマホからのコメントの受け渡し口(v0.1.1734・スマホからコメントを届ける)。
   - `status.js` — status 受け口 Vercel Serverless Function。
-- 📁 **app/** (124)
+- 📁 **app/** (125)
   - 📁 **audio-test/** (7)
     - `t-opus.mp4`
     - `t.caf`
@@ -214,6 +214,7 @@
   - `phone.js` — スマホの開始画面(/phone・iPhone アプリが最初に開くページ)。
   - `referral-attribution.js` — 【層】L0 判定層(純粋関数・I/O禁止)
   - `referral-passthrough.js` — LP（tsuioku-no-kirameki.com）で ?ref= を90日覚え、サポーターページへのリンクに足す。
+  - `supporter-pricing.js` — サポーター申し込みページの料金表示用の純関数。
   - `supporter.html`
   - `supporter.js` — 追憶のきらめき サポーター(v0.1.1893・課金 第1段)。素の JS(ビルドなし)。受け口は /api/billing。
 - 📁 **council-scout/** (26)
@@ -244,7 +245,7 @@
     - `2026-10-06.md`
     - `2026-10-12.md`
     - `2026-10-14.md`
-- 📁 **docs/** (388)
+- 📁 **docs/** (372)
   - 📁 **article-assets/** (87)
     - 📁 **venue-frames/** (12)
       - `f01.png`
@@ -566,10 +567,6 @@
   - `backfill-complete-loading-flow.html`
   - `bug-investigation-loading-scroll-2026-07-10.html`
   - `code-tree.html`
-  - `code-tree.html`
-  - `code-tree.html`
-  - `code-tree.md`
-  - `code-tree.md`
   - `code-tree.md`
   - `codex-commenter-follow-analytics-v0535.md`
   - `codex-event-lane-stuck-fix-v0613.md`
@@ -592,18 +589,12 @@
   - `dist-fingerprint-gate-IMPLEMENTATION-HANDOFF.md`
   - `extension-bump-checklist.md`
   - `feature-sitemap.html`
-  - `feature-sitemap.html`
-  - `feature-sitemap.html`
-  - `feature-sitemap.md`
-  - `feature-sitemap.md`
   - `feature-sitemap.md`
   - `inline-popup-sync.md`
   - `investigation-prompt-popup-not-appearing.md`
   - `kb-web-perf-diagnosis.md`
   - `koken-contrib-hidden-tab-stuck-fix-v0616.md`
   - `lane-architecture-redesign.md`
-  - `layer-map.html`
-  - `layer-map.html`
   - `layer-map.html`
   - `live-comment-heat-chips-DESIGN.md`
   - `live-comment-heat-chips-IMPLEMENTATION-HANDOFF.md`
@@ -632,15 +623,9 @@
   - `referral-commission.md`
   - `reliability-backlog-phase-b.md`
   - `repo-tree-map.html`
-  - `repo-tree-map.html`
-  - `repo-tree-map.html`
-  - `repo-tree-map.md`
-  - `repo-tree-map.md`
   - `repo-tree-map.md`
   - `research-nicolive-pc-comments.md`
   - `self-improvement-loop-DESIGN.md`
-  - `site-health.md`
-  - `site-health.md`
   - `site-health.md`
   - `story-user-lane-pipeline.md`
   - `surechigai-lite-improvement-plan.md`
@@ -1216,7 +1201,7 @@
   - `gift-coin-hq.wav`
   - `gift-register-hq.wav`
   - `gift-register.mp3`
-- 📁 **src/** (2595)
+- 📁 **src/** (2596)
   - 📁 **data/** (7)
     - 📁 **acquirers/** (2)
       - `laneFromStorage.js` — 応援レーン acquirer: chrome.storage.local(nls_comments) → laneStore の橋渡し。
@@ -1559,7 +1544,7 @@
         - `logo_funlink_white_RGB_link_black.png`
         - `logo_funlink_white_RGB_maru_black.png`
     - `hero-connect-hub.svg`
-  - 📁 **lib/** (2277)
+  - 📁 **lib/** (2278)
     - 📁 **__snapshots__/** (4)
       - `marketing-abema-baseline.html`
       - `marketing-niconico.html`
@@ -3451,6 +3436,7 @@
     - `supporterLicense.test.js`
     - `supporterPowerScoring.js` — 応援者パワー診断スコアリング（OSINT Phase 2-A・v0.1.609）。
     - `supporterPowerScoring.test.js`
+    - `supporterPricingDisplay.test.js`
     - `supporterRanking.js` — 「この配信の応援者ランキング(ちくらん風)」の純ロジック(v0.1.865)。
     - `supporterRanking.test.js`
     - `supporterRankingDom.js` — 応援者ランキングの行リスト DOM ビルダー(本物の人物タイルでそっくり)。

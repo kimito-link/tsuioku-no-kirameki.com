@@ -356,10 +356,11 @@
   - `src/lib/giftThrowProjectile.js`
 - **吹き出し寿命管理** — 会場の吹き出しの表示上限・追い出し(eviction)ライフサイクル
   - `src/lib/venueBubbleLifecycle.js`
-<details><summary>🗂 このカテゴリの全担当ファイル(自動分類) 305</summary>
+<details><summary>🗂 このカテゴリの全担当ファイル(自動分類) 306</summary>
 
 - `app/live-view-sound.js` — v0.1.1737: スマホの WEB版でギフトの効果音を鳴らす(拡張の会場モードと同じ音・同じ金額帯の選び方)。
 - `app/live-view-venue.js` — v0.1.1739: スマホの「かんたん会場モード」。右下の 🎪 を押すと全画面の会場になる。
+- `app/supporter-pricing.js` — サポーター申し込みページの料金表示用の純関数。
 - `extension-youtube/comeview.js` — ニコ生版 comeview-entry.js(本物)+ YouTube の記録を読む入口のバンドル
 - `extension-youtube/src/comeview-nico-entry.js` — ニコ生版のコメビュ(本物 comeview-entry.js)を YouTube の記録で動かす入口。
 - `extension-youtube/src/venue-inline-entry.js` — ニコ生版の視聴ページの「🏟 会場モード」(content-entry.js が呼ぶ mountVenueBarButton)を、
@@ -1615,6 +1616,7 @@
 - `v0.1.2159` 2026-11-18 — 概数の登録者と長い応援一覧を直す
 
 ### その他 (14版)
+- `v0.1.2179` 2026-11-23 — ウェブのサポーターページの料金表示をわかりやすく
 - `v0.1.2177` 2026-11-22 — ランキングページで終わった配信を「放送中」に見せない
 - `v0.1.2176` 2026-11-21 — 開発モードではマーケHTMLを自由に保存
 - `v0.1.2175` 2026-11-21 — ランキングページ「いま動いた人」の人数の書き方を直しました
@@ -1628,4 +1630,3 @@
 - `v0.1.2162` 2026-11-18 — 記録の終わりの人数と書き出し先
 - `v0.1.2161` 2026-11-18 — フォロワー数の正本を一つにする
 - `v0.1.2160` 2026-11-18 — 保存したフォロワー数を書き出しに出す
-- `v0.1.2158` 2026-11-18 — 記録が無いときは応援の章を出さない
