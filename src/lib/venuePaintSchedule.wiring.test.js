@@ -22,6 +22,10 @@ describe('会場の軽い描画とミクチャの発言の配線', () => {
     expect(venueBar).toContain('createVenueCrowdMotion');
     expect(venueBar).toContain('isVenuePageHidden');
     expect(venueBar).toContain('resolveVenueSpeechPaintSkip');
+    expect(venueBar).toContain('createVenueHiddenSpeechBuffer');
+    expect(venueBar).toContain('hiddenSpeechBuf.push(');
+    expect(venueBar).toContain('hiddenSpeechBuf.drain()');
+    expect(venueBar).toContain('hiddenSpeechBuf.clear()');
     expect(venueBar).not.toMatch(/for \(let i = 0; i < VENUE_FULLSCREEN_MAX_SEATS; i \+= 1\)/);
   });
 

@@ -9,6 +9,7 @@ import {
   shouldSyncVenueSeatCommit,
   createVenuePaintSchedule,
   createVenueCrowdMotion,
+  createVenueHiddenSpeechBuffer,
 } from './venuePaintSchedule.js';
 
 describe('shouldAnimateVenueCrowd', () => {
@@ -162,5 +163,60 @@ describe('createVenueCrowdMotion', () => {
     expect(drew).toBe(2);
     motion.stop();
     expect(queue).toHaveLength(0);
+  });
+});
+
+describe('createVenueHiddenSpeechBuffer', () => {
+  it('裏タブ中の大量コメントは直近3件＋「ほかに○件ありました」に縮めて洪水しない', () => {
+    const buf = createVenueHiddenSpeechBuffer({ maxKeep: 3 });
+    const rows = Array.from({ length: 10 }, (_, i) => ({
+      key: `k${i + 1}`,
+      userId: `u${i + 1}`,
+      name: `user${i + 1}`,
+      text: `msg${i + 1}`,
+      voiceText: `msg${i + 1}`,
+    }));
+    expect(buf.push(rows)).toBe(10);
+    expect(buf.count()).toBe(10);
+
+    const drained = buf.drain();
+    expect(drained.speeches.map((s) => s.key)).toEqual(['k8', 'k9', 'k10']);
+    expect(drained.omittedCount).toBe(7);
+    expect(drained.summaryText).toBe('ほかに7件ありました');
+    expect(drained.voiceSpeeches).toHaveLength(4);
+    expect(drained.voiceSpeeches[0].voiceText).toBe('ほかに7件ありました');
+    expect(drained.voiceSpeeches.slice(1).map((s) => s.key)).toEqual(['k8', 'k9', 'k10']);
+    expect(buf.count()).toBe(0);
+    expect(buf.drain().voiceSpeeches).toEqual([]);
+  });
+
+  it('3件以下なら超過告知を付けず直近そのまま返し、空 voiceText は除外する', () => {
+    const buf = createVenueHiddenSpeechBuffer({ maxKeep: 3 });
+    buf.push([
+      { key: 'a', text: 'スタンプのみ', voiceText: '   ' },
+      { key: 'b', text: 'こんにちは', voiceText: 'こんにちは' },
+      { key: 'c', text: 'わこつ', voiceText: 'わこつ' },
+    ]);
+    const drained = buf.drain();
+    expect(drained.omittedCount).toBe(0);
+    expect(drained.summaryText).toBe('');
+    expect(drained.voiceSpeeches.map((s) => s.key)).toEqual(['b', 'c']);
+  });
+
+  it('会場を開く前の過去コメント（isPrimeBurst=true）は積まない・maxKeep は最大 5', () => {
+    const buf = createVenueHiddenSpeechBuffer({ maxKeep: 99 });
+    expect(buf.push([{ key: 'old', text: '過去', voiceText: '過去' }], { isPrimeBurst: true })).toBe(0);
+    expect(buf.count()).toBe(0);
+
+    const rows = Array.from({ length: 7 }, (_, i) => ({ key: `n${i + 1}`, text: `t${i + 1}`, voiceText: `t${i + 1}` }));
+    buf.push(rows);
+    const drained = buf.drain();
+    expect(drained.speeches).toHaveLength(5);
+    expect(drained.omittedCount).toBe(2);
+    expect(drained.summaryText).toBe('ほかに2件ありました');
+
+    buf.push([{ key: 'x', text: 'x', voiceText: 'x' }]);
+    buf.clear();
+    expect(buf.count()).toBe(0);
   });
 });

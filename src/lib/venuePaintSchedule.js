@@ -229,3 +229,67 @@ export function createVenueCrowdMotion(opts = {}) {
     },
   };
 }
+
+/**
+ * 裏タブ中に届いた未読音声を、洪水させずに直近 N 件（既定 3・最大 5）だけ保持するバッファ。
+ * 吹き出し用の既読（seenKeys）とは分離し、表タブへ戻ったときに直近 N 件＋超過件数の短い告知だけを読む。
+ * 会場を開く前の過去コメント（isPrimeBurst=true）は積まない。
+ *
+ * @param {{ maxKeep?: number }} [opts]
+ */
+export function createVenueHiddenSpeechBuffer(opts = {}) {
+  const cap = Math.min(5, Math.max(1, Math.floor(Number(opts.maxKeep) || 3)));
+  /** @type {Array<Record<string, any>>} */
+  let recent = [];
+  let total = 0;
+  let drainSeq = 0;
+
+  return {
+    /**
+     * @param {Array<Record<string, any>> | null | undefined} speeches
+     * @param {{ isPrimeBurst?: boolean }} [pushOpts]
+     * @returns {number} 今回積んだ件数
+     */
+    push(speeches, pushOpts = {}) {
+      if (pushOpts.isPrimeBurst === true || !Array.isArray(speeches) || speeches.length === 0) return 0;
+      let added = 0;
+      for (const sp of speeches) {
+        if (!sp || typeof sp !== 'object') continue;
+        if (typeof sp.voiceText === 'string' && !sp.voiceText.trim()) continue;
+        recent.push(sp);
+        total += 1;
+        added += 1;
+      }
+      if (recent.length > cap) recent = recent.slice(recent.length - cap);
+      return added;
+    },
+    /** 表タブ復帰時に直近 N 件と超過件数の短い告知を取り出して空にする */
+    drain() {
+      const speeches = recent;
+      const omittedCount = Math.max(0, total - speeches.length);
+      const summaryText = omittedCount > 0 ? `ほかに${omittedCount}件ありました` : '';
+      recent = [];
+      total = 0;
+      drainSeq += 1;
+      /** @type {Array<Record<string, any>>} */
+      const voiceSpeeches = summaryText
+        ? [
+            {
+              key: `hidden-summary:${drainSeq}:${omittedCount}`,
+              userId: '',
+              name: '',
+              text: summaryText,
+              voiceText: summaryText,
+            },
+            ...speeches,
+          ]
+        : [...speeches];
+      return { speeches, omittedCount, summaryText, voiceSpeeches };
+    },
+    clear() {
+      recent = [];
+      total = 0;
+    },
+    count: () => total,
+  };
+}
