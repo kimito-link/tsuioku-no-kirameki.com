@@ -1235,7 +1235,7 @@
   - `src/extension/live-ranking-entry.js`
   - `tsuioku-no-kirameki/live/index.html`
   - `.github/workflows/live-ranking.yml`
-<details><summary>🗂 このカテゴリの全担当ファイル(自動分類) 362</summary>
+<details><summary>🗂 このカテゴリの全担当ファイル(自動分類) 363</summary>
 
 - `app/app.js` — スマホ閲覧用 status Web 版。
 - `app/live-view-block.js` — iPhone アプリの「🚩 見たくない人を隠す・報告する」(App Store の審査 1.2: ほかの人の書き込みを見せるアプリの決まり)。
@@ -1449,6 +1449,7 @@
 - `src/lib/mirrorBundleFlushScheduler.js` — 鏡バンドルの flush スケジューラ(状態を内部に閉じた純ロジック・タイマー非依存)。
 - `src/lib/mirrorSanitize.js` — v0.1.237: 北極星「鏡のように貼り付け」用の自前最小サニタイザ。
 - `src/lib/moveNodePreservingState.js` — 【層】L1 DOM 小道具(chrome.* 非依存・テスト可能)
+- `src/lib/mutationObserverHub.js` — 全配信サービスのチャット・DOM 監視で共有する MutationObserver ハブ。
 - `src/lib/nameplateToggleBoot.js` — ①POP の「なふだ」ボタンを配線する(副作用モジュール)。
 - `src/lib/nicoCommentPanelAssetLauncher.js` — ニコ生 watch のコメント欄付近から「ギフト / アイテム / スタンプ」等の起動ボタンを推定する。
 - `src/lib/nicoEngineBoot.js` — 【層】L0 判定層(純粋関数・I/O禁止)
@@ -1607,8 +1608,8 @@
 > changelog 全 20 版を「バグ系統」で束ねた枝。同系統をまた触るとき、過去の修正と「なぜ毎回触るか」を辿る(再発防止)。新しい順。
 
 ### 💾 記録件数 (2版)
+- `v0.1.2197` 2026-11-23 — YouTube チャットの監視を共通 Observer ハブへ統合
 - `v0.1.2193` 2026-11-23 — 裏タブ中に届いたコメントを復帰時に直近3件と件数告知で読み上げ
-- `v0.1.2174` 2026-11-21 — ランキングページの「いま動いた人」にコメントも
 
 ### 🏟 会場・席 (11版)
 - `v0.1.2193` 2026-11-23 — 裏タブ中に届いたコメントを復帰時に直近3件と件数告知で読み上げ
@@ -1637,7 +1638,8 @@
 ### 🗺 地図・ドキュメント (1版)
 - `v0.1.2187` 2026-11-23 — 会場の Esc と部品の層の地図を今の実装に合わせる
 
-### ⚡ 描画・性能 (2版)
+### ⚡ 描画・性能 (3版)
+- `v0.1.2197` 2026-11-23 — YouTube チャットの監視を共通 Observer ハブへ統合
 - `v0.1.2183` 2026-11-23 — 会場から全サービスで発言でき、ミクチャの新着を読む
 - `v0.1.2178` 2026-11-23 — 会場の描画を軽くしミクチャでも発言
 

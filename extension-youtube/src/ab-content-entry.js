@@ -516,14 +516,17 @@ function onBatch(body, sinceMs, untilMs, isBackfill = false) {
   diag.batches += 1;
   hideNote();
   const nextChat = String(body.chatId || chatId || 'live');
+  const key = buildAbStreamKey(pageLogin, { session: nextChat });
+  if (!key) return;
+  const sameSession = !!(streamKey && key === streamKey);
   if (nextChat !== chatId) {
-    endStream();
     chatId = nextChat;
     diag.chatId = chatId;
-    seen = new Set();
+    if (!sameSession) {
+      endStream();
+      seen = new Set();
+    }
   }
-  const key = buildAbStreamKey(pageLogin, { session: chatId });
-  if (!key) return;
   if (key !== streamKey) {
     endStream();
     streamKey = key;

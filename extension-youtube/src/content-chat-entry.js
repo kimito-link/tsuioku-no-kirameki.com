@@ -1,5 +1,5 @@
 // content-chat-entry.js — YouTube Live チャット欄 DOM の監視・コメント取得 Content Script
-/* global chrome, window, document, MutationObserver, InputEvent, setTimeout, clearTimeout, setInterval, NodeFilter, HTMLElement */
+/* global chrome, window, document, InputEvent, setTimeout, clearTimeout, setInterval, NodeFilter, HTMLElement */
 
 import {
   parseYtChatElement,
@@ -18,6 +18,10 @@ import { relativeStreamStartedAtMs, startMsFromTimestampBlob } from '../../src/l
 import { followerSampleFromDom } from '../../src/lib/platform/followerCountSample.js';
 import { startPageStallWatch } from '../../src/lib/stallTrace.js';
 import { withRevealedVenueOfficialComposer } from '../../src/lib/venueRevealOfficialComposer.js';
+import { createMutationObserverHub } from '../../src/lib/mutationObserverHub.js';
+import { createPageWatchScheduler } from '../../src/lib/pageWatchScheduler.js';
+import { isVenuePageHidden } from '../../src/lib/venuePaintSchedule.js';
+import { isExtensionContextAlive } from '../../src/lib/reportSilentError.js';
 try {
   const stallRoot = /** @type {any} */ (globalThis);
   if (!stallRoot.__nlStallWatch && isYtWatchLikeUrl(String(location.href || ''))) {
@@ -981,17 +985,23 @@ function setupLiveChatObserver() {
   const lateIconWatched = new WeakSet();
   /** @param {Element} el */
   const watchLateIcon = (el) => {
-    if (lateIconWatched.has(el) || typeof MutationObserver !== 'function') return;
+    if (lateIconWatched.has(el)) return;
     lateIconWatched.add(el);
-    const mo = new MutationObserver(() => {
-      const p = parseYtChatElement(el);
-      if (p && p.iconUrl) {
-        mo.disconnect();
-        inspectElement(el, 3);
-      }
+    const iconHub = createMutationObserverHub({
+      minIntervalMs: 100,
+      maxBatchSize: 20,
+      isAlive: () => isExtensionContextAlive(),
+      onBatch: () => {
+        const p = parseYtChatElement(el);
+        if (p && p.iconUrl) {
+          iconHub.dispose();
+          inspectElement(el, 3);
+        }
+      },
     });
-    mo.observe(el, { attributes: true, subtree: true, attributeFilter: ['src', 'data-nl-author-photo'] });
-    setTimeout(() => mo.disconnect(), 10 * 60 * 1000);
+    if (iconHub.attach(el, { attributes: true, subtree: true, attributeFilter: ['src', 'data-nl-author-photo'] })) {
+      setTimeout(() => iconHub.dispose(), 10 * 60 * 1000);
+    }
   };
 
   const scanAllExisting = (root = document) => {
@@ -1008,34 +1018,96 @@ function setupLiveChatObserver() {
 
   scanAllExisting(document);
 
-  const observer = new MutationObserver((mutations) => {
-    for (let i = 0; i < mutations.length; i += 1) {
-      const added = mutations[i].addedNodes;
-      if (!added) continue;
-      for (let j = 0; j < added.length; j += 1) {
-        const node = /** @type {any} */ (added[j]);
-        if (!node || node.nodeType !== 1) continue;
-        if (typeof node.matches === 'function' && node.matches(CHAT_ITEM_SELECTOR)) {
-          inspectElement(node, 0);
-        }
-        if (typeof node.querySelectorAll === 'function') {
-          const children = node.querySelectorAll(CHAT_ITEM_SELECTOR);
-          for (let k = 0; k < children.length; k += 1) {
-            inspectElement(children[k], 0);
+  let lastChatScrollAt = 0;
+  const noteChatScroll = () => {
+    lastChatScrollAt = Date.now();
+  };
+  try {
+    window.addEventListener('wheel', noteChatScroll, { passive: true, capture: true });
+    document.addEventListener('scroll', noteChatScroll, { passive: true, capture: true });
+  } catch { /* 古い環境でも継続 */ }
+
+  const pickChatObserverRoot = () =>
+    document.querySelector('yt-live-chat-item-list-renderer #items') ||
+    document.querySelector('yt-live-chat-item-list-renderer') ||
+    document.body;
+
+  const chatHub = createMutationObserverHub({
+    minIntervalMs: 50,
+    maxBatchSize: 120,
+    maxQueueSize: 1500,
+    scrollDeferMs: 220,
+    getLastScrollAt: () => lastChatScrollAt,
+    isAlive: () => isExtensionContextAlive(),
+    onBatch: (mutations, meta) => {
+      for (let i = 0; i < mutations.length; i += 1) {
+        const added = mutations[i].addedNodes;
+        if (!added) continue;
+        for (let j = 0; j < added.length; j += 1) {
+          const node = /** @type {any} */ (added[j]);
+          if (!node || node.nodeType !== 1) continue;
+          if (typeof node.matches === 'function' && node.matches(CHAT_ITEM_SELECTOR)) {
+            inspectElement(node, 0);
+          }
+          if (typeof node.querySelectorAll === 'function') {
+            const children = node.querySelectorAll(CHAT_ITEM_SELECTOR);
+            for (let k = 0; k < children.length; k += 1) {
+              inspectElement(children[k], 0);
+            }
           }
         }
       }
-    }
+      // 混雑滝でキューが溢れた場合は定期スキャン相当の全体回収で取りこぼしを防ぐ
+      if (meta.overflow) scanAllExisting(document);
+    },
   });
 
-  if (document.body) {
-    observer.observe(document.body, { childList: true, subtree: true });
-  }
+  const ensureChatHubAttached = () => {
+    const root = pickChatObserverRoot();
+    if (root && chatHub.getRoot() !== root) {
+      chatHub.attach(root, { childList: true, subtree: true });
+    }
+  };
+  ensureChatHubAttached();
 
-  // フィルタ切替（「トップチャット」⇄「すべてのチャット」）の定期検知
-  setInterval(() => {
-    scanAllExisting(document);
-  }, 2000);
+  // フィルタ切替（「トップチャット」⇄「すべてのチャット」）および取りこぼし回収・ルート付け替え
+  const chatScanSched = createPageWatchScheduler({
+    baseTickMs: 2000,
+    getUrl: () => String(location.href || ''),
+    isHidden: () => isVenuePageHidden(document),
+    isAlive: () => isExtensionContextAlive(),
+  });
+  chatScanSched.register({
+    id: 'yt-chat-scan',
+    intervalMs: 2000,
+    hiddenMode: 'throttle',
+    hiddenIntervalMs: 10_000,
+    runOnUrlChange: true,
+    run: () => {
+      ensureChatHubAttached();
+      scanAllExisting(document);
+    },
+  });
+  chatScanSched.start();
+  document.addEventListener('visibilitychange', () => {
+    if (!isVenuePageHidden(document)) {
+      ensureChatHubAttached();
+      chatHub.kick();
+      chatScanSched.kick();
+    }
+  });
+  window.addEventListener('pagehide', () => {
+    chatHub.detach();
+    chatScanSched.stop();
+  });
+  window.addEventListener('pageshow', (ev) => {
+    if (ev?.persisted || !chatHub.isAttached()) {
+      ensureChatHubAttached();
+      chatHub.kick();
+      chatScanSched.start();
+      chatScanSched.kick();
+    }
+  });
 }
 
 /**
@@ -1135,24 +1207,30 @@ function setupCommentSendBridge() {
  */
 function watchPaidAfterSuperChatOpen(videoId) {
   const list = document.querySelector('yt-live-chat-item-list-renderer #items') || document.querySelector('yt-live-chat-item-list-renderer');
-  if (!list || typeof MutationObserver !== 'function') return;
+  if (!list) return;
   const rec = { openAt: Date.now(), videoId, paid: /** @type {{ at: number, author: string, amount: string, text: string }[]} */ ([]) };
   const text = (/** @type {Element} */ el, /** @type {string} */ sel) => String(el.querySelector(sel)?.textContent || '').replace(/\s+/g, ' ').trim().slice(0, 60);
   const save = () => {
     try { chrome.storage.local.set({ yt_diag_superchat_paid: rec }); } catch { /* 記録できなくても続ける */ }
   };
   save();
-  const mo = new MutationObserver((recs) => {
-    for (const r of recs) {
-      for (const n of r.addedNodes) {
-        if (!(n instanceof Element) || !/^yt-live-chat-paid-(message|sticker)-renderer$/.test(n.localName) || rec.paid.length >= 10) continue;
-        rec.paid.push({ at: Date.now(), author: text(n, '#author-name'), amount: text(n, '#purchase-amount, #purchase-amount-chip'), text: text(n, '#message') });
-        save();
+  const paidHub = createMutationObserverHub({
+    minIntervalMs: 100,
+    maxBatchSize: 50,
+    isAlive: () => isExtensionContextAlive(),
+    onBatch: (recs) => {
+      for (const r of recs) {
+        for (const n of r.addedNodes) {
+          if (!(n instanceof Element) || !/^yt-live-chat-paid-(message|sticker)-renderer$/.test(n.localName) || rec.paid.length >= 10) continue;
+          rec.paid.push({ at: Date.now(), author: text(n, '#author-name'), amount: text(n, '#purchase-amount, #purchase-amount-chip'), text: text(n, '#message') });
+          save();
+        }
       }
-    }
+    },
   });
-  mo.observe(list, { childList: true, subtree: true });
-  setTimeout(() => mo.disconnect(), 180000);
+  if (paidHub.attach(list, { childList: true, subtree: true })) {
+    setTimeout(() => paidHub.dispose(), 180000);
+  }
 }
 
 function setupSuperChatOpenBridge() {
@@ -1242,22 +1320,24 @@ function setupSuperChatOpenBridge() {
         //   りんく実機で opened=[] だった=決め打ちの名前に当たらなかったか、押せていなかった。
         /** @type {Set<Element>} */
         const added = new Set();
-        const mo = new MutationObserver((recs) => {
-          for (const rec of recs) {
-            if (rec.type === 'childList') rec.addedNodes.forEach((n) => n instanceof Element && added.add(n));
-            else if (rec.target instanceof Element) added.add(rec.target);
-          }
+        const scOpenHub = createMutationObserverHub({
+          minIntervalMs: 50,
+          maxBatchSize: 100,
+          allowDocumentElement: true,
+          isAlive: () => isExtensionContextAlive(),
+          onBatch: (recs) => {
+            for (const rec of recs) {
+              if (rec.type === 'childList') rec.addedNodes.forEach((n) => n instanceof Element && added.add(n));
+              else if (rec.target instanceof Element) added.add(rec.target);
+            }
+          },
         });
-        try {
-          mo.observe(document.documentElement, {
-            childList: true,
-            subtree: true,
-            attributes: true,
-            attributeFilter: ['hidden', 'opened', 'aria-hidden', 'style', 'aria-expanded'],
-          });
-        } catch {
-          // 見張れなくても押すのは試す
-        }
+        scOpenHub.attach(document.documentElement, {
+          childList: true,
+          subtree: true,
+          attributes: true,
+          attributeFilter: ['hidden', 'opened', 'aria-hidden', 'style', 'aria-expanded'],
+        });
         const shown = (/** @type {Element} */ el) => {
           if (el.closest('yt-live-chat-item-list-renderer')) return false;
           const r = el.getBoundingClientRect();
@@ -1282,13 +1362,13 @@ function setupSuperChatOpenBridge() {
               .find((el) => el && el.getBoundingClientRect().width > 0);
             if (closeNow) fresh.push(closeNow);
             if (fresh.length) {
-              mo.disconnect();
+              scOpenHub.dispose();
               diag.opened = fresh.slice(0, 6).map((el) => el.localName + (el.id ? '#' + el.id : ''));
               saveDiag();
               return { ok: true };
             }
           }
-          mo.disconnect();
+          scOpenHub.dispose();
           diag.changed = [...added].slice(0, 12).map((el) => el.localName + (el.id ? '#' + el.id : ''));
           diag.unconfirmed = true;
           saveDiag();
