@@ -1,16 +1,16 @@
-# Handoff — 会議ハーネスの日課
+# Handoff — 低スペックPC向け L0 共有部品（#690 マージ前先行作成）
 
-STATUS: ブロック中
-ROOT_CAUSE: 下記 NEEDS_JUDGMENT を参照（未判断）
-FILES_CHANGED: council-scout/state.json, council-scout/briefs/2026-10-06.md（いずれも生成物）
-CHANGES: env充足を確認（有効 19/19体） / scoutを実行（日報: 2026-10-06.md） / 疎通不能の警告2件は据え置き（撤去条件=全モデル429/カタログ消滅/課金要求のいずれにも非該当。日数が伸びるのは新情報ではない）
-TESTS_RUN: node scripts/council-env.mjs / node scripts/scout-models.mjs
-TEST_RESULT: 異常あり（判断待ち）
-REMAINING_RISKS: 1件の未判断事象
-NEXT_ACTION: 下の NEEDS_JUDGMENT を司令塔（Claude本体）が判断する。**自動で直さないこと。**
-LAST_WORKED_ON: 2026-10-06
-WORKED_BY: council-daily.mjs（実行者: unknown）
-MACHINE_NOTES: -
+STATUS: 検品待ち（作業ブランチ commit 済み・未 push）
+ROOT_CAUSE: 全配信サービスの入口に 1 秒 setInterval と同期 MutationObserver が分散しており、アクセラレーション OFF 等の低スペック環境でメインスレッド負荷の原因になっている。PR #690 が未マージのため、#690 非接触の新規ファイルだけで L0 共有部品と単体テストを先行作成した。
+FILES_CHANGED: src/lib/pageWatchScheduler.js, src/lib/pageWatchScheduler.test.js, src/lib/mutationObserverHub.js, src/lib/mutationObserverHub.test.js, handoff.md
+CHANGES: L0 純粋ロジックとして共通ページ監視スケジューラ（createPageWatchScheduler / evaluatePageWatchTask: 単一ベースタイマー、URL 変化検知、裏タブ・paused 停止/間引き、連続 kick 束ね、isAlive 自動停止）と共有 MutationObserver ハブ（createMutationObserverHub / isForbiddenDocumentElementSubtree: ルート付け替え時の確実な disconnect、minIntervalMs・maxBatchSize・maxQueueSize によるバッチ集約と overflow 通知、既存 domHarvestScrollDefer.js 再利用によるスクロール中見送り、documentElement+subtree の既定ガード）を新規追加し、各単体テスト 15 件を作成。既存の入口ファイル・venue 系・manifest・package・changelog は未変更。
+TESTS_RUN: npm run test:cc -- src/lib/pageWatchScheduler.test.js src/lib/mutationObserverHub.test.js / npm run lint / npm run typecheck / node scripts/check-layer.mjs --check
+TEST_RESULT: 全合格（vitest 2 files / 15 passed、eslint 0 errors、tsc --noEmit 0 errors、check-layer 合格）
+REMAINING_RISKS: まだ L0 部品単体の段階であり、各サービス入口への配線・ビルド・verify:bump・verify:extension・実配信ページ（アクセラレーション OFF）での long task 計測は未実施（#690 マージ後の次フェーズ）。なお新規ファイル追加に伴い、#690 マージ後に入口移行と合わせて docs/repo-tree-map.* / layer-map の再生成が必要。
+NEXT_ACTION: PR #690 が master へマージされたら最新 origin/master を取り込み、P0-1（共通ページ監視スケジューラへの 2 サービス以上＋venue-inline-entry/ytVenueOverlayPrep 移行）および P0-2/P0-3（MutationObserver ハブの YouTube/ニコ生適用）を小さい PR 単位で配線・計測する。
+LAST_WORKED_ON: 2026-11-23
+WORKED_BY: antigravity / Gemini 4 Neon (Medium)
+MACHINE_NOTES: worktree=..\_worktrees\tsuioku-no-kirameki.com\lowspec-l0-primitives (branch: feat/lowspec-l0-primitives, base: origin/master e4ff7878b)。本体チェックアウトの未コミット変更には一切触れていない。
 
 ## NEEDS_JUDGMENT（司令塔が判断する。ここを自動で直してはいけない）
 
