@@ -26,6 +26,9 @@ describe('会場の軽い描画とミクチャの発言の配線', () => {
     expect(venueBar).toContain('hiddenSpeechBuf.push(');
     expect(venueBar).toContain('hiddenSpeechBuf.drain()');
     expect(venueBar).toContain('hiddenSpeechBuf.clear()');
+    expect(venueBar).toContain('if (!voicePlayer.readingWanted) hiddenSpeechBuf.clear();');
+    expect(venueBar).toContain('if (!voicePlayer.readingWanted) { hiddenSpeechBuf.clear(); return; }');
+    expect(venueBar).not.toContain('if (!voicePlayer.enabled) { hiddenSpeechBuf.clear(); return; }');
     expect(venueBar).not.toMatch(/for \(let i = 0; i < VENUE_FULLSCREEN_MAX_SEATS; i \+= 1\)/);
   });
 

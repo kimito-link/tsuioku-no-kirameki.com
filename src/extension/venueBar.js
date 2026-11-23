@@ -3369,6 +3369,7 @@ export function mountVenueBarButton(options = {}) {
 
   const venueVoiceWarmup = createVoicevoxWarmup(); // 初めての声を合成前に読み込む(voiceWarmup.js)
   wireVoiceQualitySetting(); // 2026-10-29: 声の音質(既定16kHz・高音質24kHz)
+  const hiddenSpeechBuf = createVenueHiddenSpeechBuffer({ maxKeep: 3 });
   const voicePlayer = new VoicePlayer({
     storage: typeof chrome !== 'undefined' && chrome.storage ? chrome.storage.local : null,
     storageOnChanged: typeof chrome !== 'undefined' && chrome.storage ? chrome.storage.onChanged : null, // P2: 音量の追従
@@ -3377,6 +3378,7 @@ export function mountVenueBarButton(options = {}) {
       pickupVoice.noteWanted(enabled);
       if (!open) voicePlayer.diag.venueGate = enabled ? 'headless' : (voicePlayer.readingWanted ? 'headless-waiting-engine' : 'panel-closed');
       if (!enabled) updatePickupBanner(null);
+      if (!voicePlayer.readingWanted) hiddenSpeechBuf.clear();
       voiceBtn.disabled = false; voiceBtn.setAttribute('aria-busy', toggleBusy ? 'true' : 'false');
       voiceBtn.classList.toggle('is-on', enabled);
       voiceBtn.textContent = enabled ? '🔊 読み上げ: ON' : '🔈 読み上げ: OFF';
@@ -3440,7 +3442,6 @@ export function mountVenueBarButton(options = {}) {
   let speechLiveId = '';
   /** @type {{ seenKeys: Set<string>|null, primed: boolean, hiNo: number }} */
   let speechState = { seenKeys: null, primed: false, hiNo: 0 };
-  const hiddenSpeechBuf = createVenueHiddenSpeechBuffer({ maxKeep: 3 });
   // Kick / Twitch で覚えた絵文字。記録の本文は名前のままなので、吹き出しはここで画像に戻す。
   /** @type {Record<string, Record<string, string>>} */
   const venueEmoteByKey = {};
@@ -7511,7 +7512,8 @@ export function mountVenueBarButton(options = {}) {
     if (document.visibilityState !== 'visible') { stopCrowdMotion(); return; }
     startCrowdMotion();
     venuePaint.kick();
-    if (!voicePlayer.enabled) { hiddenSpeechBuf.clear(); return; }
+    if (!voicePlayer.readingWanted) { hiddenSpeechBuf.clear(); return; }
+    if (!voicePlayer.enabled) return;
     if (open) try { voicePlayer.flushPendingQueue(); } catch { /* no-op */ }
     const liveId = liveIdFromPathname();
     const receivedAt = Date.now();
