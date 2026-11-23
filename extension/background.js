@@ -4,7 +4,7 @@
  * - 初回インストール/ブラウザ起動時: 既存 watch タブへ注入して即利用可能にする
  * - 拡張更新時: 既存 watch タブをリロードし、古い extension context を残さない
  */
-// nls-sw-fingerprint: 092857fb8c82
+// nls-sw-fingerprint: bc4aec7cfb7c
 
 // @ts-nocheck — service worker; Chrome API と動的インデックスが多く checkJs コストが高い
 // PR1-b-1: backfill SW エンジン(ビルド産物)。既存コードは無改修(設計正本: memory/reference_backfill_sw_migration_pr1b.md)
@@ -1724,6 +1724,24 @@ async function runMcpDiagDumpTick() {
       watchTabs = [];
     }
 
+    let otherServiceTabs = [];
+    let otherServiceDiags = {};
+    const mcpSvc = globalThis.__nlsMcpDiagServices;
+    if (mcpSvc) {
+      try {
+        const diagBag = await chrome.storage.local.get(mcpSvc.OTHER_SERVICE_DIAG_KEYS);
+        otherServiceDiags = mcpSvc.pickOtherServiceDiags(diagBag);
+      } catch {
+        otherServiceDiags = {};
+      }
+      try {
+        const svcTabs = await chrome.tabs.query({ url: mcpSvc.OTHER_SERVICE_WATCH_TAB_PATTERNS });
+        otherServiceTabs = mcpSvc.summarizeOtherServiceTabs(svcTabs);
+      } catch {
+        otherServiceTabs = [];
+      }
+    }
+
     const payload = {
       writtenBy: 'sw',
       writtenAtIso: new Date().toISOString(),
@@ -1731,7 +1749,9 @@ async function runMcpDiagDumpTick() {
         try { return chrome.runtime.getManifest()?.version || ''; } catch { return ''; }
       })(),
       watchTabs,
-      fastDiag
+      otherServiceTabs,
+      fastDiag,
+      otherServiceDiags
     };
     const json = JSON.stringify(payload, null, 2);
     // v0.1.802 修正: Service Worker には blob URL を作る API が無く(throw)、v0.1.798 の blob 方式は

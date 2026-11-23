@@ -27,13 +27,14 @@
 
 > 値が次の段へ届かない「断線」(broadcaster バグ型)は `npm run feature-map -- --check` が機械検知。
 
-## ⚠️ 役割コメントが無いソース 14 / 1358 件
+## ⚠️ 役割コメントが無いソース 15 / 1358 件
 - `docs/handoff/bench/bench-interval.mjs`
 - `docs/handoff/bench/bench-lane.mjs`
 - `extension-youtube/cloak-failsafe.js`
 - `native/voice-bridge/fixture-sources.mjs`
 - `scripts/build.mjs`
 - `src/extension/native-voice-sw-entry.js`
+- `src/extension/statusOtherServicesDump.js`
 - `src/extension/voice-native-guide-entry.js`
 - `src/lib/laneDomSelfMeasure.js`
 - `src/lib/liveLaneBuckets.js`
@@ -808,7 +809,7 @@
   - `yt-marketing-export.html`
   - `yt-sidepanel.html`
   - `yt-venue.html`
-- 📁 **extension-youtube/** (164)
+- 📁 **extension-youtube/** (162)
   - 📁 **data/** (1)
     - `ouen-banner.json`
   - 📁 **images/** (72)
@@ -932,14 +933,12 @@
     - `effect-rank-up.mp3`
     - `voice-complete.mp3`
     - `voice-watch.mp3`
-  - 📁 **src/** (35)
+  - 📁 **src/** (33)
     - `ab-content-entry.js` — ABEMA の放送ページで、ページが受け取ったコメントを記録に渡す入口。
     - `ab-main-entry.js` — ABEMA のページ自身の世界(MAIN)で動く小さな写し役。
     - `background-entry.js` — YouTube Live コメントの IndexedDB 全件記録・配信要約・Offscreen 読み上げ管理 Service Worker
     - `background-nico-relay.js` — ニコ生版 extension/background.js の、会場とコメビュが頼る受け口の写し(手を加えない)。
     - `comeview-nico-entry.js` — ニコ生版のコメビュ(本物 comeview-entry.js)を YouTube の記録で動かす入口。
-    - `content-chat-entry.js` — YouTube Live チャット欄 DOM の監視・コメント取得 Content Script
-    - `content-chat-entry.js` — YouTube Live チャット欄 DOM の監視・コメント取得 Content Script
     - `content-chat-entry.js` — YouTube Live チャット欄 DOM の監視・コメント取得 Content Script
     - `content-chat-main-entry.js` — ページ自身の世界に入る束の入口。
     - `kick-content-entry.js` — Kick の視聴ページ(kick.com/<チャンネル>)で、チャットを読んで記録に渡す入口。
@@ -1219,7 +1218,7 @@
   - `gift-coin-hq.wav`
   - `gift-register-hq.wav`
   - `gift-register.mp3`
-- 📁 **src/** (2626)
+- 📁 **src/** (2629)
   - 📁 **data/** (7)
     - 📁 **acquirers/** (2)
       - `laneFromStorage.js` — 応援レーン acquirer: chrome.storage.local(nls_comments) → laneStore の橋渡し。
@@ -1256,7 +1255,7 @@
       - `avatarResolver.test.js`
       - `identity.js` — ニコ生ユーザー ID の「匿名性」判定と関連アイデンティティ・ユーティリティ。
       - `nickname.js` — 表示名（ニックネーム）の「強弱」判定。
-  - 📁 **extension/** (120)
+  - 📁 **extension/** (121)
     - 📁 **popup/** (22)
       - 📁 **init/** (4)
         - `devMonitorExport.js` — devMonitorExport — 開発モニタの「エクスポート/ダウンロード/較正データ消去」一式。
@@ -1354,6 +1353,7 @@
     - `statusCopyFreshness.wiring.test.js`
     - `statusDeviceCred.js` — スマホ版の「利用者ごとの鍵」を拡張側で持つ部品(v0.1.1731・スマホ化 利用者ごとの鍵 第b段)。
     - `statusDeviceCred.test.js`
+    - `statusOtherServicesDump.js` — ⚠️ 役割コメント無し
     - `statusPublisherHost.js` — 【層】L2 画面層(DOM・chrome を触る。判定は statusPublisherPlan.js に任せる)
     - `statusPublisherHost.test.js`
     - `statusSmartphoneCard.js` — 【層】L2 画面層(DOM を組む。鍵の発行・削除・送信は statusDeviceCred.js、判定は lib)
@@ -1562,7 +1562,7 @@
         - `logo_funlink_white_RGB_link_black.png`
         - `logo_funlink_white_RGB_maru_black.png`
     - `hero-connect-hub.svg`
-  - 📁 **lib/** (2308)
+  - 📁 **lib/** (2310)
     - 📁 **__snapshots__/** (4)
       - `marketing-abema-baseline.html`
       - `marketing-niconico.html`
@@ -2792,6 +2792,8 @@
     - `marketingReportEmbed.test.js`
     - `marketingSupportParticipationCounts.js` — マーケ分析・HTMLレポート先頭 KPI: ギフト投げ主・広告した人の人数。
     - `marketingSupportParticipationCounts.test.js`
+    - `mcpDiagDumpServices.js` — ニコ生以外のサービス計器・タブを軽量ダンプするための純粋ロジック（L0）。
+    - `mcpDiagDumpServices.test.js`
     - `mediaKitEmbed.js` — メディアキットを分析レポートの1章として埋め込むときの、CSS の囲い(id)。
     - `mediaKitEmbed.test.js`
     - `mediaKitExport.js` — ⚠️ 役割コメント無し

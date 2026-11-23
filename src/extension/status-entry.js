@@ -223,6 +223,7 @@ import { LIVE_ENDED_PREFIX, isLiveEndedFlag, liveEndedStorageKey } from '../lib/
 import { resolveDisplayElapsedSec } from '../lib/frozenElapsedOnEnd.js';
 import { buildLiveHealth, scoreToDots } from '../lib/liveHealthScore.js';
 import { runStorageOpWithTimeout, STORAGE_OP_TIMED_OUT } from '../lib/storageOpTimeout.js';
+import { collectOtherServicesDump } from './statusOtherServicesDump.js';
 import { disablePhonePost, enablePhonePost, forgetPhonePostKey, readPhonePostKey, startPhonePostRelay } from './phonePostRelay.js';
 import { buildPublishBody, deleteDeviceOnServer, forgetDeviceCred, getPublishCredentials, maybeRegisterDevice, refreshDeviceCredCache, rotateDeviceViewToken, shouldForgetDeviceCred } from './statusDeviceCred.js';
 import { buildSmartphoneCard } from './statusSmartphoneCard.js';
@@ -4217,8 +4218,8 @@ function setupButtons() {
   }
   const btnDownload = document.getElementById('btnDownload');
   if (btnDownload) {
-    btnDownload.addEventListener('click', () => {
-      const blob = _lastRenderedBundle?.jsonBlob || {};
+    btnDownload.addEventListener('click', async () => {
+      const blob = { ...(_lastRenderedBundle?.jsonBlob || {}), ...(await collectOtherServicesDump({ safeStorageLocalGet, runStorageOpWithTimeout, timeoutMs: BOOT_STORAGE_TIMEOUT_MS, timedOutToken: STORAGE_OP_TIMED_OUT })) };
       const text = JSON.stringify(blob, null, 2);
       const file = new Blob([text], { type: 'application/json' });
       const url = URL.createObjectURL(file);

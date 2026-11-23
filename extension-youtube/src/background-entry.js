@@ -33,6 +33,19 @@ import { pickSwitchLeakPks } from '../../src/lib/youtube/ytSwitchLeakCleanup.js'
 import { pickYtCrossVideoDuplicates } from '../../src/lib/youtube/ytCrossVideoDuplicates.js';
 // ニコ生版の background にある、会場とコメビュの受け口(VOICEVOX 中継・読み手の取り合い・窓を開く)の写し
 import './background-nico-relay.js';
+import {
+  OTHER_SERVICE_DIAG_KEYS,
+  OTHER_SERVICE_WATCH_TAB_PATTERNS,
+  summarizeOtherServiceTabs,
+  pickOtherServiceDiags
+} from '../../src/lib/mcpDiagDumpServices.js';
+
+globalThis.__nlsMcpDiagServices = {
+  OTHER_SERVICE_DIAG_KEYS,
+  OTHER_SERVICE_WATCH_TAB_PATTERNS,
+  summarizeOtherServiceTabs,
+  pickOtherServiceDiags
+};
 
 /** 最後に「記録できた」を残した時刻(書きすぎないよう30秒に1回) */
 let lastIngestDiagAt = 0;
