@@ -18,7 +18,7 @@
 /** @type {readonly ChangelogEntry[]} */
 export const EXTENSION_CHANGELOG = Object.freeze([
   Object.freeze({
-    version: '0.1.2179',
+    version: '0.1.2180',
     date: '2026-11-23',
     summary: 'ウェブのサポーターページの料金表示をわかりやすく',
     items: Object.freeze([
