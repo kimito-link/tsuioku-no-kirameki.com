@@ -27,7 +27,7 @@
 
 > 値が次の段へ届かない「断線」(broadcaster バグ型)は `npm run feature-map -- --check` が機械検知。
 
-## ⚠️ 役割コメントが無いソース 14 / 1341 件
+## ⚠️ 役割コメントが無いソース 14 / 1352 件
 - `docs/handoff/bench/bench-interval.mjs`
 - `docs/handoff/bench/bench-lane.mjs`
 - `extension-youtube/cloak-failsafe.js`
@@ -75,7 +75,7 @@
   - `live-recent-comments.js` — /api/live-recent-comments — `/live/` の「コメントで応援した人」にホバーしたとき、
   - `post.js` — スマホからのコメントの受け渡し口(v0.1.1734・スマホからコメントを届ける)。
   - `status.js` — status 受け口 Vercel Serverless Function。
-- 📁 **app/** (122)
+- 📁 **app/** (125)
   - 📁 **audio-test/** (7)
     - `t-opus.mp4`
     - `t.caf`
@@ -212,6 +212,9 @@
   - `live.html`
   - `phone.html`
   - `phone.js` — スマホの開始画面(/phone・iPhone アプリが最初に開くページ)。
+  - `referral-attribution.js` — 【層】L0 判定層(純粋関数・I/O禁止)
+  - `referral-passthrough.js` — LP（tsuioku-no-kirameki.com）で ?ref= を90日覚え、サポーターページへのリンクに足す。
+  - `supporter-pricing.js` — サポーター申し込みページの料金表示用の純関数。
   - `supporter.html`
   - `supporter.js` — 追憶のきらめき サポーター(v0.1.1893・課金 第1段)。素の JS(ビルドなし)。受け口は /api/billing。
 - 📁 **council-scout/** (26)
@@ -242,7 +245,7 @@
     - `2026-10-06.md`
     - `2026-10-12.md`
     - `2026-10-14.md`
-- 📁 **docs/** (371)
+- 📁 **docs/** (386)
   - 📁 **article-assets/** (87)
     - 📁 **venue-frames/** (12)
       - `f01.png`
@@ -564,6 +567,10 @@
   - `backfill-complete-loading-flow.html`
   - `bug-investigation-loading-scroll-2026-07-10.html`
   - `code-tree.html`
+  - `code-tree.html`
+  - `code-tree.html`
+  - `code-tree.md`
+  - `code-tree.md`
   - `code-tree.md`
   - `codex-commenter-follow-analytics-v0535.md`
   - `codex-event-lane-stuck-fix-v0613.md`
@@ -586,12 +593,18 @@
   - `dist-fingerprint-gate-IMPLEMENTATION-HANDOFF.md`
   - `extension-bump-checklist.md`
   - `feature-sitemap.html`
+  - `feature-sitemap.html`
+  - `feature-sitemap.html`
+  - `feature-sitemap.md`
+  - `feature-sitemap.md`
   - `feature-sitemap.md`
   - `inline-popup-sync.md`
   - `investigation-prompt-popup-not-appearing.md`
   - `kb-web-perf-diagnosis.md`
   - `koken-contrib-hidden-tab-stuck-fix-v0616.md`
   - `lane-architecture-redesign.md`
+  - `layer-map.html`
+  - `layer-map.html`
   - `layer-map.html`
   - `live-comment-heat-chips-DESIGN.md`
   - `live-comment-heat-chips-IMPLEMENTATION-HANDOFF.md`
@@ -617,8 +630,13 @@
   - `refactor-instructions-2026-08-29.md`
   - `refactor-instructions.md`
   - `reference_deterministic_backfill.md`
+  - `referral-commission.md`
   - `reliability-backlog-phase-b.md`
   - `repo-tree-map.html`
+  - `repo-tree-map.html`
+  - `repo-tree-map.html`
+  - `repo-tree-map.md`
+  - `repo-tree-map.md`
   - `repo-tree-map.md`
   - `research-nicolive-pc-comments.md`
   - `self-improvement-loop-DESIGN.md`
@@ -629,7 +647,7 @@
   - `venue-pop-parity-loop-flow.html`
   - `visual-explainer.md`
   - `voice-quality-pipeline-flow.html`
-- 📁 **extension/** (145)
+- 📁 **extension/** (149)
   - 📁 **data/** (1)
     - `ouen-banner.json`
   - 📁 **images/** (87)
@@ -771,8 +789,12 @@
     - `voice-complete.mp3`
     - `voice-watch.mp3`
   - `background.js` — MV3 Service Worker
+  - `background.js` — MV3 Service Worker
+  - `background.js` — MV3 Service Worker
   - `comeview.html`
   - `live-view.html`
+  - `manifest.json`
+  - `manifest.json`
   - `manifest.json`
   - `marketing-export-guard.js` — マーケ分析タブ(marketing-export.html)の「何があっても開く」保険。
   - `marketing-export.html`
@@ -1197,7 +1219,7 @@
   - `gift-coin-hq.wav`
   - `gift-register-hq.wav`
   - `gift-register.mp3`
-- 📁 **src/** (2603)
+- 📁 **src/** (2612)
   - 📁 **data/** (7)
     - 📁 **acquirers/** (2)
       - `laneFromStorage.js` — 応援レーン acquirer: chrome.storage.local(nls_comments) → laneStore の橋渡し。
@@ -1540,7 +1562,7 @@
         - `logo_funlink_white_RGB_link_black.png`
         - `logo_funlink_white_RGB_maru_black.png`
     - `hero-connect-hub.svg`
-  - 📁 **lib/** (2287)
+  - 📁 **lib/** (2294)
     - 📁 **__snapshots__/** (4)
       - `marketing-abema-baseline.html`
       - `marketing-niconico.html`
@@ -1991,6 +2013,10 @@
     - `censusWatch.js` — 状態速報の「拡張プロセスの忙しさ(文書別)」を、数字だけで機械的に読む純関数(2026-10-20)。
     - `censusWatch.test.js`
     - `changelog-archive.js` — 追憶のきらめき 更新履歴アーカイブ（popup のバンドル外）。
+    - `changelog-archive.js` — 追憶のきらめき 更新履歴アーカイブ（popup のバンドル外）。
+    - `changelog-archive.js` — 追憶のきらめき 更新履歴アーカイブ（popup のバンドル外）。
+    - `changelog.js` — 拡張の更新履歴データと semver 比較ヘルパ。
+    - `changelog.js` — 拡張の更新履歴データと semver 比較ヘルパ。
     - `changelog.js` — 拡張の更新履歴データと semver 比較ヘルパ。
     - `changelog.test.js`
     - `changelogBundleBudget.test.js`
@@ -3124,6 +3150,8 @@
     - `recordRate.test.js`
     - `recordingStallWatchdog.js` — 記録停止ウォッチドッグの純粋判定ロジック。
     - `recordingStallWatchdog.test.js`
+    - `referralAttribution.js` — 【層】L0 判定層(純粋関数・I/O禁止)
+    - `referralAttribution.test.js`
     - `refreshCoalescer.js` — 描き直し(refresh)の「実行中に来た要求は、あとで1回にまとめる」合流器(時計は deps で注入)。v0.1.1687
     - `refreshCoalescer.test.js`
     - `refreshCoalescerWiring.wiring.test.js`
@@ -3437,6 +3465,7 @@
     - `supporterLicense.test.js`
     - `supporterPowerScoring.js` — 応援者パワー診断スコアリング（OSINT Phase 2-A・v0.1.609）。
     - `supporterPowerScoring.test.js`
+    - `supporterPricingDisplay.test.js`
     - `supporterRanking.js` — 「この配信の応援者ランキング(ちくらん風)」の純ロジック(v0.1.865)。
     - `supporterRanking.test.js`
     - `supporterRankingDom.js` — 応援者ランキングの行リスト DOM ビルダー(本物の人物タイルでそっくり)。
@@ -3844,7 +3873,7 @@
     - `yieldToBrowserPaint.js` — 【層】L0 判定層(依存ゼロ・chrome.* 非依存)
     - `yukkuriBroadcastSummary.js` — 放送終了後の HTML レポート / マーケ分析の頭にくる「ゆっくり解説風」要約セクション。
     - `yukkuriBroadcastSummary.test.js`
-  - 📁 **server/** (22)
+  - 📁 **server/** (24)
     - `billingApi.js` — global process, Buffer -- サーバー(Vercel 関数)専用の部品。api/ と同じく env を読む
     - `billingApi.test.js`
     - `deviceApi.test.js`
@@ -3864,6 +3893,8 @@
     - `liveRankingOne.test.js`
     - `nicoliveGuest.js` — ニコ生の「ゲスト視聴」で必要な素の I/O だけを持つ Node 側の共有部品。
     - `nicoliveGuest.test.js`
+    - `partnershipCommission.js` — サポーターの支払い・返金を partnership の紹介料台帳へ送る。
+    - `partnershipCommission.test.js`
     - `phonePostApi.test.js`
     - `phoneVoiceApi.js` — global process -- サーバー(Vercel 関数)専用の部品。api/ と同じく env を読む
     - `phoneVoiceApi.test.js`
@@ -4000,7 +4031,7 @@
   - `kouhaku_og.py`
   - `og-live-compose.py`
   - `render-og.js` — 追憶の煌めき LP 用 OG 画像（1200×630）を生成する。
-- 📁 **tsuioku-no-kirameki/** (82)
+- 📁 **tsuioku-no-kirameki/** (84)
   - 📁 **articles/** (14)
     - 📁 **role-separation-design/** (2)
       - 📁 **img/** (1)
@@ -4094,6 +4125,8 @@
   - `.htaccess`
   - `google7e3e79636d884c2.html`
   - `google7e3e79636d884c2f.html`
+  - `index.html`
+  - `index.html`
   - `index.html`
   - `privacy.html`
   - `robots.txt`

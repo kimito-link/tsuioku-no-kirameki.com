@@ -356,10 +356,11 @@
   - `src/lib/giftThrowProjectile.js`
 - **吹き出し寿命管理** — 会場の吹き出しの表示上限・追い出し(eviction)ライフサイクル
   - `src/lib/venueBubbleLifecycle.js`
-<details><summary>🗂 このカテゴリの全担当ファイル(自動分類) 310</summary>
+<details><summary>🗂 このカテゴリの全担当ファイル(自動分類) 311</summary>
 
 - `app/live-view-sound.js` — v0.1.1737: スマホの WEB版でギフトの効果音を鳴らす(拡張の会場モードと同じ音・同じ金額帯の選び方)。
 - `app/live-view-venue.js` — v0.1.1739: スマホの「かんたん会場モード」。右下の 🎪 を押すと全画面の会場になる。
+- `app/supporter-pricing.js` — サポーター申し込みページの料金表示用の純関数。
 - `extension-youtube/comeview.js` — ニコ生版 comeview-entry.js(本物)+ YouTube の記録を読む入口のバンドル
 - `extension-youtube/src/comeview-nico-entry.js` — ニコ生版のコメビュ(本物 comeview-entry.js)を YouTube の記録で動かす入口。
 - `extension-youtube/src/venue-inline-entry.js` — ニコ生版の視聴ページの「🏟 会場モード」(content-entry.js が呼ぶ mountVenueBarButton)を、
@@ -767,14 +768,18 @@
 
 - **HTMLレポート生成** — マーケ/イベント順位/タイムライン等を1枚の HTML レポートに組み立てる(popup-entry 内)
   - `src/extension/popup-entry.js`
-- **サポーター課金(マーケ HTML だけ有料)** — 有料はマーケ分析レポート(マーケ HTML)だけ=レポート全体に関所1つ(全サービス共通)。それ以外は無料。方針の正本は docs/policies/MONETIZATION.md(価格・お試し14日・1コード1台・猶予7日・やらないこと)。関所は marketing-export-entry.js の passSupporterGate→supporterAccess.checkMarketingAccess→supporterLicense.decideFeatureAccess。証明書は Ed25519・サーバーは api/billing.js(Stripe・Upstash)
+- **サポーター課金(マーケ HTML だけ有料)** — 有料はマーケ分析レポート(マーケ HTML)だけ=レポート全体に関所1つ(全サービス共通)。それ以外は無料。方針の正本は docs/policies/MONETIZATION.md(価格・お試し14日・1コード1台・猶予7日・やらないこと)。関所は marketing-export-entry.js の passSupporterGate→supporterAccess.checkMarketingAccess→supporterLicense.decideFeatureAccess。証明書は Ed25519・サーバーは api/billing.js(Stripe・Upstash)。紹介コードはウェブのサポーターページと LP だけで90日覚え、新しい契約の Stripe metadata(source=tsuioku と ref)に載せる。0円より大きい invoice.paid と charge.refunded を partnership の commission-events へ最小項目だけ送る(拡張は送らない)。詳細は docs/referral-commission.md
   - `docs/policies/MONETIZATION.md`
+  - `docs/referral-commission.md`
   - `src/lib/supporterLicense.js`
   - `src/lib/supporterAccess.js`
+  - `src/lib/referralAttribution.js`
   - `src/extension/marketing-export-entry.js`
   - `src/server/billingApi.js`
+  - `src/server/partnershipCommission.js`
   - `api/billing.js`
   - `app/supporter.html`
+  - `app/referral-passthrough.js`
   - `tsuioku-no-kirameki/tokushoho.html`
 <details><summary>🗂 このカテゴリの全担当ファイル(自動分類) 60</summary>
 
@@ -1228,7 +1233,7 @@
   - `src/extension/live-ranking-entry.js`
   - `tsuioku-no-kirameki/live/index.html`
   - `.github/workflows/live-ranking.yml`
-<details><summary>🗂 このカテゴリの全担当ファイル(自動分類) 360</summary>
+<details><summary>🗂 このカテゴリの全担当ファイル(自動分類) 361</summary>
 
 - `app/app.js` — スマホ閲覧用 status Web 版。
 - `app/live-view-block.js` — iPhone アプリの「🚩 見たくない人を隠す・報告する」(App Store の審査 1.2: ほかの人の書き込みを見せるアプリの決まり)。
@@ -1238,6 +1243,7 @@
 - `app/live-view-phone-fit.js` — v0.1.1741: スマホの WEB版で「押しても黙って何も起きない」拡張専用のボタンを片付ける。
 - `app/live-view-realtime.js` — v0.1.1758: スマホの WEB版で、PC が3秒ごとに送る新着コメントを Ably の SSE で受け取る。
 - `app/live-view.js` — global NL_BUILD_ID
+- `app/referral-attribution.js` — 【層】L0 判定層(純粋関数・I/O禁止)
 - `app/supporter.js` — 追憶のきらめき サポーター(v0.1.1893・課金 第1段)。素の JS(ビルドなし)。受け口は /api/billing。
 - `extension-youtube/content-chat-main.js` — YouTube のチャット欄(ページ自身の世界)で動く小さな手伝い。
 - `extension-youtube/src/content-chat-main-entry.js` — ページ自身の世界に入る束の入口。
@@ -1606,7 +1612,8 @@
 - `v0.1.2172` 2026-11-21 — 各サービスのイベント今の順位と次まで
 - `v0.1.2170` 2026-11-21 — イベントの今の順位と次まで
 
-### 🏟 会場・席 (4版)
+### 🏟 会場・席 (5版)
+- `v0.1.2183` 2026-11-23 — 会場から全サービスで発言でき、ミクチャの新着を読む
 - `v0.1.2179` 2026-11-23 — 会場の発言を全サービスで通し、ミクチャの新着を読む
 - `v0.1.2178` 2026-11-23 — 会場の描画を軽くしミクチャでも発言
 - `v0.1.2172` 2026-11-21 — 各サービスのイベント今の順位と次まで
@@ -1615,13 +1622,16 @@
 ### 🎁 ギフト (1版)
 - `v0.1.2173` 2026-11-21 — ランキングページのコメント集計を約1分ごとに
 
-### 🔊 読み上げ (1版)
+### 🔊 読み上げ (2版)
+- `v0.1.2183` 2026-11-23 — 会場から全サービスで発言でき、ミクチャの新着を読む
 - `v0.1.2179` 2026-11-23 — 会場の発言を全サービスで通し、ミクチャの新着を読む
 
-### ⚡ 描画・性能 (1版)
+### ⚡ 描画・性能 (2版)
+- `v0.1.2183` 2026-11-23 — 会場から全サービスで発言でき、ミクチャの新着を読む
 - `v0.1.2178` 2026-11-23 — 会場の描画を軽くしミクチャでも発言
 
-### その他 (13版)
+### その他 (12版)
+- `v0.1.2180` 2026-11-23 — ウェブのサポーターページの料金表示をわかりやすく
 - `v0.1.2177` 2026-11-22 — ランキングページで終わった配信を「放送中」に見せない
 - `v0.1.2176` 2026-11-21 — 開発モードではマーケHTMLを自由に保存
 - `v0.1.2175` 2026-11-21 — ランキングページ「いま動いた人」の人数の書き方を直しました
@@ -1633,5 +1643,3 @@
 - `v0.1.2164` 2026-11-18 — 視聴ページを離れたら欄を閉じる
 - `v0.1.2163` 2026-11-18 — 権限を足さず終わりの人数
 - `v0.1.2162` 2026-11-18 — 記録の終わりの人数と書き出し先
-- `v0.1.2161` 2026-11-18 — フォロワー数の正本を一つにする
-- `v0.1.2160` 2026-11-18 — 保存したフォロワー数を書き出しに出す
