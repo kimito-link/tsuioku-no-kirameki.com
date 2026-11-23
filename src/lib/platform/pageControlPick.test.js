@@ -42,4 +42,13 @@ describe('pageControlPick', () => {
     official.querySelector('button')?.remove();
     expect(findPageButton(document, /送信/)).toBeNull();
   });
+
+  it('html に nlsb-venue-open が付いていても、公式の欄は追憶の部品ではない', () => {
+    const { official } = pageWithVenueFirst();
+    document.documentElement.classList.add('nlsb-venue-open');
+    expect(isOwnExtensionUi(official.querySelector('input'))).toBe(false);
+    expect(queryPageControl(document, MX_INPUT_SEL)).toBe(official.querySelector('input'));
+    expect(findPageButton(document, /送信/, official.querySelector('input'))).toBe(official.querySelector('button'));
+    document.documentElement.classList.remove('nlsb-venue-open');
+  });
 });

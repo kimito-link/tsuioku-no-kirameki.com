@@ -4,7 +4,8 @@
 //   textarea(emotion: ehsyv870、枠は e10cxjj00 / .textarea-wrapper、placeholder は
 //   「コメントする...」、送信は button.submit-btn)。高さ用の見えないダミー textarea が
 //   body 直下に1つ置かれる。未ログインでは textarea は無く「コメントするにはログインしてください」の div だけ。
-//   会場を開くと覆われて欄が外れることがあり、そのときは会場を一時的にしまってから送る。
+//   送り方そのものは SHOWROOM / YouTube と同じ共通経路。ここは公式欄の探し方だけを担う。
+//   欄の節は覚えず毎回探す。高さや矩形の下限では落とさない(サイドパネルで欄が小さくなる)。
 //   見た目の「コメントする...」が placeholder 属性でない・SimpleBar や open shadow の中に
 //   ある、など今の DOM のゆらぎでも公式の欄を拾う。
 // @layer L1 — DOM を読む / 会場をしまう印は付け外しだけ
@@ -31,6 +32,11 @@ const COMMENT_SEND_RE = /^\s*送信\s*$/;
  */
 export function isMxDummyAutosizeField(el) {
   if (!el || el.tagName !== 'TEXTAREA') return false;
+  // 公式の欄は、サイドパネルで高さが小さくなっても計測用ダミーではない。
+  //   高さや矩形の下限では落とさない。公式枠・「コメントする」なら本物。
+  if (el.closest && el.closest('.textarea-wrapper, .e10cxjj00, .ehsyv870, .e5x5d221')) return false;
+  const label = fieldLabel(el);
+  if (PLACEHOLDER_RE.test(label)) return false;
   const ariaHidden = el.getAttribute('aria-hidden') === 'true';
   const tabIndex = el.getAttribute('tabindex');
   const style = String(el.getAttribute('style') || '');
@@ -38,21 +44,17 @@ export function isMxDummyAutosizeField(el) {
   if (parentIsBody) {
     const vis = typeof getComputedStyle === 'function' ? getComputedStyle(el).visibility : '';
     const z = typeof getComputedStyle === 'function' ? getComputedStyle(el).zIndex : '';
-    const h = typeof el.clientHeight === 'number' ? el.clientHeight : 0;
-    if (vis === 'hidden' || h === 0 || (Number(z) < 0 && Number.isFinite(Number(z)))) return true;
+    if (vis === 'hidden' || (Number(z) < 0 && Number.isFinite(Number(z)))) return true;
     if (/visibility:\s*hidden/i.test(style) || /z-index:\s*-\d/i.test(style)) return true;
+    // 高さ0だけでは落とさない。body 直下かつ隠し印があるときだけダミー。
+    if (ariaHidden || tabIndex === '-1') return true;
   }
-  // react-textarea-autosize の計測欄(body 直下・aria-hidden・高さ0)
   if (ariaHidden && (parentIsBody || tabIndex === '-1' || /visibility:\s*hidden/i.test(style) || /z-index:\s*-\d/i.test(style))) {
     return true;
   }
   return false;
 }
 
-/**
- * @param {Element | null | undefined} el
- * @returns {boolean}
- */
 export function isMxVisibleField(el) {
   if (!el || typeof el.getClientRects !== 'function') return false;
   return el.getClientRects().length > 0;
@@ -184,11 +186,18 @@ function isNearOfficialSend(el) {
  * サイト内の検索欄などを公式コメントと取り違えない。
  * @param {Element} el
  */
+function nearbyOfficialText(el) {
+  let t = fieldLabel(el);
+  const box = el.closest && el.closest('.e10cxjj00, .textarea-wrapper, .e5x5d221, .ehsyv870, .column.right');
+  if (box) t += ' ' + String(box.textContent || '');
+  return t;
+}
+
 function isLikelyOfficialField(el) {
   if (!isTypeableField(el)) return false;
   if (el.closest && el.closest('#tab-boxes, .gift-menu-header, .icon-list')) return false;
-  const label = fieldLabel(el);
-  if (PLACEHOLDER_RE.test(label)) return true;
+  const label = nearbyOfficialText(el);
+  if (PLACEHOLDER_RE.test(label) && !LOGIN_PROMPT_RE.test(label)) return true;
   if (el.closest && el.closest('.e10cxjj00, .textarea-wrapper, .ehsyv870, .e5x5d221')) return true;
   if (isNearOfficialSend(el)) return true;
   return false;
@@ -253,10 +262,18 @@ export function findMxCommentComposerToReveal(root = typeof document !== 'undefi
   if (!root || typeof root.querySelectorAll !== 'function') return null;
   for (const scope of collectSearchRoots(root)) {
     try {
-      for (const box of Array.from(scope.querySelectorAll(MX_COMPOSER_SEL))) {
+      const boxes = [
+        ...Array.from(scope.querySelectorAll(MX_COMPOSER_SEL)),
+        ...Array.from(scope.querySelectorAll('button, [role="button"], .column.right, .column.right *, [class*="textarea"]')).filter((el) => {
+          const t = String(el.textContent || '').replace(/\s+/g, ' ').trim();
+          return t.length <= 20 && /コメントする/.test(t) && !LOGIN_PROMPT_RE.test(t);
+        }),
+      ];
+      for (const box of boxes) {
         const el = /** @type {HTMLElement} */ (box);
         if (isOwnExtensionUi(el) || isMxCommentPromptOnly(el)) continue;
         if (el.querySelector && el.querySelector('textarea, input, [contenteditable="true"], [role="textbox"]')) continue;
+        if (LOGIN_PROMPT_RE.test(String(el.textContent || ''))) continue;
         if (typeof el.click === 'function') return el;
       }
     } catch {

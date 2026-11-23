@@ -1,0 +1,66 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+  <meta charset="utf-8" />
+  <title>mixch official composer fixture</title>
+  <style>
+    html, body { margin: 0; height: 100%; font-family: sans-serif; }
+    .page { display: flex; height: 100%; }
+    .video { flex: 1; background: #222; min-width: 0; }
+    .column.right { width: 280px; max-width: 40vw; display: flex; flex-direction: column; background: #f6f6f6; }
+    .comments { flex: 1; overflow: auto; padding: 8px; }
+    .e5x5d221 { min-height: 0; border-bottom: 1px solid #ddd; background: #eee; }
+    .e10cxjj00 { display: flex; align-items: center; padding: 0 6px; }
+    .textarea-wrapper { flex: 1; max-height: 100%; margin-left: 8px; display: flex; }
+    textarea.ehsyv870 { width: 100%; font-size: 13px; line-height: 1.5em; resize: none; outline: 0; overflow: hidden; min-height: 0; height: 18px; border: 0; background: transparent; }
+    button.submit-btn { margin-left: 8px; font-size: 12px; font-weight: bold; }
+    .gift-grid { height: 120px; background: #e8e0f0; }
+    #nlsb-venue-root { position: fixed; inset: 0; z-index: 2147483000; pointer-events: none; }
+    .nlsb-stage { position: absolute; left: 0; right: 0; bottom: 0; height: 140px; background: rgba(20,20,20,0.55); color: #fff; pointer-events: auto; }
+  </style>
+</head>
+<body>
+  <div class="page">
+    <div class="video"></div>
+    <div class="column right">
+      <div class="comments">コメント1<br>コメント2<br>コメント3</div>
+      <div class="e5x5d221">
+        <div class="e10cxjj00">
+          <div class="textarea-wrapper">
+            <textarea class="css-0 ehsyv870" placeholder="コメントする..."></textarea>
+          </div>
+          <button type="button" class="submit-btn">送信</button>
+        </div>
+      </div>
+      <div class="gift-grid">gift</div>
+    </div>
+  </div>
+  <div id="nlsb-venue-root" class="nlsb-root nlsb-is-open">
+    <section class="nlsb-stage">会場オーバーレイ</section>
+  </div>
+  <script type="module">
+    import { findMxCommentInput, findMxSendButton } from '/src/lib/mixch/mxCommentInput.js';
+    const input = findMxCommentInput(document);
+    const btn = findMxSendButton(document, input);
+    let clicked = false;
+    if (btn) btn.addEventListener('click', () => { clicked = true; });
+    if (input) {
+      const proto = input instanceof HTMLTextAreaElement ? HTMLTextAreaElement.prototype : HTMLInputElement.prototype;
+      Object.getOwnPropertyDescriptor(proto, 'value')?.set?.call(input, 'aud693fix');
+      input.dispatchEvent(new Event('input', { bubbles: true }));
+      input.dispatchEvent(new Event('change', { bubbles: true }));
+      if (btn && !btn.disabled) btn.click();
+    }
+    window.__mxFixture = {
+      found: !!input,
+      sameNode: input === document.querySelector('textarea.ehsyv870'),
+      value: input ? String(input.value || '') : '',
+      button: !!(btn && btn.classList.contains('submit-btn')),
+      clicked,
+      innerWidth: window.innerWidth,
+      innerHeight: window.innerHeight,
+      inputHeight: input ? input.getBoundingClientRect().height : 0,
+    };
+  </script>
+</body>
+</html>

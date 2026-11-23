@@ -24,6 +24,14 @@
 /** @type {ChangelogEntry[]} */
 const ARCHIVE_ENTRIES = [
   Object.freeze({
+    version: '0.1.2164',
+    date: '2026-11-18',
+    summary: '視聴ページを離れたら欄を閉じる',
+    items: Object.freeze([
+      '視聴ページから別のページへ移って少しすると、横の欄を閉じます。すぐ戻ったときは、欄は開いたままです。',
+    ])
+  }),
+  Object.freeze({
     version: '0.1.2163',
     date: '2026-11-18',
     summary: '権限を足さず終わりの人数',
