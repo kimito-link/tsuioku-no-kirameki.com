@@ -14,8 +14,10 @@ describe('会場の軽い描画とミクチャの発言の配線', () => {
     expect(venueBar).toContain('unusedSeatNeedsCleanup');
     expect(venueBar).toContain('shouldAnimateVenueCrowd');
     expect(venueBar).toContain('shouldSyncVenueSeatCommit');
-    expect(venueBar).toContain('requiredSeatNodeCount');
-    expect(venueBar).toContain('ensureSeatNodes(visibleSeats)');
+    expect(venueBar).toContain('growVenueSeatNodes');
+    expect(venueBar).toContain('createVenueCrowdMotion');
+    expect(venueBar).toContain('isVenuePageHidden');
+    expect(venueBar).toContain('resolveVenueSpeechPaintSkip');
     expect(venueBar).not.toMatch(/for \(let i = 0; i < VENUE_FULLSCREEN_MAX_SEATS; i \+= 1\)/);
   });
 

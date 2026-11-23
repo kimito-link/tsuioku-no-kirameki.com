@@ -64,10 +64,8 @@ import { escapeHtml } from '../lib/htmlText.js';
 import { createVenueLiveCommentHandler } from '../lib/venueLiveCommentRoute.js';
 import { buildVenueHeadlessVoiceItem } from '../lib/venueHeadlessVoiceItem.js';
 import {
-  createVenuePaintSchedule,
-  requiredSeatNodeCount,
-  shouldAnimateVenueCrowd,
-  shouldSyncVenueSeatCommit,
+  createVenueCrowdMotion, createVenuePaintSchedule, growVenueSeatNodes, isVenuePageHidden,
+  resolveVenueSpeechPaintSkip, shouldAnimateVenueCrowd, shouldSyncVenueSeatCommit,
   unusedSeatNeedsCleanup,
 } from '../lib/venuePaintSchedule.js';
 import { REMEMBERED_EMOTE_KEYS, rememberedEmoteChanges, rememberedEmoteDict } from '../lib/platform/streamEmotes.js';
@@ -2847,10 +2845,6 @@ export function mountVenueBarButton(options = {}) {
   seatsHost.appendChild(storyDiagHost);
   /** @type {ReturnType<typeof createSeatNode>[]} */
   const seatNodes = [];
-  const ensureSeatNodes = (visible) => {
-    const want = requiredSeatNodeCount(visible, seatNodes.length, VENUE_FULLSCREEN_MAX_SEATS);
-    while (seatNodes.length < want) seatNodes.push(createSeatNode(seatNodes.length));
-  };
 
   const emptyMessage = document.createElement('div');
   emptyMessage.className = 'nlsb-empty-message';
@@ -3317,17 +3311,12 @@ export function mountVenueBarButton(options = {}) {
 
   let open = false;
   let tucked = false;
+  const isPageHidden = () => isVenuePageHidden(typeof document !== 'undefined' ? document : null);
   const venuePaint = createVenuePaintSchedule({
-    isHidden: () => typeof document !== 'undefined' && document.visibilityState !== 'visible',
-    isPaused: () => tucked === true || open !== true,
-    minIntervalMs: 80,
+    isHidden: isPageHidden, isPaused: () => tucked === true || open !== true, minIntervalMs: 80,
   });
   const crowdAnimAllowed = () => shouldAnimateVenueCrowd({
-    open,
-    tucked,
-    hidden: typeof document !== 'undefined' && document.visibilityState !== 'visible',
-    reducedMotion: crowdReducedMotion,
-    count: crowdAnimCount,
+    open, tucked, hidden: isPageHidden(), reducedMotion: crowdReducedMotion, count: crowdAnimCount,
   });
   // 別窓化リファクタで参照側が外れ書込専用に(復活に備え代入は残す)。
   // eslint-disable-next-line no-unused-vars
@@ -3473,9 +3462,6 @@ export function mountVenueBarButton(options = {}) {
   let crowdAnimCount = 0;
   let crowdAnimSeed = 0;
   let crowdHeatLevel = 0;
-  /** @type {number} */
-  let crowdRaf = 0;
-  let crowdLastDrawMs = 0;
   const crowdReducedMotion =
     typeof window.matchMedia === 'function' &&
     window.matchMedia('(prefers-reduced-motion: reduce)').matches;
@@ -5326,27 +5312,6 @@ export function mountVenueBarButton(options = {}) {
       : Date.now();
 
   /**
-   * 「生きている会場」アニメループ。観客 canvas を約18fpsで再描画し、観客を呼吸・同期させる。
-   * reduced-motion / 観客0 / 閉じてる時は走らない(無駄な描画ゼロ)。
-   */
-  const crowdMotionTick = () => {
-    crowdRaf = 0;
-    if (!crowdAnimAllowed()) return;
-    const t = nowMs();
-    // ~18fps(55ms)に間引き。重い canvas を毎フレーム描かない(大規模配信でも安全)。
-    if (t - crowdLastDrawMs >= 55) {
-      crowdLastDrawMs = t;
-      drawCrowdOnCanvas(crowdCanvas, crowdAnimCount, crowdAnimSeed, {
-        timeMs: t,
-        heatLevel: crowdHeatLevel
-      });
-    }
-    if (typeof requestAnimationFrame === 'function') {
-      crowdRaf = requestAnimationFrame(crowdMotionTick);
-    }
-  };
-
-  /**
    * 群衆canvasの寸法を戻す(v0.1.1239)。stopCrowdMotion が 0 に落としてバックストアを
    * 解放するため、描き始める前に必ず復元する。既に正しい寸法なら何もしない
    * (寸法代入は canvas をクリアする副作用があるため、無条件代入は避ける)。
@@ -5360,17 +5325,24 @@ export function mountVenueBarButton(options = {}) {
     } catch { /* canvas 不在環境でも会場は止めない */ }
   };
 
+  const crowdMotion = createVenueCrowdMotion({
+    allowed: crowdAnimAllowed,
+    now: nowMs,
+    minFrameMs: 55,
+    draw: (t) => {
+      drawCrowdOnCanvas(crowdCanvas, crowdAnimCount, crowdAnimSeed, { timeMs: t, heatLevel: crowdHeatLevel });
+    },
+  });
+
   const startCrowdMotion = () => {
-    if (crowdRaf || !crowdAnimAllowed()) return;
+    if (!crowdAnimAllowed()) return;
     if (typeof requestAnimationFrame !== 'function') return;
     ensureCrowdCanvasSize();
-    crowdLastDrawMs = 0;
-    crowdRaf = requestAnimationFrame(crowdMotionTick);
+    crowdMotion.start();
   };
 
   const stopCrowdMotion = () => {
-    if (crowdRaf && typeof cancelAnimationFrame === 'function') cancelAnimationFrame(crowdRaf);
-    crowdRaf = 0;
+    crowdMotion.stop();
     // ★v0.1.1239: 群衆canvasのバックストア(1200x350x4B = 1.68MB)を解放する。
     //   従来は rAF を止めるだけでピクセルバッファが残り続けていた。
     //   width=0 でバックストアが破棄される(次に描くとき setupCrowd 側が寸法を戻す)。
@@ -5714,8 +5686,7 @@ export function mountVenueBarButton(options = {}) {
 
     const visibleSeatIndexSet = new Set(visibleSeats.map((entry) => entry.seatIndex));
     const entryBySeatIndex = new Map(visibleSeats.map((entry) => [entry.seatIndex, entry]));
-    // 見える席の分だけノードを足す(ページを開いた時点で 500 席を作らない)。どのサービスでも同じ。
-    ensureSeatNodes(visibleSeats);
+    growVenueSeatNodes(seatNodes, visibleSeats, VENUE_FULLSCREEN_MAX_SEATS, createSeatNode);
     for (let i = 0; i < seatNodes.length; i += 1) {
       const node = seatNodes[i];
       // v0.1.1608: 「空へ戻す」は望む最終状態(next)を作るだけ。DOM へは席装飾ループの後に1回だけ、変わった項目だけ書く
@@ -5728,7 +5699,6 @@ export function mountVenueBarButton(options = {}) {
       //   resolveVenueRegularScore)に対し、順位不変でも毎paintでdelete→再代入していたのがバッジの
       //   明滅(ちらつき)の真因。renderSeats全体のsig-skipはv0.1.1032で撤回済みの地雷なので、
       //   ここではRANKバッジのdataset属性1つだけを対象にした局所diff-skipで対処する。
-      // 使っていない席は、まだ付いている/中身があるときだけ外す。既に空なら触らない。
       if (!isVisible && unusedSeatNeedsCleanup(node, false)) {
         if (node.seat.parentElement) node.seat.parentElement.removeChild(node.seat);
         node.seat.replaceChildren();
@@ -6857,13 +6827,11 @@ export function mountVenueBarButton(options = {}) {
     };
     // 会場を閉じても「読み上げ ON」は実際に読み続ける。描画・席・吹き出しは一切起こさず、
     // 同じ新着/dedup経路から音声だけを渡す(閉じた会場のCPU負荷を復活させない)。
-    const pageHidden = typeof document !== 'undefined' && document.visibilityState !== 'visible';
-    // 閉じている・しまっている・裏タブでは席と吹き出しを描かない(低スペックでスクロールを奪わない)。
-    // しまっている間も読み上げは続ける。裏タブは待ち行列を貯めない(復帰時に一掃する既存の決まり)。
+    const pageHidden = isPageHidden();
     if (!open || tucked || pageHidden) {
-      voicePlayer.diag.venueGate = open
-        ? (tucked ? (voicePlayer.enabled ? 'ok' : 'voice-off') : 'headless')
-        : (voicePlayer.enabled ? 'headless' : (voicePlayer.readingWanted ? 'headless-waiting-engine' : 'panel-closed'));
+      voicePlayer.diag.venueGate = resolveVenueSpeechPaintSkip({
+        open, tucked, hidden: pageHidden, voiceEnabled: voicePlayer.enabled, readingWanted: voicePlayer.readingWanted,
+      }).venueGate;
       if (pageHidden) return;
       const liveId = liveIdFromPathname();
       const receivedAt = Date.now();
@@ -7386,10 +7354,7 @@ export function mountVenueBarButton(options = {}) {
     showTuckNote(tucked ? note : '');
     root.classList.toggle('nlsb-is-tucked', tucked);
     if (tucked) stopCrowdMotion();
-    else {
-      startCrowdMotion();
-      venuePaint.kick();
-    }
+    else { startCrowdMotion(); venuePaint.kick(); }
     toggle.textContent = tucked ? '▲ 会場に戻る' : TOGGLE_LABEL_OPEN;
     toggle.setAttribute('aria-label', tucked ? '会場に戻る' : '会場モード');
     if (tucked) {
@@ -7551,10 +7516,7 @@ export function mountVenueBarButton(options = {}) {
   //   復帰時に古い読み上げ backlog が溜まったまま=「今」から大きく遅れて喋り出す。可視復帰時に
   //   待機中の読み上げキューを一掃して「今」へリセットする(再生中の1本は止めない)。
   document.addEventListener('visibilitychange', () => {
-    if (document.visibilityState !== 'visible') {
-      stopCrowdMotion();
-      return;
-    }
+    if (document.visibilityState !== 'visible') { stopCrowdMotion(); return; }
     startCrowdMotion();
     venuePaint.kick();
     if (!open || !voicePlayer.enabled) return;

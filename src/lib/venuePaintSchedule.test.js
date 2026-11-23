@@ -3,8 +3,12 @@ import {
   shouldAnimateVenueCrowd,
   unusedSeatNeedsCleanup,
   requiredSeatNodeCount,
+  growVenueSeatNodes,
+  isVenuePageHidden,
+  resolveVenueSpeechPaintSkip,
   shouldSyncVenueSeatCommit,
   createVenuePaintSchedule,
+  createVenueCrowdMotion,
 } from './venuePaintSchedule.js';
 
 describe('shouldAnimateVenueCrowd', () => {
@@ -96,5 +100,67 @@ describe('createVenuePaintSchedule', () => {
     now += 80;
     queue.shift()();
     expect(ran).toBe(11);
+  });
+});
+
+describe('growVenueSeatNodes', () => {
+  it('足りない席だけ足し、上限は超えない', () => {
+    const nodes = ['a', 'b'];
+    growVenueSeatNodes(nodes, [{ seatIndex: 4 }], 500, (i) => `n${i}`);
+    expect(nodes).toEqual(['a', 'b', 'n2', 'n3', 'n4']);
+    growVenueSeatNodes(nodes, [{ seatIndex: 900 }], 6, (i) => `n${i}`);
+    expect(nodes).toHaveLength(6);
+  });
+});
+
+describe('isVenuePageHidden / resolveVenueSpeechPaintSkip', () => {
+  it('裏タブを hidden とみなす', () => {
+    expect(isVenuePageHidden({ visibilityState: 'hidden' })).toBe(true);
+    expect(isVenuePageHidden({ visibilityState: 'visible' })).toBe(false);
+    expect(isVenuePageHidden(null)).toBe(false);
+  });
+
+  it('開いて見えるときだけ席を描き、しまったときは声だけ、裏タブは待ち行列も貯めない', () => {
+    expect(resolveVenueSpeechPaintSkip({ open: true }).skipSeats).toBe(false);
+    const tucked = resolveVenueSpeechPaintSkip({ open: true, tucked: true, voiceEnabled: true });
+    expect(tucked).toEqual({ skipSeats: true, skipEnqueue: false, venueGate: 'ok' });
+    const hidden = resolveVenueSpeechPaintSkip({ open: true, hidden: true, voiceEnabled: true });
+    expect(hidden).toEqual({ skipSeats: true, skipEnqueue: true, venueGate: 'headless' });
+    const closed = resolveVenueSpeechPaintSkip({ open: false, readingWanted: true });
+    expect(closed).toEqual({ skipSeats: true, skipEnqueue: false, venueGate: 'headless-waiting-engine' });
+  });
+});
+
+describe('createVenueCrowdMotion', () => {
+  it('allowed が false なら動かず、許可されても短い間隔では 1 回しか描かない', () => {
+    const queue = [];
+    let now = 0;
+    let allowed = false;
+    let drew = 0;
+    const motion = createVenueCrowdMotion({
+      raf: (cb) => {
+        queue.push(cb);
+        return queue.length;
+      },
+      caf: () => { queue.length = 0; },
+      now: () => now,
+      allowed: () => allowed,
+      minFrameMs: 55,
+      draw: () => { drew += 1; },
+    });
+    expect(motion.start()).toBe(false);
+    allowed = true;
+    expect(motion.start()).toBe(true);
+    expect(queue).toHaveLength(1);
+    queue.shift()();
+    expect(drew).toBe(1);
+    now += 10;
+    queue.shift()();
+    expect(drew).toBe(1);
+    now += 55;
+    queue.shift()();
+    expect(drew).toBe(2);
+    motion.stop();
+    expect(queue).toHaveLength(0);
   });
 });
