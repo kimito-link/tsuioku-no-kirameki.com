@@ -876,7 +876,7 @@
 - **影響範囲ゲート(規律を自動化)** — 星野ロミ式「規律を自動ゲートに」。diff から影響大(複数機能波及)の変更ファイルを検出し波及先機能を列挙。警告のみ(摩擦ゼロ)・--strict で exit1。AGENTS.md §10 のルールを diff 発火に
   - `scripts/impact-check.mjs`
   - `docs/feature-map/impact-map.json`
-<details><summary>🗂 このカテゴリの全担当ファイル(自動分類) 93</summary>
+<details><summary>🗂 このカテゴリの全担当ファイル(自動分類) 94</summary>
 
 - `extension/status-guard.js` — 状態速報ページ(status.html)の「何があっても開く」保険。
 - `mobile/scripts/verify-android-signing-config.mjs` — Android「未署名 AAB 出荷事故」防止ゲート。
@@ -939,6 +939,7 @@
 - `src/lib/liveHealthScore.js` — 配信ごとの「健康チェック」5段階評価(純関数)。
 - `src/lib/liveviewPublishSelfDiag.js` — 純Web公開コピーの自己診断（council/status-self-diagnoses-SYNTHESIS.md）。
 - `src/lib/liveViewPublishSignature.js` — 状態速報「重さ根治 P4」: publishLiveViewPublishPayload(status-entry.js)は 3秒 min-gap を
+- `src/lib/mcpDiagDumpServices.js` — ニコ生以外のサービス計器・タブを軽量ダンプするための純粋ロジック（L0）。
 - `src/lib/milestoneEffectDiag.js` — コメント数マイルストーン(100/200/500/1000/2000/3000/5000/10000件)の
 - `src/lib/milestoneEffectDiagKey.js` — コメント数マイルストーンの「検知→演出→効果音」が揃っているかの観測値を popup-entry.js が
 - `src/lib/northStarMirrorPublishRace.js` — 北極星鏡publish取りこぼしの実害確定計器(診断先行アプローチ)。
@@ -1640,11 +1641,15 @@
 - `v0.1.2183` 2026-11-23 — 会場から全サービスで発言でき、ミクチャの新着を読む
 - `v0.1.2179` 2026-11-23 — 会場の発言を全サービスで通し、ミクチャの新着を読む
 
-### 🩺 診断・状態速報 (1版)
+### 🩺 診断・状態速報 (2版)
+- `v0.1.2200` 2026-11-23 — 状態ダンプ（JSON）にニコ生以外のサービス計器・タブ一覧を追加
 - `v0.1.2199` 2026-11-23 — 全サービスへ孤児タブ自動復帰・診断間引き・会場負荷抑制を横展開
 
 ### 🗺 地図・ドキュメント (1版)
 - `v0.1.2187` 2026-11-23 — 会場の Esc と部品の層の地図を今の実装に合わせる
+
+### 🧊 storage安定 (1版)
+- `v0.1.2200` 2026-11-23 — 状態ダンプ（JSON）にニコ生以外のサービス計器・タブ一覧を追加
 
 ### ⚡ 描画・性能 (4版)
 - `v0.1.2198` 2026-11-23 — ニコ生の常駐タイマーを共通スケジューラへ集約し裏タブを間引き
@@ -1652,7 +1657,6 @@
 - `v0.1.2183` 2026-11-23 — 会場から全サービスで発言でき、ミクチャの新着を読む
 - `v0.1.2178` 2026-11-23 — 会場の描画を軽くしミクチャでも発言
 
-### その他 (3版)
+### その他 (2版)
 - `v0.1.2189` 2026-11-23 — ミクチャの欄を探す部品の型を直す
 - `v0.1.2180` 2026-11-23 — ウェブのサポーターページの料金表示をわかりやすく
-- `v0.1.2177` 2026-11-22 — ランキングページで終わった配信を「放送中」に見せない
