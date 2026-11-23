@@ -43,6 +43,9 @@ import {
   shouldStopTwVodBackfill,
 } from '../../src/lib/twitch/twGql.js';
 import { runBackfillLoop } from '../../src/lib/platform/historyBackfill.js';
+import { createPageWatchScheduler } from '../../src/lib/pageWatchScheduler.js';
+import { isVenuePageHidden } from '../../src/lib/venuePaintSchedule.js';
+import { isExtensionContextAlive } from '../../src/lib/reportSilentError.js';
 import {
   twHermesUrl,
   twRewardTopic,
@@ -881,19 +884,6 @@ try {
   /* 拡張が入れ替わった直後 */
 }
 
-// Twitch は1枚のページの中で URL だけ変わる(チャンネルを移っても読み込み直さない)ので、URL を見張る
-let lastHref = '';
-setInterval(() => {
-  if (location.href !== lastHref) {
-    lastHref = location.href;
-    lastInfoAt = 0;
-  }
-  void check();
-}, 1000);
-window.addEventListener('pagehide', () => {
-  current?.stop();
-});
-
 // ---- 視聴者数はページに出ている数を10秒おきに写す(保存の書き込みを増やしすぎないよう10秒・変わったときだけ) ----
 // 配信の情報(GQL)は30秒おきなので、ページの数が 10,533→10,583 と動いても欄が古い数のままだった(2026-11-11 PC 計測)。
 //   ページの「N 人視聴中」の数字(data-a-target="animated-channel-viewers-count")が変わったときだけ送る。読めなければ何もしない。
@@ -909,15 +899,51 @@ function readTwPageViewers() {
     return null;
   }
 }
+
+// Twitch は1枚のページの中で URL だけ変わる(チャンネルを移っても読み込み直さない)ので、
+//   URL 監視(1s)と視聴者数読み取り(10s)を共通スケジューラ 1 本へ統合し、裏タブでは間引く。
 let lastDomViewers = -1;
-setInterval(() => {
-  if (!current) return;
-  try {
-    const n = readTwPageViewers();
-    if (n === null || n === lastDomViewers) return;
-    lastDomViewers = n;
-    safeSendMessage({ type: 'YT_STREAM_META', payload: { videoId: current.key, concurrentViewers: n } });
-  } catch {
-    /* 読めなければ30秒おきの数のまま */
-  }
-}, 10_000);
+const twWatchSched = createPageWatchScheduler({
+  baseTickMs: 1000,
+  getUrl: () => String(location.href || ''),
+  isHidden: () => isVenuePageHidden(document),
+  isAlive: () => isExtensionContextAlive(),
+  onUrlChange: () => {
+    lastInfoAt = 0;
+  },
+});
+twWatchSched.register({
+  id: 'tw-watch',
+  intervalMs: 1000,
+  hiddenMode: 'throttle',
+  hiddenIntervalMs: 10_000,
+  runOnUrlChange: true,
+  run: () => {
+    void check();
+  },
+});
+twWatchSched.register({
+  id: 'tw-viewers',
+  intervalMs: 10_000,
+  hiddenMode: 'throttle',
+  hiddenIntervalMs: 30_000,
+  run: () => {
+    if (!current) return;
+    try {
+      const n = readTwPageViewers();
+      if (n === null || n === lastDomViewers) return;
+      lastDomViewers = n;
+      safeSendMessage({ type: 'YT_STREAM_META', payload: { videoId: current.key, concurrentViewers: n } });
+    } catch {
+      /* 読めなければ30秒おきの数のまま */
+    }
+  },
+});
+twWatchSched.start();
+document.addEventListener('visibilitychange', () => {
+  if (!isVenuePageHidden(document)) twWatchSched.kick();
+});
+window.addEventListener('pagehide', () => {
+  twWatchSched.stop();
+  current?.stop();
+});

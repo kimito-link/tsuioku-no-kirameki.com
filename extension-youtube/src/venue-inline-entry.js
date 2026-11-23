@@ -20,6 +20,8 @@ import { mountVenueBarButton, __ytSetVenueLiveId } from '../../src/extension/ven
 import { platformOfHostname } from '../../src/lib/platform/streamPlatform.js';
 import { startOrphanTabAutoReloadInPage } from '../../src/extension/orphanTabAutoReloadHost.js';
 import { isExtensionContextAlive } from '../../src/lib/reportSilentError.js';
+import { createPageWatchScheduler } from '../../src/lib/pageWatchScheduler.js';
+import { isVenuePageHidden } from '../../src/lib/venuePaintSchedule.js';
 import { installLastStreamUrlRemember } from './pfLastStreamUrl.js';
 import { venueRootVisibilityAction } from '../../src/lib/venueWatchPageVisibility.js';
 
@@ -144,10 +146,29 @@ const PREFETCH = [
   'images/toumeilink.png',
 ];
 
-// YouTube はページを読み直さずに動画を移る。1秒ごとに見て、動画が変わったら会場の配信を切り替える。
+// YouTube はページを読み直さずに動画を移る。共通スケジューラで監視し、裏タブでは 10 秒に間引く。
 void ytPrefetchLocalAssets(PREFETCH).then(() => {
-  setInterval(sync, 1000);
-  sync();
+  const venueSyncSched = createPageWatchScheduler({
+    baseTickMs: 1000,
+    getUrl: () => String(location.href || ''),
+    isHidden: () => isVenuePageHidden(document),
+    isAlive: () => isExtensionContextAlive(),
+  });
+  venueSyncSched.register({
+    id: 'venue-inline-sync',
+    intervalMs: 1000,
+    hiddenMode: 'throttle',
+    hiddenIntervalMs: 10_000,
+    runOnUrlChange: true,
+    run: () => sync(),
+  });
+  venueSyncSched.start({ runImmediately: true });
+  try {
+    document.addEventListener('visibilitychange', () => {
+      if (!isVenuePageHidden(document)) venueSyncSched.kick();
+    });
+    window.addEventListener('pagehide', () => venueSyncSched.stop());
+  } catch { /* 古い DOM でも継続 */ }
   // 仮キーで開いた会場を、同じ部屋の本物の配信キーが来た瞬間に切り替える
   //   (1秒待ちだと、その間の新着が会場の liveId と合わず読み上げに入らない)。
   try {

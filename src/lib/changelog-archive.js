@@ -24,6 +24,14 @@
 /** @type {ChangelogEntry[]} */
 const ARCHIVE_ENTRIES = [
   Object.freeze({
+    version: '0.1.2168',
+    date: '2026-11-18',
+    summary: 'ストア提出記録の版表記を最新に',
+    items: Object.freeze([
+      'ストア提出の記録を、公開中 0.1.2139・審査中 0.1.2167 に直しました。拡張の動きは変わりません。',
+    ])
+  }),
+  Object.freeze({
     version: '0.1.2167',
     date: '2026-11-18',
     summary: '開いたままの書き出しと概数',

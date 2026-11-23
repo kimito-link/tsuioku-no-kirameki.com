@@ -18,6 +18,15 @@
 /** @type {readonly ChangelogEntry[]} */
 export const EXTENSION_CHANGELOG = Object.freeze([
   Object.freeze({
+    version: '0.1.2190',
+    date: '2026-11-23',
+    summary: '裏タブや視聴ページの定期監視を共通スケジューラへ集約',
+    items: Object.freeze([
+      'YouTube 会場・重ね表示・Twitch・Kick の視聴ページで個別に動いていた定期タイマーを、共通のページ監視スケジューラへまとめました。',
+      '裏タブでは定期チェックを停止または間引き、重ね表示ではボタン書き換え後の不要な DOM 走査を止めることで、低スペック PC での負荷を抑えます。',
+    ])
+  }),
+  Object.freeze({
     version: '0.1.2189',
     date: '2026-11-23',
     summary: 'ミクチャの欄を探す部品の型を直す',
@@ -195,14 +204,6 @@ export const EXTENSION_CHANGELOG = Object.freeze([
     summary: '引き継ぎノートの公開版表記を最新に',
     items: Object.freeze([
       '開発用の引き継ぎノートにある公開中・審査中の版を、0.1.2139・0.1.2167 に直しました。拡張の動きは変わりません。',
-    ])
-  }),
-  Object.freeze({
-    version: '0.1.2168',
-    date: '2026-11-18',
-    summary: 'ストア提出記録の版表記を最新に',
-    items: Object.freeze([
-      'ストア提出の記録を、公開中 0.1.2139・審査中 0.1.2167 に直しました。拡張の動きは変わりません。',
     ])
   })
 ]);

@@ -1,16 +1,16 @@
-# Handoff — 会議ハーネスの日課
+# Handoff — P0-1: 共通ページ監視スケジューラへの 4 入口移行 (v0.1.2190)
 
-STATUS: ブロック中
-ROOT_CAUSE: 下記 NEEDS_JUDGMENT を参照（未判断）
-FILES_CHANGED: council-scout/state.json, council-scout/briefs/2026-10-06.md（いずれも生成物）
-CHANGES: env充足を確認（有効 19/19体） / scoutを実行（日報: 2026-10-06.md） / 疎通不能の警告2件は据え置き（撤去条件=全モデル429/カタログ消滅/課金要求のいずれにも非該当。日数が伸びるのは新情報ではない）
-TESTS_RUN: node scripts/council-env.mjs / node scripts/scout-models.mjs
-TEST_RESULT: 異常あり（判断待ち）
-REMAINING_RISKS: 1件の未判断事象
-NEXT_ACTION: 下の NEEDS_JUDGMENT を司令塔（Claude本体）が判断する。**自動で直さないこと。**
-LAST_WORKED_ON: 2026-10-06
-WORKED_BY: council-daily.mjs（実行者: unknown）
-MACHINE_NOTES: -
+STATUS: 検品・push・下書きPR作成待ち（commit 済み・未 push）
+ROOT_CAUSE: 視聴ページの入口ごとに 1 秒 / 300ms の setInterval が乱立しており、裏タブや重ね表示でも不要な DOM 走査・getBoundingClientRect・定期チェックが走り続けていた。
+FILES_CHANGED: src/lib/pageWatchScheduler.js, src/lib/pageWatchScheduler.test.js, src/lib/pageWatchScheduler.wiring.test.js, extension-youtube/src/venue-inline-entry.js, extension-youtube/src/ytVenueOverlayPrep.js, extension-youtube/src/tw-content-entry.js, extension-youtube/src/kick-content-entry.js, extension/manifest.json, package.json, src/lib/changelog.js, src/lib/changelog-archive.js, tsuioku-no-kirameki/index.html, extension/dist/*, app/dist/live-view.js, extension/background.js, .dist-fingerprint.json, docs/repo-tree-map.{md,html}, docs/code-tree.{md,html}, docs/feature-sitemap.{md,html}, docs/layer-map.html, handoff.md
+CHANGES: origin/master（5c8f700c0, #690/#693 マージ後, v0.1.2189）から feat/lowspec-p0-1-page-watch を切り、L0 共通部品 pageWatchScheduler.js と既存 venuePaintSchedule.js（isVenuePageHidden を複製せず再利用）を用いて以下 4 入口を移行。(1) venue-inline-entry.js: 裸の 1s setInterval を共通スケジューラへ移行（裏タブ 10s 間引き・表復帰時 kick）。(2) ytVenueOverlayPrep.js: 300ms 毎の button 全探索と getBoundingClientRect を裏タブ pause＋closeLabelPatched による 1 回限り書き換えへ改善。(3) tw-content-entry.js: 1s URL 監視と 10s 視聴者数ポーリングを 1 本のスケジューラへ統合（裏タブ 10s/30s 間引き）。(4) kick-content-entry.js: 1s URL 監視を共通スケジューラへ移行（裏タブ 10s 間引き）。配線テスト pageWatchScheduler.wiring.test.js を追加し、版を 0.1.2190 へ統一・build・split-changelog・tree-map・layer-map を実行。権限・課金・文言・VOICEVOX 設定は未変更。
+TESTS_RUN: npm run test:cc -- src/lib/pageWatchScheduler.test.js src/lib/pageWatchScheduler.wiring.test.js src/lib/venuePaintSchedule.test.js src/lib/venuePaintSchedule.wiring.test.js src/lib/changelogBundleBudget.test.js src/lib/changelog.test.js src/lib/changelogConsistency.test.js / npm run verify:bump / npm run check:dist-fresh / npm run tree-map:check / npm run layer-map:check / npm run check:layer / npm run check:no-secrets / npm run lint / npm run typecheck / verify:extension
+TEST_RESULT: 全合格（vitest 7 files / 57 passed、verify:bump 全7ステップOK 0.1.2190、dist-fresh OK 37f75a14aa0b、tree-map/layer-map up to date、check-layer 合格、no-secrets OK、eslint 0 errors、tsc 0 errors、verify:extension 合格［v0.1.2190 全13画面・全10差し込み先OK］）
+REMAINING_RISKS: 実配信ページ（グラフィック アクセラレーション OFF）での拡張 ON/OFF 比較計測（long task 回数・最長・CPU・スクリーンショット）はまだ未実施のため、PR 本文では「軽くなった」と断定せず、実測の追記待ちとして下書き PR にする。push・下書き PR 作成は Antigravity ルール（~/.gemini/AGENTS.md）により未実施。
+NEXT_ACTION: Claude Code / 手元で feat/lowspec-p0-1-page-watch を push して下書き PR を作成し、CI 確認＋グラフィック アクセラレーション OFF 実配信比較計測を追記する。次 PR は P0-2（content-chat-entry.js の Observer 4 つを mutationObserverHub へ統合）。
+LAST_WORKED_ON: 2026-11-23
+WORKED_BY: antigravity / Gemini 4 Neon (Medium)
+MACHINE_NOTES: worktree=..\_worktrees\tsuioku-no-kirameki.com\lowspec-p0-1 (branch: feat/lowspec-p0-1-page-watch, base: origin/master 5c8f700c0)。本体チェックアウトの未コミット変更には一切触れていない。
 
 ## NEEDS_JUDGMENT（司令塔が判断する。ここを自動で直してはいけない）
 

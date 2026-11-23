@@ -39,6 +39,9 @@ import {
 import { followerSampleFromDom, followerSampleFromKickChannel, followerSampleFromKickEvent } from '../../src/lib/platform/followerCountSample.js';
 import { kickEmotesFromCatalog, kickEmotesFromDom } from '../../src/lib/platform/streamEmotes.js';
 import { runBackfillLoop } from '../../src/lib/platform/historyBackfill.js';
+import { createPageWatchScheduler } from '../../src/lib/pageWatchScheduler.js';
+import { isVenuePageHidden } from '../../src/lib/venuePaintSchedule.js';
+import { isExtensionContextAlive } from '../../src/lib/reportSilentError.js';
 import { buildKickStreamKey } from '../../src/lib/platform/streamPlatform.js';
 import {
   KICK_REALTIME_CONNECTION_URL,
@@ -890,13 +893,31 @@ try {
   /* 拡張が入れ替わった直後 */
 }
 
-// Kick も1枚のページの中で URL だけ変わるので、URL を見張る
-let lastHref = '';
-setInterval(() => {
-  if (location.href !== lastHref) {
-    lastHref = location.href;
+// Kick も1枚のページの中で URL だけ変わるので、共通スケジューラで見張り、裏タブでは 10 秒に間引く
+const kickWatchSched = createPageWatchScheduler({
+  baseTickMs: 1000,
+  getUrl: () => String(location.href || ''),
+  isHidden: () => isVenuePageHidden(document),
+  isAlive: () => isExtensionContextAlive(),
+  onUrlChange: () => {
     lastInfoAt = 0;
-  }
-  void check();
-}, 1000);
-window.addEventListener('pagehide', () => current?.stop());
+  },
+});
+kickWatchSched.register({
+  id: 'kick-watch',
+  intervalMs: 1000,
+  hiddenMode: 'throttle',
+  hiddenIntervalMs: 10_000,
+  runOnUrlChange: true,
+  run: () => {
+    void check();
+  },
+});
+kickWatchSched.start();
+document.addEventListener('visibilitychange', () => {
+  if (!isVenuePageHidden(document)) kickWatchSched.kick();
+});
+window.addEventListener('pagehide', () => {
+  kickWatchSched.stop();
+  current?.stop();
+});
