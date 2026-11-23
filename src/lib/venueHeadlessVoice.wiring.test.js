@@ -18,7 +18,7 @@ describe('会場を閉じても読み上げ ON は実際に読む配線', () => 
     const start = source.indexOf('const processSpeechRows =');
     const end = source.indexOf('const scheduleRosterCommit =', start);
     const body = source.slice(start, end);
-    const headless = body.indexOf('if (!open) {');
+    const headless = body.indexOf('if (!open || tucked || pageHidden) {');
     const enqueue = body.indexOf('voicePlayer.enqueue', headless);
     const heat = body.indexOf('applyVenueHeat(rows)', headless);
     expect(headless).toBeGreaterThanOrEqual(0);

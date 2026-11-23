@@ -356,7 +356,7 @@
   - `src/lib/giftThrowProjectile.js`
 - **吹き出し寿命管理** — 会場の吹き出しの表示上限・追い出し(eviction)ライフサイクル
   - `src/lib/venueBubbleLifecycle.js`
-<details><summary>🗂 このカテゴリの全担当ファイル(自動分類) 305</summary>
+<details><summary>🗂 このカテゴリの全担当ファイル(自動分類) 307</summary>
 
 - `app/live-view-sound.js` — v0.1.1737: スマホの WEB版でギフトの効果音を鳴らす(拡張の会場モードと同じ音・同じ金額帯の選び方)。
 - `app/live-view-venue.js` — v0.1.1739: スマホの「かんたん会場モード」。右下の 🎪 を押すと全画面の会場になる。
@@ -526,6 +526,7 @@
 - `src/lib/migrateInlinePanelBelowToDock.js` — `below` → `dock_bottom` のワンショット移行（0.1.63 AS）。
 - `src/lib/migrateInlinePanelFloatToDock.js` — 旧「ポップアップ風（floating）」利用者を画面下ドックへ一度だけ移す（公式右パネルとの衝突緩和）。
 - `src/lib/migrateSuggestInitialInlinePanelPlacement.js` — 新規インストール時のみ、インライン配置キーが未保存なら画面幅で既定を一度書き込む。
+- `src/lib/mixch/mxCommentInput.js` — ミクチャの公式コメント欄を探す(会場の「ここから発言」は拾わない)。
 - `src/lib/mixch/mxGiftImages.js` — ミクチャのギフトの絵を resource_id から引く(バックグラウンドで使う・council/mixch-support-PLAN.md)。
 - `src/lib/nameplateToggleFinder.js` — ニコ生公式の「なふだを表示」トグルを見つける(純関数)。
 - `src/lib/nicoadCelebrationKey.js` — ニコ広/ギフトのシステムコメント演出を「同じコメントで二度光らせない」ための
@@ -626,6 +627,7 @@
 - `src/lib/venueModeCensus.js` — 会場モード専用の計器(純関数)。
 - `src/lib/venueOpenCache.js` — 「会場モードが開いているか」を安く保持する。
 - `src/lib/venueOpenLatency.js` — 会場モードの「開いてから見えるまで」を分解して観測する純関数(v0.1.1207)。
+- `src/lib/venuePaintSchedule.js` — 会場モードの描画を、どの配信サービスでも同じルールで軽くする。
 - `src/lib/venuePickupBanner.js` — 会場モードの「ピックアップ枠」(BSP風・v0.1.1230)。
 - `src/lib/venuePickupPlayback.js` — 会場の PICK UP を「声が鳴り始めたコメント」に合わせる判定(純粋)。
 - `src/lib/venuePickupRing.js` — 【層】L0 判定層(純粋関数・I/O禁止)
@@ -1223,7 +1225,7 @@
   - `src/extension/live-ranking-entry.js`
   - `tsuioku-no-kirameki/live/index.html`
   - `.github/workflows/live-ranking.yml`
-<details><summary>🗂 このカテゴリの全担当ファイル(自動分類) 359</summary>
+<details><summary>🗂 このカテゴリの全担当ファイル(自動分類) 360</summary>
 
 - `app/app.js` — スマホ閲覧用 status Web 版。
 - `app/live-view-block.js` — iPhone アプリの「🚩 見たくない人を隠す・報告する」(App Store の審査 1.2: ほかの人の書き込みを見せるアプリの決まり)。
@@ -1582,6 +1584,7 @@
 - `tools/audit-lp-overflow.mjs` — One-off LP overflow audit (run: node tools/audit-lp-overflow.mjs)
 - `tools/mcp-nicolive/server.mjs` — NicoLive Local MCP Bridge Phase1a (PoC) — stdio JSON-RPC server.
 - `tools/mcp-nicolive/store.mjs` — NicoLive Local MCP Bridge - Snapshot Store.
+- `tsuioku-no-kirameki/assets/js/app-store-badges.js` — global document, window
 - `tsuioku-no-kirameki/assets/js/kouhaku-app-cta.js` — global URL
 - `tsuioku-no-kirameki/assets/js/site-chrome-lp.js` — 追憶のきらめき サイト共通の「ヘッダー(ロゴ＋ハンバーガー)・ドロワーメニュー・フッター」。
 
@@ -1600,7 +1603,8 @@
 - `v0.1.2172` 2026-11-21 — 各サービスのイベント今の順位と次まで
 - `v0.1.2170` 2026-11-21 — イベントの今の順位と次まで
 
-### 🏟 会場・席 (2版)
+### 🏟 会場・席 (3版)
+- `v0.1.2178` 2026-11-23 — 会場の描画を軽くしミクチャでも発言
 - `v0.1.2172` 2026-11-21 — 各サービスのイベント今の順位と次まで
 - `v0.1.2170` 2026-11-21 — イベントの今の順位と次まで
 
@@ -1608,7 +1612,10 @@
 - `v0.1.2173` 2026-11-21 — ランキングページのコメント集計を約1分ごとに
 - `v0.1.2159` 2026-11-18 — 概数の登録者と長い応援一覧を直す
 
-### その他 (14版)
+### ⚡ 描画・性能 (1版)
+- `v0.1.2178` 2026-11-23 — 会場の描画を軽くしミクチャでも発言
+
+### その他 (13版)
 - `v0.1.2177` 2026-11-22 — ランキングページで終わった配信を「放送中」に見せない
 - `v0.1.2176` 2026-11-21 — 開発モードではマーケHTMLを自由に保存
 - `v0.1.2175` 2026-11-21 — ランキングページ「いま動いた人」の人数の書き方を直しました
@@ -1622,4 +1629,3 @@
 - `v0.1.2162` 2026-11-18 — 記録の終わりの人数と書き出し先
 - `v0.1.2161` 2026-11-18 — フォロワー数の正本を一つにする
 - `v0.1.2160` 2026-11-18 — 保存したフォロワー数を書き出しに出す
-- `v0.1.2158` 2026-11-18 — 記録が無いときは応援の章を出さない

@@ -63,6 +63,13 @@ import {
 import { escapeHtml } from '../lib/htmlText.js';
 import { createVenueLiveCommentHandler } from '../lib/venueLiveCommentRoute.js';
 import { buildVenueHeadlessVoiceItem } from '../lib/venueHeadlessVoiceItem.js';
+import {
+  createVenuePaintSchedule,
+  requiredSeatNodeCount,
+  shouldAnimateVenueCrowd,
+  shouldSyncVenueSeatCommit,
+  unusedSeatNeedsCleanup,
+} from '../lib/venuePaintSchedule.js';
 import { REMEMBERED_EMOTE_KEYS, rememberedEmoteChanges, rememberedEmoteDict } from '../lib/platform/streamEmotes.js';
 
 /**
@@ -2840,10 +2847,10 @@ export function mountVenueBarButton(options = {}) {
   seatsHost.appendChild(storyDiagHost);
   /** @type {ReturnType<typeof createSeatNode>[]} */
   const seatNodes = [];
-  for (let i = 0; i < VENUE_FULLSCREEN_MAX_SEATS; i += 1) {
-    const node = createSeatNode(i);
-    seatNodes.push(node);
-  }
+  const ensureSeatNodes = (visible) => {
+    const want = requiredSeatNodeCount(visible, seatNodes.length, VENUE_FULLSCREEN_MAX_SEATS);
+    while (seatNodes.length < want) seatNodes.push(createSeatNode(seatNodes.length));
+  };
 
   const emptyMessage = document.createElement('div');
   emptyMessage.className = 'nlsb-empty-message';
@@ -3309,6 +3316,19 @@ export function mountVenueBarButton(options = {}) {
   parent.appendChild(root);
 
   let open = false;
+  let tucked = false;
+  const venuePaint = createVenuePaintSchedule({
+    isHidden: () => typeof document !== 'undefined' && document.visibilityState !== 'visible',
+    isPaused: () => tucked === true || open !== true,
+    minIntervalMs: 80,
+  });
+  const crowdAnimAllowed = () => shouldAnimateVenueCrowd({
+    open,
+    tucked,
+    hidden: typeof document !== 'undefined' && document.visibilityState !== 'visible',
+    reducedMotion: crowdReducedMotion,
+    count: crowdAnimCount,
+  });
   // 別窓化リファクタで参照側が外れ書込専用に(復活に備え代入は残す)。
   // eslint-disable-next-line no-unused-vars
   let userChangedOpen = false;
@@ -3563,8 +3583,6 @@ export function mountVenueBarButton(options = {}) {
   // ストリーム駆動で在席を回すか。standalone(venue.html=onLiveComments 来ない)は必ず false で
   //   従来の storage 経路へ degrade。VENUE_ROSTER_ENABLED=false で全面ロールバック(静的判定=const)。
   const rosterDriven = VENUE_ROSTER_ENABLED && !isStandalone;
-  /** @type {number} rAF id(描画集約) */
-  let rosterCommitRaf = 0;
   /** @type {number} 沈黙中も退席を反映する軽量 prune タイマー */
   let rosterPruneTimer = 0;
   // 「空っぽ・途中で消える」根治(v0.1.745+): 直近の非空表示行を保持し、集計/poll が一瞬0件や
@@ -5313,7 +5331,7 @@ export function mountVenueBarButton(options = {}) {
    */
   const crowdMotionTick = () => {
     crowdRaf = 0;
-    if (!open || crowdReducedMotion || crowdAnimCount <= 0) return;
+    if (!crowdAnimAllowed()) return;
     const t = nowMs();
     // ~18fps(55ms)に間引き。重い canvas を毎フレーム描かない(大規模配信でも安全)。
     if (t - crowdLastDrawMs >= 55) {
@@ -5343,7 +5361,7 @@ export function mountVenueBarButton(options = {}) {
   };
 
   const startCrowdMotion = () => {
-    if (crowdReducedMotion || crowdRaf || !open || crowdAnimCount <= 0) return;
+    if (crowdRaf || !crowdAnimAllowed()) return;
     if (typeof requestAnimationFrame !== 'function') return;
     ensureCrowdCanvasSize();
     crowdLastDrawMs = 0;
@@ -5696,18 +5714,22 @@ export function mountVenueBarButton(options = {}) {
 
     const visibleSeatIndexSet = new Set(visibleSeats.map((entry) => entry.seatIndex));
     const entryBySeatIndex = new Map(visibleSeats.map((entry) => [entry.seatIndex, entry]));
+    // 見える席の分だけノードを足す(ページを開いた時点で 500 席を作らない)。どのサービスでも同じ。
+    ensureSeatNodes(visibleSeats);
     for (let i = 0; i < seatNodes.length; i += 1) {
       const node = seatNodes[i];
       // v0.1.1608: 「空へ戻す」は望む最終状態(next)を作るだけ。DOM へは席装飾ループの後に1回だけ、変わった項目だけ書く
       //   (旧: 全席を毎回 class/aria-hidden/title ごと書き戻し→飾り直しで、視聴ページの DOM 変更が 7,200件/秒になっていた。正本=venueSeatDomState.js)。
       node.next = createEmptySeatState();
-      if (node.seat.dataset.tierIndex !== undefined) delete node.seat.dataset.tierIndex;
+      const isVisible = visibleSeatIndexSet.has(i);
+      if (isVisible && node.seat.dataset.tierIndex !== undefined) delete node.seat.dataset.tierIndex;
       // 2026-07-24: venueRankはここでdeleteしない(装飾ループのWeakMap diff-skipに一本化)。
       //   1コメントごとに全参加者のスコアが僅かに動き上位3位が頻繁に入れ替わる構造(venueSeats.js
       //   resolveVenueRegularScore)に対し、順位不変でも毎paintでdelete→再代入していたのがバッジの
       //   明滅(ちらつき)の真因。renderSeats全体のsig-skipはv0.1.1032で撤回済みの地雷なので、
       //   ここではRANKバッジのdataset属性1つだけを対象にした局所diff-skipで対処する。
-      if (!visibleSeatIndexSet.has(i)) {
+      // 使っていない席は、まだ付いている/中身があるときだけ外す。既に空なら触らない。
+      if (!isVisible && unusedSeatNeedsCleanup(node, false)) {
         if (node.seat.parentElement) node.seat.parentElement.removeChild(node.seat);
         node.seat.replaceChildren();
         node.tile = null;
@@ -6692,10 +6714,7 @@ export function mountVenueBarButton(options = {}) {
     stopVenueLiveOpenHeartbeat();
     clearAggregateBurst();
     if (rosterPruneTimer) { clearInterval(rosterPruneTimer); rosterPruneTimer = 0; }
-    if (rosterCommitRaf && typeof cancelAnimationFrame === 'function') {
-      cancelAnimationFrame(rosterCommitRaf);
-    }
-    rosterCommitRaf = 0;
+    venuePaint.cancel();
     if (!aggregateTimer) return;
     clearInterval(aggregateTimer);
     aggregateTimer = 0;
@@ -6838,8 +6857,14 @@ export function mountVenueBarButton(options = {}) {
     };
     // 会場を閉じても「読み上げ ON」は実際に読み続ける。描画・席・吹き出しは一切起こさず、
     // 同じ新着/dedup経路から音声だけを渡す(閉じた会場のCPU負荷を復活させない)。
-    if (!open) {
-      voicePlayer.diag.venueGate = voicePlayer.enabled ? 'headless' : (voicePlayer.readingWanted ? 'headless-waiting-engine' : 'panel-closed');
+    const pageHidden = typeof document !== 'undefined' && document.visibilityState !== 'visible';
+    // 閉じている・しまっている・裏タブでは席と吹き出しを描かない(低スペックでスクロールを奪わない)。
+    // しまっている間も読み上げは続ける。裏タブは待ち行列を貯めない(復帰時に一掃する既存の決まり)。
+    if (!open || tucked || pageHidden) {
+      voicePlayer.diag.venueGate = open
+        ? (tucked ? (voicePlayer.enabled ? 'ok' : 'voice-off') : 'headless')
+        : (voicePlayer.enabled ? 'headless' : (voicePlayer.readingWanted ? 'headless-waiting-engine' : 'panel-closed'));
+      if (pageHidden) return;
       const liveId = liveIdFromPathname();
       const receivedAt = Date.now();
       for (const speech of result.speeches) {
@@ -6891,11 +6916,19 @@ export function mountVenueBarButton(options = {}) {
       //   同期 commit】して必ず座らせる(発言→即着席→吹き出し)。rAF コミットは通常更新用に残す。
       const nowMs = Date.now();
       if (rosterDriven) {
+        const needSync = shouldSyncVenueSeatCommit({
+          open: true,
+          tucked,
+          hidden: pageHidden,
+          speakerIds: result.speeches.map((s) => s.userId),
+          hasSeat: (uid) => liveRoster.has(uid),
+        });
         for (const speech of result.speeches) {
           touchRoster(liveRoster, { userId: speech.userId, name: speech.name, text: speech.text }, nowMs);
         }
         baseRows = rosterToVenueRows(liveRoster);
-        commitDisplay(baseRows); // 同期で renderSeats→seatByKey 更新(吹き出しが席を見つけられる)
+        if (needSync) commitDisplay(baseRows); // 新しい発言者だけ同期で座らせ、吹き出しが席を見つけられる
+        else venuePaint.schedule(() => { if (open && !tucked) commitDisplay(baseRows); });
       } else {
         // 非ストリーム(standalone/rollback)は従来どおり発言者マージで席を即更新。
         // v0.1.1111(X層): 鏡使用中は「鏡にまだ居ない発言者」を暫定として初見時刻を記録。
@@ -6958,10 +6991,8 @@ export function mountVenueBarButton(options = {}) {
   // v0.1.754 ストリーム駆動在席: 在席 Map の変更を rAF で集約して席へ反映。コメント怒涛でも
   //   1フレーム1回の renderSeats に間引く(buildVenueSeating の prevSeatByKey で席は安定・軽い)。
   const scheduleRosterCommit = () => {
-    if (rosterCommitRaf) return;
-    const run = () => {
-      rosterCommitRaf = 0;
-      if (!open || !rosterDriven) return;
+    venuePaint.schedule(() => {
+      if (!open || !rosterDriven || tucked) return;
       pruneRoster(liveRoster, Date.now(), {
         windowMs: VENUE_ROSTER_WINDOW_MS,
         vipWindowMs: VENUE_ROSTER_VIP_WINDOW_MS,
@@ -6969,11 +7000,7 @@ export function mountVenueBarButton(options = {}) {
       });
       baseRows = rosterToVenueRows(liveRoster);
       commitDisplay(baseRows); // keep-last-good + renderSeats(prevSeatByKey で安定)
-    };
-    rosterCommitRaf =
-      typeof requestAnimationFrame === 'function'
-        ? requestAnimationFrame(run)
-        : (run(), 0);
+    });
   };
 
   // v0.1.752 リアルタイム化: 録画側(content-entry.js persistCommentRows)が新着コメントを
@@ -7332,7 +7359,6 @@ export function mountVenueBarButton(options = {}) {
   };
 
   /** v0.1.1654: 会場を一時的にしまっているか(会場自体は開いたまま・閉じると必ず解除)。 */
-  let tucked = false;
   const TOGGLE_LABEL_OPEN = toggle.textContent || '🏟 会場モード';
   /** @type {HTMLDivElement | null} */
   let tuckNote = null;
@@ -7359,6 +7385,11 @@ export function mountVenueBarButton(options = {}) {
     tucked = next === true;
     showTuckNote(tucked ? note : '');
     root.classList.toggle('nlsb-is-tucked', tucked);
+    if (tucked) stopCrowdMotion();
+    else {
+      startCrowdMotion();
+      venuePaint.kick();
+    }
     toggle.textContent = tucked ? '▲ 会場に戻る' : TOGGLE_LABEL_OPEN;
     toggle.setAttribute('aria-label', tucked ? '会場に戻る' : '会場モード');
     if (tucked) {
@@ -7402,6 +7433,7 @@ export function mountVenueBarButton(options = {}) {
       startAggregation();
       startSpeechPolling();
     } else {
+      venuePaint.cancel();
       setTucked(false); // v0.1.1654: 閉じたらしまい状態も解除(開き直しは必ず通常状態から)
       // v0.1.1645: 会場を閉じたらパネル・ホバーカードも閉じる(以前は開いたまま残り、再オープンで復活した)。
       try {
@@ -7519,7 +7551,12 @@ export function mountVenueBarButton(options = {}) {
   //   復帰時に古い読み上げ backlog が溜まったまま=「今」から大きく遅れて喋り出す。可視復帰時に
   //   待機中の読み上げキューを一掃して「今」へリセットする(再生中の1本は止めない)。
   document.addEventListener('visibilitychange', () => {
-    if (document.visibilityState !== 'visible') return;
+    if (document.visibilityState !== 'visible') {
+      stopCrowdMotion();
+      return;
+    }
+    startCrowdMotion();
+    venuePaint.kick();
     if (!open || !voicePlayer.enabled) return;
     try { voicePlayer.flushPendingQueue(); } catch { /* no-op */ }
   });

@@ -27,7 +27,7 @@
 
 > 値が次の段へ届かない「断線」(broadcaster バグ型)は `npm run feature-map -- --check` が機械検知。
 
-## ⚠️ 役割コメントが無いソース 14 / 1335 件
+## ⚠️ 役割コメントが無いソース 14 / 1338 件
 - `docs/handoff/bench/bench-interval.mjs`
 - `docs/handoff/bench/bench-lane.mjs`
 - `extension-youtube/cloak-failsafe.js`
@@ -1197,7 +1197,7 @@
   - `gift-coin-hq.wav`
   - `gift-register-hq.wav`
   - `gift-register.mp3`
-- 📁 **src/** (2590)
+- 📁 **src/** (2596)
   - 📁 **data/** (7)
     - 📁 **acquirers/** (2)
       - `laneFromStorage.js` — 応援レーン acquirer: chrome.storage.local(nls_comments) → laneStore の橋渡し。
@@ -1540,7 +1540,7 @@
         - `logo_funlink_white_RGB_link_black.png`
         - `logo_funlink_white_RGB_maru_black.png`
     - `hero-connect-hub.svg`
-  - 📁 **lib/** (2274)
+  - 📁 **lib/** (2280)
     - 📁 **__snapshots__/** (4)
       - `marketing-abema-baseline.html`
       - `marketing-niconico.html`
@@ -1594,7 +1594,9 @@
       - `schema.test.js`
       - `validateAndMerge.test.js`
       - `validateLiveMcpSnapshot.js` — Canonical Snapshot の構造検証。schema.js の isCanonicalLiveSnapshot より詳細な
-    - 📁 **mixch/** (4)
+    - 📁 **mixch/** (6)
+      - `mxCommentInput.js` — ミクチャの公式コメント欄を探す(会場の「ここから発言」は拾わない)。
+      - `mxCommentInput.test.js`
       - `mxGiftImages.js` — ミクチャのギフトの絵を resource_id から引く(バックグラウンドで使う・council/mixch-support-PLAN.md)。
       - `mxGiftImages.test.js`
       - `mxParse.js` — ミクチャ(mixch.tv)の配信・コメント・ギフトを、YouTube 版の記録と同じ形にする(純関数)
@@ -1808,6 +1810,7 @@
     - `anonLabelSingleSource.test.js`
     - `anonymousIdenticon.js` — 匿名 userId 向けの決定論的アバター（SVG data URL）。
     - `anonymousIdenticon.test.js`
+    - `appStoreBadges.test.js`
     - `appliedEntriesMemo.js` — 大きな記録で「同じ行・同じ控え」なら、正規化と名前・顔の重ね直しの結果を使い回す(v0.1.2023)。
     - `appliedEntriesMemo.test.js`
     - `arrivalEffect.js` — ニコ生「来場」システムメッセージ(parseArrivalComment.js でパース済み)を、パチンコの
@@ -3620,6 +3623,9 @@
     - `venueOpenClassCleanup.wiring.test.js`
     - `venueOpenLatency.js` — 会場モードの「開いてから見えるまで」を分解して観測する純関数(v0.1.1207)。
     - `venueOpenLatency.test.js`
+    - `venuePaintSchedule.js` — 会場モードの描画を、どの配信サービスでも同じルールで軽くする。
+    - `venuePaintSchedule.test.js`
+    - `venuePaintSchedule.wiring.test.js`
     - `venuePanelBottom.wiring.test.js`
     - `venuePanelHidden.wiring.test.js`
     - `venuePanelLifecycle.wiring.test.js`
@@ -3987,7 +3993,7 @@
   - `kouhaku_og.py`
   - `og-live-compose.py`
   - `render-og.js` — 追憶の煌めき LP 用 OG 画像（1200×630）を生成する。
-- 📁 **tsuioku-no-kirameki/** (78)
+- 📁 **tsuioku-no-kirameki/** (82)
   - 📁 **articles/** (14)
     - 📁 **role-separation-design/** (2)
       - 📁 **img/** (1)
@@ -4005,17 +4011,19 @@
     - `phase-gate-flow-canon.html`
     - `prewarm-coordinator-lease.html`
     - `reaction-template-classifier.html`
-  - 📁 **assets/** (7)
-    - 📁 **css/** (4)
+  - 📁 **assets/** (9)
+    - 📁 **css/** (5)
+      - `app-download.css`
       - `kouhaku-ranking.css`
       - `live-ranking.css`
       - `site-chrome-lp.css`
       - `yukkuri-thread.css`
-    - 📁 **js/** (3)
+    - 📁 **js/** (4)
+      - `app-store-badges.js` — global document, window
       - `kouhaku-app-cta.js` — global URL
       - `kouhaku-board.js` — 紅白の順位を、当サイトの /api/kouhaku-ranking だけから描く。
       - `site-chrome-lp.js` — 追憶のきらめき サイト共通の「ヘッダー(ロゴ＋ハンバーガー)・ドロワーメニュー・フッター」。
-  - 📁 **images/** (41)
+  - 📁 **images/** (43)
     - 📁 **lp/** (7)
       - 📁 **phone/** (2)
         - `phone-start.webp`
@@ -4025,6 +4033,9 @@
       - `kimito-maru-black.webp`
       - `nc321221_creatorcross.webp`
       - `twitter-icon.webp`
+    - 📁 **store-badges/** (2)
+      - `apple-appstore-ja.svg`
+      - `google-play-ja.png`
     - 📁 **venue/** (6)
       - `venue-living-overview.jpg`
       - `venue-living-overview.mp4`

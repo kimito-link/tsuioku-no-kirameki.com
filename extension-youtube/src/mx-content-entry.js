@@ -47,7 +47,8 @@ import { parseMxLiveStats } from '../../src/lib/platform/platformStats.js';
 import { followerSampleFromMixch } from '../../src/lib/platform/followerCountSample.js';
 import { makeDiagTabToken, shouldSkipDiagWrite } from '../../src/lib/platform/diagTabShare.js';
 import { platformFetchTimeoutSignal } from '../../src/lib/platform/fetchTimeout.js';
-import { findPageButton, queryPageControl } from '../../src/lib/platform/pageControlPick.js';
+import { findPageButton } from '../../src/lib/platform/pageControlPick.js';
+import { findMxCommentInput, findMxSendButton, revealMxOfficialComposer } from '../../src/lib/mixch/mxCommentInput.js';
 
 const META_EVERY_MS = 30_000;
 const BOARD_EVERY_MS = 120_000;
@@ -620,7 +621,6 @@ async function check() {
 // ---- サイドパネル・会場からのコメント送信 ----
 // 未ログインのときは入力欄が無く「コメントするにはログインしてください」が出る(2026-11-08 PC 実測)。
 //   ログイン中の入力欄の形は未実測なので、コメントの入力欄らしいものを広めに探す。/api-web/login-status が null なら未ログイン。
-const MX_INPUT_SEL = 'textarea[placeholder*="コメント"], input[placeholder*="コメント"], form textarea, form input[type="text"]';
 const sleep = (/** @type {number} */ ms) => new Promise((r) => setTimeout(r, ms));
 
 /** ログインしていないと分かるか(分からなければ false=送ってみる) */
@@ -659,23 +659,29 @@ try {
         noteSendFail('not-signed-in');
         return { ok: false, reason: 'not-signed-in' };
       }
-      let input = /** @type {HTMLInputElement | HTMLTextAreaElement | null} */ (queryPageControl(document, MX_INPUT_SEL));
+      // 公式の欄は form に入っていない textarea(placeholder「コメントする...」)。会場が覆って欄が外れていたら、
+      //   会場を一時的にしまって出してから探す。サイドパネルも会場も同じ MX_SEND_COMMENT を使う。
+      const restoreVenue = revealMxOfficialComposer(document);
+      try {
+      let input = findMxCommentInput(document);
       for (let i = 0; !input && i < 6; i += 1) {
         await sleep(250);
-        input = /** @type {any} */ (queryPageControl(document, MX_INPUT_SEL));
+        input = findMxCommentInput(document);
       }
       if (!input) {
         noteSendFail('no-input');
         return { ok: false, reason: 'no-input' };
       }
+      try { input.scrollIntoView({ block: 'nearest', inline: 'nearest' }); } catch { /* 送れればよい */ }
       // 窓が狭いとミクチャがコメント欄を隠す(りんく「広くするとコメントうてるっぽい」)。隠れていても入れて押してみて、見えていたかを記録に残す
       const inputShown = input.getClientRects().length > 0;
       input.focus();
       const proto = input instanceof HTMLTextAreaElement ? HTMLTextAreaElement.prototype : HTMLInputElement.prototype;
       Object.getOwnPropertyDescriptor(proto, 'value')?.set?.call(input, text);
       input.dispatchEvent(new Event('input', { bubbles: true }));
+      input.dispatchEvent(new Event('change', { bubbles: true }));
       await sleep(150);
-      const btn = findSendButton(input);
+      const btn = findMxSendButton(document, input) || findSendButton(input);
       if (btn && (btn.disabled || btn.getAttribute('aria-disabled') === 'true')) {
         noteSendFail(`send-disabled${inputShown ? '' : ':hidden'}`);
         return { ok: false, reason: 'send-disabled' };
@@ -695,6 +701,9 @@ try {
       }
       if (!ok) noteSendFail(`still-in-box${inputShown ? '' : ':hidden'}`);
       return { ok, reason: ok ? '' : 'still-in-box' };
+      } finally {
+        restoreVenue();
+      }
     })()
       .then((r) => sendResponse(r))
       .catch((e) => sendResponse({ ok: false, reason: String(e) }));
