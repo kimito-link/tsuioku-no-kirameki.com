@@ -18,6 +18,15 @@
 /** @type {readonly ChangelogEntry[]} */
 export const EXTENSION_CHANGELOG = Object.freeze([
   Object.freeze({
+    version: '0.1.2198',
+    date: '2026-11-23',
+    summary: 'ニコ生の常駐タイマーを共通スケジューラへ集約し裏タブを間引き',
+    items: Object.freeze([
+      'ニコ生視聴ページ（content-entry.js）の常駐タイマー 6 本（360ms 枠更新・550ms パネルスキャン・4s 配信ID監視・5s 公式DOM・45s 統計・120s deep harvest）を共通ページ監視スケジューラへ集約しました。',
+      '表タブの間隔とスクロール中見送り保護はそのまま維持し、裏タブでは間引きまたは停止、bfcache 復帰時は pageshow で再開します。',
+    ])
+  }),
+  Object.freeze({
     version: '0.1.2197',
     date: '2026-11-23',
     summary: 'YouTube チャットの監視を共通 Observer ハブへ統合',
@@ -186,15 +195,6 @@ export const EXTENSION_CHANGELOG = Object.freeze([
     items: Object.freeze([
       'りんくさんの開発用の読み込み（フォルダから読み込んだ版／ストア提出ではないビルド）では、コードがなくてもマーケレポートのHTMLを保存できます。',
       'Chromeウェブストアから入れた版と、提出用のZIPの関所・14日のお試しは、今までどおりです。',
-    ])
-  }),
-  Object.freeze({
-    version: '0.1.2175',
-    date: '2026-11-21',
-    summary: 'ランキングページ「いま動いた人」の人数の書き方を直しました',
-    items: Object.freeze([
-      '拡張そのものの動きは変わりません。ウェブのランキングページ（/live/）の更新です。',
-      '「⚡ いま動いた人」で並びきらない人数を「（ほか N人）」と書くようにしました。コメントで動いた人は下の順位表に載っていないことがあるため、「下の順位表に」は外しました。',
     ])
   })
 ]);
