@@ -1,13 +1,13 @@
 # Handoff — 低スペックPC向け L0 共有部品（#690 マージ前先行作成）
 
-STATUS: マージ衝突解消済み・push 待ち（PR #692 / v0.1.2182 / origin/master b36c3568a を取り込み commit 済み・未 push）
-ROOT_CAUSE: PR #692（1f888d973）の起点 e4ff7878b のあと origin/master に #691（0.1.2180, b36c3568a）が入り、manifest/package/changelog/LP/dist/maps が衝突したため GitHub Actions の pull_request CI（test-and-build / e2e）が未発火だった。
-FILES_CHANGED: src/lib/pageWatchScheduler.js, src/lib/pageWatchScheduler.test.js, src/lib/mutationObserverHub.js, src/lib/mutationObserverHub.test.js, extension/manifest.json, package.json, src/lib/changelog.js, tsuioku-no-kirameki/index.html, extension/dist/*, app/dist/live-view.js, extension/background.js, .dist-fingerprint.json, docs/repo-tree-map.{md,html}, docs/code-tree.{md,html}, docs/feature-sitemap.{md,html}, docs/layer-map.html, handoff.md
-CHANGES: origin/master（b36c3568a, #691 0.1.2180）を feat/lowspec-l0-primitives へマージして衝突を解消。版は 0.1.2182 を維持し、changelog.js に 0.1.2182 と 0.1.2180 の両方を順序どおり残したうえで npm run build・tree-map・layer-map を再生成した。既存の入口ファイル・venue 系・#690 対象ファイルは未変更。
-TESTS_RUN: npm run build / npm run verify:bump / npm run check:dist-fresh / npm run tree-map:check / npm run test:cc -- src/lib/changelog.test.js src/lib/changelogConsistency.test.js src/lib/pageWatchScheduler.test.js src/lib/mutationObserverHub.test.js
-TEST_RESULT: 全合格（verify:bump 全7ステップOK 0.1.2182、dist-fresh OK 483526e0da49、tree-map up to date、vitest 4 files / 39 passed）
-REMAINING_RISKS: push は Antigravity ルールにより未実行。push 後に PR #692 の GitHub Actions（test-and-build / e2e）が発火する。入口への移行と実配信ページ計測は #690 マージ後の別 PR（P0-1 / P0-2）で行う。
-NEXT_ACTION: Claude Code / 手元で feat/lowspec-l0-primitives を push して PR #692 の CI（test-and-build / e2e）を実行する。#690 マージ連絡後に最新 origin/master から新ブランチを切り P0-1 へ着手。
+STATUS: CI 失敗修正済み・push 待ち（PR #692 / v0.1.2182 / split-changelog 適用 commit 済み・未 push）
+ROOT_CAUSE: PR #692（cde18c290）の test-and-build CI が src/lib/changelogBundleBudget.test.js:54 で失敗（#691 の 0.1.2180 と 0.1.2182 を両方残した結果 changelog.js が 21 版になり上限 20 を 1 版超過）。
+FILES_CHANGED: src/lib/changelog.js, src/lib/changelog-archive.js, .dist-fingerprint.json, app/dist/live-view.js, extension/background.js, extension/dist/*, docs/repo-tree-map.{md,html}, docs/code-tree.{md,html}, docs/feature-sitemap.{md,html}, handoff.md
+CHANGES: node scripts/split-changelog.mjs で changelog.js を 21→20 版へ削減し、最古 1 版を changelog-archive.js（1881 版）へ押し出した。続けて npm run build・npm run tree-map を再実行し、版は 0.1.2182 のまま維持。既存の入口ファイル・venue 系・#690 対象ファイルは未変更。
+TESTS_RUN: node scripts/split-changelog.mjs / npm run build / npm run verify:bump / npm run check:dist-fresh / npm run tree-map:check / npm run layer-map:check / npm run check:layer / npm run lint / npm run typecheck / npm run test:cc -- src/lib/changelogBundleBudget.test.js src/lib/changelog.test.js src/lib/changelogConsistency.test.js src/lib/pageWatchScheduler.test.js src/lib/mutationObserverHub.test.js
+TEST_RESULT: 全合格（vitest 5 files / 45 passed［changelogBundleBudget 含む］、verify:bump 全7ステップOK 0.1.2182、dist-fresh OK fa570323f3ec、tree-map/layer-map up to date、check-layer 合格、eslint 0 errors、tsc 0 errors）
+REMAINING_RISKS: push は Antigravity ルール（~/.gemini/AGENTS.md）により未実行。push 後に PR #692 の test-and-build と e2e が緑になる見込み。
+NEXT_ACTION: Claude Code / 手元で feat/lowspec-l0-primitives を push して PR #692 の CI（test-and-build / e2e）を確認する。#690 マージ連絡後に最新 origin/master から新ブランチを切り P0-1 へ着手。
 LAST_WORKED_ON: 2026-11-23
 WORKED_BY: antigravity / Gemini 4 Neon (Medium)
 MACHINE_NOTES: worktree=..\_worktrees\tsuioku-no-kirameki.com\lowspec-l0-primitives (branch: feat/lowspec-l0-primitives, base: origin/master e4ff7878b)。本体チェックアウトの未コミット変更には一切触れていない。
