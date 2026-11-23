@@ -4,6 +4,8 @@
 //   ?overlay=1 のときは「重ねた会場」: 閉じる(window.close)は親の視聴ページへ知らせ、
 //   真ん中の映像の場所(.nlsb-safe-area)を親へ送り、親がページの本物のプレーヤーをそこへ置く。
 import { pseudoLvForVideoId } from './ytNicoShim.js';
+import { createPageWatchScheduler } from '../../src/lib/pageWatchScheduler.js';
+import { isVenuePageHidden } from '../../src/lib/venuePaintSchedule.js';
 
 export const YT_VENUE_OVERLAY = (() => {
   try {
@@ -38,18 +40,45 @@ if (YT_VENUE_OVERLAY && typeof window !== 'undefined' && window.parent !== windo
     if (ev.key === 'Escape') post({ type: 'close' });
   });
   let last = '';
-  setInterval(() => {
-    // 重ねた会場はタブではないので「✕ タブを閉じる」を「✕ 閉じる」に
-    for (const b of document.querySelectorAll('button')) {
-      if (b.textContent === '✕ タブを閉じる') b.textContent = '✕ 閉じる';
+  let closeLabelPatched = false;
+  const overlaySched = createPageWatchScheduler({
+    baseTickMs: 300,
+    isHidden: () => isVenuePageHidden(document),
+  });
+  overlaySched.register({
+    id: 'yt-venue-overlay-rect',
+    intervalMs: 300,
+    hiddenMode: 'pause',
+    run: () => {
+      // 重ねた会場はタブではないので「✕ タブを閉じる」を「✕ 閉じる」に（1度直したら全button走査を止める）
+      if (!closeLabelPatched) {
+        for (const b of document.querySelectorAll('button')) {
+          if (b.textContent === '✕ タブを閉じる') {
+            b.textContent = '✕ 閉じる';
+            closeLabelPatched = true;
+            break;
+          }
+        }
+      }
+      const el = document.querySelector('.nlsb-safe-area');
+      if (!el) return;
+      const r = el.getBoundingClientRect();
+      const rect = { x: Math.round(r.left), y: Math.round(r.top), w: Math.round(r.width), h: Math.round(r.height) };
+      const sig = JSON.stringify(rect);
+      if (sig === last) return;
+      last = sig;
+      post({ type: 'safe-rect', rect });
+    },
+  });
+  overlaySched.start({ runImmediately: true });
+  document.addEventListener('visibilitychange', () => {
+    if (!isVenuePageHidden(document)) overlaySched.kick();
+  });
+  window.addEventListener('pagehide', () => overlaySched.stop());
+  window.addEventListener('pageshow', (ev) => {
+    if (ev?.persisted) {
+      overlaySched.start();
+      overlaySched.kick();
     }
-    const el = document.querySelector('.nlsb-safe-area');
-    if (!el) return;
-    const r = el.getBoundingClientRect();
-    const rect = { x: Math.round(r.left), y: Math.round(r.top), w: Math.round(r.width), h: Math.round(r.height) };
-    const sig = JSON.stringify(rect);
-    if (sig === last) return;
-    last = sig;
-    post({ type: 'safe-rect', rect });
-  }, 300);
+  });
 }

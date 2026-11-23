@@ -1,5 +1,5 @@
 // tw-content-entry.js — Twitch の視聴ページ(www.twitch.tv/<チャンネル>)で、チャットを読んで記録に渡す入口。
-/* global chrome, WebSocket, location, setTimeout, clearTimeout, setInterval, window, fetch, document, HTMLTextAreaElement, Event */
+/* global chrome, WebSocket, location, setTimeout, clearTimeout, window, fetch, document, HTMLTextAreaElement, Event */
 //
 // ★設計(council/twitch-support-PLAN.md)
 //   - 読むのは Twitch 公式の読み取り専用 IRC(ログイン無し・justinfanNNNN)。DOM より壊れにくい。
@@ -43,6 +43,9 @@ import {
   shouldStopTwVodBackfill,
 } from '../../src/lib/twitch/twGql.js';
 import { runBackfillLoop } from '../../src/lib/platform/historyBackfill.js';
+import { createPageWatchScheduler, shouldReconnectSilentSocket } from '../../src/lib/pageWatchScheduler.js';
+import { isVenuePageHidden } from '../../src/lib/venuePaintSchedule.js';
+import { isExtensionContextAlive } from '../../src/lib/reportSilentError.js';
 import {
   twHermesUrl,
   twRewardTopic,
@@ -482,6 +485,7 @@ function startReader(login, key, channelId = '', streamMeta = {}) {
 
     ws.onopen = () => {
       backoff = 1000;
+      ircLastAt = Date.now();
       diag.ircState = 'open';
       const nick = `justinfan${10000 + Math.floor(Math.random() * 80000)}`;
       ws?.send('CAP REQ :twitch.tv/tags twitch.tv/commands');
@@ -492,6 +496,7 @@ function startReader(login, key, channelId = '', streamMeta = {}) {
       saveDiagSoon();
     };
     ws.onmessage = (ev) => {
+      ircLastAt = Date.now();
       const text = typeof ev.data === 'string' ? ev.data : '';
       for (const line of text.split('\r\n')) if (line) onLine(line);
     };
@@ -519,9 +524,11 @@ function startReader(login, key, channelId = '', streamMeta = {}) {
   let hws = null;
   let hBackoff = 2000;
   let hTimer = 0;
-  let hWatch = 0;
   let hKeepMs = 30_000;
   let hLastAt = 0;
+  // Twitch IRC の無通信見張り（公式 PING 周期 ~5 分 + 余裕 30 秒。黙ったら close して再接続）
+  const IRC_SILENCE_MS = 330_000;
+  let ircLastAt = 0;
   const topic = twRewardTopic(channelId);
   // ハイプトレイン・予想も同じ口で受ける(2026-11-08 PC 実測で、ログインなしで購読でき形も取れた)
   const extraTopics = [twHypeTopic(channelId), twPredictionTopic(channelId)].filter(Boolean);
@@ -610,17 +617,40 @@ function startReader(login, key, channelId = '', streamMeta = {}) {
     }, hBackoff);
     hBackoff = Math.min(hBackoff * 2, 120_000);
   };
-  // keepalive が途絶えたら(つながったまま黙った)つなぎ直す
-  hWatch = setInterval(() => {
-    if (stopped || !hws || diag.hermesState !== 'open') return;
-    if (Date.now() - hLastAt > hKeepMs) {
-      try {
-        hws.close();
-      } catch {
-        /* no-op */
+  // IRC・Hermes の無通信見張りを共通スケジューラへ（裏タブでは 60 秒に粗く間引き、表に戻ったら即検査）
+  const socketWatchSched = createPageWatchScheduler({
+    baseTickMs: 10_000,
+    isHidden: () => isVenuePageHidden(document),
+    isAlive: () => !stopped && isExtensionContextAlive(),
+  });
+  socketWatchSched.register({
+    id: 'tw-socket-silence',
+    intervalMs: 10_000,
+    hiddenMode: 'throttle',
+    hiddenIntervalMs: 60_000,
+    run: ({ now }) => {
+      if (stopped) return;
+      if (ws && shouldReconnectSilentSocket({ open: diag.ircState === 'open', lastActivityAt: ircLastAt, now, silenceMs: IRC_SILENCE_MS })) {
+        try {
+          ws.close();
+        } catch {
+          /* no-op */
+        }
       }
-    }
-  }, 10_000);
+      if (hws && shouldReconnectSilentSocket({ open: diag.hermesState === 'open', lastActivityAt: hLastAt, now, silenceMs: hKeepMs })) {
+        try {
+          hws.close();
+        } catch {
+          /* no-op */
+        }
+      }
+    },
+  });
+  const onSocketWatchVisibility = () => {
+    if (!stopped && !isVenuePageHidden(document)) socketWatchSched.kick();
+  };
+  document.addEventListener('visibilitychange', onSocketWatchVisibility);
+  socketWatchSched.start();
 
   connect();
   hConnect();
@@ -628,7 +658,8 @@ function startReader(login, key, channelId = '', streamMeta = {}) {
     stopped = true;
     hermesRewardsOk = false;
     if (hTimer) clearTimeout(hTimer);
-    clearInterval(hWatch);
+    socketWatchSched.stop();
+    document.removeEventListener('visibilitychange', onSocketWatchVisibility);
     try {
       if (hws) hws.onclose = null;
       hws?.close();
@@ -881,19 +912,6 @@ try {
   /* 拡張が入れ替わった直後 */
 }
 
-// Twitch は1枚のページの中で URL だけ変わる(チャンネルを移っても読み込み直さない)ので、URL を見張る
-let lastHref = '';
-setInterval(() => {
-  if (location.href !== lastHref) {
-    lastHref = location.href;
-    lastInfoAt = 0;
-  }
-  void check();
-}, 1000);
-window.addEventListener('pagehide', () => {
-  current?.stop();
-});
-
 // ---- 視聴者数はページに出ている数を10秒おきに写す(保存の書き込みを増やしすぎないよう10秒・変わったときだけ) ----
 // 配信の情報(GQL)は30秒おきなので、ページの数が 10,533→10,583 と動いても欄が古い数のままだった(2026-11-11 PC 計測)。
 //   ページの「N 人視聴中」の数字(data-a-target="animated-channel-viewers-count")が変わったときだけ送る。読めなければ何もしない。
@@ -909,15 +927,61 @@ function readTwPageViewers() {
     return null;
   }
 }
+
+// Twitch は1枚のページの中で URL だけ変わる(チャンネルを移っても読み込み直さない)ので、
+//   URL 監視(1s)と視聴者数読み取り(10s)を共通スケジューラ 1 本へ統合し、裏タブでは間引く。
 let lastDomViewers = -1;
-setInterval(() => {
-  if (!current) return;
-  try {
-    const n = readTwPageViewers();
-    if (n === null || n === lastDomViewers) return;
-    lastDomViewers = n;
-    safeSendMessage({ type: 'YT_STREAM_META', payload: { videoId: current.key, concurrentViewers: n } });
-  } catch {
-    /* 読めなければ30秒おきの数のまま */
-  }
-}, 10_000);
+const twWatchSched = createPageWatchScheduler({
+  baseTickMs: 1000,
+  getUrl: () => String(location.href || ''),
+  isHidden: () => isVenuePageHidden(document),
+  isAlive: () => isExtensionContextAlive(),
+  onUrlChange: () => {
+    lastInfoAt = 0;
+  },
+});
+twWatchSched.register({
+  id: 'tw-watch',
+  intervalMs: 1000,
+  hiddenMode: 'throttle',
+  hiddenIntervalMs: 10_000,
+  runOnUrlChange: true,
+  run: () => {
+    void check();
+  },
+});
+twWatchSched.register({
+  id: 'tw-viewers',
+  intervalMs: 10_000,
+  hiddenMode: 'throttle',
+  hiddenIntervalMs: 30_000,
+  run: () => {
+    if (!current) return;
+    try {
+      const n = readTwPageViewers();
+      if (n === null || n === lastDomViewers) return;
+      lastDomViewers = n;
+      safeSendMessage({ type: 'YT_STREAM_META', payload: { videoId: current.key, concurrentViewers: n } });
+    } catch {
+      /* 読めなければ30秒おきの数のまま */
+    }
+  },
+});
+twWatchSched.start();
+const resumeTwWatch = () => {
+  if (!current) lastInfoAt = 0;
+  twWatchSched.start();
+  twWatchSched.kick();
+};
+document.addEventListener('visibilitychange', () => {
+  if (!isVenuePageHidden(document)) resumeTwWatch();
+});
+window.addEventListener('pagehide', () => {
+  twWatchSched.stop();
+  current?.stop();
+  current = null;
+  lastInfoAt = 0;
+});
+window.addEventListener('pageshow', (ev) => {
+  if (ev?.persisted || !current) resumeTwWatch();
+});

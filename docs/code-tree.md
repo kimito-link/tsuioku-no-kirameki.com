@@ -27,7 +27,7 @@
 
 > 値が次の段へ届かない「断線」(broadcaster バグ型)は `npm run feature-map -- --check` が機械検知。
 
-## ⚠️ 役割コメントが無いソース 14 / 1348 件
+## ⚠️ 役割コメントが無いソース 14 / 1349 件
 - `docs/handoff/bench/bench-interval.mjs`
 - `docs/handoff/bench/bench-lane.mjs`
 - `extension-youtube/cloak-failsafe.js`
@@ -1201,7 +1201,7 @@
   - `gift-coin-hq.wav`
   - `gift-register-hq.wav`
   - `gift-register.mp3`
-- 📁 **src/** (2615)
+- 📁 **src/** (2618)
   - 📁 **data/** (7)
     - 📁 **acquirers/** (2)
       - `laneFromStorage.js` — 応援レーン acquirer: chrome.storage.local(nls_comments) → laneStore の橋渡し。
@@ -1544,7 +1544,7 @@
         - `logo_funlink_white_RGB_link_black.png`
         - `logo_funlink_white_RGB_maru_black.png`
     - `hero-connect-hub.svg`
-  - 📁 **lib/** (2297)
+  - 📁 **lib/** (2300)
     - 📁 **__snapshots__/** (4)
       - `marketing-abema-baseline.html`
       - `marketing-niconico.html`
@@ -2950,6 +2950,9 @@
     - `ownPostedUserIdSet.js` — v0.1.773: 「自分が投稿した userId」の集合を1パスで作る純関数。
     - `ownPostedUserIdSet.test.js`
     - `pageColorSchemeGate.test.js`
+    - `pageWatchScheduler.js` — 全配信サービスの視聴ページで共有する「ページ監視・定期チェック」スケジューラ。
+    - `pageWatchScheduler.test.js`
+    - `pageWatchScheduler.wiring.test.js`
     - `paintCompletionPipeline.test.js`
     - `paintCompletionProbe.js` — paintCompletionProbe — 「JSが返った時点」でなく【画面に出るまで】を測る(v0.1.1320)。
     - `paintCompletionProbe.test.js`

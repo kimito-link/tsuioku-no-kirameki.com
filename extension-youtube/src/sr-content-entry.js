@@ -39,6 +39,9 @@ try {
   }
 } catch { /* 計器 */ }
 import { createInfoPollGate } from '../../src/lib/platform/infoPollGate.js';
+import { createPageWatchScheduler } from '../../src/lib/pageWatchScheduler.js';
+import { isVenuePageHidden } from '../../src/lib/venuePaintSchedule.js';
+import { isExtensionContextAlive } from '../../src/lib/reportSilentError.js';
 import { srEventAndSupportUrl, parseSrEventStats, parseSrEventBoard } from '../../src/lib/platform/platformStats.js';
 import { makeDiagTabToken, shouldSkipDiagWrite } from '../../src/lib/platform/diagTabShare.js';
 import { platformFetchTimeoutSignal } from '../../src/lib/platform/fetchTimeout.js';
@@ -594,15 +597,41 @@ try {
   /* 拡張が入れ替わった直後 */
 }
 
-let lastHref = '';
-setInterval(() => {
-  if (location.href !== lastHref) {
-    lastHref = location.href;
+const srWatchSched = createPageWatchScheduler({
+  baseTickMs: 1000,
+  getUrl: () => String(location.href || ''),
+  isHidden: () => isVenuePageHidden(document),
+  isAlive: () => isExtensionContextAlive(),
+  onUrlChange: () => {
     infoGate.reset();
-  }
-  void check();
-}, 1000);
+  },
+});
+srWatchSched.register({
+  id: 'sr-watch',
+  intervalMs: 1000,
+  hiddenMode: 'throttle',
+  hiddenIntervalMs: 10_000,
+  runOnUrlChange: true,
+  run: () => {
+    void check();
+  },
+});
+srWatchSched.start();
+const resumeSrWatch = () => {
+  if (!current) infoGate.reset();
+  srWatchSched.start();
+  srWatchSched.kick();
+};
+document.addEventListener('visibilitychange', () => {
+  if (!isVenuePageHidden(document)) resumeSrWatch();
+});
 window.addEventListener('pagehide', () => {
+  srWatchSched.stop();
   current?.stop();
+  current = null;
+  infoGate.reset();
   leaveSrFollowerEnd();
+});
+window.addEventListener('pageshow', (ev) => {
+  if (ev?.persisted || !current) resumeSrWatch();
 });

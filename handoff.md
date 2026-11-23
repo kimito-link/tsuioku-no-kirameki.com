@@ -1,16 +1,16 @@
-# Handoff — 会議ハーネスの日課
+# Handoff — P0-1: 6 入口移行 + bfcache 再接続 + Twitch IRC 無通信見張り (v0.1.2192)
 
-STATUS: ブロック中
-ROOT_CAUSE: 下記 NEEDS_JUDGMENT を参照（未判断）
-FILES_CHANGED: council-scout/state.json, council-scout/briefs/2026-10-06.md（いずれも生成物）
-CHANGES: env充足を確認（有効 19/19体） / scoutを実行（日報: 2026-10-06.md） / 疎通不能の警告2件は据え置き（撤去条件=全モデル429/カタログ消滅/課金要求のいずれにも非該当。日数が伸びるのは新情報ではない）
-TESTS_RUN: node scripts/council-env.mjs / node scripts/scout-models.mjs
-TEST_RESULT: 異常あり（判断待ち）
-REMAINING_RISKS: 1件の未判断事象
-NEXT_ACTION: 下の NEEDS_JUDGMENT を司令塔（Claude本体）が判断する。**自動で直さないこと。**
-LAST_WORKED_ON: 2026-10-06
-WORKED_BY: council-daily.mjs（実行者: unknown）
-MACHINE_NOTES: -
+STATUS: 追加レビュー指摘対応済み・push 待ち（PR #694 / v0.1.2192 commit 済み・未 push）
+ROOT_CAUSE: (1) Twitch・Kick・mixch・SHOWROOM で pagehide 時に current.stop() しても current = null にしていなかったため、pageshow や表示復帰で戻っても同じ key では startReader() が再実行されず記録・読み上げが止まったままになっていた。(2) Twitch IRC に Hermes 相当の無通信見張りがなく、サイレント切断時に再接続されなかった。
+FILES_CHANGED: src/lib/pageWatchScheduler.js, src/lib/pageWatchScheduler.test.js, src/lib/pageWatchScheduler.wiring.test.js, extension-youtube/src/tw-content-entry.js, extension-youtube/src/kick-content-entry.js, extension-youtube/src/mx-content-entry.js, extension-youtube/src/sr-content-entry.js, extension/manifest.json, package.json, src/lib/changelog.js, src/lib/changelog-archive.js, tsuioku-no-kirameki/index.html, extension/dist/*, app/dist/live-view.js, extension/background.js, .dist-fingerprint.json, docs/repo-tree-map.{md,html}, docs/code-tree.{md,html}, docs/feature-sitemap.{md,html}, handoff.md
+CHANGES: (1) Twitch・Kick・mixch・SHOWROOM 全 4 入口（mixch/SHOWROOM の 1s setInterval も pageWatchScheduler へ移行）で pagehide 時に current?.stop(); current = null; とゲートリセットを行い、pageshow(ev?.persisted || !current) および visibilitychange 表復帰で必ず同じ key でも再接続するように修正。(2) src/lib/pageWatchScheduler.js に L0 純関数 shouldReconnectSilentSocket を追加し、tw-content-entry.js の IRC（IRC_SILENCE_MS=330_000）と Hermes の無通信見張りを共通スケジューラ（表 10s / 裏 60s / 表復帰で即 kick()）へ統合（裸の hWatch setInterval も撤去）。(3) 単体テスト・配線テストを追加し、版を 0.1.2192 へ統一（権限追加なし）。
+TESTS_RUN: npm run test:cc -- src/lib/pageWatchScheduler.test.js src/lib/pageWatchScheduler.wiring.test.js src/lib/venuePaintSchedule.test.js src/lib/venuePaintSchedule.wiring.test.js src/lib/changelogBundleBudget.test.js src/lib/changelog.test.js src/lib/changelogConsistency.test.js / npm run verify:bump / npm run check:dist-fresh / npm run tree-map:check / npm run lint / npm run typecheck / verify:extension
+TEST_RESULT: 全合格（vitest 7 files / 63 passed、verify:bump 全7ステップOK 0.1.2192、dist-fresh OK 7397ec5204a9、tree-map up to date、eslint 0 errors、tsc 0 errors、verify:extension 合格［v0.1.2192 全13画面・全10差し込み先OK］）
+REMAINING_RISKS: 実配信ページ（グラフィック アクセラレーション OFF）での拡張 ON/OFF 比較計測（long task 回数・最長・CPU・スクリーンショット）はまだ未実施のため、PR 本文では「軽くなった」と断定せず、実測の追記待ちとして下書き PR にする。push・下書き PR 作成は Antigravity ルール（~/.gemini/AGENTS.md）により未実施。
+NEXT_ACTION: Claude Code / 手元で feat/lowspec-p0-1-page-watch を push して下書き PR を作成し、CI 確認＋グラフィック アクセラレーション OFF 実配信比較計測を追記する。次 PR は P0-2（content-chat-entry.js の Observer 4 つを mutationObserverHub へ統合）。
+LAST_WORKED_ON: 2026-11-23
+WORKED_BY: antigravity / Gemini 4 Neon (Medium)
+MACHINE_NOTES: worktree=..\_worktrees\tsuioku-no-kirameki.com\lowspec-p0-1 (branch: feat/lowspec-p0-1-page-watch, base: origin/master 5c8f700c0)。本体チェックアウトの未コミット変更には一切触れていない。
 
 ## NEEDS_JUDGMENT（司令塔が判断する。ここを自動で直してはいけない）
 
