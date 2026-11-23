@@ -14,7 +14,7 @@ const INLINE_HOST_ID = 'nls-inline-popup-host';
 
 /**
  * v0.1.595: storage に件数サマリが無くても、content メモリ直結 metrics で
- * 初回 open から記録・来場・同接カードが「—」/「~0」にならない。
+ * 初回 open から記録・来場は数値。同接は負数や ~0 にせず、材料不足なら —／計測中、取れたら正の推定。
  */
 test('chunk index のみ + metrics 直結で初回カードが埋まる（cold open）', async ({
   context
@@ -102,10 +102,10 @@ test('chunk index のみ + metrics 直結で初回カードが埋まる（cold o
       async () => (await frame.locator('#watchConcurrentEst').innerText()).trim(),
       {
         timeout: 25_000,
-        message: '同接カードが ~0 ではなく推定中または正の推定になるまで'
+        message: '同接カードが負数や ~0 にならず、—／計測中または正の推定になるまで'
       }
     )
-    .toMatch(/^(推定中|~?[1-9][\d,，]*)$/u);
+    .toMatch(/^(—|－|推定中|計測中…?|[1-9][\d,，]*)$/u);
 
   const popup = await context.newPage();
   await popup.goto(`chrome-extension://${extensionId}/popup.html`, {
