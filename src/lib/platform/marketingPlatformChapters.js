@@ -242,6 +242,7 @@ export function sectionPlatformDedicatedHtml(comments, view, pageCount, pageFact
     for (const chip of panelExtraChips(view.id, pageFacts)) {
       if (chip.placeholder) continue;
       if (chip.key === 'totalViews' && pageCount > 0) continue;
+      if (chip.key === 'estimatedViewerSpend') continue;
       cards.push([`ページの${chip.label}`, chip.text]);
     }
   }

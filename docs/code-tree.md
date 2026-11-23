@@ -27,7 +27,7 @@
 
 > 値が次の段へ届かない「断線」(broadcaster バグ型)は `npm run feature-map -- --check` が機械検知。
 
-## ⚠️ 役割コメントが無いソース 15 / 1358 件
+## ⚠️ 役割コメントが無いソース 15 / 1360 件
 - `docs/handoff/bench/bench-interval.mjs`
 - `docs/handoff/bench/bench-lane.mjs`
 - `extension-youtube/cloak-failsafe.js`
@@ -246,7 +246,7 @@
     - `2026-10-06.md`
     - `2026-10-12.md`
     - `2026-10-14.md`
-- 📁 **docs/** (384)
+- 📁 **docs/** (386)
   - 📁 **article-assets/** (87)
     - 📁 **venue-frames/** (12)
       - `f01.png`
@@ -604,6 +604,8 @@
   - `kb-web-perf-diagnosis.md`
   - `koken-contrib-hidden-tab-stuck-fix-v0616.md`
   - `lane-architecture-redesign.md`
+  - `layer-map.html`
+  - `layer-map.html`
   - `layer-map.html`
   - `live-comment-heat-chips-DESIGN.md`
   - `live-comment-heat-chips-IMPLEMENTATION-HANDOFF.md`
@@ -1218,7 +1220,7 @@
   - `gift-coin-hq.wav`
   - `gift-register-hq.wav`
   - `gift-register.mp3`
-- 📁 **src/** (2629)
+- 📁 **src/** (2632)
   - 📁 **data/** (7)
     - 📁 **acquirers/** (2)
       - `laneFromStorage.js` — 応援レーン acquirer: chrome.storage.local(nls_comments) → laneStore の橋渡し。
@@ -1255,8 +1257,8 @@
       - `avatarResolver.test.js`
       - `identity.js` — ニコ生ユーザー ID の「匿名性」判定と関連アイデンティティ・ユーティリティ。
       - `nickname.js` — 表示名（ニックネーム）の「強弱」判定。
-  - 📁 **extension/** (121)
-    - 📁 **popup/** (22)
+  - 📁 **extension/** (122)
+    - 📁 **popup/** (23)
       - 📁 **init/** (4)
         - `devMonitorExport.js` — devMonitorExport — 開発モニタの「エクスポート/ダウンロード/較正データ消去」一式。
         - `devMonitorExport.test.js`
@@ -1268,6 +1270,7 @@
       - `attachAiDiagButtonHandler.js` — attachAiDiagButtonHandler — 「AIで診断」ボタンの delegated listener を張る。
       - `attachAiDiagButtonHandler.test.js`
       - `eventLiveBoardPopup.js` — 2026-11-21 Phase 2: popup のイベント💎ボード（いまの順位・pt・次の順位まで）。popup-entry.js は
+      - `nicoEstimatedSpendChip.js` — ニコ生横欄（.nl-official-nico-stats__row）へ「推定（視聴者の購入額）」チップを同期する。
       - `renderAcquisitionDashboard.js` — renderAcquisitionDashboard — 開発者モニタの「データ取得率」ダッシュボードを描く。
       - `renderAcquisitionDashboard.test.js`
       - `wireLaneUserDetailOpen.js` — 応援レーン(story user lane)のタイルを押したら、その人の「この配信での発言一覧」を
@@ -1562,7 +1565,7 @@
         - `logo_funlink_white_RGB_link_black.png`
         - `logo_funlink_white_RGB_maru_black.png`
     - `hero-connect-hub.svg`
-  - 📁 **lib/** (2310)
+  - 📁 **lib/** (2312)
     - 📁 **__snapshots__/** (4)
       - `marketing-abema-baseline.html`
       - `marketing-niconico.html`
@@ -2296,6 +2299,8 @@
     - `enrichmentAvatarFallback.test.js`
     - `errorAutoDiagnosis.js` — v0.1.205 Phase D: 既存の診断データ（consoleErrors / networkErrors / diagWarnings）から
     - `errorAutoDiagnosis.test.js`
+    - `estimatedViewerSpend.js` — 【層】L0 判定層(純粋関数・I/O禁止)
+    - `estimatedViewerSpend.test.js`
     - `eventLiveBoardHtml.js` — イベント💎ボードの HTML（純関数・2026-11-21 Phase 2）。モデルは eventLiveBoardModel.js。
     - `eventLiveBoardModel.js` — イベント💎「いまの順位・pt・次の順位まで」ボードの表示モデル（純関数・2026-11-21 Phase 2）。
     - `eventLiveBoardModel.test.js`

@@ -11,6 +11,7 @@
 
 import { platformOfStreamKey, STREAM_PLATFORMS } from './streamPlatform.js';
 import { FOLLOWER_NOUN, followerKpiLabels } from './followerCountSample.js';
+import { estimateYoutubeSupportSpendJpy, formatEstimatedViewerSpendDisplay } from '../estimatedViewerSpend.js';
 
 /** 能力表を持つサービス。ABEMA は記録の実装が別の変更にあるので、数字の枠だけを先に置く。 */
 export const PLATFORM_METRIC_IDS = Object.freeze(['niconico', 'youtube', 'twitch', 'kick', 'abema', 'showroom', 'mixch', 'whowatch', 'twitcasting', 'tiktok']);
@@ -755,7 +756,7 @@ function supportChips(id, support) {
     const count = (num(support.superchatCount) || 0) + (num(support.stickerCount) || 0);
     const cap = platformCapability(id);
     if ('superchatWhenPositive' in cap && cap.superchatWhenPositive && paid.text === '0' && count === 0) return [];
-    return [
+    const out = [
       chip(
         'superchat',
         'スパチャ',
@@ -763,7 +764,12 @@ function supportChips(id, support) {
         paid.unit,
         `${RECORDED}スーパーチャット ${formatInt(support.superchatCount || 0)}・スーパーステッカー ${formatInt(support.stickerCount || 0)}。${paid.extra}`.trim(),
       ),
-    ].concat(countSinceChip(id, support));
+    ];
+    const estDisp = formatEstimatedViewerSpendDisplay(estimateYoutubeSupportSpendJpy(amounts));
+    if (estDisp) {
+      out.push(chip('estimatedViewerSpend', estDisp.label, estDisp.text, '', estDisp.title));
+    }
+    return out.concat(countSinceChip(id, support));
   }
   if (id === 'twitch') {
     const bits = money('BITS', 'Bits');

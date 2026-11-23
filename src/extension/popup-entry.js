@@ -779,6 +779,7 @@ import { measureLaneDomSelf, perTierKeysOf } from '../lib/laneDomSelfMeasure.js'
 import { laneDomFingerprint } from '../lib/laneSceneEnvelope.js';
 import { createMirrorBundleFlushScheduler } from '../lib/mirrorBundleFlushScheduler.js';
 import { KEY_STAT_CARDS_MIRROR } from '../lib/statCardsMirrorKey.js';
+import { syncNicoEstimatedViewerSpendChip } from './popup/nicoEstimatedSpendChip.js';
 import { buildStatCardsMirrorSnapshot } from '../lib/statCardsMirror.js';
 import { createStatCardsMirrorPassivePainter } from '../lib/statCardsMirrorDom.js';
 // 北極星レーン鏡(公式値レーン)を status→純Web へ送るための publish(laneMirror/statCardsMirror と同じ轍)。
@@ -9503,7 +9504,7 @@ function paintOfficialNicoStatsStrip(snapshot) {
   const RATE_PH = { text: '', isPlaceholder: true };
   if (!snapshot || !String(snapshot.liveId || '').trim()) {
     for (const id of ids) applyChip(id, PH);
-    applyChip(RATE_ID, RATE_PH);
+    applyChip(RATE_ID, RATE_PH); syncNicoEstimatedViewerSpendChip($('officialStatNicoGiftPts'), null);
     _officialCommentRate.reset();
     _officialCommentRateLid = '';
     return;
@@ -9538,7 +9539,7 @@ function paintOfficialNicoStatsStrip(snapshot) {
   const digest = buildOfficialNicoStatsStripDigest(augmented);
   if (!digest) {
     for (const id of ids) applyChip(id, PH);
-    applyChip(RATE_ID, RATE_PH);
+    applyChip(RATE_ID, RATE_PH); syncNicoEstimatedViewerSpendChip($('officialStatNicoGiftPts'), null);
     return;
   }
   const foreignPlatform = String(snapshot?.platform || '').trim().toLowerCase();
@@ -9550,7 +9551,7 @@ function paintOfficialNicoStatsStrip(snapshot) {
     applyChip('officialStatNicoComments', PH);
     applyChip(RATE_ID, RATE_PH);
     applyChip('officialStatNicoAdPts', PH);
-    applyChip('officialStatNicoGiftPts', PH);
+    applyChip('officialStatNicoGiftPts', PH); syncNicoEstimatedViewerSpendChip($('officialStatNicoGiftPts'), null);
     return;
   }
   applyChip('officialStatNicoViewers', digest.viewers);
@@ -9562,7 +9563,7 @@ function paintOfficialNicoStatsStrip(snapshot) {
   const rateText = digest.comments.isPlaceholder ? '' : formatCommentRate(_officialCommentRate.ratePerMin(Date.now()));
   applyChip(RATE_ID, { text: rateText, isPlaceholder: rateText === '' });
   applyChip('officialStatNicoAdPts', digest.adPts);
-  applyChip('officialStatNicoGiftPts', digest.giftPts);
+  applyChip('officialStatNicoGiftPts', digest.giftPts); syncNicoEstimatedViewerSpendChip($('officialStatNicoGiftPts'), digest.giftPts);
 
   // v0.1.1720: pt 優先順位は resolveOfficialPoints.js に集約(DOM 優先・status と共有)。
   const adPtsNum = resolveOfficialPoints({

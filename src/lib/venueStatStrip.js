@@ -24,6 +24,7 @@
 
 import { ageMsOf } from './timeAuthority.js';
 import { venueItemsForPlatform } from './platform/platformMetrics.js';
+import { estimateNiconicoGiftSpendJpy, formatEstimatedViewerSpendDisplay } from './estimatedViewerSpend.js';
 
 /** 鏡がこれより古ければ「パネルが閉じている」とみなす[ms](鏡は中身が同じでも15秒ごとに書き直される)。 */
 /** 数字の帯に出す3キャラの顔(拡張の中の画像)。視聴ページの中の会場はこれを先に blob: へ読んでおく(venue-inline-entry.js)。 */
@@ -160,6 +161,20 @@ export function buildVenueStatStripModel(snap, opts = {}) {
       { key: 'adPts', label: '広告pt', ...adPts, unit: '', face: '' },
       { key: 'giftPts', label: 'ギフトpt', ...giftPts, unit: '', face: '' }
     ];
+    if (!giftPts.isPlaceholder) {
+      const estDisp = formatEstimatedViewerSpendDisplay(estimateNiconicoGiftSpendJpy(giftPts.text));
+      if (estDisp) {
+        items.push({
+          key: 'estimatedViewerSpend',
+          label: estDisp.label,
+          text: estDisp.text,
+          unit: '',
+          isPlaceholder: false,
+          face: '',
+          title: estDisp.title
+        });
+      }
+    }
   }
 
   /** @type {'mirror'|'self'|'fallback'|'none'} */

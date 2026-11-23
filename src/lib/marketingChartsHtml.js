@@ -22,6 +22,11 @@ import {
 } from './platform/marketingPlatformChapters.js';
 import { followerKpiTexts } from './platform/followerCountSample.js';
 import { followerSeriesForPlatform } from './platform/followerSampleStore.js';
+import {
+  estimateNiconicoGiftSpendJpy,
+  estimateYoutubeSpendFromComments,
+  formatEstimatedViewerSpendDisplay
+} from './estimatedViewerSpend.js';
 import { buildCommenterFollowAnalytics } from './commenterFollowAnalytics.js';
 import { buildUserProfileLinkedLabelHtml } from './userProfileLinkHtml.js';
 import {
@@ -3486,6 +3491,18 @@ export function buildMarketingDashboardHtml(r, opts = {}) {
   //   (このページでできること/りんく達から/分析スキル/ハーネス/作戦会議・応援が増えそうな時間・初見さん・切り抜き・お返し・お願い・注意/
   //   ファネル優先度・層別の使い方/各グラフ後の助言カード)は出さない。数字の章を「要点→視聴維持→流れ→応援者→ギフト→過去比較→記録」の順に並べる。
   const followerSeries = followerSeriesForPlatform(view ? view.id : 'niconico', opts.followerSamples);
+  const estimatedViewerSpendDisp = (() => {
+    if (!view) {
+      const nicoGiftPts =
+        positiveMarketingNumber(opts.officialEventDomBundle?.programStats?.giftPoints) ||
+        positiveMarketingNumber(giftMomentum?.totals?.totalPoints);
+      return formatEstimatedViewerSpendDisplay(estimateNiconicoGiftSpendJpy(nicoGiftPts));
+    }
+    if (view.id === 'youtube') {
+      return formatEstimatedViewerSpendDisplay(estimateYoutubeSpendFromComments(commentsRaw));
+    }
+    return null;
+  })();
   const supportArrivalHtml = sectionSupportArrivalHtml({
     platformId: view ? view.id : 'niconico',
     comments: commentsRaw,
@@ -3496,7 +3513,7 @@ export function buildMarketingDashboardHtml(r, opts = {}) {
   });
   const bodyHtml = `${supportArrivalHtml ? `${supportArrivalHtml}\n` : ''}__NL_TOC_PLACEHOLDER__
 ${sectionHeroCard(r, broadcastNarrative?.summaryLine || '', maskShare, view ? null : audienceGap) + (view ? sectionSupportFlowHtml(commentsRaw, view) + sectionPlatformDedicatedHtml(commentsRaw, view, pageCount, pageFacts) + sectionStreamerMomentsHtml(commentsRaw, view, sessionSummaryRows, pageCount) : '')}
-${idWrap('mkt-kpi', sectionKpi(r, view ? null : audienceGap, followerSeries))}
+${idWrap('mkt-kpi', sectionKpi(r, view ? null : audienceGap, followerSeries, estimatedViewerSpendDisp))}
 ${view ? sectionPlatformSummaryHtml(r, view, concurrentSeries, concurrentPeak, pageCount) : sectionMarketingDataSummary(marketingDataSummary)}
 ${view ? sectionParticipationForPlatform(r, view, pageCount) : sectionAudienceParticipationLead(audienceGap, r, supportParticipation)}
 ${view && view.hide.has('mkt-audience-gap') ? '' : sectionAudienceEngagementGap(audienceGap, r)}
@@ -3974,8 +3991,8 @@ ${copyScript}
 </section>`;
 }
 
-/** @param {MarketingReport} r @param {import('./audienceEngagementGap.js').AudienceEngagementGap} [gap] @param {ReturnType<typeof followerSeriesForPlatform>} [followerSeries] */
-function sectionKpi(r, gap, followerSeries) {
+/** @param {MarketingReport} r @param {import('./audienceEngagementGap.js').AudienceEngagementGap} [gap] @param {ReturnType<typeof followerSeriesForPlatform>} [followerSeries] @param {ReturnType<typeof formatEstimatedViewerSpendDisplay>} [estimatedSpend] */
+function sectionKpi(r, gap, followerSeries, estimatedSpend) {
   const participation = gap ? resolveCommentParticipation(r, gap) : null;
   /** @type {{ label: string, value: string, icon: string }[]} */
   const cards = [];
@@ -3985,6 +4002,13 @@ function sectionKpi(r, gap, followerSeries) {
       { label: texts.countLabel, value: texts.countText, icon: '👤' },
       { label: texts.gainLabel, value: texts.gainedText, icon: '📈' }
     );
+  }
+  if (estimatedSpend) {
+    cards.push({
+      label: estimatedSpend.label,
+      value: estimatedSpend.text,
+      icon: '💴'
+    });
   }
   if (participation && participation.totalVisitors > 0) {
     cards.push({
@@ -4014,7 +4038,10 @@ function sectionKpi(r, gap, followerSeries) {
         `<div class="mkt-kpi"><span class="mkt-kpi__icon">${c.icon}</span><span class="mkt-kpi__val">${escapeHtml(c.value)}</span><span class="mkt-kpi__label">${escapeHtml(c.label)}</span></div>`
     )
     .join('');
-  return `<section class="mkt-section"><h2>KPI サマリ</h2><div class="mkt-kpi-grid">${inner}</div></section>`;
+  const spendNote = estimatedSpend
+    ? `<p class="mkt-note">${escapeHtml(estimatedSpend.note)}（出典: ${escapeHtml(estimatedSpend.sourceUrl)}）</p>`
+    : '';
+  return `<section class="mkt-section"><h2>KPI サマリ</h2><div class="mkt-kpi-grid">${inner}</div>${spendNote}</section>`;
 }
 
 /** @param {MarketingReport} r */

@@ -1,16 +1,16 @@
-# Handoff — P2: 状態ダンプ（JSON）へのニコ生以外サービス追加 (v0.1.2200)
+# Handoff — 推定（視聴者の購入額）チップ・マーケレポート追加 (v0.1.2201)
 
 STATUS: コミット済み・push・下書きPR作成待ち（未 push）
-ROOT_CAUSE: extension/background.js の runMcpDiagDumpTick（nicolivelog-mcp/status-latest.json・既定 OFF）と status.html の JSON ダウンロードがニコ生のみを対象としており、YouTube・Twitch・Kick・ふわっち・SHOWROOM・ミクチャ・ツイキャス・TikTok・ABEMA の計器スナップショットや開いている視聴タブを JSON ダンプから確認できなかった。
-FILES_CHANGED: src/lib/mcpDiagDumpServices.js, src/lib/mcpDiagDumpServices.test.js, src/extension/statusOtherServicesDump.js, extension-youtube/src/background-entry.js, extension/background.js, src/extension/status-entry.js, extension/manifest.json, package.json, src/lib/changelog.js, src/lib/changelog-archive.js, tsuioku-no-kirameki/index.html, extension/dist/*, app/dist/live-view.js, .dist-fingerprint.json, docs/repo-tree-map.{md,html}, docs/code-tree.{md,html}, docs/feature-sitemap.{md,html}, docs/layer-map.html, handoff.md
-CHANGES: L0 共通モジュール src/lib/mcpDiagDumpServices.js を新設し、固定ホワイトリストの他サービス計器キー 15 件（yt_diag_*_chat 等）と既存 host_permissions 内の視聴タブ URL パターン・軽量要約（最大 30 件、機密クエリ除外）を定義。extension/background.js の runMcpDiagDumpTick（既定 OFF 維持、全 storage ダンプなし）と status.html の JSON ダウンロード（クリック時オンデマンド取得で常時負荷・純Webペイロード肥大ゼロ）の両方へ otherServiceTabs / otherServiceDiags を追加。権限・価格・関所・UI 文言・VOICEVOX CPU 基準は未変更。
-TESTS_RUN: npm run test:cc -- src/lib/mcpDiagDumpServices.test.js src/lib/changelogBundleBudget.test.js src/lib/changelog.test.js src/lib/changelogConsistency.test.js / npm run verify:bump / npm run check:dist-fresh / npm run tree-map:check / npm run check:layer / npm run lint / npm run typecheck / verify:extension
-TEST_RESULT: 全合格（vitest 4 files / 35 passed、verify:bump 全7ステップOK 0.1.2200、dist-fresh OK、tree-map up to date、check:layer 合格、eslint 0 errors［status-entry.js 行数上限クリア］、tsc 0 errors、verify:extension 合格［v0.1.2200 全13画面・全10差し込み先OK］）
-REMAINING_RISKS: 実配信ページを開いた状態で status.html の JSON ダウンロードおよび opt-in 時の status-latest.json 出力を確認してから Ready for review にする。push・PR 作成は Antigravity ルールにより未実施。
-NEXT_ACTION: 手元で feat/lowspec-p2-status-dump-services を push して下書き PR を作成する。次は ④ 推定購入額（v0.1.2201）。
+ROOT_CAUSE: YouTube のスーパーチャット・スーパーステッカーおよびニコ生の有料ギフト pt について、視聴者の推定購入額（円換算）を会場・横欄・マーケ分析レポートで確認できる表示が無く、ytGiftToNico.js の固定為替は日付・出典が無いため購入額の推定根拠として使えなかった。
+FILES_CHANGED: src/lib/estimatedViewerSpend.js, src/lib/estimatedViewerSpend.test.js, src/extension/popup/nicoEstimatedSpendChip.js, src/lib/platform/platformMetrics.js, src/lib/venueStatStrip.js, src/lib/venueStatStrip.test.js, src/extension/popup-entry.js, src/lib/platform/marketingPlatformChapters.js, src/lib/marketingChartsHtml.js, src/lib/__snapshots__/marketing-youtube-baseline.html, extension/manifest.json, package.json, src/lib/changelog.js, src/lib/changelog-archive.js, tsuioku-no-kirameki/index.html, extension/dist/*, app/dist/live-view.js, extension/background.js, .dist-fingerprint.json, docs/repo-tree-map.{md,html}, docs/code-tree.{md,html}, docs/feature-sitemap.{md,html}, docs/layer-map.html, handoff.md
+CHANGES: 価格と為替を日付・一次出典 URL つきで 1 ファイル（src/lib/estimatedViewerSpend.js: ニコニコポイント Web 標準単価 2026-11-23 確認・ECB 基準為替 2026-11-20 確定値）に集約し、ytGiftToNico.js の固定為替は使わずに YouTube スパチャ・ステッカーとニコ生有料ギフト pt のみを対象に「推定（視聴者の購入額）」を算出（配信者の手取りは表示しない）。会場（venueStatStrip.js / platformMetrics.js）・横欄（platformMetrics.js / popup-entry.js）・マーケレポート（marketingChartsHtml.js）へ接続し、他サービスや広告 pt・無料ギフトには出さない。権限・価格・関所・UI 文言・VOICEVOX CPU 基準は未変更。
+TESTS_RUN: npm run test:cc -- src/lib/estimatedViewerSpend.test.js src/lib/venueStatStrip.test.js src/lib/platform/platformMetrics.test.js src/lib/platform/platformMetricChrome.test.js src/lib/marketingChartsHtml.snapshot.test.js src/lib/changelogBundleBudget.test.js src/lib/changelog.test.js src/lib/changelogConsistency.test.js / npm run verify:bump / npm run check:dist-fresh / npm run tree-map:check / npm run check:layer / npm run lint / npm run typecheck / verify:extension
+TEST_RESULT: 全合格（vitest 8 files / 101 passed、verify:bump 全7ステップOK 0.1.2201、dist-fresh OK、tree-map up to date、check:layer 合格、eslint 0 errors［popup-entry.js 行数上限クリア］、tsc 0 errors、verify:extension 合格［v0.1.2201 全13画面・全10差し込み先OK］）
+REMAINING_RISKS: 実配信ページ（YouTube スパチャあり・ニコ生有料ギフトあり）で会場・横欄・マーケ HTML の表示を確認してから Ready for review にする。push・PR 作成は Antigravity ルールにより未実施。
+NEXT_ACTION: 手元で feat/estimated-viewer-spend を push して下書き PR を作成する。
 LAST_WORKED_ON: 2026-11-23
 WORKED_BY: antigravity / Gemini 4 Neon (Medium)
-MACHINE_NOTES: worktree=..\_worktrees\tsuioku-no-kirameki.com\cleanup-p2 (branch: feat/lowspec-p2-status-dump-services, base: origin/master a7290164a)。本体チェックアウトの未コミット変更には一切触れていない。
+MACHINE_NOTES: worktree=..\_worktrees\tsuioku-no-kirameki.com\cleanup-est-spend (branch: feat/estimated-viewer-spend, base: origin/master a7290164a)。本体チェックアウトの未コミット変更には一切触れていない。
 
 ## NEEDS_JUDGMENT（司令塔が判断する。ここを自動で直してはいけない）
 
