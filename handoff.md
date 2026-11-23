@@ -1,13 +1,13 @@
 # Handoff — 低スペックPC向け L0 共有部品（#690 マージ前先行作成）
 
-STATUS: 検品・push・下書きPR作成待ち（0.1.2182 版バンプまで commit 済み・未 push）
-ROOT_CAUSE: 全配信サービスの入口に 1 秒 setInterval と同期 MutationObserver が分散しており、アクセラレーション OFF 等の低スペック環境でメインスレッド負荷の原因になっている。PR #690 が未マージのため、#690 非接触の新規ファイルだけで L0 共有部品と単体テストを先行作成し、版を 0.1.2182 へ揃えた。
+STATUS: マージ衝突解消済み・push 待ち（PR #692 / v0.1.2182 / origin/master b36c3568a を取り込み commit 済み・未 push）
+ROOT_CAUSE: PR #692（1f888d973）の起点 e4ff7878b のあと origin/master に #691（0.1.2180, b36c3568a）が入り、manifest/package/changelog/LP/dist/maps が衝突したため GitHub Actions の pull_request CI（test-and-build / e2e）が未発火だった。
 FILES_CHANGED: src/lib/pageWatchScheduler.js, src/lib/pageWatchScheduler.test.js, src/lib/mutationObserverHub.js, src/lib/mutationObserverHub.test.js, extension/manifest.json, package.json, src/lib/changelog.js, tsuioku-no-kirameki/index.html, extension/dist/*, app/dist/live-view.js, extension/background.js, .dist-fingerprint.json, docs/repo-tree-map.{md,html}, docs/code-tree.{md,html}, docs/feature-sitemap.{md,html}, docs/layer-map.html, handoff.md
-CHANGES: (1) L0 共通部品（pageWatchScheduler.js / mutationObserverHub.js）と単体テスト 15 件を追加（d31d2d355）。(2) manifest / package / changelog（要約:「低スペック PC 向けの共通部品を追加（まだ使われていません）」）/ LP を 0.1.2182 へ揃え、npm run build・tree-map・layer-map を再生成。既存の入口ファイル・venue 系・権限・課金・文言は未変更。
-TESTS_RUN: npm run build / npm run verify:bump / npm run check:dist-fresh / npm run tree-map:check / npm run layer-map:check / npm run check:layer / npm run check:no-secrets / npm run lint / npm run typecheck / npm run test:cc -- src/lib/changelog.test.js src/lib/changelogConsistency.test.js src/lib/pageWatchScheduler.test.js src/lib/mutationObserverHub.test.js
-TEST_RESULT: 全合格（verify:bump 全7ステップOK、dist-fresh OK、tree-map/layer-map up to date、check-layer 合格、no-secrets OK、eslint 0 errors、tsc 0 errors、vitest 4 files / 39 passed）
-REMAINING_RISKS: Antigravity のグローバルルール（~/.gemini/AGENTS.md: git push・gh pr 実行禁止）に従い、push・下書き PR 作成・CI 確認は未実施。入口への配線・実配信ページ（アクセラレーション OFF）での long task 計測は #690 マージ後の別 PR（P0-1 / P0-2）で行う。
-NEXT_ACTION: Claude Code 側で feat/lowspec-l0-primitives を push して下書き PR を作成し、CI（test-and-build / e2e）を確認する。#690 マージ後は最新 origin/master から新ブランチを切り、P0-1（pageWatchScheduler 移行）→ P0-2（mutationObserverHub 移行）を別 PR で進める。
+CHANGES: origin/master（b36c3568a, #691 0.1.2180）を feat/lowspec-l0-primitives へマージして衝突を解消。版は 0.1.2182 を維持し、changelog.js に 0.1.2182 と 0.1.2180 の両方を順序どおり残したうえで npm run build・tree-map・layer-map を再生成した。既存の入口ファイル・venue 系・#690 対象ファイルは未変更。
+TESTS_RUN: npm run build / npm run verify:bump / npm run check:dist-fresh / npm run tree-map:check / npm run test:cc -- src/lib/changelog.test.js src/lib/changelogConsistency.test.js src/lib/pageWatchScheduler.test.js src/lib/mutationObserverHub.test.js
+TEST_RESULT: 全合格（verify:bump 全7ステップOK 0.1.2182、dist-fresh OK 483526e0da49、tree-map up to date、vitest 4 files / 39 passed）
+REMAINING_RISKS: push は Antigravity ルールにより未実行。push 後に PR #692 の GitHub Actions（test-and-build / e2e）が発火する。入口への移行と実配信ページ計測は #690 マージ後の別 PR（P0-1 / P0-2）で行う。
+NEXT_ACTION: Claude Code / 手元で feat/lowspec-l0-primitives を push して PR #692 の CI（test-and-build / e2e）を実行する。#690 マージ連絡後に最新 origin/master から新ブランチを切り P0-1 へ着手。
 LAST_WORKED_ON: 2026-11-23
 WORKED_BY: antigravity / Gemini 4 Neon (Medium)
 MACHINE_NOTES: worktree=..\_worktrees\tsuioku-no-kirameki.com\lowspec-l0-primitives (branch: feat/lowspec-l0-primitives, base: origin/master e4ff7878b)。本体チェックアウトの未コミット変更には一切触れていない。

@@ -25,7 +25,7 @@
         line-height: 1.6;
         padding: 24px 16px 32px;
       }
-      main { max-width: 520px; margin: 0 auto; }
+      main { max-width: 640px; margin: 0 auto; }
       h1 { font-size: 21px; margin: 0 0 6px; text-align: center; }
       .lead { color: var(--nl-text-soft); font-size: 14px; margin: 0 0 18px; text-align: center; }
       .card {
@@ -38,6 +38,18 @@
       }
       .card h2 { font-size: 15px; margin: 0 0 8px; }
       ul { margin: 0; padding-left: 1.2em; font-size: 14px; }
+      .boundary { display: grid; grid-template-columns: 1fr; gap: 10px; }
+      @media (min-width: 640px) {
+        .boundary { grid-template-columns: 1fr 1fr; }
+      }
+      .scope {
+        background: #fff;
+        border: 1px solid var(--nl-border);
+        border-radius: 10px;
+        padding: 12px;
+      }
+      .scope h3 { font-size: 14px; margin: 0 0 8px; }
+      .scope li { word-break: keep-all; overflow-wrap: anywhere; line-break: strict; }
       .plans { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
       .plan {
         border: 2px solid var(--nl-border);
@@ -49,9 +61,10 @@
         font: inherit;
         color: inherit;
       }
-      .plan.is-best { border-color: var(--nl-accent); }
-      .plan .price { font-size: 20px; font-weight: 800; }
+      .plan.is-yearly { border-color: var(--nl-accent); }
+      .plan .price { font-size: 18px; font-weight: 800; }
       .plan .note { font-size: 12px; color: var(--nl-text-soft); }
+      .trial-note { margin-top: 12px; }
       .badge { display: inline-block; font-size: 11px; font-weight: 700; color: #fff; background: var(--nl-accent); border-radius: 999px; padding: 1px 8px; }
       button.primary {
         width: 100%;
@@ -102,14 +115,28 @@
       <!-- 申し込み前 -->
       <section id="joinView">
         <div class="card">
-          <h2>サポーターでできること</h2>
-          <ul>
-            <li>マーケ HTML(配信の分析レポート)</li>
-            <li>メディアキット(自分の配信の紹介資料)</li>
-            <li>スパチャ・ギフトの集計、視聴維持率、配信をまたいだ推移</li>
-            <li>コメビュ(OBS)の隅の「追憶のきらめき」の表示を消す</li>
-          </ul>
-          <p class="msg">コメントの記録・振り返り・読み上げ・スマホでの表示は、これまでどおり無料です。</p>
+          <h2>無料で使えるものと、サポーターでできること</h2>
+          <div class="boundary">
+            <div class="scope" id="freeScope">
+              <h3>無料で使えること</h3>
+              <ul>
+                <li>コメントの記録・振り返り</li>
+                <li>3つのレーン、会場、コメビュ（OBS）</li>
+                <li>応援者ランキング（配信中の表示を含む）</li>
+                <li>読み上げ（人ごとの声や VOICEVOX を含む）</li>
+                <li>スマホでの表示（WEB 版とアプリ）</li>
+              </ul>
+            </div>
+            <div class="scope" id="paidScope">
+              <h3>サポーターでできること</h3>
+              <ul>
+                <li>マーケ分析レポート（マーケ HTML）一式</li>
+                <li>メディアキット（同じレポートの中の紹介資料）</li>
+                <li>スパチャ・ギフトの集計、視聴維持率、配信をまたいだ推移</li>
+                <li>コメビュ（OBS）の隅の「追憶のきらめき」の表示を消す</li>
+              </ul>
+            </div>
+          </div>
         </div>
         <div class="card">
           <h2>料金</h2>
@@ -117,17 +144,17 @@
           <input id="refCode" class="ref-input" type="text" inputmode="text" autocomplete="off" spellcheck="false" maxlength="32" placeholder="RH-XXXX" aria-describedby="refHint" />
           <p class="msg ref-hint" id="refHint">紹介リンクから開いた人は入っています。別の端末で申し込むときはここに入れてください。入れても料金は変わりません。</p>
           <div class="plans">
-            <button class="plan is-best" type="button" data-plan="yearly">
-              <span class="badge">おすすめ</span>
-              <div class="price" id="priceYearly">年額</div>
-              <div class="note">2か月分おトク</div>
+            <button class="plan is-yearly" type="button" data-plan="yearly">
+              <div class="price" id="priceYearly">年額 9,800円（税込）</div>
+              <div class="note">月額12か月分は 11,760円です</div>
             </button>
             <button class="plan" type="button" data-plan="monthly">
-              <div class="price" id="priceMonthly">月額</div>
+              <div class="price" id="priceMonthly">月額 980円（税込）</div>
               <div class="note">いつでも解約できます</div>
             </button>
           </div>
-          <p class="msg">支払いは Stripe(カード・Apple Pay・Google Pay)。カード番号はこちらには届きません。</p>
+          <p class="msg trial-note" id="trialNote"></p>
+          <p class="msg">支払いは Stripe（カード・Apple Pay・Google Pay）。カード番号はこちらには届きません。</p>
           <p class="msg err" id="joinErr" hidden></p>
         </div>
       </section>

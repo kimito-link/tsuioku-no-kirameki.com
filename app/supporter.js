@@ -2,11 +2,12 @@
 //   価格の表示は SUPPORTER_PRICES だけを直す(Stripe の価格と必ずそろえる)。
 //   紹介コードはブラウザに90日だけ覚え、Checkout の Subscription metadata に載せる。
 import { normalizeReferralCode, rememberReferralCode, resolveReferralCode } from './referral-attribution.js';
+import { formatPriceLabel, formatTrialBillingNotice } from './supporter-pricing.js';
 
 (function () {
   'use strict';
-  /** ★りんくさんが価格を決めたらここを直す(Stripe 側の価格と同じ値)。 */
-  const SUPPORTER_PRICES = { yearly: '年額 9,800円', monthly: '月額 980円' };
+  /** 表示文言。金額そのものは supporter-pricing.js の SUPPORTER_PRICE_YEN（Stripe と同じ値）。 */
+  const SUPPORTER_PRICES = { yearly: formatPriceLabel('yearly'), monthly: formatPriceLabel('monthly') };
   const API = '/api/billing';
 
   function $(id) { return document.getElementById(id); }
@@ -33,6 +34,9 @@ import { normalizeReferralCode, rememberReferralCode, resolveReferralCode } from
 
   $('priceYearly').textContent = SUPPORTER_PRICES.yearly;
   $('priceMonthly').textContent = SUPPORTER_PRICES.monthly;
+  if ($('trialNote')) {
+    $('trialNote').textContent = formatTrialBillingNotice({ nowMs: Date.now() });
+  }
 
   const params = new URLSearchParams(location.search);
   const remembered = resolveReferralCode(storage(), params.get('ref'));
