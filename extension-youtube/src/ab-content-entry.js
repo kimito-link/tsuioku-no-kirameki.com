@@ -39,6 +39,7 @@ import { withRevealedVenueOfficialComposer } from '../../src/lib/venueRevealOffi
 import { createPageWatchScheduler } from '../../src/lib/pageWatchScheduler.js';
 import { isVenuePageHidden } from '../../src/lib/venuePaintSchedule.js';
 import { isExtensionContextAlive } from '../../src/lib/reportSilentError.js';
+import { startOrphanTabAutoReloadInPage } from '../../src/extension/orphanTabAutoReloadHost.js';
 
 const OUT = 'nl-ab-iso';
 const IN = 'nl-ab-main';
@@ -816,3 +817,4 @@ window.addEventListener('pagehide', () => {
 window.addEventListener('pageshow', (ev) => {
   if (ev?.persisted || !streamKey) resumeAbWatch();
 });
+if (window.top === window) startOrphanTabAutoReloadInPage(() => isExtensionContextAlive());

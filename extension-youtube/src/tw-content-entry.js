@@ -46,6 +46,8 @@ import { runBackfillLoop } from '../../src/lib/platform/historyBackfill.js';
 import { createPageWatchScheduler, shouldReconnectSilentSocket } from '../../src/lib/pageWatchScheduler.js';
 import { isVenuePageHidden } from '../../src/lib/venuePaintSchedule.js';
 import { isExtensionContextAlive } from '../../src/lib/reportSilentError.js';
+import { startOrphanTabAutoReloadInPage } from '../../src/extension/orphanTabAutoReloadHost.js';
+import { createThrottledSnapshotWriter } from '../../src/lib/diagFlushThrottle.js';
 import {
   twHermesUrl,
   twRewardTopic,
@@ -127,20 +129,18 @@ function safeSendMessage(msg) {
   }
 }
 
-let diagTimer = 0;
 /** 絵文字の名前 → 画像(画面で本文を画像にする・pfEmoteStore.js) */
 const emoteSaver = createEmoteSaver('yt_tw_emotes');
+const diagWriter = createThrottledSnapshotWriter('yt_diag_tw_chat', {
+  getSnapshot: () => ({ ...diag }),
+  writeStorage: (items) => { void chrome.storage.local.set(items); },
+  minIntervalMs: 2000,
+  hiddenMinIntervalMs: 15_000,
+  isHidden: () => isVenuePageHidden(document),
+  isContextAlive: () => isExtensionContextAlive(),
+});
 function saveDiagSoon() {
-  if (diagTimer) return;
-  diagTimer = setTimeout(() => {
-    diagTimer = 0;
-    diag.updatedAt = Date.now();
-    try {
-      void chrome.storage.local.set({ yt_diag_tw_chat: { ...diag } });
-    } catch {
-      /* no-op */
-    }
-  }, 2000);
+  diagWriter.schedule();
 }
 
 /** @param {any} body */
@@ -985,3 +985,4 @@ window.addEventListener('pagehide', () => {
 window.addEventListener('pageshow', (ev) => {
   if (ev?.persisted || !current) resumeTwWatch();
 });
+if (window.top === window) startOrphanTabAutoReloadInPage(() => isExtensionContextAlive());

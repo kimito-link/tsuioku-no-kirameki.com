@@ -24,6 +24,15 @@
 /** @type {ChangelogEntry[]} */
 const ARCHIVE_ENTRIES = [
   Object.freeze({
+    version: '0.1.2176',
+    date: '2026-11-21',
+    summary: '開発モードではマーケHTMLを自由に保存',
+    items: Object.freeze([
+      'りんくさんの開発用の読み込み（フォルダから読み込んだ版／ストア提出ではないビルド）では、コードがなくてもマーケレポートのHTMLを保存できます。',
+      'Chromeウェブストアから入れた版と、提出用のZIPの関所・14日のお試しは、今までどおりです。',
+    ])
+  }),
+  Object.freeze({
     version: '0.1.2175',
     date: '2026-11-21',
     summary: 'ランキングページ「いま動いた人」の人数の書き方を直しました',

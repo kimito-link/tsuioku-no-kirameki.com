@@ -14,6 +14,9 @@ import {
  * @returns {() => void}
  */
 export function startOrphanTabAutoReloadInPage(hasContext) {
+  const root = /** @type {any} */ (globalThis);
+  if (root.__nlOrphanAutoReloadStarted) return () => {};
+  root.__nlOrphanAutoReloadStarted = true;
   return startOrphanTabAutoReload({
     hasContext,
     isTyping: () => isTypingInPage(document),

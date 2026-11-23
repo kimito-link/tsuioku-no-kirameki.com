@@ -44,6 +44,7 @@ import { createInfoPollGate } from '../../src/lib/platform/infoPollGate.js';
 import { createPageWatchScheduler } from '../../src/lib/pageWatchScheduler.js';
 import { isVenuePageHidden } from '../../src/lib/venuePaintSchedule.js';
 import { isExtensionContextAlive } from '../../src/lib/reportSilentError.js';
+import { startOrphanTabAutoReloadInPage } from '../../src/extension/orphanTabAutoReloadHost.js';
 import { makeDiagTabToken, shouldSkipDiagWrite } from '../../src/lib/platform/diagTabShare.js';
 import { platformFetchTimeoutSignal } from '../../src/lib/platform/fetchTimeout.js';
 import { followerSampleFromDom, followerSampleFromTikTokRoom } from '../../src/lib/platform/followerCountSample.js';
@@ -632,3 +633,4 @@ window.addEventListener('pagehide', () => {
 window.addEventListener('pageshow', (ev) => {
   if (ev?.persisted || !current) resumeTtWatch();
 });
+if (window.top === window) startOrphanTabAutoReloadInPage(() => isExtensionContextAlive());

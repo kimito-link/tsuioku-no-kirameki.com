@@ -143,3 +143,96 @@ export function createThrottledDiagFlusher(applyDelta, key, opts) {
     isDirty: () => queue.length > 0
   };
 }
+
+/**
+ * スナップショット置換型の診断キー（yt_diag_* 等）を「値が変わったときだけ・最短間隔つき・裏タブさらに間引き」で書く L0 書き手。
+ * 同一内容の再書き込みを抑止し、混雑時の chrome.storage.local.set 輻輳を防ぐ。
+ *
+ * @param {string} key
+ * @param {{
+ *   getSnapshot: () => Record<string, unknown> | null | undefined,
+ *   writeStorage: (items: Record<string, unknown>) => unknown,
+ *   minIntervalMs?: number,
+ *   hiddenMinIntervalMs?: number,
+ *   isHidden?: () => boolean,
+ *   isContextAlive?: () => boolean,
+ *   now?: () => number,
+ *   setTimeoutFn?: (fn: () => void, ms: number) => unknown,
+ *   clearTimeoutFn?: (handle: unknown) => void
+ * }} opts
+ */
+export function createThrottledSnapshotWriter(key, opts) {
+  const {
+    getSnapshot,
+    writeStorage,
+    minIntervalMs = 2000,
+    hiddenMinIntervalMs = 15_000,
+    isHidden = () => false,
+    isContextAlive = () => true,
+    now = () => Date.now(),
+    setTimeoutFn,
+    clearTimeoutFn
+  } = opts || {};
+  /** @type {(fn: () => void, ms: number) => unknown} */
+  const doSetTimeout = setTimeoutFn || ((fn, ms) => setTimeout(fn, ms));
+  /** @type {(handle: unknown) => void} */
+  const doClearTimeout = clearTimeoutFn || ((h) => clearTimeout(/** @type {any} */ (h)));
+
+  let lastSig = '';
+  let lastWriteAt = -Infinity;
+  /** @type {unknown} */
+  let timer = null;
+  let writes = 0;
+  let skippedSame = 0;
+
+  function clearTimer() {
+    if (timer != null) {
+      doClearTimeout(timer);
+      timer = null;
+    }
+  }
+
+  function flushNow() {
+    clearTimer();
+    if (!isContextAlive()) return false;
+    const snap = typeof getSnapshot === 'function' ? getSnapshot() : null;
+    if (!snap || typeof snap !== 'object') return false;
+    let sig = '';
+    try {
+      sig = JSON.stringify(snap);
+    } catch {
+      return false;
+    }
+    if (sig === lastSig) {
+      skippedSame += 1;
+      return false;
+    }
+    lastSig = sig;
+    lastWriteAt = now();
+    writes += 1;
+    try {
+      writeStorage({ [key]: { ...snap, at: lastWriteAt } });
+    } catch {
+      /* 診断の書き込み失敗で本体を止めない */
+    }
+    return true;
+  }
+
+  function schedule() {
+    if (!isContextAlive() || timer != null) return;
+    const interval = isHidden() ? Math.max(minIntervalMs, hiddenMinIntervalMs) : minIntervalMs;
+    const elapsed = now() - lastWriteAt;
+    const waitMs = Number.isFinite(elapsed) && elapsed < interval ? Math.max(0, interval - elapsed) : Math.min(interval, minIntervalMs);
+    timer = doSetTimeout(() => {
+      timer = null;
+      flushNow();
+    }, waitMs);
+  }
+
+  return {
+    schedule,
+    flushNow,
+    stop: clearTimer,
+    stats: () => ({ writes, skippedSame })
+  };
+}

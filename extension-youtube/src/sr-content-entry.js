@@ -42,6 +42,7 @@ import { createInfoPollGate } from '../../src/lib/platform/infoPollGate.js';
 import { createPageWatchScheduler } from '../../src/lib/pageWatchScheduler.js';
 import { isVenuePageHidden } from '../../src/lib/venuePaintSchedule.js';
 import { isExtensionContextAlive } from '../../src/lib/reportSilentError.js';
+import { startOrphanTabAutoReloadInPage } from '../../src/extension/orphanTabAutoReloadHost.js';
 import { srEventAndSupportUrl, parseSrEventStats, parseSrEventBoard } from '../../src/lib/platform/platformStats.js';
 import { makeDiagTabToken, shouldSkipDiagWrite } from '../../src/lib/platform/diagTabShare.js';
 import { platformFetchTimeoutSignal } from '../../src/lib/platform/fetchTimeout.js';
@@ -394,9 +395,20 @@ function startReader(roomId, key, bc) {
       /* no-op */
     }
   }, PING_MS);
-  const boardTimer = setInterval(() => {
-    if (!stopped && Date.now() - boardAt >= BOARD_EVERY_MS) void loadBoard();
-  }, 15_000);
+  const boardSched = createPageWatchScheduler({
+    baseTickMs: 15_000,
+    isHidden: () => isVenuePageHidden(document),
+    isAlive: () => !stopped && isExtensionContextAlive(),
+  });
+  boardSched.register({
+    id: 'sr-board',
+    intervalMs: 15_000,
+    hiddenMode: 'pause',
+    run: ({ now }) => {
+      if (!stopped && now - boardAt >= BOARD_EVERY_MS) void loadBoard();
+    },
+  });
+  boardSched.start();
 
   void (async () => {
     await loadGifts();
@@ -410,7 +422,7 @@ function startReader(roomId, key, bc) {
     stopped = true;
     if (reconnectTimer) clearTimeout(reconnectTimer);
     clearInterval(pingTimer);
-    clearInterval(boardTimer);
+    boardSched.stop();
     flush();
     try {
       ws?.close();
@@ -635,3 +647,4 @@ window.addEventListener('pagehide', () => {
 window.addEventListener('pageshow', (ev) => {
   if (ev?.persisted || !current) resumeSrWatch();
 });
+if (window.top === window) startOrphanTabAutoReloadInPage(() => isExtensionContextAlive());

@@ -42,6 +42,8 @@ import { runBackfillLoop } from '../../src/lib/platform/historyBackfill.js';
 import { createPageWatchScheduler } from '../../src/lib/pageWatchScheduler.js';
 import { isVenuePageHidden } from '../../src/lib/venuePaintSchedule.js';
 import { isExtensionContextAlive } from '../../src/lib/reportSilentError.js';
+import { startOrphanTabAutoReloadInPage } from '../../src/extension/orphanTabAutoReloadHost.js';
+import { createThrottledSnapshotWriter } from '../../src/lib/diagFlushThrottle.js';
 import { buildKickStreamKey } from '../../src/lib/platform/streamPlatform.js';
 import {
   KICK_REALTIME_CONNECTION_URL,
@@ -136,7 +138,6 @@ function safeSendMessage(/** @type {any} */ msg) {
   }
 }
 
-let diagTimer = 0;
 /** 絵文字の名前 → 画像(画面で本文を画像にする・pfEmoteStore.js) */
 const emoteSaver = createEmoteSaver('yt_kk_emotes');
 /** @param {{ name: string, url: string }[]} list */
@@ -174,17 +175,16 @@ function startKickDomEmotes() {
   }).observe(document.documentElement, { childList: true, subtree: true });
 }
 startKickDomEmotes.started = false;
+const diagWriter = createThrottledSnapshotWriter('yt_diag_kk_chat', {
+  getSnapshot: () => ({ ...diag, events: { ...diag.events } }),
+  writeStorage: (items) => { void chrome.storage.local.set(items); },
+  minIntervalMs: 2000,
+  hiddenMinIntervalMs: 15_000,
+  isHidden: () => isVenuePageHidden(document),
+  isContextAlive: () => isExtensionContextAlive(),
+});
 function saveDiagSoon() {
-  if (diagTimer) return;
-  diagTimer = setTimeout(() => {
-    diagTimer = 0;
-    diag.updatedAt = Date.now();
-    try {
-      void chrome.storage.local.set({ yt_diag_kk_chat: { ...diag, events: { ...diag.events } } });
-    } catch {
-      /* no-op */
-    }
-  }, 2000);
+  diagWriter.schedule();
 }
 
 /** @param {string} url @param {any} body */
@@ -500,11 +500,21 @@ function startReader(slug, key, ids) {
   //   「最終更新: 7分前（少し前の値）」と古く見えた(値は正しい)ので、5分届かなければ API で読み直す
   void fetchBoard();
   void fetchSubBoard();
-  const boardTimer = setInterval(() => {
-    if (stopped) return clearInterval(boardTimer);
-    if (Date.now() - boardAt >= BOARD_REFRESH_MS) void fetchBoard();
-    if (Date.now() - subBoardAt >= BOARD_REFRESH_MS) void fetchSubBoard();
-  }, 60_000);
+  const boardSched = createPageWatchScheduler({
+    baseTickMs: 60_000,
+    isHidden: () => isVenuePageHidden(document),
+    isAlive: () => !stopped && isExtensionContextAlive(),
+  });
+  boardSched.register({
+    id: 'kick-board',
+    intervalMs: 60_000,
+    hiddenMode: 'pause',
+    run: ({ now }) => {
+      if (now - boardAt >= BOARD_REFRESH_MS) void fetchBoard();
+      if (now - subBoardAt >= BOARD_REFRESH_MS) void fetchSubBoard();
+    },
+  });
+  boardSched.start();
 
   // 開いた時点でチャット欄に出ている過去ログを記録に入れる(つないだ後に来た分しか記録せず、開いた直後は「記録 0」に見えた・
   //   2026-11-12 PC 実測: kuru96 で過去ログ25行中1行しか記録されず、YouTube は 73行全部)。
@@ -931,3 +941,4 @@ window.addEventListener('pagehide', () => {
 window.addEventListener('pageshow', (ev) => {
   if (ev?.persisted || !current) resumeKickWatch();
 });
+if (window.top === window) startOrphanTabAutoReloadInPage(() => isExtensionContextAlive());
