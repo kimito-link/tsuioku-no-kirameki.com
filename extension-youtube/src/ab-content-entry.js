@@ -1,5 +1,5 @@
 // ab-content-entry.js — ABEMA の放送ページで、ページが受け取ったコメントを記録に渡す入口。
-/* global chrome, location, setTimeout, setInterval, window, document, KeyboardEvent, InputEvent */
+/* global chrome, location, setTimeout, window, document, KeyboardEvent, InputEvent */
 //
 // ★写し役(ab-main-entry.js)の postMessage だけを読む。別ホストへ取りに行かない。
 //   記録は YT_STREAM_META / YT_CHAT_ITEMS。画面に出ている分は全部渡す。
@@ -36,6 +36,9 @@ import { makeDiagTabToken, shouldSkipDiagWrite } from '../../src/lib/platform/di
 import { findPageButton, isOwnExtensionUi } from '../../src/lib/platform/pageControlPick.js';
 import { followerSampleFromDom } from '../../src/lib/platform/followerCountSample.js';
 import { withRevealedVenueOfficialComposer } from '../../src/lib/venueRevealOfficialComposer.js';
+import { createPageWatchScheduler } from '../../src/lib/pageWatchScheduler.js';
+import { isVenuePageHidden } from '../../src/lib/venuePaintSchedule.js';
+import { isExtensionContextAlive } from '../../src/lib/reportSilentError.js';
 
 const OUT = 'nl-ab-iso';
 const IN = 'nl-ab-main';
@@ -763,13 +766,27 @@ function watchSpaNavigation() {
 loadAutoOpen();
 syncPage();
 watchSpaNavigation();
-setInterval(() => {
-  syncPage();
-  noteDomCounts();
-  pollPanel(false);
-  maybeNote();
-  syncSettingChip();
-}, 1000);
+const abWatchSched = createPageWatchScheduler({
+  baseTickMs: 1000,
+  getUrl: () => String(location.href || ''),
+  isHidden: () => isVenuePageHidden(document),
+  isAlive: () => isExtensionContextAlive(),
+});
+abWatchSched.register({
+  id: 'ab-watch',
+  intervalMs: 1000,
+  hiddenMode: 'throttle',
+  hiddenIntervalMs: 10_000,
+  runOnUrlChange: true,
+  run: () => {
+    syncPage();
+    noteDomCounts();
+    pollPanel(false);
+    maybeNote();
+    syncSettingChip();
+  },
+});
+abWatchSched.start();
 let foregroundTimer = 0;
 function claimWhenForeground() {
   if (foregroundTimer || !streamKey) return;
@@ -780,8 +797,19 @@ function claimWhenForeground() {
     sendMeta(true);
   }, 400);
 }
+const resumeAbWatch = () => {
+  abWatchSched.start();
+  abWatchSched.kick();
+  claimWhenForeground();
+};
 document.addEventListener('visibilitychange', () => {
-  if (document.visibilityState === 'visible') claimWhenForeground();
+  if (!isVenuePageHidden(document)) resumeAbWatch();
 });
 window.addEventListener('focus', claimWhenForeground);
-window.addEventListener('pagehide', () => endStream());
+window.addEventListener('pagehide', () => {
+  abWatchSched.stop();
+  endStream();
+});
+window.addEventListener('pageshow', (ev) => {
+  if (ev?.persisted || !streamKey) resumeAbWatch();
+});

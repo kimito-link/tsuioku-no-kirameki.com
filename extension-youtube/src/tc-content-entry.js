@@ -28,6 +28,8 @@ import { makeDiagTabToken, shouldSkipDiagWrite } from '../../src/lib/platform/di
 import { platformFetchTimeoutSignal } from '../../src/lib/platform/fetchTimeout.js';
 import { followerSampleFromTcDocument } from '../../src/lib/platform/followerCountSample.js';
 import { withRevealedVenueOfficialComposer } from '../../src/lib/venueRevealOfficialComposer.js';
+import { createPageWatchScheduler } from '../../src/lib/pageWatchScheduler.js';
+import { isVenuePageHidden } from '../../src/lib/venuePaintSchedule.js';
 
 const META_EVERY_MS = 30_000;
 const FLUSH_MS = 200;
@@ -568,27 +570,51 @@ function contextGone() {
   }
 }
 
-let lastHref = '';
-const mainTimer = setInterval(() => {
-  // 拡張が入れ替わったら、古いタブの読み取りは黙って止まる(2026-11-16 ツイキャスのタブで Uncaught Error が出た)。
-  //   新しい版はタブの読み直しで入る(background の reloadExistingWatchTabs)
-  if (contextGone()) {
-    clearInterval(mainTimer);
+const tcWatchSched = createPageWatchScheduler({
+  baseTickMs: 1000,
+  getUrl: () => String(location.href || ''),
+  isHidden: () => isVenuePageHidden(document),
+  isAlive: () => {
+    // 拡張が入れ替わったら、古いタブの読み取りは黙って止まる(2026-11-16 ツイキャスのタブで Uncaught Error が出た)。
+    if (!contextGone()) return true;
     if (diagTimer) clearTimeout(diagTimer);
     diagTimer = 0;
     current?.stop();
     current = null;
-    return;
-  }
-  if (location.href !== lastHref) {
-    lastHref = location.href;
+    return false;
+  },
+  onUrlChange: () => {
     infoGate.reset();
-  }
-  void check();
-}, 1000);
+  },
+});
+tcWatchSched.register({
+  id: 'tc-watch',
+  intervalMs: 1000,
+  hiddenMode: 'throttle',
+  hiddenIntervalMs: 10_000,
+  runOnUrlChange: true,
+  run: () => {
+    void check();
+  },
+});
+tcWatchSched.start();
+const resumeTcWatch = () => {
+  if (!current) infoGate.reset();
+  tcWatchSched.start();
+  tcWatchSched.kick();
+};
+document.addEventListener('visibilitychange', () => {
+  if (!isVenuePageHidden(document)) resumeTcWatch();
+});
 window.addEventListener('pagehide', () => {
+  tcWatchSched.stop();
   if (current?.key && lastTcFollow) {
     safeSendMessage({ type: 'YT_STREAM_META', payload: { videoId: current.key, followerSample: { ...lastTcFollow, at: Date.now(), force: true } } });
   }
   current?.stop();
+  current = null;
+  infoGate.reset();
+});
+window.addEventListener('pageshow', (ev) => {
+  if (ev?.persisted || !current) resumeTcWatch();
 });

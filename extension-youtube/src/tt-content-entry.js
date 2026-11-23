@@ -41,6 +41,9 @@ try {
   }
 } catch { /* 計器 */ }
 import { createInfoPollGate } from '../../src/lib/platform/infoPollGate.js';
+import { createPageWatchScheduler } from '../../src/lib/pageWatchScheduler.js';
+import { isVenuePageHidden } from '../../src/lib/venuePaintSchedule.js';
+import { isExtensionContextAlive } from '../../src/lib/reportSilentError.js';
 import { makeDiagTabToken, shouldSkipDiagWrite } from '../../src/lib/platform/diagTabShare.js';
 import { platformFetchTimeoutSignal } from '../../src/lib/platform/fetchTimeout.js';
 import { followerSampleFromDom, followerSampleFromTikTokRoom } from '../../src/lib/platform/followerCountSample.js';
@@ -589,17 +592,43 @@ try {
   /* 拡張が入れ替わった直後 */
 }
 
-let lastHref = '';
-setInterval(() => {
-  if (location.href !== lastHref) {
-    lastHref = location.href;
+const ttWatchSched = createPageWatchScheduler({
+  baseTickMs: 1000,
+  getUrl: () => String(location.href || ''),
+  isHidden: () => isVenuePageHidden(document),
+  isAlive: () => isExtensionContextAlive(),
+  onUrlChange: () => {
     infoGate.reset();
-  }
-  void check();
-}, 1000);
+  },
+});
+ttWatchSched.register({
+  id: 'tt-watch',
+  intervalMs: 1000,
+  hiddenMode: 'throttle',
+  hiddenIntervalMs: 10_000,
+  runOnUrlChange: true,
+  run: () => {
+    void check();
+  },
+});
+ttWatchSched.start();
+const resumeTtWatch = () => {
+  if (!current) infoGate.reset();
+  ttWatchSched.start();
+  ttWatchSched.kick();
+};
+document.addEventListener('visibilitychange', () => {
+  if (!isVenuePageHidden(document)) resumeTtWatch();
+});
 window.addEventListener('pagehide', () => {
+  ttWatchSched.stop();
   if (current?.key && lastTtFollow) {
     safeSendMessage({ type: 'YT_STREAM_META', payload: { videoId: current.key, followerSample: { ...lastTtFollow, at: Date.now(), force: true } } });
   }
   current?.stop();
+  current = null;
+  infoGate.reset();
+});
+window.addEventListener('pageshow', (ev) => {
+  if (ev?.persisted || !current) resumeTtWatch();
 });
