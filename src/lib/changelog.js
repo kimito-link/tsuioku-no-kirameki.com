@@ -18,6 +18,14 @@
 /** @type {readonly ChangelogEntry[]} */
 export const EXTENSION_CHANGELOG = Object.freeze([
   Object.freeze({
+    version: '0.1.2187',
+    date: '2026-11-23',
+    summary: '会場の Esc と部品の層の地図を今の実装に合わせる',
+    items: Object.freeze([
+      '拡張の動きは 0.1.2186 と同じです。会場をしまったときの Esc の試験を、送信中の一時退避も含めた今の判定に合わせ、部品の層の地図の数字を実測に合わせました。',
+    ])
+  }),
+  Object.freeze({
     version: '0.1.2186',
     date: '2026-11-23',
     summary: 'ミクチャの公式コメント欄を、小さい画面でも見つけられるように',
@@ -197,16 +205,6 @@ export const EXTENSION_CHANGELOG = Object.freeze([
     items: Object.freeze([
       'メディアキットのサービス名・応援の種類・人数の呼び方は、書き出している配信のサービスから作ります。別の配信を記録していても、その名前は出ません。',
       'YouTube の出所はチャンネル登録者数です。他のサービスも、それぞれの人数の呼び方で書きます。',
-    ])
-  }),
-  Object.freeze({
-    version: '0.1.2165',
-    date: '2026-11-18',
-    summary: '終わりの人数と書き出しの全件',
-    items: Object.freeze([
-      'SHOWROOM とふわっちで、配信のページを閉じたり別のページへ移ったあとも、終わりの人数を1回読みます。読めた時刻を、その人数の時刻にします。',
-      '人数の見出しは、その配信の呼び方にします。YouTube はチャンネル登録者数と登録者の増加です。',
-      '配信のページを開いたまま書き出しても、保存したコメントを全部出します。件数と配信時間は、ページを閉じたあとと同じです。',
     ])
   })
 ]);
