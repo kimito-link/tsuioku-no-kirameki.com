@@ -1,16 +1,16 @@
-# Handoff — P0-B: 残サービス（ふわっち・ツイキャス・TikTok・ABEMA）の復帰再接続とスケジューラ移行 (v0.1.2196)
+# Handoff — P0-2: YouTube チャット 4 Observer の mutationObserverHub 統合 + ABEMA 重複防止 (v0.1.2197)
 
-STATUS: origin/master (c77f60c2c / #695 0.1.2195) へ rebase 済み・push・下書きPR作成待ち（commit 済み・未 push）
-ROOT_CAUSE: ふわっち（ww）・ツイキャス（tc）・TikTok（tt）・ABEMA（ab）の視聴ページ入口に 1 秒の裸 setInterval が残っており、さらに ww/tc/tt は pagehide で current?.stop() のみで current = null にせず pageshow / 表示復帰での再接続が無く、戻っても記録・読み上げが止まったままになる問題が残っていた。YouTube チャット（content-chat-entry.js:672）の pagehide はフォロワー送信のみで接続を止めないため同種の穴は無いことを確認済み。
-FILES_CHANGED: extension-youtube/src/ww-content-entry.js, extension-youtube/src/tc-content-entry.js, extension-youtube/src/tt-content-entry.js, extension-youtube/src/ab-content-entry.js, src/lib/pageWatchScheduler.wiring.test.js, extension/manifest.json, package.json, src/lib/changelog.js, src/lib/changelog-archive.js, tsuioku-no-kirameki/index.html, extension/dist/*, app/dist/live-view.js, extension/background.js, .dist-fingerprint.json, docs/repo-tree-map.{md,html}, docs/code-tree.{md,html}, docs/feature-sitemap.{md,html}, handoff.md
-CHANGES: ww/tc/tt/ab の 4 入口すべてを既存 L0 共通部品 pageWatchScheduler.js と venuePaintSchedule.js（isVenuePageHidden 再利用）へ移行（表 1s / 裏 10s 間引き）。ww/tc/tt は pagehide で current = null とゲートリセットを行い、ab は endStream() 後、4 入口すべてで pageshow(ev?.persisted || !current/!streamKey) および visibilitychange 表復帰時に start()+kick() で同じ配信でも確実に再接続するよう統一。全 10 入口の配線テストを pageWatchScheduler.wiring.test.js に追加し、#695 マージ後の origin/master (0.1.2195) へ rebase して版を 0.1.2196 へ統一（権限追加なし）。
-TESTS_RUN: npm run test:cc -- src/lib/pageWatchScheduler.test.js src/lib/pageWatchScheduler.wiring.test.js src/lib/venuePaintSchedule.test.js src/lib/venuePaintSchedule.wiring.test.js src/lib/changelogBundleBudget.test.js src/lib/changelog.test.js src/lib/changelogConsistency.test.js / npm run verify:bump / npm run check:dist-fresh / npm run tree-map:check / npm run lint / npm run typecheck / verify:extension
-TEST_RESULT: 全合格（vitest 7 files / 64 passed、verify:bump 全7ステップOK 0.1.2196、dist-fresh OK、tree-map up to date、eslint 0 errors、tsc 0 errors、verify:extension 合格［v0.1.2196 全13画面・全10差し込み先OK］）
-REMAINING_RISKS: 実配信ページ（アクセラレーション OFF）での復帰確認は未実施のため下書き PR として実測追記待ち。push・PR 作成は Antigravity ルールにより未実施。
-NEXT_ACTION: 手元で fix/remaining-services-reconnect を push して下書き PR を作成する。次の PR は P0-2（#692 から mutationObserverHub.js と試験を取り込み、YouTube チャット content-chat-entry.js の 4 Observer をハブへ移行）。
+STATUS: 検品・push・下書きPR作成待ち（commit 済み・未 push。#692 は本 PR で置き換え）
+ROOT_CAUSE: extension-youtube/src/content-chat-entry.js に裸の MutationObserver が 4 箇所（新着チャット・遅延アイコン・スパチャ送信後・購入窓検出）あり、混雑チャットで同期処理と全件 querySelectorAll がメインスレッドを奪っていた。また ab-content-entry.js の onBatch では同一 streamKey 内の chatId 表記揺れでも seen をリセットする余地があった。
+FILES_CHANGED: src/lib/mutationObserverHub.js, src/lib/mutationObserverHub.test.js, src/lib/mutationObserverHub.wiring.test.js, extension-youtube/src/content-chat-entry.js, extension-youtube/src/ab-content-entry.js, extension/manifest.json, package.json, src/lib/changelog.js, src/lib/changelog-archive.js, tsuioku-no-kirameki/index.html, extension/dist/*, app/dist/live-view.js, extension/background.js, .dist-fingerprint.json, docs/repo-tree-map.{md,html}, docs/code-tree.{md,html}, docs/feature-sitemap.{md,html}, docs/layer-map.html, handoff.md
+CHANGES: (1) #692 から src/lib/mutationObserverHub.js と単体テストを取り込み、content-chat-entry.js の 4 箇所すべての MutationObserver を createMutationObserverHub へ統合（裸の new MutationObserver を 0 件化）。メインチャット監視には domHarvestScrollDefer.js によるスクロール中見送り・バッチ上限・overflow 時 scanAllExisting 回収を入れ、2000ms 定期スキャンも pageWatchScheduler（裏タブ 10s 間引き）へ移行。(2) ab-content-entry.js の onBatch で同一 streamKey 判定を先に行い、同一セッションの表記揺れで seen を誤リセットしないよう修正（visibilitychange 表復帰自体では seen を消していないことも確認）。(3) 配線テストを追加し、版を 0.1.2197 へ統一（権限追加なし）。
+TESTS_RUN: npm run test:cc -- src/lib/mutationObserverHub.test.js src/lib/mutationObserverHub.wiring.test.js src/lib/domHarvestScrollDefer.test.js src/lib/changelogBundleBudget.test.js src/lib/changelog.test.js src/lib/changelogConsistency.test.js / npm run verify:bump / npm run check:dist-fresh / npm run tree-map:check / npm run layer-map:check / npm run check:layer / npm run lint / npm run typecheck / verify:extension
+TEST_RESULT: 全合格（vitest 6 files / 48 passed、verify:bump 全7ステップOK 0.1.2197、dist-fresh OK b795713acec6、tree-map/layer-map up to date、check-layer 合格、eslint 0 errors、tsc 0 errors、verify:extension 合格［v0.1.2197 全13画面・全10差し込み先OK］）
+REMAINING_RISKS: アクセラレーション OFF の実配信ページでの long task 比較計測は未実施のため下書き PR として実測追記待ち。push・PR 作成は Antigravity ルールにより未実施。
+NEXT_ACTION: 手元で feat/lowspec-p0-2-yt-observer-hub を push して下書き PR を作成（#692 はこれで置き換え）。続けて ① P0-3（0.1.2198）→ ② P1（0.1.2199）→ ③ P2（0.1.2200）→ ④ 推定購入額（0.1.2201）へ進む。
 LAST_WORKED_ON: 2026-11-23
 WORKED_BY: antigravity / Gemini 4 Neon (Medium)
-MACHINE_NOTES: worktree=..\_worktrees\tsuioku-no-kirameki.com\cleanup-p0-b (branch: fix/remaining-services-reconnect, rebased onto origin/master c77f60c2c)。本体チェックアウトの未コミット変更には一切触れていない。
+MACHINE_NOTES: worktree=..\_worktrees\tsuioku-no-kirameki.com\cleanup-p0-2 (branch: feat/lowspec-p0-2-yt-observer-hub, base: origin/master a7290164a)。本体チェックアウトの未コミット変更には一切触れていない。
 
 ## NEEDS_JUDGMENT（司令塔が判断する。ここを自動で直してはいけない）
 

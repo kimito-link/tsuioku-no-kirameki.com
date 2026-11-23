@@ -18,6 +18,16 @@
 /** @type {readonly ChangelogEntry[]} */
 export const EXTENSION_CHANGELOG = Object.freeze([
   Object.freeze({
+    version: '0.1.2197',
+    date: '2026-11-23',
+    summary: 'YouTube チャットの監視を共通 Observer ハブへ統合',
+    items: Object.freeze([
+      'YouTube ライブチャットの 4 つの DOM 監視（新着・遅延アイコン・スパチャ送信後・購入窓検出）を共通の MutationObserver ハブへ統合しました。',
+      '混雑チャットでのバッチ集約・件数上限・スクロール中見送り（domHarvestScrollDefer 再利用）と overflow 時の全体回収を入れ、定期スキャンも共通スケジューラ（裏タブ 10 秒間引き）へ移行しました。',
+      'ABEMA のチャット受信で同一配信キー内の chatId 表記揺れによる重複取り込み（seen 誤リセット）を防止しました。',
+    ])
+  }),
+  Object.freeze({
     version: '0.1.2196',
     date: '2026-11-23',
     summary: 'ふわっち・ツイキャス・TikTok・ABEMA の復帰再接続を修正',
@@ -185,16 +195,6 @@ export const EXTENSION_CHANGELOG = Object.freeze([
     items: Object.freeze([
       '拡張そのものの動きは変わりません。ウェブのランキングページ（/live/）の更新です。',
       '「⚡ いま動いた人」で並びきらない人数を「（ほか N人）」と書くようにしました。コメントで動いた人は下の順位表に載っていないことがあるため、「下の順位表に」は外しました。',
-    ])
-  }),
-  Object.freeze({
-    version: '0.1.2174',
-    date: '2026-11-21',
-    summary: 'ランキングページの「いま動いた人」にコメントも',
-    items: Object.freeze([
-      '拡張そのものの動きは変わりません。ウェブのランキングページ（/live/）の更新です。',
-      '「⚡ いま動いた人」に、前回の集計から新しく増えたコメントの件数を出します。長い放送で「直近ぶんの集計」の配信でも、新しい側だけを数えた件数なので、さかのぼりで増えた分は入りません。',
-      '新しく一覧に入った配信は、まず新しい側を短く数えてすぐ出し、古い側はあとから順にさかのぼります。一覧に入ってからコメント集計が出るまで、ふだん1〜2分です。',
     ])
   })
 ]);
