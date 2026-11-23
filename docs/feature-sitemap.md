@@ -1227,7 +1227,7 @@
   - `src/extension/live-ranking-entry.js`
   - `tsuioku-no-kirameki/live/index.html`
   - `.github/workflows/live-ranking.yml`
-<details><summary>🗂 このカテゴリの全担当ファイル(自動分類) 361</summary>
+<details><summary>🗂 このカテゴリの全担当ファイル(自動分類) 363</summary>
 
 - `app/app.js` — スマホ閲覧用 status Web 版。
 - `app/live-view-block.js` — iPhone アプリの「🚩 見たくない人を隠す・報告する」(App Store の審査 1.2: ほかの人の書き込みを見せるアプリの決まり)。
@@ -1441,6 +1441,7 @@
 - `src/lib/mirrorBundleFlushScheduler.js` — 鏡バンドルの flush スケジューラ(状態を内部に閉じた純ロジック・タイマー非依存)。
 - `src/lib/mirrorSanitize.js` — v0.1.237: 北極星「鏡のように貼り付け」用の自前最小サニタイザ。
 - `src/lib/moveNodePreservingState.js` — 【層】L1 DOM 小道具(chrome.* 非依存・テスト可能)
+- `src/lib/mutationObserverHub.js` — 全配信サービスのチャット・DOM 監視で共有する MutationObserver ハブ。
 - `src/lib/nameplateToggleBoot.js` — ①POP の「なふだ」ボタンを配線する(副作用モジュール)。
 - `src/lib/nicoCommentPanelAssetLauncher.js` — ニコ生 watch のコメント欄付近から「ギフト / アイテム / スタンプ」等の起動ボタンを推定する。
 - `src/lib/nicoEngineBoot.js` — 【層】L0 判定層(純粋関数・I/O禁止)
@@ -1460,6 +1461,7 @@
 - `src/lib/opSoundDirector.js` — 操作音(パチンコの「玉の打ち出し」比喩・council/operation-sound-SYNTHESIS.md Phase D1)の
 - `src/lib/orphanTabAutoReload.js` — 拡張が入れ替わった後、開いたままの放送ページが古い版のまま止まるのを、ページ自身が見つけて読み込み直す。
 - `src/lib/ouenBannerDom.js` — 応援動画バナーを DOM に反映する。
+- `src/lib/pageWatchScheduler.js` — 全配信サービスの視聴ページで共有する「ページ監視・定期チェック」スケジューラ。
 - `src/lib/panelActivity.js` — 【層】L0 判定層(純粋関数・I/O禁止)
 - `src/lib/panelCoverCulprit.js` — 【層】L0 判定層(純粋関数・I/O禁止)
 - `src/lib/panelLiveSummary.js` — パネルカード用の超軽量サマリ（多タブ時の snapshot / 巨大配列 read 待ちを避ける）。
@@ -1595,7 +1597,7 @@
 
 ## 🧬 修正系譜マップ(この系統のバグを過去にどう直したか)
 
-> changelog 全 20 版を「バグ系統」で束ねた枝。同系統をまた触るとき、過去の修正と「なぜ毎回触るか」を辿る(再発防止)。新しい順。
+> changelog 全 21 版を「バグ系統」で束ねた枝。同系統をまた触るとき、過去の修正と「なぜ毎回触るか」を辿る(再発防止)。新しい順。
 
 ### 💾 記録件数 (2版)
 - `v0.1.2174` 2026-11-21 — ランキングページの「いま動いた人」にコメントも
@@ -1614,7 +1616,8 @@
 - `v0.1.2173` 2026-11-21 — ランキングページのコメント集計を約1分ごとに
 - `v0.1.2159` 2026-11-18 — 概数の登録者と長い応援一覧を直す
 
-### その他 (14版)
+### その他 (15版)
+- `v0.1.2182` 2026-11-23 — 低スペック PC 向けの共通部品を追加（まだ使われていません）
 - `v0.1.2177` 2026-11-22 — ランキングページで終わった配信を「放送中」に見せない
 - `v0.1.2176` 2026-11-21 — 開発モードではマーケHTMLを自由に保存
 - `v0.1.2175` 2026-11-21 — ランキングページ「いま動いた人」の人数の書き方を直しました

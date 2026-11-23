@@ -27,7 +27,7 @@
 
 > 値が次の段へ届かない「断線」(broadcaster バグ型)は `npm run feature-map -- --check` が機械検知。
 
-## ⚠️ 役割コメントが無いソース 14 / 1340 件
+## ⚠️ 役割コメントが無いソース 14 / 1342 件
 - `docs/handoff/bench/bench-interval.mjs`
 - `docs/handoff/bench/bench-lane.mjs`
 - `extension-youtube/cloak-failsafe.js`
@@ -244,7 +244,7 @@
     - `2026-10-06.md`
     - `2026-10-12.md`
     - `2026-10-14.md`
-- 📁 **docs/** (388)
+- 📁 **docs/** (372)
   - 📁 **article-assets/** (87)
     - 📁 **venue-frames/** (12)
       - `f01.png`
@@ -566,10 +566,6 @@
   - `backfill-complete-loading-flow.html`
   - `bug-investigation-loading-scroll-2026-07-10.html`
   - `code-tree.html`
-  - `code-tree.html`
-  - `code-tree.html`
-  - `code-tree.md`
-  - `code-tree.md`
   - `code-tree.md`
   - `codex-commenter-follow-analytics-v0535.md`
   - `codex-event-lane-stuck-fix-v0613.md`
@@ -592,18 +588,12 @@
   - `dist-fingerprint-gate-IMPLEMENTATION-HANDOFF.md`
   - `extension-bump-checklist.md`
   - `feature-sitemap.html`
-  - `feature-sitemap.html`
-  - `feature-sitemap.html`
-  - `feature-sitemap.md`
-  - `feature-sitemap.md`
   - `feature-sitemap.md`
   - `inline-popup-sync.md`
   - `investigation-prompt-popup-not-appearing.md`
   - `kb-web-perf-diagnosis.md`
   - `koken-contrib-hidden-tab-stuck-fix-v0616.md`
   - `lane-architecture-redesign.md`
-  - `layer-map.html`
-  - `layer-map.html`
   - `layer-map.html`
   - `live-comment-heat-chips-DESIGN.md`
   - `live-comment-heat-chips-IMPLEMENTATION-HANDOFF.md`
@@ -632,15 +622,9 @@
   - `referral-commission.md`
   - `reliability-backlog-phase-b.md`
   - `repo-tree-map.html`
-  - `repo-tree-map.html`
-  - `repo-tree-map.html`
-  - `repo-tree-map.md`
-  - `repo-tree-map.md`
   - `repo-tree-map.md`
   - `research-nicolive-pc-comments.md`
   - `self-improvement-loop-DESIGN.md`
-  - `site-health.md`
-  - `site-health.md`
   - `site-health.md`
   - `story-user-lane-pipeline.md`
   - `surechigai-lite-improvement-plan.md`
@@ -1216,7 +1200,7 @@
   - `gift-coin-hq.wav`
   - `gift-register-hq.wav`
   - `gift-register.mp3`
-- 📁 **src/** (2595)
+- 📁 **src/** (2599)
   - 📁 **data/** (7)
     - 📁 **acquirers/** (2)
       - `laneFromStorage.js` — 応援レーン acquirer: chrome.storage.local(nls_comments) → laneStore の橋渡し。
@@ -1559,7 +1543,7 @@
         - `logo_funlink_white_RGB_link_black.png`
         - `logo_funlink_white_RGB_maru_black.png`
     - `hero-connect-hub.svg`
-  - 📁 **lib/** (2277)
+  - 📁 **lib/** (2281)
     - 📁 **__snapshots__/** (4)
       - `marketing-abema-baseline.html`
       - `marketing-niconico.html`
@@ -2819,6 +2803,8 @@
     - `monotonicCommentCount.test.js`
     - `moveNodePreservingState.js` — 【層】L1 DOM 小道具(chrome.* 非依存・テスト可能)
     - `moveNodePreservingState.test.js`
+    - `mutationObserverHub.js` — 全配信サービスのチャット・DOM 監視で共有する MutationObserver ハブ。
+    - `mutationObserverHub.test.js`
     - `nameplateToggle.wiring.test.js`
     - `nameplateToggleBoot.js` — ①POP の「なふだ」ボタンを配線する(副作用モジュール)。
     - `nameplateToggleFinder.js` — ニコ生公式の「なふだを表示」トグルを見つける(純関数)。
@@ -2957,6 +2943,8 @@
     - `ownPostedUserIdSet.js` — v0.1.773: 「自分が投稿した userId」の集合を1パスで作る純関数。
     - `ownPostedUserIdSet.test.js`
     - `pageColorSchemeGate.test.js`
+    - `pageWatchScheduler.js` — 全配信サービスの視聴ページで共有する「ページ監視・定期チェック」スケジューラ。
+    - `pageWatchScheduler.test.js`
     - `paintCompletionPipeline.test.js`
     - `paintCompletionProbe.js` — paintCompletionProbe — 「JSが返った時点」でなく【画面に出るまで】を測る(v0.1.1320)。
     - `paintCompletionProbe.test.js`

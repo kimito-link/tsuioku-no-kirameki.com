@@ -18,6 +18,15 @@
 /** @type {readonly ChangelogEntry[]} */
 export const EXTENSION_CHANGELOG = Object.freeze([
   Object.freeze({
+    version: '0.1.2182',
+    date: '2026-11-23',
+    summary: '低スペック PC 向けの共通部品を追加（まだ使われていません）',
+    items: Object.freeze([
+      '拡張の動きはまだ変わりません。低スペック PC でも軽く動くようにするための共通部品（ページ監視スケジューラと DOM 監視ハブ）を先行して追加しました。',
+      '新しいファイルだけでどこからも呼ばれておらず、各サービスの入口への切り替えは次の更新で行います。',
+    ])
+  }),
+  Object.freeze({
     version: '0.1.2177',
     date: '2026-11-22',
     summary: 'ランキングページで終わった配信を「放送中」に見せない',
