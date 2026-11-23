@@ -56,7 +56,7 @@ describe('buildWatchMetaCardAudienceViewModel', () => {
     expect(vm.concurrent.charReactionDelta).toBe(null);
   });
 
-  it('古い official 0 + 来場ありは推定中ではなく滞留推定を出す', () => {
+  it('古い official 0 + 来場ありでも、直近の発言者が無いときは人数を出さない', () => {
     const vm = buildWatchMetaCardAudienceViewModel(
       {
         liveId: 'lv1',
@@ -68,12 +68,14 @@ describe('buildWatchMetaCardAudienceViewModel', () => {
       },
       { nowMs, prevForReactions: { viewerCount: null, concurrentEstimated: null } }
     );
-    expect(vm.concurrent.estText).not.toBe('推定中');
-    expect(vm.concurrent.estText).not.toBe('0');
-    expect(vm.concurrent.numericEstimated).toBeGreaterThan(100);
+    expect(vm.concurrent.estText).toBe('—');
+    expect(vm.concurrent.estIsPlaceholder).toBe(true);
+    expect(vm.concurrent.subText).toBe('計測中');
+    expect(vm.concurrent.numericEstimated).toBe(null);
+    expect(vm.concurrent.estText).not.toMatch(/~/u);
   });
 
-  it('来場あり・recentActiveUsers 0・経過不明なら ~0 ではなく推定中', () => {
+  it('来場あり・recentActiveUsers 0・経過不明なら人数を出さない（~0 や負数にしない）', () => {
     const vm = buildWatchMetaCardAudienceViewModel(
       {
         liveId: 'lv1',
@@ -83,27 +85,31 @@ describe('buildWatchMetaCardAudienceViewModel', () => {
       },
       { nowMs, prevForReactions: { viewerCount: null, concurrentEstimated: 33 } }
     );
-    expect(vm.concurrent.estText).toBe('推定中');
+    expect(vm.concurrent.estText).toBe('—');
     expect(vm.concurrent.estIsPlaceholder).toBe(true);
+    expect(vm.concurrent.subText).toBe('計測中');
     expect(vm.concurrent.numericEstimated).toBe(null);
     expect(vm.nextPrevForReactions.concurrentEstimated).toBe(33);
+    expect(vm.concurrent.estText).not.toMatch(/~/u);
   });
 
-  it('来場あり・recentActiveUsers 0 でも経過があれば滞留推定を表示する', () => {
+  it('v0.1.2201 実機: 来場あり・5分内 0人の滞留床だけなら — を出し、~ や負数は出さない', () => {
     const vm = buildWatchMetaCardAudienceViewModel(
       {
         liveId: 'lv1',
-        viewerCountFromDom: 723,
+        viewerCountFromDom: 39289,
         recentActiveUsers: 0,
         officialViewerCount: null,
-        streamAgeMin: 420
+        streamAgeMin: 19 * 60 + 20
       },
       { nowMs, prevForReactions: { viewerCount: null, concurrentEstimated: null } }
     );
-    expect(vm.concurrent.estText).not.toBe('~0');
-    expect(vm.concurrent.estText).toMatch(/^~/u);
-    expect(vm.concurrent.numericEstimated).toBeGreaterThan(0);
-    expect(vm.concurrent.subText).toContain('5分内 0人');
+    expect(vm.concurrent.estText).toBe('—');
+    expect(vm.concurrent.estIsPlaceholder).toBe(true);
+    expect(vm.concurrent.subText).toBe('計測中');
+    expect(vm.concurrent.numericEstimated).toBe(null);
+    expect(vm.concurrent.estText).not.toMatch(/~/u);
+    expect(vm.concurrent.estText).not.toMatch(/-/u);
   });
 
   it('公式の視聴者数しか出さないサービスでは、推定を出さず読み込み中にする', () => {

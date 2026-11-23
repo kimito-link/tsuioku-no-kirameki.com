@@ -38,7 +38,7 @@ describe('buildVenueStatStripModel', () => {
     expect(m.stale).toBe(false);
     expect(m.items.map((i) => i.label)).toEqual(['記録', '推定同時接続', '来場者数', '来場', '本家コメ', '経過', '広告pt', 'ギフトpt', '推定（視聴者の購入額）']);
     const k = byKey(m);
-    expect(k.records.text).toBe('81'); // 鏡が新しいうちは鏡(=パネルの表示)が正
+    expect(k.records.text).toBe('999'); // 正本と鏡があるときは大きい方（凍った「記録 1」で正本を潰さない）
     expect(k.concurrent.text).toBe('108');
     expect(k.concurrent.unit).toBe('直接値');
     expect(k.visitor.text).toBe('350');
@@ -46,6 +46,14 @@ describe('buildVenueStatStripModel', () => {
     expect(k.comments.text).toBe('567');
     expect(k.streamAge.text).toBe('2時間36分');
     expect(k.giftPts.text).toBe('1,200');
+  });
+
+  it('v0.1.2201 実機: 凍った鏡の「記録 1」より正本（状態ページと同じ件数）を出す', () => {
+    const frozen = mirror({ recordsText: '1' });
+    const m = buildVenueStatStripModel(frozen, { liveId: 'lv123', nowMs: NOW, recordedCount: 1956 });
+    expect(byKey(m).records.text).toBe('1,956');
+    const mid = buildVenueStatStripModel(frozen, { liveId: 'lv123', nowMs: NOW, recordedCount: 5 });
+    expect(byKey(mid).records.text).toBe('5');
   });
 
   it('別の配信の鏡は使わない(記録だけは正本の件数で出す)', () => {

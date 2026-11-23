@@ -23,6 +23,7 @@
  */
 
 import { ageMsOf } from './timeAuthority.js';
+import { resolveRecordsCountForDisplay } from './displayRecordedCount.js';
 import { venueItemsForPlatform } from './platform/platformMetrics.js';
 import { estimateNiconicoGiftSpendJpy, formatEstimatedViewerSpendDisplay } from './estimatedViewerSpend.js';
 
@@ -105,18 +106,18 @@ export function buildVenueStatStripModel(snap, opts = {}) {
   const ageMs = picked.age;
   const stale = usable && !picked.fresh;
 
-  const fallbackRecords = formatCount(opts.recordedCount);
-
-  // 記録: 新しい鏡ならパネルと同じ文字。古い/無いときは正本の件数(パネルが閉じていても動く)。
-  let records = { text: PH, isPlaceholder: true };
   const mirrorRecords = usable ? str(s.recordsText).trim() : '';
-  // (自分で作った写しの件数は最大15秒古いので、その場で動く正本の件数があればそちら)
-  if (usable && !stale && mirrorRecords && !(useSelf && fallbackRecords)) {
-    records = { text: mirrorRecords, isPlaceholder: s.recordsIsPlaceholder === true };
-  } else if (fallbackRecords) {
-    records = { text: fallbackRecords, isPlaceholder: false };
-  } else if (mirrorRecords) {
-    records = { text: mirrorRecords, isPlaceholder: s.recordsIsPlaceholder === true };
+
+  // 記録: 正本(panel_summary の recordedCount)と、同じ配信の鏡/写しの数字の大きい方。
+  //   開いた瞬間の「記録 1」が鏡に凍っても、状態ページと同じ正本を潰さない。
+  let records = { text: PH, isPlaceholder: true };
+  const includeMirror = Boolean(mirrorRecords) && (!stale || opts.recordedCount == null);
+  const pickedRecords = resolveRecordsCountForDisplay({
+    recordedCount: opts.recordedCount,
+    mirrorTexts: [includeMirror ? mirrorRecords : '']
+  });
+  if (pickedRecords != null) {
+    records = { text: formatCount(pickedRecords), isPlaceholder: false };
   }
 
   const conc = usable && s.concurrent && typeof s.concurrent === 'object' ? s.concurrent : {};
@@ -178,7 +179,7 @@ export function buildVenueStatStripModel(snap, opts = {}) {
   }
 
   /** @type {'mirror'|'self'|'fallback'|'none'} */
-  const source = usable && !stale ? (useSelf ? 'self' : 'mirror') : fallbackRecords || usable ? 'fallback' : 'none';
+  const source = usable && !stale ? (useSelf ? 'self' : 'mirror') : (pickedRecords != null || usable) ? 'fallback' : 'none';
   return { source, stale, ageMs, items };
 }
 

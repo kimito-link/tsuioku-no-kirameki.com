@@ -9,7 +9,7 @@
  * `snapshot` は呼び出し側でマージ済みであること（本 VM 内では二重マージしない）。
  */
 
-import { resolveConcurrentViewers } from './concurrentEstimate.js';
+import { formatConcurrentEstimateText, isInsufficientConcurrentEstimate, resolveConcurrentViewers } from './concurrentEstimate.js';
 import { summarizeRecordedCommenters } from './liveCommenterStats.js';
 import { watchMetaConcurrentGateFromSnapshot } from './popupWatchMetaConcurrentGate.js';
 import { buildWatchAudienceNote } from './watchAudienceCopy.js';
@@ -229,10 +229,7 @@ export function buildWatchMetaCardAudienceViewModel(snapshot, opts) {
       vc > 0;
     const unresolvedFallback =
       staleOfficialZero ||
-      (!directLike &&
-        resolved.method === 'fallback' &&
-        resolved.estimated <= 0 &&
-        resolved.base.method === 'none');
+      (!directLike && isInsufficientConcurrentEstimate(resolved));
     // ページに数が出ているサービス(YouTube・Twitch・Kick・ABEMA など)は、その数をそのまま出す。推定はしない・「推定」とも書かない
     //   (2026-11-11 りんく「推定という表現もおかしい」「もとからでているところはそれにならって」)。
     //   ニコ生の推定の式(resolveConcurrentViewers)の答えは使わない: 公式の数の更新が少し遅れただけで「推定中・材料待ち」に落ちていた。
@@ -293,11 +290,11 @@ export function buildWatchMetaCardAudienceViewModel(snapshot, opts) {
     } else if (unresolvedFallback) {
       concurrent = {
         phase: 'loading',
-        estText: '推定中',
+        estText: '—',
         estIsPlaceholder: true,
         estTitle:
-          '来場者数は取得済みです。コメント参加者または配信経過から推定材料を集めています。',
-        subText: '材料待ち',
+          '同時接続を出す材料が足りません。直近のコメント参加者が無いときは人数を推測して出しません。',
+        subText: '計測中',
         concurrentLoadingHidden: true,
         concurrentReadyHidden: false,
         ariaBusy: true,
@@ -308,7 +305,7 @@ export function buildWatchMetaCardAudienceViewModel(snapshot, opts) {
     } else {
       nextConcurrentEstimated = resolved.estimated;
 
-    const estStr = resolved.estimated.toLocaleString('ja-JP');
+    const estStr = formatConcurrentEstimateText(resolved.estimated);
     /** @type {string[]} */
     const parts = [];
     parts.push(concurrentResolutionMethodTitlePart(resolved.method));
@@ -400,9 +397,24 @@ export function buildWatchMetaCardAudienceViewModel(snapshot, opts) {
       );
     }
 
+    if (!estStr) {
+      concurrent = {
+        phase: 'loading',
+        estText: '—',
+        estIsPlaceholder: true,
+        estTitle: '同時接続を出す材料が足りません。',
+        subText: '計測中',
+        concurrentLoadingHidden: true,
+        concurrentReadyHidden: false,
+        ariaBusy: true,
+        numericEstimated: null,
+        charReactionDelta: null
+      };
+      nextConcurrentEstimated = prev.concurrentEstimated;
+    } else {
     concurrent = {
       phase: 'ready',
-      estText: `${directLike ? '' : '~'}${estStr}`,
+      estText: estStr,
       estIsPlaceholder: false,
       estTitle: parts.join(' | '),
       subText,
@@ -412,6 +424,7 @@ export function buildWatchMetaCardAudienceViewModel(snapshot, opts) {
       numericEstimated: resolved.estimated,
       charReactionDelta: concurrentReactionDelta
     };
+    }
     }
   } else {
     concurrent = {

@@ -309,6 +309,38 @@ export function countRecentActiveUsers(userTimestamps, now, windowMs) {
  */
 
 /**
+ * 同時接続の表示文字列。負数・非数・Infinity は出さない（100年後安心）。
+ * 「~3,143」のチルダは会場帯の小さい文字ではマイナスに見えるため使わない。
+ * 推定値でも数字のみ（ラベルが既に「推定同時接続」）。出せないときは null。
+ * @param {unknown} estimated
+ * @returns {string|null}
+ */
+export function formatConcurrentEstimateText(estimated) {
+  const n = Number(estimated);
+  if (!Number.isFinite(n) || n < 0) return null;
+  try {
+    return Math.floor(n).toLocaleString('ja-JP');
+  } catch {
+    return String(Math.floor(n));
+  }
+}
+
+/**
+ * 公式の直接値・補間でもなく、直近の発言者も居ない推定は材料不足。
+ * 滞留率の下限（来場累計×床%）だけの人数は、精確な同接に見えてしまうので出さない。
+ * @param {ConcurrentResolutionResult|null|undefined} resolved
+ * @returns {boolean}
+ */
+export function isInsufficientConcurrentEstimate(resolved) {
+  if (!resolved || typeof resolved !== 'object') return true;
+  const n = Number(resolved.estimated);
+  if (!Number.isFinite(n) || n < 0) return true;
+  if (resolved.method === 'official' || resolved.method === 'nowcast') return false;
+  const active = Number(resolved.base && resolved.base.activeCommenters);
+  return !(Number.isFinite(active) && active > 0 && n > 0);
+}
+
+/**
  * 複合シグナルで推定同時接続数を計算する。
  *
  * @param {object} params
@@ -321,6 +353,7 @@ export function countRecentActiveUsers(userTimestamps, now, windowMs) {
  * @param {PlatformProfile|string} [params.profile]  プラットフォーム係数（省略時はニコ生）
  * @returns {ConcurrentEstimateResult}
  */
+
 export function estimateConcurrentViewers({
   recentActiveUsers,
   totalVisitors,
@@ -412,6 +445,11 @@ export function estimateConcurrentViewers({
   const blendSignals = [signalAInt, signalB, signalC, signalD];
   const blended = geometricMeanOfPositive(blendSignals);
   const blendedSignalCount = blendSignals.filter((s) => s > 0).length;
+
+  if (!Number.isFinite(estimated) || estimated < 0) {
+    estimated = 0;
+    method = 'none';
+  }
 
   return {
     estimated,
