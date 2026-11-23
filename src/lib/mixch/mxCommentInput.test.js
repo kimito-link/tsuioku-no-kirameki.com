@@ -120,16 +120,17 @@ describe('findMxCommentInput', () => {
 });
 
 describe('revealMxOfficialComposer', () => {
-  it('会場が開いているときだけ nlsb-is-tucked を付け、戻すと外れる', () => {
+  it('会場が開いているとき、しまい印は付けず、戻しても会場は開いたまま', () => {
     document.body.innerHTML = '';
     document.documentElement.classList.add('nlsb-venue-open');
     const root = document.createElement('div');
     root.id = 'nlsb-venue-root';
     document.body.append(root);
     const restore = revealMxOfficialComposer(document);
-    expect(root.classList.contains('nlsb-is-tucked')).toBe(true);
-    restore();
     expect(root.classList.contains('nlsb-is-tucked')).toBe(false);
+    expect(root.classList.contains('nlsb-is-composer-pass')).toBe(true);
+    restore();
+    expect(root.classList.contains('nlsb-is-composer-pass')).toBe(false);
     document.documentElement.classList.remove('nlsb-venue-open');
   });
 
@@ -144,7 +145,7 @@ describe('revealMxOfficialComposer', () => {
     restore();
   });
 
-  it('前回の失敗で残った nlsb-is-tucked も、戻すと外れる', () => {
+  it('前回の失敗で残った nlsb-is-tucked は、送り始めに外す', () => {
     document.body.innerHTML = '';
     document.documentElement.classList.add('nlsb-venue-open');
     const root = document.createElement('div');
@@ -152,7 +153,7 @@ describe('revealMxOfficialComposer', () => {
     root.classList.add('nlsb-is-tucked');
     document.body.append(root);
     const restore = revealMxOfficialComposer(document);
-    expect(root.classList.contains('nlsb-is-tucked')).toBe(true);
+    expect(root.classList.contains('nlsb-is-tucked')).toBe(false);
     restore();
     expect(root.classList.contains('nlsb-is-tucked')).toBe(false);
     document.documentElement.classList.remove('nlsb-venue-open');

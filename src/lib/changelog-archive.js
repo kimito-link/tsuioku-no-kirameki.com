@@ -24,6 +24,15 @@
 /** @type {ChangelogEntry[]} */
 const ARCHIVE_ENTRIES = [
   Object.freeze({
+    version: '0.1.2163',
+    date: '2026-11-18',
+    summary: '権限を足さず終わりの人数',
+    items: Object.freeze([
+      'Twitch は、配信が終わったとページが分かっているあいだだけ人数を読みます。タブを閉じたり別のページへ移ったあとは、最後に読めた人数を、その読んだ時刻のまま出します。',
+      'SHOWROOM とふわっちは、タブを閉じたときも裏方で人数を1回読みます。新しい権限は足していません。',
+    ])
+  }),
+  Object.freeze({
     version: '0.1.2162',
     date: '2026-11-18',
     summary: '記録の終わりの人数と書き出し先',

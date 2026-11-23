@@ -128,14 +128,17 @@ describe('会場のギフトボタン', () => {
 });
 
 describe('会場から発言するとき公式の欄を出す', () => {
-  it('送っているあいだ会場をしまい、終わったら戻す(どのサービスでも同じ)', async () => {
+  it('送っているあいだ会場は消さず、終わったら通過の印も外す', async () => {
     document.documentElement.classList.add('nlsb-venue-open');
     const root = document.createElement('div');
     root.id = 'nlsb-venue-root';
     document.body.append(root);
-    let tuckedDuringPost = false;
+    let during = { tucked: false, pass: false };
     const post = async () => {
-      tuckedDuringPost = root.classList.contains('nlsb-is-tucked');
+      during = {
+        tucked: root.classList.contains('nlsb-is-tucked'),
+        pass: root.classList.contains('nlsb-is-composer-pass'),
+      };
       return { ok: true };
     };
     const form = createVenueComposeBox(post);
@@ -145,7 +148,9 @@ describe('会場から発言するとき公式の欄を出す', () => {
     input.dispatchEvent(new Event('input'));
     form.dispatchEvent(new Event('submit', { cancelable: true }));
     await tick();
-    expect(tuckedDuringPost).toBe(true);
+    expect(during.tucked).toBe(false);
+    expect(during.pass).toBe(true);
     expect(root.classList.contains('nlsb-is-tucked')).toBe(false);
+    expect(root.classList.contains('nlsb-is-composer-pass')).toBe(false);
   });
 });

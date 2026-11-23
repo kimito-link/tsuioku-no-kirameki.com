@@ -21,6 +21,7 @@ import { platformOfHostname } from '../../src/lib/platform/streamPlatform.js';
 import { startOrphanTabAutoReloadInPage } from '../../src/extension/orphanTabAutoReloadHost.js';
 import { isExtensionContextAlive } from '../../src/lib/reportSilentError.js';
 import { installLastStreamUrlRemember } from './pfLastStreamUrl.js';
+import { venueRootVisibilityAction } from '../../src/lib/venueWatchPageVisibility.js';
 
 /** Twitch/Kick の視聴ページで動いているか(council/twitch-support-PLAN.md・会場は YouTube と同じくニコ生版の venueBar をそのまま使う) */
 const PAGE_PLATFORM = platformOfHostname(location.hostname);
@@ -58,14 +59,27 @@ async function statCardsSource() {
   if (!sum) return null;
   return { snapshot: ytSummaryToNicoSnapshot(sum, vid, '', all) };
 }
-/** 視聴ページ以外(ホーム・検索など)へ移ったら、会場をしまって隠す。ニコ生の視聴ページは移るとページごと消えるのと同じに見せる */
+/** 視聴キーが一瞬でも取れなくなった時刻。取れていれば 0 */
+let watchKeyMissingSince = 0;
+/** 視聴ページ以外(ホーム・検索など)へ移ったら、会場の根を隠す。
+ *   サイドパネルで幅が狭くなり配信ページが組み直されてキーが一瞬空になっても、
+ *   すぐには閉じない(少し待って、本当に視聴ページでなくなってから閉じる)。 */
 function setRootShown(/** @type {boolean} */ shown) {
   const root = /** @type {HTMLElement|null} */ (document.getElementById('nlsb-venue-root'));
   if (!root) return;
-  if (!shown && document.documentElement.classList.contains('nlsb-venue-open')) {
+  const now = Date.now();
+  if (shown) watchKeyMissingSince = 0;
+  else if (!watchKeyMissingSince) watchKeyMissingSince = now;
+  const missingMs = shown ? 0 : now - watchKeyMissingSince;
+  const act = venueRootVisibilityAction({
+    shown,
+    venueOpen: document.documentElement.classList.contains('nlsb-venue-open'),
+    missingMs,
+  });
+  if (act.closeVenue) {
     root.querySelector('.nlsb-close-btn')?.dispatchEvent(new MouseEvent('click', { bubbles: true }));
   }
-  root.style.display = shown ? '' : 'none';
+  root.style.display = act.hideRoot ? 'none' : '';
 }
 /** 0.1.1948: このページが「最後に見た配信」を記録する(ニコ生版 rememberWatchPageUrl と同じ決まり・pfLastStreamUrl.js) */
 const lastStreamRemember =
