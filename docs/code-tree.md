@@ -27,7 +27,7 @@
 
 > 値が次の段へ届かない「断線」(broadcaster バグ型)は `npm run feature-map -- --check` が機械検知。
 
-## ⚠️ 役割コメントが無いソース 14 / 1338 件
+## ⚠️ 役割コメントが無いソース 14 / 1341 件
 - `docs/handoff/bench/bench-interval.mjs`
 - `docs/handoff/bench/bench-lane.mjs`
 - `extension-youtube/cloak-failsafe.js`
@@ -1197,7 +1197,7 @@
   - `gift-coin-hq.wav`
   - `gift-register-hq.wav`
   - `gift-register.mp3`
-- 📁 **src/** (2596)
+- 📁 **src/** (2603)
   - 📁 **data/** (7)
     - 📁 **acquirers/** (2)
       - `laneFromStorage.js` — 応援レーン acquirer: chrome.storage.local(nls_comments) → laneStore の橋渡し。
@@ -1540,7 +1540,7 @@
         - `logo_funlink_white_RGB_link_black.png`
         - `logo_funlink_white_RGB_maru_black.png`
     - `hero-connect-hub.svg`
-  - 📁 **lib/** (2280)
+  - 📁 **lib/** (2287)
     - 📁 **__snapshots__/** (4)
       - `marketing-abema-baseline.html`
       - `marketing-niconico.html`
@@ -1601,7 +1601,7 @@
       - `mxGiftImages.test.js`
       - `mxParse.js` — ミクチャ(mixch.tv)の配信・コメント・ギフトを、YouTube 版の記録と同じ形にする(純関数)
       - `mxParse.test.js`
-    - 📁 **platform/** (45)
+    - 📁 **platform/** (46)
       - 📁 **__fixtures__/** (1)
         - `eventStanding.2026-11-21.json`
       - `diagTabShare.js` — 計器(yt_diag_*_chat)は1つの置き場を全タブで分け合う。
@@ -1644,11 +1644,14 @@
       - `slowFollowerFetch.test.js`
       - `streamEmotes.js` — Twitch・Kick のチャットの絵文字(エモート)を、画面で画像として出すための部品(純粋関数)。
       - `streamEmotes.test.js`
+      - `streamKeyAlias.test.js`
       - `streamPlatform.js` — YouTube 版の画面で見る「YouTube 以外の配信サービス」(Twitch・Kick・ツイキャス など)の違いを1か所にまとめた表(純関数)
       - `streamPlatform.reload.test.js`
       - `supportArrival.js` — 【層】L0 判定層(純粋関数・I/O禁止)
       - `supportArrival.test.js`
-    - 📁 **showroom/** (2)
+    - 📁 **showroom/** (4)
+      - `srCommentInput.js` — SHOWROOM の公式コメント欄を探す(会場の「ここから発言」は拾わない)。
+      - `srCommentInput.test.js`
       - `srParse.js` — SHOWROOM の配信・コメント・ギフトを、YouTube 版の記録と同じ形にする(純関数)
       - `srParse.test.js`
     - 📁 **tiktok/** (5)
@@ -1674,7 +1677,7 @@
     - 📁 **whowatch/** (2)
       - `wwParse.js` — ふわっち(whowatch.tv)の配信とコメントを、YouTube 版の記録と同じ形にする(純関数)
       - `wwParse.test.js`
-    - 📁 **youtube/** (100)
+    - 📁 **youtube/** (102)
       - `exportStoredComments.js` — 疑似 lv の書き出しは、画面用の組み立て（人物・アイコン・ランキング）を待たない。
       - `pfLastStreamUrl.test.js`
       - `ytActiveVideoId.js` — 「いま見ている配信」(yt_active_video_id) を書いてよいか。
@@ -1709,6 +1712,8 @@
       - `ytLeaderboardSig.test.js`
       - `ytLiveRowOrder.js` — 【層】L0 判定層(純粋関数・I/O禁止)
       - `ytLiveRowOrder.test.js`
+      - `ytLiveRowsAccept.js` — 視聴ページの会場へ、保存より先に届く新着行(YT_LIVE_ROWS)を受け取ってよいか。
+      - `ytLiveRowsAccept.test.js`
       - `ytLvKeyBridge.js` — 疑似 lv → 配信キー。マーケの過去比較が他サービスの配信を混ぜないために使う。
       - `ytMergedIsolation.js` — 本体の拡張に同梱した YouTube 版を、ニコ生版から切り離す仕切り(2026-11-05 本体統合)。
       - `ytMergedIsolation.test.js`
@@ -3641,6 +3646,8 @@
     - `venuePresenceNote.test.js`
     - `venueResidents.js` — 会場モードの常駐3キャラ(りんく・こん太・たぬ姉)の描画モデル(純関数)。
     - `venueResidents.test.js`
+    - `venueRevealOfficialComposer.js` — 会場モードから公式のコメント欄へ送るとき、会場が欄を覆っていたら一時的にしまう。
+    - `venueRevealOfficialComposer.test.js`
     - `venueRoster.js` — 2026-06-14 ユーザー要望「今会場にいるメンバーを視覚的に確認できるボタン・AIも人間も検証
     - `venueRoster.test.js`
     - `venueRowSpeechCarry.test.js`

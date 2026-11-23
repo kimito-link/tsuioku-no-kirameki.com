@@ -27,7 +27,8 @@ import { buildGiftThrowLedgerTableSectionHtml, buildGiftThrowLedgerTableRowHtml 
 import { ytWording, ytWordingTopFanToSuperChatRank, ytWordingSuperChatRankToTopFan, ytWordingForPlatform, ytWordingPlatformFixed, ytWordingPlatformOfficial, ytGiftUnitWording } from '../../src/lib/youtube/ytWording.js';
 import { ytSuperChatTierColor, ytSuperChatFromRowText } from '../../src/lib/youtube/ytSuperChatTier.js';
 import { parseYtVideoIdFromUrl, isYtWatchLikeUrl, ytHandleLivePendingKey, ytHandleOfPendingKey, ytHandleLivePath, ytChannelUrlOfPendingKey } from '../../src/lib/youtube/ytPageMeta.js';
-import { platformOfStreamKey, platformOfPersonKey, platformChannelOfUrl, platformOfHostname, STREAM_PLATFORMS, placeholderStreamKeyForChannel, isPlaceholderStreamKey } from '../../src/lib/platform/streamPlatform.js';
+import { platformOfStreamKey, platformOfPersonKey, platformChannelOfUrl, platformOfHostname, STREAM_PLATFORMS, placeholderStreamKeyForChannel, isPlaceholderStreamKey, streamKeysShareChannel, preferLiveStreamKey } from '../../src/lib/platform/streamPlatform.js';
+import { shouldAcceptYtLiveRows } from '../../src/lib/youtube/ytLiveRowsAccept.js';
 import { splitTextByEmotes, isEmoteName, isSafeEmoteUrl } from '../../src/lib/platform/streamEmotes.js';
 import { buildYtGiftBags } from './ytGiftToNico.js';
 import { ytCommentSendReasonText } from '../../src/lib/youtube/ytCommentSendReason.js';
@@ -2022,8 +2023,28 @@ if (real && real.storage && real.storage.local && (real.tabs || YT_SHIM_IN_PAGE)
       real.runtime.onMessage.addListener((/** @type {any} */ msg) => {
         if (!msg || msg.type !== 'YT_LIVE_ROWS' || !Array.isArray(msg.items)) return;
         const vid = String(msg.videoId || '');
-        const cur = inPageCommentCache.get(vid);
-        if (!cur) return; // まだ会場がこの配信を読んでいない(最初の全件で入る)
+        const pageUrl = typeof location !== 'undefined' ? String(location.href || '') : '';
+        const currentWatchKey = YT_SHIM_IN_PAGE ? streamKeyForWatchUrl(pageUrl) : '';
+        const cachedKeys = [...inPageCommentCache.keys()].map((k) => String(k));
+        // 仮キーで会場を開いたあと、同じ部屋の本物のキーで届いた新着を捨てない(ミクチャで読み上げが全く来なかった)。
+        if (!shouldAcceptYtLiveRows({ incomingKey: vid, cachedKeys, pageUrl, currentWatchKey })) return;
+        let cur = inPageCommentCache.get(vid);
+        if (!cur) {
+          const alias = cachedKeys.find((k) => streamKeysShareChannel(k, vid));
+          cur = alias ? inPageCommentCache.get(alias) : { pending: [], byPk: new Map(), ver: 0 };
+          inPageCommentCache.set(vid, cur);
+        }
+        const adopted = preferLiveStreamKey(currentWatchKey, vid);
+        if (adopted === vid && vid && vid !== currentWatchKey) {
+          if (!knownSummaries[vid] || typeof knownSummaries[vid] !== 'object') {
+            knownSummaries = { ...knownSummaries, [vid]: { ...(knownSummaries[vid] || {}), updatedAt: Date.now() } };
+          }
+          try {
+            document.dispatchEvent(new CustomEvent('nlsb-watch-key-ready', { detail: { videoId: vid } }));
+          } catch {
+            /* 会場の切り替えは 1 秒ごとの確認でも追いつく */
+          }
+        }
         let added = 0;
         if (!cur.pending) cur.pending = [];
         for (const r of msg.items) {

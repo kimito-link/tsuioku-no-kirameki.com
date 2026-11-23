@@ -321,3 +321,49 @@ export function platformOfHostname(hostname) {
   if (/^(?:www\.)?twitcasting\.tv$/.test(h)) return STREAM_PLATFORMS.twitcasting;
   return null;
 }
+
+/**
+ * 同じチャンネルの別セッション(または仮キーと本物のキー)か。
+ * ミクチャ・SHOWROOM などは URL に配信番号が無く、会場を先に仮キーで開くことがある。
+ * @param {unknown} a
+ * @param {unknown} b
+ * @returns {boolean}
+ */
+export function streamKeysShareChannel(a, b) {
+  const pa = platformOfStreamKey(a);
+  const pb = platformOfStreamKey(b);
+  if (!pa || pa !== pb) return false;
+  const la = pa.loginOfStreamKey(a);
+  const lb = pb.loginOfStreamKey(b);
+  return !!(la && la === lb);
+}
+
+/**
+ * この視聴ページのチャンネルの配信キーか。
+ * @param {unknown} url
+ * @param {unknown} key
+ * @returns {boolean}
+ */
+export function watchUrlMatchesStreamKey(url, key) {
+  const ch = platformChannelOfUrl(url);
+  const p = platformOfStreamKey(key);
+  if (!ch || !p || ch.platform !== p) return false;
+  return ch.login === p.loginOfStreamKey(key);
+}
+
+/**
+ * 仮キーで開いている会場を、同じチャンネルの本物の配信キーへ進める。
+ * @param {unknown} currentKey
+ * @param {unknown} incomingKey
+ * @returns {string}
+ */
+export function preferLiveStreamKey(currentKey, incomingKey) {
+  const cur = String(currentKey || '').trim();
+  const inc = String(incomingKey || '').trim();
+  if (!inc) return cur;
+  if (!cur) return inc;
+  if (cur === inc) return inc;
+  if (streamKeysShareChannel(cur, inc) && isPlaceholderStreamKey(cur) && !isPlaceholderStreamKey(inc)) return inc;
+  return cur;
+}
+

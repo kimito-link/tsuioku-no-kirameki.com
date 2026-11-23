@@ -35,6 +35,7 @@ import {
 import { makeDiagTabToken, shouldSkipDiagWrite } from '../../src/lib/platform/diagTabShare.js';
 import { findPageButton, isOwnExtensionUi } from '../../src/lib/platform/pageControlPick.js';
 import { followerSampleFromDom } from '../../src/lib/platform/followerCountSample.js';
+import { withRevealedVenueOfficialComposer } from '../../src/lib/venueRevealOfficialComposer.js';
 
 const OUT = 'nl-ab-iso';
 const IN = 'nl-ab-main';
@@ -664,6 +665,7 @@ try {
     (async () => {
       const text = String(msg.text || '').replace(/\s+/g, ' ').trim().slice(0, 150);
       if (!text) return { ok: false, reason: 'empty' };
+      return await withRevealedVenueOfficialComposer(document, async () => {
       let input = findComposer();
       for (let i = 0; !input && i < 6; i += 1) {
         await sleep(250);
@@ -707,6 +709,7 @@ try {
       const ok = left !== text;
       if (!ok) noteSendFail('still-in-box');
       return { ok, reason: ok ? '' : 'still-in-box' };
+      });
     })()
       .then((r) => sendResponse(r))
       .catch((e) => sendResponse({ ok: false, reason: String(e) }));

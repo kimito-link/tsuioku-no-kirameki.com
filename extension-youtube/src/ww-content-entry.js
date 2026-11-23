@@ -15,6 +15,7 @@ import { createSlowFollowerFetch } from '../../src/lib/platform/slowFollowerFetc
 import { platformFetchTimeoutSignal } from '../../src/lib/platform/fetchTimeout.js';
 import { startPageStallWatch } from '../../src/lib/stallTrace.js';
 import { isOwnExtensionUi } from '../../src/lib/platform/pageControlPick.js';
+import { withRevealedVenueOfficialComposer } from '../../src/lib/venueRevealOfficialComposer.js';
 try {
   const stallRoot = /** @type {any} */ (globalThis);
   if (!stallRoot.__nlStallWatch) {
@@ -460,6 +461,7 @@ try {
     (async () => {
       const text = String(msg.text || '').replace(/\s+/g, ' ').trim().slice(0, 200);
       if (!text) return { ok: false, reason: 'empty' };
+      return await withRevealedVenueOfficialComposer(document, async () => {
       let input = /** @type {HTMLTextAreaElement | HTMLInputElement | null} */ (document.querySelector(WW_INPUT_SEL));
       for (let i = 0; !input && i < 6; i += 1) {
         await sleep(250);
@@ -503,6 +505,7 @@ try {
       }
       if (!ok) noteSendFail('still-in-box');
       return { ok, reason: ok ? '' : 'still-in-box' };
+      });
     })()
       .then((r) => sendResponse(r))
       .catch((e) => sendResponse({ ok: false, reason: String(e) }));

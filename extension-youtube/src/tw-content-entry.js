@@ -58,6 +58,7 @@ import { createEmoteSaver } from './pfEmoteStore.js';
 import { platformFetchTimeoutSignal } from '../../src/lib/platform/fetchTimeout.js';
 import { followerSampleFromDom } from '../../src/lib/platform/followerCountSample.js';
 import { createSlowFollowerFetch } from '../../src/lib/platform/slowFollowerFetch.js';
+import { withRevealedVenueOfficialComposer } from '../../src/lib/venueRevealOfficialComposer.js';
 
 const IRC_URL = 'wss://irc-ws.chat.twitch.tv:443';
 const META_EVERY_MS = 30_000;
@@ -825,6 +826,7 @@ try {
         noteSendFail('not-signed-in');
         return { ok: false, reason: 'not-signed-in' };
       }
+      return await withRevealedVenueOfficialComposer(document, async () => {
       let input = /** @type {HTMLElement | null} */ (document.querySelector(TW_INPUT_SEL));
       for (let i = 0; !input && i < 6; i += 1) {
         await sleep(250);
@@ -869,6 +871,7 @@ try {
         /* no-op */
       }
       return { ok, reason: ok ? '' : 'still-in-box' };
+      });
     })()
       .then((r) => sendResponse(r))
       .catch((e) => sendResponse({ ok: false, reason: String(e) }));

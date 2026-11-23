@@ -4,6 +4,7 @@
 //   そのときは会場を一時的にしまって欄を出してから送る。
 // @layer L1 — DOM を読む / 会場をしまう印は付け外しだけ
 import { isOwnExtensionUi, queryPageControl, findPageButton } from '../platform/pageControlPick.js';
+export { revealVenueOfficialComposer as revealMxOfficialComposer } from '../venueRevealOfficialComposer.js';
 
 /** 公式の欄らしいセレクタ(form に入っていない textarea も拾う) */
 export const MX_INPUT_SEL =
@@ -58,27 +59,4 @@ export function findMxSendButton(root = typeof document !== 'undefined' ? docume
   const byClass = scope.querySelector && scope.querySelector('button.submit-btn');
   if (byClass && !isOwnExtensionUi(byClass)) return /** @type {HTMLButtonElement} */ (byClass);
   return findPageButton(root, /送信/, near);
-}
-
-/**
- * 会場が公式の欄を覆っているとき、一時的にしまって欄を出してから戻す。
- * 既にしまっている・会場が閉じていれば何もしない。
- * @param {Document} [doc]
- * @returns {() => void} 元に戻す関数
- */
-export function revealMxOfficialComposer(doc = typeof document !== 'undefined' ? document : /** @type {any} */ (null)) {
-  if (!doc) return () => {};
-  const html = doc.documentElement;
-  const root = doc.getElementById && doc.getElementById('nlsb-venue-root');
-  const open = !!(html && html.classList && html.classList.contains('nlsb-venue-open'));
-  if (!open || !root || !root.classList) return () => {};
-  if (root.classList.contains('nlsb-is-tucked')) return () => {};
-  root.classList.add('nlsb-is-tucked');
-  return () => {
-    try {
-      root.classList.remove('nlsb-is-tucked');
-    } catch {
-      /* 戻し損なっても送信の本体は止めない */
-    }
-  };
 }

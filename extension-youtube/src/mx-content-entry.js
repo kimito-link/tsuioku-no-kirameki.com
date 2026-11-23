@@ -48,7 +48,8 @@ import { followerSampleFromMixch } from '../../src/lib/platform/followerCountSam
 import { makeDiagTabToken, shouldSkipDiagWrite } from '../../src/lib/platform/diagTabShare.js';
 import { platformFetchTimeoutSignal } from '../../src/lib/platform/fetchTimeout.js';
 import { findPageButton } from '../../src/lib/platform/pageControlPick.js';
-import { findMxCommentInput, findMxSendButton, revealMxOfficialComposer } from '../../src/lib/mixch/mxCommentInput.js';
+import { findMxCommentInput, findMxSendButton } from '../../src/lib/mixch/mxCommentInput.js';
+import { withRevealedVenueOfficialComposer } from '../../src/lib/venueRevealOfficialComposer.js';
 
 const META_EVERY_MS = 30_000;
 const BOARD_EVERY_MS = 120_000;
@@ -661,8 +662,7 @@ try {
       }
       // 公式の欄は form に入っていない textarea(placeholder「コメントする...」)。会場が覆って欄が外れていたら、
       //   会場を一時的にしまって出してから探す。サイドパネルも会場も同じ MX_SEND_COMMENT を使う。
-      const restoreVenue = revealMxOfficialComposer(document);
-      try {
+      return await withRevealedVenueOfficialComposer(document, async () => {
       let input = findMxCommentInput(document);
       for (let i = 0; !input && i < 6; i += 1) {
         await sleep(250);
@@ -701,9 +701,7 @@ try {
       }
       if (!ok) noteSendFail(`still-in-box${inputShown ? '' : ':hidden'}`);
       return { ok, reason: ok ? '' : 'still-in-box' };
-      } finally {
-        restoreVenue();
-      }
+      });
     })()
       .then((r) => sendResponse(r))
       .catch((e) => sendResponse({ ok: false, reason: String(e) }));

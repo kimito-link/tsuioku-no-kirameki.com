@@ -44,6 +44,8 @@ import { makeDiagTabToken, shouldSkipDiagWrite } from '../../src/lib/platform/di
 import { platformFetchTimeoutSignal } from '../../src/lib/platform/fetchTimeout.js';
 import { followerSampleFromDom, followerSampleFromShowroom } from '../../src/lib/platform/followerCountSample.js';
 import { createSlowFollowerFetch } from '../../src/lib/platform/slowFollowerFetch.js';
+import { findSrCommentInput, findSrSendButton } from '../../src/lib/showroom/srCommentInput.js';
+import { withRevealedVenueOfficialComposer } from '../../src/lib/venueRevealOfficialComposer.js';
 
 const META_EVERY_MS = 30_000;
 const BOARD_EVERY_MS = 60_000;
@@ -507,8 +509,7 @@ async function check() {
 // ---- サイドパネル・会場からのコメント送信 ----
 // SHOWROOM の入力欄(input[placeholder="コメントを投稿"])に書いて送信ボタンを押す。
 //   未ログインでも入力欄は使える形なので(2026-11-08 PC 実測)、/api/current_user で先に確かめる。
-const SR_INPUT_SEL = 'input[placeholder="コメントを投稿"], textarea[placeholder="コメントを投稿"], .st-comment input[type="text"]';
-const SR_SEND_SEL = 'button.st-comment__button, .st-comment button[type="submit"]';
+// 公式欄のセレクタと探し方は src/lib/showroom/srCommentInput.js
 const sleep = (/** @type {number} */ ms) => new Promise((r) => setTimeout(r, ms));
 
 /** ログインしていないと分かるか(分からなければ false=送ってみる) */
@@ -544,21 +545,26 @@ try {
         noteSendFail('not-signed-in');
         return { ok: false, reason: 'not-signed-in' };
       }
-      let input = /** @type {HTMLInputElement | HTMLTextAreaElement | null} */ (document.querySelector(SR_INPUT_SEL));
+      // 会場の箱が公式の欄を覆っていると、文字は入っても送信が届かず still-in-box になる。
+      //   会場の「ここから発言」もサイドパネルも同じ SR_SEND_COMMENT。送っているあいだだけ会場をしまう。
+      return await withRevealedVenueOfficialComposer(document, async () => {
+      let input = findSrCommentInput(document);
       for (let i = 0; !input && i < 6; i += 1) {
         await sleep(250);
-        input = /** @type {any} */ (document.querySelector(SR_INPUT_SEL));
+        input = findSrCommentInput(document);
       }
       if (!input) {
         noteSendFail('no-input');
         return { ok: false, reason: 'no-input' };
       }
+      try { input.scrollIntoView({ block: 'nearest', inline: 'nearest' }); } catch { /* 送れればよい */ }
       input.focus();
       const proto = input instanceof HTMLTextAreaElement ? HTMLTextAreaElement.prototype : HTMLInputElement.prototype;
       Object.getOwnPropertyDescriptor(proto, 'value')?.set?.call(input, text);
       input.dispatchEvent(new Event('input', { bubbles: true }));
+      input.dispatchEvent(new Event('change', { bubbles: true }));
       await sleep(150);
-      const btn = /** @type {HTMLButtonElement | null} */ (document.querySelector(SR_SEND_SEL));
+      const btn = findSrSendButton(document, input);
       if (btn && (btn.disabled || btn.getAttribute('aria-disabled') === 'true')) {
         noteSendFail('send-disabled');
         return { ok: false, reason: 'send-disabled' };
@@ -578,6 +584,7 @@ try {
       }
       if (!ok) noteSendFail('still-in-box');
       return { ok, reason: ok ? '' : 'still-in-box' };
+      });
     })()
       .then((r) => sendResponse(r))
       .catch((e) => sendResponse({ ok: false, reason: String(e) }));

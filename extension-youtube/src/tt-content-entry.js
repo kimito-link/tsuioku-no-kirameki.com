@@ -44,6 +44,7 @@ import { createInfoPollGate } from '../../src/lib/platform/infoPollGate.js';
 import { makeDiagTabToken, shouldSkipDiagWrite } from '../../src/lib/platform/diagTabShare.js';
 import { platformFetchTimeoutSignal } from '../../src/lib/platform/fetchTimeout.js';
 import { followerSampleFromDom, followerSampleFromTikTokRoom } from '../../src/lib/platform/followerCountSample.js';
+import { withRevealedVenueOfficialComposer } from '../../src/lib/venueRevealOfficialComposer.js';
 
 const META_EVERY_MS = 30_000;
 const BOARD_EVERY_MS = 60_000;
@@ -537,6 +538,7 @@ try {
     (async () => {
       const text = String(msg.text || '').replace(/\s+/g, ' ').trim().slice(0, 150);
       if (!text) return { ok: false, reason: 'empty' };
+      return await withRevealedVenueOfficialComposer(document, async () => {
       let input = /** @type {HTMLElement | null} */ (document.querySelector(INPUT_SEL));
       for (let i = 0; !input && i < 6; i += 1) {
         await sleep(250);
@@ -577,6 +579,7 @@ try {
       }
       if (!ok) noteSendFail('still-in-box');
       return { ok, reason: ok ? '' : 'still-in-box' };
+      });
     })()
       .then((r) => sendResponse(r))
       .catch((e) => sendResponse({ ok: false, reason: String(e) }));

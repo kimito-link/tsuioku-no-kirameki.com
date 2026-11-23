@@ -134,6 +134,13 @@ const PREFETCH = [
 void ytPrefetchLocalAssets(PREFETCH).then(() => {
   setInterval(sync, 1000);
   sync();
+  // 仮キーで開いた会場を、同じ部屋の本物の配信キーが来た瞬間に切り替える
+  //   (1秒待ちだと、その間の新着が会場の liveId と合わず読み上げに入らない)。
+  try {
+    document.addEventListener('nlsb-watch-key-ready', () => {
+      try { sync(); } catch { /* 次の定期確認で切り替える */ }
+    });
+  } catch { /* 古い DOM でも会場は出す */ }
   // ギフト・広告・順位の効果音も blob: にしておく(会場を出した後に裏で1本ずつ)。
   //   chrome-extension:// の mp3 をページの中で直接読むと YouTube の見張りに弾かれ、最初の1回が鳴らなかった。
   void ytPrefetchLocalAssetsInOrder(listBundledEffectSoundPaths());

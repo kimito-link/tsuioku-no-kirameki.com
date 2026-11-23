@@ -27,6 +27,7 @@ import { createInfoPollGate } from '../../src/lib/platform/infoPollGate.js';
 import { makeDiagTabToken, shouldSkipDiagWrite } from '../../src/lib/platform/diagTabShare.js';
 import { platformFetchTimeoutSignal } from '../../src/lib/platform/fetchTimeout.js';
 import { followerSampleFromTcDocument } from '../../src/lib/platform/followerCountSample.js';
+import { withRevealedVenueOfficialComposer } from '../../src/lib/venueRevealOfficialComposer.js';
 
 const META_EVERY_MS = 30_000;
 const FLUSH_MS = 200;
@@ -513,6 +514,7 @@ try {
         noteSendFail('not-signed-in');
         return { ok: false, reason: 'not-signed-in' };
       }
+      return await withRevealedVenueOfficialComposer(document, async () => {
       let input = /** @type {HTMLInputElement | HTMLTextAreaElement | null} */ (document.querySelector(TC_INPUT_SEL));
       for (let i = 0; !input && i < 6; i += 1) {
         await sleep(250);
@@ -547,6 +549,7 @@ try {
       }
       if (!ok) noteSendFail('still-in-box');
       return { ok, reason: ok ? '' : 'still-in-box' };
+      });
     })()
       .then((r) => sendResponse(r))
       .catch((e) => sendResponse({ ok: false, reason: String(e) }));

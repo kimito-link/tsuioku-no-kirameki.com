@@ -356,7 +356,7 @@
   - `src/lib/giftThrowProjectile.js`
 - **吹き出し寿命管理** — 会場の吹き出しの表示上限・追い出し(eviction)ライフサイクル
   - `src/lib/venueBubbleLifecycle.js`
-<details><summary>🗂 このカテゴリの全担当ファイル(自動分類) 307</summary>
+<details><summary>🗂 このカテゴリの全担当ファイル(自動分類) 310</summary>
 
 - `app/live-view-sound.js` — v0.1.1737: スマホの WEB版でギフトの効果音を鳴らす(拡張の会場モードと同じ音・同じ金額帯の選び方)。
 - `app/live-view-venue.js` — v0.1.1739: スマホの「かんたん会場モード」。右下の 🎪 を押すと全画面の会場になる。
@@ -570,6 +570,7 @@
 - `src/lib/scrollWhiteoutReport.js` — スクロール白化(下にスクロールすると重く・一瞬白くなって・遅れて描画される)を状態速報の
 - `src/lib/selfActionCelebration.js` — アプリから自分が操作した直後に返す軽量演出の spec。
 - `src/lib/sessionCommentCache.js` — v0.1.650: JSONキャッシュ即時表示の本丸。「開いた瞬間に全コメント表示・ローディングなし」。
+- `src/lib/showroom/srCommentInput.js` — SHOWROOM の公式コメント欄を探す(会場の「ここから発言」は拾わない)。
 - `src/lib/sidepanelIframeLoader.js` — サイドパネルの iframe(中の popup)の読み込みを「親の最初の描画のあと」まで遅らせる、読み込み役(時計・iframe は引数で受け取る)。v0.1.1693
 - `src/lib/storyAvatarDiagLine.js` — 応援グリッド用・診断表示（PII なし・件数のみ）。
 - `src/lib/storyAvatarTvFallbackClass.js` — 人物タイル/アイコンの「リモートサムネ取得失敗→ゆっくりTVスタイルへ落とす」class 付け外しの正本。
@@ -633,6 +634,7 @@
 - `src/lib/venuePickupRing.js` — 【層】L0 判定層(純粋関数・I/O禁止)
 - `src/lib/venuePresenceNote.js` — 【層】L0 判定層（純関数・chrome/DOM/fetch に触らない）
 - `src/lib/venueResidents.js` — 会場モードの常駐3キャラ(りんく・こん太・たぬ姉)の描画モデル(純関数)。
+- `src/lib/venueRevealOfficialComposer.js` — 会場モードから公式のコメント欄へ送るとき、会場が欄を覆っていたら一時的にしまう。
 - `src/lib/venueRoster.js` — 2026-06-14 ユーザー要望「今会場にいるメンバーを視覚的に確認できるボタン・AIも人間も検証
 - `src/lib/venueSeatDomState.js` — 【層】L0 判定層(DOM を触るが「値が違うときだけ書く」だけの薄い部品。chrome.*・storage・fetch は無い)
 - `src/lib/venueSeatLinkParity.js` — 会場タイルの「リンク欠落」実害確定計器(診断先行アプローチ)。
@@ -656,6 +658,7 @@
 - `src/lib/youtube/ytFullRefreshInterval.js` — YouTube 系の横の欄・会場が「記録を全件読み直す」間隔(v0.1.1969)。
 - `src/lib/youtube/ytGiftOnlyRow.js` — ふわっち・SHOWROOM・ミクチャのギフトは、記録ではコメントの行(本文=ギフトの名前)としても残る。
 - `src/lib/youtube/ytLaneAssign.js` — YouTube Live コメントの 3 レーン（りんく・こん太・たぬ姉）振り分け・集計（純関数）
+- `src/lib/youtube/ytLiveRowsAccept.js` — 視聴ページの会場へ、保存より先に届く新着行(YT_LIVE_ROWS)を受け取ってよいか。
 - `src/lib/youtube/ytPostedAt.js` — YouTube のチャット1件の「本当に書かれた時刻」を、チャット欄の時刻表示(#timestamp)から求める。
 - `src/lib/youtube/ytUserLaneTiers.js` — ニコ生版「アイコン列」（りんく・ギフト・広告・こん太・たぬ姉の段）を YouTube の応援者に当てはめる純粋関数
 - `src/lib/youtube/ytVenueBoot.js` — 【層】L0 判定層(純粋関数・I/O禁止)
@@ -1603,14 +1606,17 @@
 - `v0.1.2172` 2026-11-21 — 各サービスのイベント今の順位と次まで
 - `v0.1.2170` 2026-11-21 — イベントの今の順位と次まで
 
-### 🏟 会場・席 (3版)
+### 🏟 会場・席 (4版)
+- `v0.1.2179` 2026-11-23 — 会場の発言を全サービスで通し、ミクチャの新着を読む
 - `v0.1.2178` 2026-11-23 — 会場の描画を軽くしミクチャでも発言
 - `v0.1.2172` 2026-11-21 — 各サービスのイベント今の順位と次まで
 - `v0.1.2170` 2026-11-21 — イベントの今の順位と次まで
 
-### 🎁 ギフト (2版)
+### 🎁 ギフト (1版)
 - `v0.1.2173` 2026-11-21 — ランキングページのコメント集計を約1分ごとに
-- `v0.1.2159` 2026-11-18 — 概数の登録者と長い応援一覧を直す
+
+### 🔊 読み上げ (1版)
+- `v0.1.2179` 2026-11-23 — 会場の発言を全サービスで通し、ミクチャの新着を読む
 
 ### ⚡ 描画・性能 (1版)
 - `v0.1.2178` 2026-11-23 — 会場の描画を軽くしミクチャでも発言
