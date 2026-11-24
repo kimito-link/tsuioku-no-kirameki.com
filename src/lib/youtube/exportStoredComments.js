@@ -63,6 +63,7 @@ function exportCommentFromStoredRow(row, index, liveId) {
     ytAmount: row?.amount ?? row?.ytAmount ?? '',
     ytCurrency: String(row?.currency || row?.ytCurrency || ''),
     ytGiftCount: row?.giftCount,
+    ...(row?.giftPartOf ? { giftPartOf: String(row.giftPartOf) } : {}),
     ...(row?.giftName || row?.ytGiftName ? { ytGiftName: String(row.giftName || row.ytGiftName) } : {}),
     ...(row?.subTier ? { subTier: String(row.subTier) } : {}),
     ...(Array.isArray(row?.badges) && row.badges.length ? { badges: row.badges } : {}),

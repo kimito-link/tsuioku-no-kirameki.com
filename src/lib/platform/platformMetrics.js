@@ -18,7 +18,8 @@ import {
   estimateTwitcastingConsumptionPt,
   accumulateTwitcastingGiftItem,
   normalizeTwitchSubTier,
-  formatEstimatedViewerSpendDisplay
+  formatEstimatedViewerSpendDisplay,
+  formatEstimatedViewerSpendDisplays
 } from '../estimatedViewerSpend.js';
 
 /** 能力表を持つサービス。ABEMA は記録の実装が別の変更にあるので、数字の枠だけを先に置く。 */
@@ -525,7 +526,7 @@ export function tallySupportItems(items) {
   /** @type {Record<string, number>} */
   const amounts = {};
   const subTierCounts = { tier1: 0, tier2: 0, tier3: 0, prime: 0 };
-  const tcConsumption = { confirmedPt: 0, confirmedCount: 0, unknownPaidCount: 0 };
+  const tcConsumption = { ticketJpy: 0, ticketCount: 0, confirmedPt: 0, confirmedCount: 0, unknownPaidCount: 0 };
   const t = {
     ready: true,
     superchatCount: 0,
@@ -574,7 +575,7 @@ export function tallySupportItems(items) {
       t.membershipCount += 1;
       addSubTier(rec.subTier, 1);
     } else if (kind === 'membership_gift') {
-      const gc = Number(rec.giftCount);
+      const gc = rec.giftPartOf ? 0 : Number(rec.giftCount);
       const count = Number.isFinite(gc) ? Math.max(0, Math.floor(gc)) : 1;
       t.membershipGiftCount += count;
       addSubTier(rec.subTier, count);
@@ -843,8 +844,8 @@ function supportChips(id, support) {
     return out.concat(countSinceChip(id, support));
   }
   if (id === 'twitcasting') {
-    const estDisp = formatEstimatedViewerSpendDisplay(estimateTwitcastingConsumptionPt(support.tcConsumption));
-    return estDisp ? [chip('estimatedViewerSpend', estDisp.label, estDisp.text, '', estDisp.title)] : [];
+    const disps = formatEstimatedViewerSpendDisplays(estimateTwitcastingConsumptionPt(support.tcConsumption));
+    return disps.map((d) => chip(d.key, d.label, d.text, '', d.title));
   }
   return [];
 }

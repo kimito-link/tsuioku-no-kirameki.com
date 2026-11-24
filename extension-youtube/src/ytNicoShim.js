@@ -432,7 +432,15 @@ export function ytRecordToNicoEntry(r, i, lv, personKey, stableNo) {
     // リプレイ(アーカイブ)は時刻表示が経過時間なので、配信の開始時刻 + 経過時間にする
     ytPostedAt: postedAt,
     ytKind: String(r?.kind || 'text'),
-    ...(platformOfPersonKey(channelId) ? { ytPlatform: platformOfPersonKey(channelId)?.id, ...(Number(r?.giftCount) > 0 ? { ytGiftCount: Number(r.giftCount) } : {}) } : {}),
+    ...(platformOfPersonKey(channelId)
+      ? {
+          ytPlatform: platformOfPersonKey(channelId)?.id,
+          ...(r?.giftCount != null && Number.isFinite(Number(r.giftCount)) && Number(r.giftCount) >= 0
+            ? { ytGiftCount: Math.floor(Number(r.giftCount)) }
+            : {}),
+          ...(r?.giftPartOf ? { giftPartOf: String(r.giftPartOf) } : {})
+        }
+      : {}),
     ...(r?.giftName ? { ytGiftName: String(r.giftName) } : {}),
     ...(r?.giftImageUrl ? { ytGiftImageUrl: String(r.giftImageUrl) } : {}),
     ytAmount: Number(r?.amount || 0),

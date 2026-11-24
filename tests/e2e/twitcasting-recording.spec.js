@@ -281,7 +281,8 @@ test('ツイキャスのコメント・ギフト(🍡)・ページの数を記�
   const laneText = (await giftLane()).join(' / ');
   expect(laneText).toMatch(/90 スコア/);
   expect(laneText).not.toMatch(/\d\s*pt\b/);
-  expect(await chip('estimatedViewerSpend')).toContain('推定（視聴者の消費）約1,000pt');
+  expect(await chip('estimatedViewerSpend')).toContain('チケット基準の推定約¥1,000');
+  expect(await chip('estimatedViewerConsumption')).toContain('推定（視聴者の消費）約1,000pt');
   expect(await bodyText()).not.toMatch(/推定同時接続|広告pt|来場者数/);
   await ext.locator('[data-nl-metric="totalViews"]').locator('xpath=..').screenshot({ path: 'test-results/twitcasting-official-chips.png' });
   await ext.screenshot({ path: 'test-results/twitcasting-sidepanel.png', fullPage: true });

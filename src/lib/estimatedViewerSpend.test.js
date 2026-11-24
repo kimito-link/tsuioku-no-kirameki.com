@@ -4,6 +4,7 @@ import { resolve } from 'node:path';
 import {
   ESTIMATED_VIEWER_SPEND_LABEL,
   ESTIMATED_VIEWER_CONSUMPTION_LABEL,
+  ESTIMATED_TICKET_BASIS_LABEL,
   ESTIMATED_VIEWER_SPEND_RATES,
   jpyPerCurrencyUnit,
   estimateNiconicoGiftSpendJpy,
@@ -15,7 +16,8 @@ import {
   estimateTwitchSpendFromComments,
   estimateTwitcastingConsumptionPt,
   estimateTwitcastingSpendFromComments,
-  formatEstimatedViewerSpendDisplay
+  formatEstimatedViewerSpendDisplay,
+  formatEstimatedViewerSpendDisplays
 } from './estimatedViewerSpend.js';
 import { panelExtraChips, venueItemsForPlatform, tallySupportItems } from './platform/platformMetrics.js';
 import { buildVenueStatStripModel } from './venueStatStrip.js';
@@ -35,8 +37,16 @@ describe('estimatedViewerSpend (L0 単価・日付付き為替・純粋計算)',
     expect(ESTIMATED_VIEWER_SPEND_RATES.kickSub.sourceUrl).toContain('help.kick.com/en/articles/15159735');
     expect(ESTIMATED_VIEWER_SPEND_RATES.kickSub.giftSourceUrl).toContain('help.kick.com/en/articles/15064143');
     expect(ESTIMATED_VIEWER_SPEND_RATES.twitchSub.asOf).toMatch(/^\d{4}-\d{2}-\d{2}$/);
-    expect(ESTIMATED_VIEWER_SPEND_RATES.twitchSub.sourceUrl).toContain('help.twitch.tv/s/article/gift-subscriptions');
-    expect(ESTIMATED_VIEWER_SPEND_RATES.twitcastingItemPt.asOf).toMatch(/^\d{4}-\d{2}-\d{2}$/);
+    expect(ESTIMATED_VIEWER_SPEND_RATES.twitchSub.sourceUrl).toContain('blog.twitch.tv/en/2017/04/19/');
+    expect(ESTIMATED_VIEWER_SPEND_RATES.twitchSub.tierPriceHelpUrl).toContain(
+      'help.twitch.tv/s/article/lifetime-subscriber-guide-for-partners'
+    );
+    expect(ESTIMATED_VIEWER_SPEND_RATES.twitchSub.giftSpecUrl).toContain('help.twitch.tv/s/article/gift-subscriptions');
+    expect(ESTIMATED_VIEWER_SPEND_RATES.twitcastingTicketJpy.asOf).toBe('2026-11-24');
+    expect(ESTIMATED_VIEWER_SPEND_RATES.twitcastingTicketJpy.sourceUrl).toBe(
+      'https://twitcasting.tv/helpcenter.php?pid=HELP_TICKET_ITEM_TABLE'
+    );
+    expect(ESTIMATED_VIEWER_SPEND_RATES.twitcastingItemPt.asOf).toBe('2026-11-24');
     expect(ESTIMATED_VIEWER_SPEND_RATES.twitcastingItemPt.sourceUrl).toContain('ANNOUNCE_JA_20250715');
     expect(ESTIMATED_VIEWER_SPEND_RATES.fx.asOf).toMatch(/^\d{4}-\d{2}-\d{2}$/);
     expect(ESTIMATED_VIEWER_SPEND_RATES.fx.sourceUrl).toMatch(/^https:\/\//);
@@ -115,7 +125,6 @@ describe('estimatedViewerSpend (L0 単価・日付付き為替・純粋計算)',
     expect(disp?.text).toBe(`約¥${Math.round(15 * (174.35 / 1.0990)).toLocaleString('ja-JP')}`);
     expect(disp?.note).not.toContain('手取り');
 
-    // Kicks だけなら null
     expect(estimateKickSpendFromComments([kicksEv])).toBeNull();
     expect(estimateKickSubSpendJpy({ subCount: 0, giftSubCount: 0 })).toBeNull();
   });
@@ -147,96 +156,121 @@ describe('estimatedViewerSpend (L0 単価・日付付き為替・純粋計算)',
     expect(disp?.note).toContain('Prime×1は0として除外');
     expect(disp?.note).not.toContain('手取り');
 
-    // Tier2 / Tier3 の単価確認
     const multi = estimateTwitchSubSpendJpy({ tier1: 1, tier2: 1, tier3: 1, prime: 2 });
     expect(multi?.usd).toBe(39.97);
-
-    // Prime と Bits だけなら null
     expect(estimateTwitchSpendFromComments([primeSub, bitsMsg])).toBeNull();
   });
 
-  it('ツイキャス: お茶爆100×1＋お茶爆50×1 → 約1,500pt、未知有料アイテムは件数だけ、無料お茶・お団子は足さない', () => {
-    const ocha100 = parseTcEvent(
-      {
-        type: 'gift',
-        id: 'g1',
-        isPaidGift: true,
-        item: { name: 'お茶爆100', showsSenderInfo: true },
-        sender: { id: 'c:u1', name: 'A', screenName: 'c:u1' },
-        score_items: [{ title: '🍡', text: '✨' }]
-      },
-      { user: 'caster', nowMs: 1000 }
+  it('Twitch: まとめギフト（submysterygift 5件 + 内訳 subgift 5行 giftCount=0）が二重計上されない', () => {
+    const mystery = parseTwChatLine(
+      '@msg-id=submysterygift;msg-param-mass-gift-count=5;msg-param-sub-plan=1000;msg-param-origin-id=orig-99;user-id=10;display-name=Gifter :tmi.twitch.tv USERNOTICE #ch'
     );
-    const ocha50 = parseTcEvent(
-      {
-        type: 'gift',
-        id: 'g2',
-        isPaidGift: true,
-        item: { name: 'お茶爆50', showsSenderInfo: true },
-        sender: { id: 'c:u2', name: 'B', screenName: 'c:u2' },
-        score_items: [{ title: '🍡', text: '✨' }]
-      },
-      { user: 'caster', nowMs: 2000 }
+    const innerGifts = [1, 2, 3, 4, 5].map((i) =>
+      parseTwChatLine(
+        `@msg-id=subgift;msg-param-sub-plan=1000;msg-param-community-gift-id=orig-99;msg-param-recipient-display-name=Recv${i};user-id=10;display-name=Gifter :tmi.twitch.tv USERNOTICE #ch`
+      )
     );
-    const freeTea = parseTcEvent(
-      {
-        type: 'gift',
-        id: 'g3',
-        isPaidGift: true,
-        item: { name: 'お茶ｘ10', showsSenderInfo: true },
-        sender: { id: 'c:u3', name: 'C', screenName: 'c:u3' },
-        score_items: [{ title: '🍡', text: '20' }]
-      },
-      { user: 'caster', nowMs: 3000 }
-    );
-    const freeStar = parseTcEvent(
-      {
-        type: 'gift',
-        id: 'g4',
-        isPaidGift: false,
-        item: { name: '応援スター', showsSenderInfo: true },
-        sender: { id: 'c:u4', name: 'D', screenName: 'c:u4' },
-        score_items: [{ title: '🍡', text: '90' }]
-      },
-      { user: 'caster', nowMs: 4000 }
-    );
-    const unknownPaid = parseTcEvent(
-      {
-        type: 'gift',
-        id: 'g5',
-        isPaidGift: true,
-        item: { name: 'スペシャル花火', showsSenderInfo: true },
-        sender: { id: 'c:u5', name: 'E', screenName: 'c:u5' },
-        score_items: [{ title: '🍡', text: '✨' }]
-      },
-      { user: 'caster', nowMs: 5000 }
-    );
+    expect(mystery?.giftCount).toBe(5);
+    for (const g of innerGifts) {
+      expect(g?.giftCount).toBe(0);
+      expect(g?.giftPartOf).toBe('orig-99');
+    }
 
-    // お茶爆100×1 + お茶爆50×1 + 無料お茶/応援アイテム → 1,500pt のみ
-    const estConfirmed = estimateTwitcastingSpendFromComments([ocha100, ocha50, freeTea, freeStar]);
-    expect(estConfirmed?.points).toBe(1500);
-    expect(estConfirmed?.jpy).toBe(0);
-    expect(estConfirmed?.unknownPaidCount).toBe(0);
-    const dispConfirmed = formatEstimatedViewerSpendDisplay(estConfirmed);
-    expect(dispConfirmed?.label).toBe(ESTIMATED_VIEWER_CONSUMPTION_LABEL);
-    expect(dispConfirmed?.text).toBe('約1,500pt');
-    expect(dispConfirmed?.note).not.toContain('手取り');
+    // 1) コメント配列からの直接集計（10件ではなく5件=$24.95のみ）
+    const rows = [mystery, ...innerGifts];
+    const est = estimateTwitchSpendFromComments(rows);
+    expect(est?.tierCounts).toEqual({ tier1: 5, tier2: 0, tier3: 0, prime: 0 });
+    expect(est?.usd).toBe(24.95);
+    expect(est?.jpy).toBe(Math.round(24.95 * (174.35 / 1.0990)));
 
-    // 未知の有料アイテム混在時 → pt は足さず「ほか 1件は金額不明」
-    const estMixed = estimateTwitcastingSpendFromComments([ocha100, ocha50, unknownPaid, freeTea, freeStar]);
-    expect(estMixed?.points).toBe(1500);
-    expect(estMixed?.unknownPaidCount).toBe(1);
-    expect(formatEstimatedViewerSpendDisplay(estMixed)?.text).toBe('約1,500pt（ほか 1件は金額不明）');
+    // 2) tallySupportItems（横欄・会場チップ）でも二重計上されない
+    const tally = tallySupportItems(rows);
+    expect(tally.membershipGiftCount).toBe(5);
+    expect(tally.subTierCounts).toEqual({ tier1: 5, tier2: 0, tier3: 0, prime: 0 });
+    const chip = panelExtraChips('twitch', { support: tally }).find((c) => c.key === 'estimatedViewerSpend');
+    expect(chip?.text).toBe(`約¥${Math.round(24.95 * (174.35 / 1.0990)).toLocaleString('ja-JP')}`);
 
-    // 未知の有料アイテムだけ → 件数だけ出す
+    // 3) ytNicoShim 変換後形式（ytGiftCount: 0, giftPartOf: 'orig-99'）でも二重計上されない
+    const shimRows = rows.map((r) => ({
+      ytPlatform: 'twitch',
+      ytKind: r?.kind,
+      subTier: r?.subTier,
+      ytGiftCount: r?.giftCount,
+      ...(r?.giftPartOf ? { giftPartOf: r.giftPartOf } : {})
+    }));
+    expect(estimateTwitchSpendFromComments(shimRows)?.usd).toBe(24.95);
+  });
+
+  it('ツイキャス: チケット基準の推定（500/1000/3000/5000/10000円）＋お茶爆50/100のpt表示残存、未知有料は件数のみ、無料お茶・お団子は足さない', () => {
+    const makeTcGift = (id, name, isPaidGift = true, scoreText = '✨') =>
+      parseTcEvent(
+        {
+          type: 'gift',
+          id,
+          isPaidGift,
+          item: { name, showsSenderInfo: true },
+          sender: { id: `c:${id}`, name: id, screenName: `c:${id}` },
+          score_items: [{ title: '🍡', text: scoreText }]
+        },
+        { user: 'caster', nowMs: 1000 }
+      );
+
+    const ocha50 = makeTcGift('g50', 'お茶爆50');
+    const ocha100 = makeTcGift('g100', 'お茶爆100');
+    const ocha300 = makeTcGift('g300', 'お茶爆300');
+    const ocha500 = makeTcGift('g500', 'お茶爆500');
+    const kiwami1000 = makeTcGift('g1000', '極茶爆1000');
+    const freeTea = makeTcGift('gtea', 'お茶ｘ10', true, '20');
+    const freeStar = makeTcGift('gstar', '応援スター', false, '90');
+    const unknownPaid = makeTcGift('gunk', 'スペシャル花火', true, '✨');
+
+    // 1) お茶爆100×1 + お茶爆50×1 → チケット基準 約¥1,500 ＆ 消費 約1,500pt の両方が表示される
+    const est50And100 = estimateTwitcastingSpendFromComments([ocha100, ocha50, freeTea, freeStar]);
+    expect(est50And100?.ticketJpy).toBe(1500);
+    expect(est50And100?.points).toBe(1500);
+    expect(est50And100?.unknownPaidCount).toBe(0);
+    const disps50And100 = formatEstimatedViewerSpendDisplays(est50And100);
+    expect(disps50And100).toHaveLength(2);
+    expect(disps50And100[0].label).toBe(ESTIMATED_TICKET_BASIS_LABEL);
+    expect(disps50And100[0].text).toBe('約¥1,500');
+    expect(disps50And100[0].note).toContain('ポイント購入・アプリ内課金・オートチャージでは実際の支払と異なる場合');
+    expect(disps50And100[0].note).toContain('配信者の受取額ではありません');
+    expect(disps50And100[0].sourceUrl).toBe('https://twitcasting.tv/helpcenter.php?pid=HELP_TICKET_ITEM_TABLE');
+    expect(disps50And100[1].label).toBe(ESTIMATED_VIEWER_CONSUMPTION_LABEL);
+    expect(disps50And100[1].text).toBe('約1,500pt');
+
+    // 2) 5種すべて（500 + 1,000 + 3,000 + 5,000 + 10,000 = 19,500円、pt はお茶爆50/100分の1,500ptのみ）
+    const estAll5 = estimateTwitcastingSpendFromComments([ocha50, ocha100, ocha300, ocha500, kiwami1000, freeTea, freeStar]);
+    expect(estAll5?.ticketJpy).toBe(19500);
+    expect(estAll5?.points).toBe(1500);
+    expect(estAll5?.unknownPaidCount).toBe(0);
+    const dispsAll5 = formatEstimatedViewerSpendDisplays(estAll5);
+    expect(dispsAll5[0]).toMatchObject({ label: 'チケット基準の推定', text: '約¥19,500' });
+    expect(dispsAll5[1]).toMatchObject({ label: '推定（視聴者の消費）', text: '約1,500pt' });
+
+    // 3) お茶爆300/500/極茶爆1000 のみ（pt確認対象外）→ チケット基準の円のみ出て、勝手なptは作らない
+    const est300Only = estimateTwitcastingSpendFromComments([ocha300, kiwami1000]);
+    expect(est300Only?.ticketJpy).toBe(13000);
+    expect(est300Only?.points).toBe(0);
+    const disps300Only = formatEstimatedViewerSpendDisplays(est300Only);
+    expect(disps300Only).toHaveLength(1);
+    expect(disps300Only[0]).toMatchObject({ label: 'チケット基準の推定', text: '約¥13,000' });
+
+    // 4) 未知の有料アイテム混在 → 円にもptにも足さず「ほか 1件は金額不明」
+    const estMixed = estimateTwitcastingSpendFromComments([ocha100, unknownPaid, freeTea, freeStar]);
+    const dispsMixed = formatEstimatedViewerSpendDisplays(estMixed);
+    expect(dispsMixed[0].text).toBe('約¥1,000（ほか 1件は金額不明）');
+    expect(dispsMixed[1].text).toBe('約1,000pt');
+
+    // 5) 未知の有料アイテムだけ → 件数のみ出す
     const estUnknownOnly = estimateTwitcastingSpendFromComments([unknownPaid, freeTea, freeStar]);
-    expect(estUnknownOnly?.points).toBe(0);
-    expect(estUnknownOnly?.unknownPaidCount).toBe(1);
-    expect(formatEstimatedViewerSpendDisplay(estUnknownOnly)?.text).toBe('ほか 1件は金額不明');
+    const dispsUnknown = formatEstimatedViewerSpendDisplays(estUnknownOnly);
+    expect(dispsUnknown).toHaveLength(1);
+    expect(dispsUnknown[0]).toMatchObject({ label: 'チケット基準の推定', text: 'ほか 1件は金額不明' });
 
-    // 無料お茶・お団子スコアのみ → null（出さない）
+    // 6) 無料お茶・お団子スコアのみ → null（出さない）
     expect(estimateTwitcastingSpendFromComments([freeTea, freeStar])).toBeNull();
-    expect(estimateTwitcastingConsumptionPt({ confirmedPt: 0, unknownPaidCount: 0 })).toBeNull();
+    expect(estimateTwitcastingConsumptionPt({ ticketJpy: 0, confirmedPt: 0, unknownPaidCount: 0 })).toBeNull();
   });
 
   it('会場と横欄のチップは対象5サービス（該当イベントあり時）のみに出し、Bits/Kicks単体や対象外サービスには出さない', () => {
@@ -248,48 +282,41 @@ describe('estimatedViewerSpend (L0 単価・日付付き為替・純粋計算)',
       '推定（視聴者の購入額）'
     );
 
-    // Twitch: Bits のみでは出ない、有料サブがあれば出る
     const twBitsOnly = tallySupportItems([{ kind: 'superchat', amount: 500, currency: 'BITS', recordedAt: 1000 }]);
     expect(panelExtraChips('twitch', { support: twBitsOnly }).some((c) => c.key === 'estimatedViewerSpend')).toBe(false);
-    const twPaidSub = tallySupportItems([
-      { kind: 'membership', subTier: 'Tier 1', recordedAt: 1000 },
-      { kind: 'membership', subTier: 'Prime', recordedAt: 1500 }
-    ]);
-    expect(panelExtraChips('twitch', { support: twPaidSub }).find((c) => c.key === 'estimatedViewerSpend')?.text).toBe(
-      `約¥${Math.round(4.99 * (174.35 / 1.0990)).toLocaleString('ja-JP')}`
-    );
 
-    // Kick: Kicks のみでは出ない、サブがあれば出る
     const kkKicksOnly = tallySupportItems([{ kind: 'superchat', amount: 500, currency: 'KICKS', recordedAt: 1000 }]);
     expect(panelExtraChips('kick', { support: kkKicksOnly }).some((c) => c.key === 'estimatedViewerSpend')).toBe(false);
-    const kkSub = tallySupportItems([{ kind: 'membership_gift', giftCount: 3, recordedAt: 1000 }]);
-    expect(panelExtraChips('kick', { support: kkSub }).find((c) => c.key === 'estimatedViewerSpend')?.text).toBe(
-      `約¥${Math.round(15 * (174.35 / 1.0990)).toLocaleString('ja-JP')}`
-    );
 
-    // ツイキャス: お茶爆で「推定（視聴者の消費）」が出る
+    // ツイキャス: チケット基準の推定（円）と 推定（視聴者の消費）（pt）の両チップが横欄・会場に出る
     const tcSupport = tallySupportItems([
       { kind: 'superchat', currency: 'TCSCORE', giftName: 'お茶爆100', badges: ['paid'], amount: 0 },
-      { kind: 'superchat', currency: 'TCSCORE', giftName: 'お茶爆50', badges: ['paid'], amount: 0 }
+      { kind: 'superchat', currency: 'TCSCORE', giftName: 'お茶爆500', badges: ['paid'], amount: 0 }
     ]);
-    const tcChip = panelExtraChips('twitcasting', { support: tcSupport }).find((c) => c.key === 'estimatedViewerSpend');
-    expect(tcChip?.label).toBe('推定（視聴者の消費）');
-    expect(tcChip?.text).toBe('約1,500pt');
+    const tcChips = panelExtraChips('twitcasting', { support: tcSupport });
+    expect(tcChips.find((c) => c.key === 'estimatedViewerSpend')).toMatchObject({
+      label: 'チケット基準の推定',
+      text: '約¥6,000'
+    });
+    expect(tcChips.find((c) => c.key === 'estimatedViewerConsumption')).toMatchObject({
+      label: '推定（視聴者の消費）',
+      text: '約1,000pt'
+    });
+
     const tcVenue = venueItemsForPlatform('twitcasting', {
       records: { text: '5', isPlaceholder: false },
       concurrent: { text: '20', isPlaceholder: false },
       streamAge: { text: '10分', isPlaceholder: false },
       facts: { viewers: 20, support: tcSupport }
     });
-    expect(tcVenue?.find((i) => i.key === 'estimatedViewerSpend')?.text).toBe('約1,500pt');
+    expect(tcVenue?.find((i) => i.key === 'estimatedViewerSpend')?.text).toBe('約¥6,000');
+    expect(tcVenue?.find((i) => i.key === 'estimatedViewerConsumption')?.text).toBe('約1,000pt');
 
-    // SHOWROOM / ミクチャ / TikTok / ふわっち / ABEMA には出さない
     for (const excluded of ['showroom', 'mixch', 'tiktok', 'whowatch', 'abema']) {
       const sup = tallySupportItems([{ kind: 'superchat', amount: 1000, currency: 'SRPT' }]);
       expect(panelExtraChips(excluded, { support: sup }).some((c) => c.key === 'estimatedViewerSpend')).toBe(false);
     }
 
-    // ニコ生会場: 有料ギフトpt > 0 のときだけ出る（広告ptのみでは出ない）
     const now = 1_700_000_000_000;
     const nicoWithGift = buildVenueStatStripModel(
       {
@@ -312,55 +339,21 @@ describe('estimatedViewerSpend (L0 単価・日付付き為替・純粋計算)',
     expect(nicoWithGift.items.find((i) => i.key === 'estimatedViewerSpend')?.text).toBe('約¥1,200');
   });
 
-  it('マーケレポート HTML にニコ生・YouTube・Kick・Twitch・ツイキャスの推定を出し、BitsのみやSHOWROOMには出さない', () => {
-    const baseComments = [
-      { id: 'c1', liveId: 'lv1', text: 'hi', userId: 'u1', nickname: 'a', capturedAt: 1_700_000_000_000 }
-    ];
-    const nicoHtml = buildMarketingDashboardHtml(aggregateMarketingReport(baseComments, 'lv1'), {
-      commentsForAnalytics: baseComments,
-      officialEventDomBundle: { programStats: { giftPoints: 2500, adPoints: 9000 } }
-    });
-    expect(nicoHtml).toContain('推定（視聴者の購入額）');
-    expect(nicoHtml).toContain('約¥2,500');
-
-    const kkComments = [
-      { id: 'k1', liveId: 'lv900000000010', text: 'ギフトサブ3件', userId: 'u1', nickname: 'a', capturedAt: 1_700_000_000_000, ytPlatform: 'kick', ytKind: 'membership_gift', ytGiftCount: 3 }
-    ];
-    const kkHtml = buildMarketingDashboardHtml(aggregateMarketingReport(kkComments, 'lv900000000010'), {
-      platform: 'kick',
-      commentsForAnalytics: kkComments
-    });
-    expect(kkHtml).toContain('推定（視聴者の購入額）');
-    expect(kkHtml).toContain(ESTIMATED_VIEWER_SPEND_RATES.kickSub.sourceUrl);
-
-    const twSubComments = [
-      { id: 'tw1', liveId: 'lv900000000011', text: 'sub', userId: 'u1', nickname: 'a', capturedAt: 1_700_000_000_000, ytPlatform: 'twitch', ytKind: 'membership', subTier: 'Tier 1' }
-    ];
-    const twSubHtml = buildMarketingDashboardHtml(aggregateMarketingReport(twSubComments, 'lv900000000011'), {
-      platform: 'twitch',
-      commentsForAnalytics: twSubComments
-    });
-    expect(twSubHtml).toContain('推定（視聴者の購入額）');
-    expect(twSubHtml).toContain('地域別価格・アプリ課金で実際と異なる場合あり');
-
+  it('マーケレポート HTML にニコ生・YouTube・Kick・Twitch・ツイキャス（チケット基準円＋消費pt）を出し、対象外には出さない', () => {
     const tcComments = [
-      { id: 'tc1', liveId: 'lv900000000012', text: 'お茶爆100', userId: 'u1', nickname: 'a', capturedAt: 1_700_000_000_000, ytPlatform: 'twitcasting', ytKind: 'superchat', ytCurrency: 'TCSCORE', ytGiftName: 'お茶爆100', badges: ['paid'] }
+      { id: 'tc1', liveId: 'lv900000000012', text: 'お茶爆100', userId: 'u1', nickname: 'a', capturedAt: 1_700_000_000_000, ytPlatform: 'twitcasting', ytKind: 'superchat', ytCurrency: 'TCSCORE', ytGiftName: 'お茶爆100', badges: ['paid'] },
+      { id: 'tc2', liveId: 'lv900000000012', text: '極茶爆1000', userId: 'u2', nickname: 'b', capturedAt: 1_700_000_000_000, ytPlatform: 'twitcasting', ytKind: 'superchat', ytCurrency: 'TCSCORE', ytGiftName: '極茶爆1000', badges: ['paid'] }
     ];
     const tcHtml = buildMarketingDashboardHtml(aggregateMarketingReport(tcComments, 'lv900000000012'), {
       platform: 'twitcasting',
       commentsForAnalytics: tcComments
     });
+    expect(tcHtml).toContain('チケット基準の推定');
+    expect(tcHtml).toContain('約¥11,000');
+    expect(tcHtml).toContain('HELP_TICKET_ITEM_TABLE');
+    expect(tcHtml).toContain('ポイント購入・アプリ内課金・オートチャージでは実際の支払と異なる場合');
     expect(tcHtml).toContain('推定（視聴者の消費）');
     expect(tcHtml).toContain('約1,000pt');
-
-    // Bits のみの Twitch は出さない
-    const twBitsOnly = [
-      { id: 't1', liveId: 'lv900000000002', text: 'bits', userId: 'u1', nickname: 'a', capturedAt: 1_700_000_000_000, ytPlatform: 'twitch', ytKind: 'superchat', ytAmount: 500, ytCurrency: 'BITS' }
-    ];
-    const twBitsHtml = buildMarketingDashboardHtml(aggregateMarketingReport(twBitsOnly, 'lv900000000002'), {
-      platform: 'twitch',
-      commentsForAnalytics: twBitsOnly
-    });
-    expect(twBitsHtml).not.toContain('推定（視聴者の購入額）');
+    expect(tcHtml).not.toContain('手取り');
   });
 });

@@ -1,9 +1,9 @@
 /**
  * 【層】L0 判定層(純粋関数・I/O禁止)
- * 【この箱に入るもの】視聴者の推定購入額／推定消費ptの単価・日付付き為替レート・純粋計算
+ * 【この箱に入るもの】視聴者の推定購入額／チケット基準推定／推定消費ptの単価・日付付き為替レート・純粋計算
  * 【この箱に入らないもの】fetch / storage / DOM / chrome.* ・配信者の手取り計算
  * 【書けるstorageキー】なし
- * 【正本宣言】推定（視聴者の購入額）／推定（視聴者の消費）に使う価格・為替・出典・日付はこのファイル1本だけ
+ * 【正本宣言】推定（視聴者の購入額）／チケット基準の推定／推定（視聴者の消費）に使う価格・為替・出典・日付はこのファイル1本だけ
  *
  * estimatedViewerSpend.js — 公式で価格・消費ptを確認済みの項目のみを対象に、
  * 視聴者の推定購入額（JPY）または推定消費（pt）を算出する。
@@ -12,8 +12,11 @@
  *   - ニコ生: 有料ギフト pt（1pt = 1円 Web標準）
  *   - YouTube: スーパーチャット・スーパーステッカー（非JPYはECB基準為替で換算）
  *   - Kick: サブスク・ギフトサブ（1件 = $5 USD → ECB基準為替で円換算）
- *   - Twitch: 有料サブスク・ギフトサブ（Tier1 $4.99 / Tier2 $9.99 / Tier3 $24.99 → 円換算、Prime=0除外）
- *   - ツイキャス: 公式確認済み有料アイテム（お茶爆50=500pt、お茶爆100=1,000pt。1pt≠1円のため pt 表記、未知有料は件数のみ）
+ *   - Twitch: 有料サブスク・ギフトサブ（Tier1 $4.99 / Tier2 $9.99 / Tier3 $24.99 → 円換算、Prime=0除外、まとめギフト内訳は二重計上しない）
+ *   - ツイキャス:
+ *     (a) 公式アイテムチケット1枚の円（お茶爆50=500円 / お茶爆100=1,000円 / お茶爆300=3,000円 / お茶爆500=5,000円 / 極茶爆1000=10,000円）→「チケット基準の推定」
+ *     (b) 公式確認済み消費pt（お茶爆50=500pt / お茶爆100=1,000pt。1pt≠1円のため pt 表記を残す）→「推定（視聴者の消費）」
+ *     (c) 表にない有料アイテムは金額・ptに足さず「ほか n件は金額不明」と件数のみ表示
  *
  * ■対象外（確認できない値段は作らない・配信者の取り分を支払額と混同しない）:
  *   - ニコニ広告 pt、無料ポイント／無料ギフト、ツイキャスの無料お茶・応援アイテム・お団子スコア
@@ -29,6 +32,7 @@
 
 export const ESTIMATED_VIEWER_SPEND_LABEL = '推定（視聴者の購入額）';
 export const ESTIMATED_VIEWER_CONSUMPTION_LABEL = '推定（視聴者の消費）';
+export const ESTIMATED_TICKET_BASIS_LABEL = 'チケット基準の推定';
 
 /**
  * 価格・消費pt・為替の正本（すべて確認日付と公式一次出典 URL を明記）。
@@ -51,20 +55,44 @@ export const ESTIMATED_VIEWER_SPEND_RATES = Object.freeze({
     giftSourceUrl: 'https://help.kick.com/en/articles/15064143',
     note: 'サブスク・ギフトサブ 1件=$5 USD（2026-11-24確認）をECB基準為替で円換算。地域別価格・アプリ課金等で実際と異なる場合あり。Kicksは単価不明のため含めません。'
   }),
-  // 出典: https://help.twitch.tv/s/article/gift-subscriptions （2026-11-24 確認）
+  // 出典（2026-11-24 本文裏取り済み）:
+  //   - 単価正本（静的HTML本文で $4.99 / $9.99 / $24.99 を確認）:
+  //     https://blog.twitch.tv/en/2017/04/19/everything-you-need-to-know-about-our-new-subscriptions-beta-4f7535749f2c/
+  //   - 公式Help単価併記（レンダリング本文で "Tier 1 Sub: $4.99" / "Tier 2 Sub: $9.99" / "Tier 3 Sub: $24.99" を確認）:
+  //     https://help.twitch.tv/s/article/lifetime-subscriber-guide-for-partners?language=en_US
+  //   - ギフトサブ仕様（Tier 1/2/3 対応の確認用。この記事本文にはドル単価の数値記載なし）:
+  //     https://help.twitch.tv/s/article/gift-subscriptions?language=en_US
+  //   - 地域別価格表: https://help.twitch.tv/s/article/local-sub-price-countries?language=en_US
   twitchSub: Object.freeze({
     tierUsd: Object.freeze({
-      'Tier 1': 4.99, // Tier 1 = $4.99 USD（2026-11-24 確認）
-      'Tier 2': 9.99, // Tier 2 = $9.99 USD（2026-11-24 確認）
-      'Tier 3': 24.99, // Tier 3 = $24.99 USD（2026-11-24 確認）
+      'Tier 1': 4.99, // Tier 1 = $4.99 USD（2026-11-24 公式Blog/Help本文で確認）
+      'Tier 2': 9.99, // Tier 2 = $9.99 USD（2026-11-24 公式Blog/Help本文で確認）
+      'Tier 3': 24.99, // Tier 3 = $24.99 USD（2026-11-24 公式Blog/Help本文で確認）
       Prime: 0 // Prime Gaming サブは追加支払 0 として除外
     }),
     asOf: '2026-11-24',
-    sourceName: 'Twitch Help (Gift Subscriptions / Subscription Tiers)',
-    sourceUrl: 'https://help.twitch.tv/s/article/gift-subscriptions',
+    sourceName: 'Twitch Official Blog & Help (Subscription Tiers $4.99 / $9.99 / $24.99)',
+    sourceUrl: 'https://blog.twitch.tv/en/2017/04/19/everything-you-need-to-know-about-our-new-subscriptions-beta-4f7535749f2c/',
+    tierPriceHelpUrl: 'https://help.twitch.tv/s/article/lifetime-subscriber-guide-for-partners?language=en_US',
+    giftSpecUrl: 'https://help.twitch.tv/s/article/gift-subscriptions?language=en_US',
+    localPriceUrl: 'https://help.twitch.tv/s/article/local-sub-price-countries?language=en_US',
     note: '有料サブ・ギフトサブ（Tier1 $4.99 / Tier2 $9.99 / Tier3 $24.99、Prime除外、2026-11-24確認）をECB基準為替で円換算。地域別価格・アプリ課金で実際と異なる場合あり。Bitsは視聴者支払額と一致しないため含めません。'
   }),
-  // 出典: https://twitcasting.tv/helpcenter.php?pid=ANNOUNCE_JA_20250715 （2026-11-24 確認）
+  // 出典: https://twitcasting.tv/helpcenter.php?pid=HELP_TICKET_ITEM_TABLE （2026-11-24 本文確認）
+  twitcastingTicketJpy: Object.freeze({
+    itemsJpy: Object.freeze({
+      お茶爆50: 500, // お茶爆50チケット 1枚 = 500円（2026-11-24 公式販売テーブルで確認）
+      お茶爆100: 1000, // お茶爆100チケット 1枚 = 1,000円（2026-11-24 公式販売テーブルで確認）
+      お茶爆300: 3000, // お茶爆300チケット 1枚 = 3,000円（2026-11-24 公式販売テーブルで確認）
+      お茶爆500: 5000, // お茶爆500チケット 1枚 = 5,000円（2026-11-24 公式販売テーブルで確認）
+      極茶爆1000: 10000 // 極茶爆1000チケット 1枚 = 10,000円（2026-11-24 公式販売テーブルで確認）
+    }),
+    asOf: '2026-11-24',
+    sourceName: 'ツイキャス公式ヘルプ（アイテムチケットの販売テーブル）',
+    sourceUrl: 'https://twitcasting.tv/helpcenter.php?pid=HELP_TICKET_ITEM_TABLE',
+    note: '公式アイテムチケット1枚の価格（お茶爆50=500円・お茶爆100=1,000円・お茶爆300=3,000円・お茶爆500=5,000円・極茶爆1000=10,000円、2026-11-24確認）によるチケット基準の推定です。ポイント購入・アプリ内課金・オートチャージでは実際の支払と異なる場合があります。配信者の受取額ではありません。'
+  }),
+  // 出典: https://twitcasting.tv/helpcenter.php?pid=ANNOUNCE_JA_20250715 （2026-11-24 本文確認）
   twitcastingItemPt: Object.freeze({
     itemsPt: Object.freeze({
       お茶爆50: 500, // お茶爆50 = 500pt（2026-11-24 公式お知らせで確認）
@@ -172,6 +200,7 @@ export function normalizeTwitchSubTier(rawTier) {
  * @typedef {{
  *   platform: 'niconico' | 'youtube' | 'kick' | 'twitch' | 'twitcasting',
  *   jpy: number,
+ *   ticketJpy?: number,
  *   points?: number,
  *   usd?: number,
  *   hasFxConversion: boolean,
@@ -179,6 +208,7 @@ export function normalizeTwitchSubTier(rawTier) {
  *   fxAsOf?: string,
  *   sourceName: string,
  *   sourceUrl: string,
+ *   ptSourceUrl?: string,
  *   unconverted: Array<{ currency: string, amount: number }>,
  *   giftPoints?: number,
  *   subCount?: number,
@@ -186,6 +216,18 @@ export function normalizeTwitchSubTier(rawTier) {
  *   tierCounts?: { tier1: number, tier2: number, tier3: number, prime: number },
  *   unknownPaidCount?: number
  * }} EstimatedViewerSpendResult
+ */
+
+/**
+ * @typedef {{
+ *   key: string,
+ *   label: string,
+ *   text: string,
+ *   title: string,
+ *   note: string,
+ *   sourceUrl: string,
+ *   asOf: string
+ * }} EstimatedViewerSpendDisplayItem
  */
 
 /**
@@ -343,10 +385,11 @@ export function parseTwitcastingGiftNameAndCount(rawName, explicitCount) {
 
 /**
  * ツイキャスの1行を累積オブジェクトへ加算する（純関数）。
- * - 公式確認済みアイテム（お茶爆50=500pt、お茶爆100=1,000pt）は confirmedPt へ合算。
+ * - 公式アイテムチケット表（お茶爆50/100/300/500・極茶爆1000）は ticketJpy へ合算。
+ * - 公式確認済み消費pt表（お茶爆50=500pt・お茶爆100=1,000pt）は confirmedPt へ合算。
  * - 無料のお茶（ベース名 "お茶"）や無料応援アイテム（isPaidGift!==true かつ badges に 'paid' 無し）は除外。
- * - 表にない有料アイテムは pt に足さず unknownPaidCount に件数のみ加算。お団子スコアは使わない。
- * @param {{ confirmedPt: number, confirmedCount: number, unknownPaidCount: number }} acc
+ * - 表にない有料アイテムは金額・ptに足さず unknownPaidCount に件数のみ加算。お団子スコアは使わない。
+ * @param {{ ticketJpy?: number, ticketCount?: number, confirmedPt: number, confirmedCount: number, unknownPaidCount: number }} acc
  * @param {Record<string, unknown>|null|undefined} row
  */
 export function accumulateTwitcastingGiftItem(acc, row) {
@@ -362,10 +405,21 @@ export function accumulateTwitcastingGiftItem(acc, row) {
   if (baseName === 'お茶') return;
   if (row.isPaidGift === false) return;
 
-  const table = /** @type {Record<string, number>} */ (ESTIMATED_VIEWER_SPEND_RATES.twitcastingItemPt.itemsPt);
-  if (Object.prototype.hasOwnProperty.call(table, baseName)) {
-    acc.confirmedPt += table[baseName] * count;
-    acc.confirmedCount += count;
+  const ticketTable = /** @type {Record<string, number>} */ (ESTIMATED_VIEWER_SPEND_RATES.twitcastingTicketJpy.itemsJpy);
+  const ptTable = /** @type {Record<string, number>} */ (ESTIMATED_VIEWER_SPEND_RATES.twitcastingItemPt.itemsPt);
+
+  const hasTicket = Object.prototype.hasOwnProperty.call(ticketTable, baseName);
+  const hasPt = Object.prototype.hasOwnProperty.call(ptTable, baseName);
+
+  if (hasTicket || hasPt) {
+    if (hasTicket) {
+      acc.ticketJpy = (Number(acc.ticketJpy) || 0) + ticketTable[baseName] * count;
+      acc.ticketCount = (Number(acc.ticketCount) || 0) + count;
+    }
+    if (hasPt) {
+      acc.confirmedPt += ptTable[baseName] * count;
+      acc.confirmedCount += count;
+    }
     return;
   }
 
@@ -377,24 +431,28 @@ export function accumulateTwitcastingGiftItem(acc, row) {
 }
 
 /**
- * ツイキャスの累積結果から推定消費（pt）モデルを生成する（円換算はしない）。
- * @param {{ confirmedPt?: unknown, confirmedCount?: unknown, unknownPaidCount?: unknown }|null|undefined} summary
+ * ツイキャスの累積結果から推定モデル（チケット基準の円＋お茶爆50/100消費pt＋未知有料件数）を生成する。
+ * @param {{ ticketJpy?: unknown, confirmedPt?: unknown, confirmedCount?: unknown, unknownPaidCount?: unknown }|null|undefined} summary
  * @returns {EstimatedViewerSpendResult|null}
  */
 export function estimateTwitcastingConsumptionPt(summary) {
   if (!summary || typeof summary !== 'object') return null;
+  const ticketJpy = Math.max(0, Math.floor(Number(summary.ticketJpy) || 0));
   const points = Math.max(0, Math.floor(Number(summary.confirmedPt) || 0));
   const unknownPaidCount = Math.max(0, Math.floor(Number(summary.unknownPaidCount) || 0));
-  if (points <= 0 && unknownPaidCount <= 0) return null;
-  const cfg = ESTIMATED_VIEWER_SPEND_RATES.twitcastingItemPt;
+  if (ticketJpy <= 0 && points <= 0 && unknownPaidCount <= 0) return null;
+  const ticketCfg = ESTIMATED_VIEWER_SPEND_RATES.twitcastingTicketJpy;
+  const ptCfg = ESTIMATED_VIEWER_SPEND_RATES.twitcastingItemPt;
   return {
     platform: 'twitcasting',
-    jpy: 0,
+    jpy: ticketJpy,
+    ticketJpy,
     points,
     hasFxConversion: false,
-    asOf: cfg.asOf,
-    sourceName: cfg.sourceName,
-    sourceUrl: cfg.sourceUrl,
+    asOf: ticketCfg.asOf,
+    sourceName: ticketCfg.sourceName,
+    sourceUrl: ticketCfg.sourceUrl,
+    ptSourceUrl: ptCfg.sourceUrl,
     unconverted: [],
     unknownPaidCount
   };
@@ -435,13 +493,14 @@ export function estimateKickSpendFromComments(comments) {
   let giftSubCount = 0;
   for (const row of comments) {
     if (!row || typeof row !== 'object') continue;
-    const c = /** @type {{ ytKind?: unknown, kind?: unknown, ytPlatform?: unknown, ytGiftCount?: unknown, giftCount?: unknown }} */ (row);
+    const c = /** @type {{ ytKind?: unknown, kind?: unknown, ytPlatform?: unknown, ytGiftCount?: unknown, giftCount?: unknown, giftPartOf?: unknown }} */ (row);
     const plat = String(c.ytPlatform || '').trim().toLowerCase();
     if (plat && plat !== 'kick') continue;
     const kind = String(c.ytKind ?? c.kind ?? '').trim().toLowerCase();
     if (kind === 'membership') {
       subCount += 1;
     } else if (kind === 'membership_gift') {
+      if (c.giftPartOf) continue;
       const rawGc = c.ytGiftCount ?? c.giftCount;
       const gc = rawGc !== undefined && rawGc !== null ? Number(rawGc) : 1;
       if (Number.isFinite(gc) && gc > 0) giftSubCount += Math.floor(gc);
@@ -451,7 +510,7 @@ export function estimateKickSpendFromComments(comments) {
 }
 
 /**
- * Twitch のコメント配列から有料サブ・ギフトサブを Tier 別に集計して推定購入額を算出する（Prime・Bits 除外）。
+ * Twitch のコメント配列から有料サブ・ギフトサブを Tier 別に集計して推定購入額を算出する（Prime・Bits・まとめ贈り内訳は除外）。
  * @param {readonly unknown[]} comments
  * @returns {EstimatedViewerSpendResult|null}
  */
@@ -460,13 +519,14 @@ export function estimateTwitchSpendFromComments(comments) {
   const counts = { tier1: 0, tier2: 0, tier3: 0, prime: 0 };
   for (const row of comments) {
     if (!row || typeof row !== 'object') continue;
-    const c = /** @type {{ ytKind?: unknown, kind?: unknown, ytPlatform?: unknown, subTier?: unknown, ytGiftCount?: unknown, giftCount?: unknown }} */ (row);
+    const c = /** @type {{ ytKind?: unknown, kind?: unknown, ytPlatform?: unknown, subTier?: unknown, ytGiftCount?: unknown, giftCount?: unknown, giftPartOf?: unknown }} */ (row);
     const plat = String(c.ytPlatform || '').trim().toLowerCase();
     if (plat && plat !== 'twitch') continue;
     const kind = String(c.ytKind ?? c.kind ?? '').trim().toLowerCase();
     if (kind !== 'membership' && kind !== 'membership_gift') continue;
     let n = 1;
     if (kind === 'membership_gift') {
+      if (c.giftPartOf) continue;
       const rawGc = c.ytGiftCount ?? c.giftCount;
       const gc = rawGc !== undefined && rawGc !== null ? Number(rawGc) : 1;
       n = Number.isFinite(gc) ? Math.max(0, Math.floor(gc)) : 1;
@@ -482,13 +542,13 @@ export function estimateTwitchSpendFromComments(comments) {
 }
 
 /**
- * ツイキャスのコメント配列から公式確認済み有料アイテム（お茶爆50/100）と未知有料アイテム件数を集計する。
+ * ツイキャスのコメント配列からチケット基準の円（5種）・消費pt（お茶爆50/100）・未知有料アイテム件数を集計する。
  * @param {readonly unknown[]} comments
  * @returns {EstimatedViewerSpendResult|null}
  */
 export function estimateTwitcastingSpendFromComments(comments) {
   if (!Array.isArray(comments) || !comments.length) return null;
-  const acc = { confirmedPt: 0, confirmedCount: 0, unknownPaidCount: 0 };
+  const acc = { ticketJpy: 0, ticketCount: 0, confirmedPt: 0, confirmedCount: 0, unknownPaidCount: 0 };
   for (const row of comments) {
     if (!row || typeof row !== 'object') continue;
     const rec = /** @type {Record<string, unknown>} */ (row);
@@ -500,52 +560,85 @@ export function estimateTwitcastingSpendFromComments(comments) {
 }
 
 /**
- * 会場・横欄・マーケレポート共通の表示テキストと説明文（title / note）を生成する。
- * 配信者の手取りは一切表示しない。
+ * 会場・横欄・マーケレポート共通の表示アイテム配列を生成する。
+ * - ツイキャスは「チケット基準の推定」（円・5種＋未知件数）と「推定（視聴者の消費）」（お茶爆50/100 pt）の最大2件を返す。
+ * - 他サービスは1件を返す。配信者の手取りは一切表示しない。
  * @param {EstimatedViewerSpendResult|null|undefined} est
- * @returns {{ label: string, text: string, title: string, note: string, sourceUrl: string, asOf: string }|null}
+ * @returns {EstimatedViewerSpendDisplayItem[]}
  */
-export function formatEstimatedViewerSpendDisplay(est) {
-  if (!est) return null;
+export function formatEstimatedViewerSpendDisplays(est) {
+  if (!est) return [];
 
   if (est.platform === 'twitcasting') {
+    const ticketJpy = Math.max(0, Math.floor(Number(est.ticketJpy ?? est.jpy) || 0));
     const pts = Math.max(0, Math.floor(Number(est.points) || 0));
     const unk = Math.max(0, Math.floor(Number(est.unknownPaidCount) || 0));
-    if (pts <= 0 && unk <= 0) return null;
-    const cfg = ESTIMATED_VIEWER_SPEND_RATES.twitcastingItemPt;
+    if (ticketJpy <= 0 && pts <= 0 && unk <= 0) return [];
+
+    const ticketCfg = ESTIMATED_VIEWER_SPEND_RATES.twitcastingTicketJpy;
+    const ptCfg = ESTIMATED_VIEWER_SPEND_RATES.twitcastingItemPt;
     const unkPhrase = unk > 0 ? `ほか ${unk.toLocaleString('ja-JP')}件は金額不明` : '';
-    const text =
-      pts > 0 && unk > 0
-        ? `約${pts.toLocaleString('ja-JP')}pt（${unkPhrase}）`
-        : pts > 0
-          ? `約${pts.toLocaleString('ja-JP')}pt`
-          : unkPhrase;
     const unkSentence = unk > 0 ? `表にない有料アイテム（${unkPhrase}）は合算していません。` : '';
-    const note = `ツイキャスの公式確認済み有料アイテム（お茶爆50=500pt・お茶爆100=1,000pt、${cfg.asOf}確認）から算出した視聴者の消費ポイント推定です。1pt=1円ではないため円換算していません。${unkSentence}お団子スコアや無料のお茶・応援アイテムは含めません。配信者の受取額ではありません。`;
-    return {
-      label: ESTIMATED_VIEWER_CONSUMPTION_LABEL,
-      text,
-      title: note,
-      note,
-      sourceUrl: cfg.sourceUrl,
-      asOf: cfg.asOf
-    };
+
+    /** @type {EstimatedViewerSpendDisplayItem[]} */
+    const items = [];
+
+    if (ticketJpy > 0 || (unk > 0 && pts <= 0)) {
+      const text =
+        ticketJpy > 0 && unk > 0
+          ? `約¥${ticketJpy.toLocaleString('ja-JP')}（${unkPhrase}）`
+          : ticketJpy > 0
+            ? `約¥${ticketJpy.toLocaleString('ja-JP')}`
+            : unkPhrase;
+      const note = `ツイキャス公式アイテムチケット1枚の価格（お茶爆50=500円・お茶爆100=1,000円・お茶爆300=3,000円・お茶爆500=5,000円・極茶爆1000=10,000円、${ticketCfg.asOf}確認）によるチケット基準の推定です。${unkSentence}ポイント購入・アプリ内課金・オートチャージでは実際の支払と異なる場合があります。お団子スコアや無料のお茶・応援アイテムは含めません。配信者の受取額ではありません。`;
+      items.push({
+        key: 'estimatedViewerSpend',
+        label: ESTIMATED_TICKET_BASIS_LABEL,
+        text,
+        title: note,
+        note,
+        sourceUrl: ticketCfg.sourceUrl,
+        asOf: ticketCfg.asOf
+      });
+    }
+
+    if (pts > 0) {
+      const attachUnkHere = items.length === 0 && unk > 0;
+      const ptText = attachUnkHere
+        ? `約${pts.toLocaleString('ja-JP')}pt（${unkPhrase}）`
+        : `約${pts.toLocaleString('ja-JP')}pt`;
+      const ptNote = `ツイキャスの公式確認済み有料アイテム（お茶爆50=500pt・お茶爆100=1,000pt、${ptCfg.asOf}確認）から算出した視聴者の消費ポイント推定です。1pt=1円ではないため円換算していません。${attachUnkHere ? unkSentence : ''}お団子スコアや無料のお茶・応援アイテムは含めません。配信者の受取額ではありません。`;
+      items.push({
+        key: 'estimatedViewerConsumption',
+        label: ESTIMATED_VIEWER_CONSUMPTION_LABEL,
+        text: ptText,
+        title: ptNote,
+        note: ptNote,
+        sourceUrl: ptCfg.sourceUrl,
+        asOf: ptCfg.asOf
+      });
+    }
+
+    return items;
   }
 
-  if (!(est.jpy > 0)) return null;
+  if (!(est.jpy > 0)) return [];
   const formatted = `約¥${Math.round(est.jpy).toLocaleString('ja-JP')}`;
 
   if (est.platform === 'niconico') {
     const cfg = ESTIMATED_VIEWER_SPEND_RATES.niconicoGiftPt;
     const note = `ニコ生有料ギフトpt（${Math.round(est.giftPoints || 0).toLocaleString('ja-JP')}pt）× 1pt=1円（${cfg.asOf}確認・Web購入標準単価）での視聴者購入額の推定です。アプリ課金や無料ポイント等で実際と異なる場合があります。配信者の受取額ではありません。`;
-    return {
-      label: ESTIMATED_VIEWER_SPEND_LABEL,
-      text: formatted,
-      title: note,
-      note,
-      sourceUrl: cfg.sourceUrl,
-      asOf: cfg.asOf
-    };
+    return [
+      {
+        key: 'estimatedViewerSpend',
+        label: ESTIMATED_VIEWER_SPEND_LABEL,
+        text: formatted,
+        title: note,
+        note,
+        sourceUrl: cfg.sourceUrl,
+        asOf: cfg.asOf
+      }
+    ];
   }
 
   if (est.platform === 'kick') {
@@ -553,14 +646,17 @@ export function formatEstimatedViewerSpendDisplay(est) {
     const fx = ESTIMATED_VIEWER_SPEND_RATES.fx;
     const total = (Number(est.subCount) || 0) + (Number(est.giftSubCount) || 0);
     const note = `Kick のサブスク・ギフトサブ計 ${total.toLocaleString('ja-JP')}件 × $5 USD（${cfg.asOf}確認、計 $${Number(est.usd || 0).toFixed(2)}）を ECB 基準為替（${fx.asOf} 確定値）で円換算した視聴者の購入額推定です。地域別価格・アプリ課金で実際と異なる場合あり。Kicks は単価不明のため含めません。配信者の受取額ではありません。`;
-    return {
-      label: ESTIMATED_VIEWER_SPEND_LABEL,
-      text: formatted,
-      title: note,
-      note,
-      sourceUrl: cfg.sourceUrl,
-      asOf: cfg.asOf
-    };
+    return [
+      {
+        key: 'estimatedViewerSpend',
+        label: ESTIMATED_VIEWER_SPEND_LABEL,
+        text: formatted,
+        title: note,
+        note,
+        sourceUrl: cfg.sourceUrl,
+        asOf: cfg.asOf
+      }
+    ];
   }
 
   if (est.platform === 'twitch') {
@@ -573,14 +669,17 @@ export function formatEstimatedViewerSpendDisplay(est) {
     if (tc.tier3 > 0) parts.push(`Tier3×${tc.tier3}`);
     const primeNote = tc.prime > 0 ? `（Prime×${tc.prime}は0として除外）` : '';
     const note = `Twitch の有料サブ・ギフトサブ（${parts.join('・')}${primeNote}、計 $${Number(est.usd || 0).toFixed(2)}、${cfg.asOf}確認）を ECB 基準為替（${fx.asOf} 確定値）で円換算した視聴者の購入額推定です。地域別価格・アプリ課金で実際と異なる場合あり。Bits は視聴者の購入支払額ではないため含めません。配信者の受取額ではありません。`;
-    return {
-      label: ESTIMATED_VIEWER_SPEND_LABEL,
-      text: formatted,
-      title: note,
-      note,
-      sourceUrl: cfg.sourceUrl,
-      asOf: cfg.asOf
-    };
+    return [
+      {
+        key: 'estimatedViewerSpend',
+        label: ESTIMATED_VIEWER_SPEND_LABEL,
+        text: formatted,
+        title: note,
+        note,
+        sourceUrl: cfg.sourceUrl,
+        asOf: cfg.asOf
+      }
+    ];
   }
 
   const fx = ESTIMATED_VIEWER_SPEND_RATES.fx;
@@ -591,12 +690,25 @@ export function formatEstimatedViewerSpendDisplay(est) {
     ? `円以外の通貨は ECB 基準為替（${fx.asOf} 確定値）で円換算しています。`
     : '円建ての記録から集計しています。';
   const note = `YouTube スーパーチャット・スーパーステッカーの記録から算出した視聴者購入額の推定です。${fxNote}${unconvText}配信者の受取額ではありません。`;
-  return {
-    label: ESTIMATED_VIEWER_SPEND_LABEL,
-    text: formatted,
-    title: note,
-    note,
-    sourceUrl: fx.sourceUrl,
-    asOf: fx.asOf
-  };
+  return [
+    {
+      key: 'estimatedViewerSpend',
+      label: ESTIMATED_VIEWER_SPEND_LABEL,
+      text: formatted,
+      title: note,
+      note,
+      sourceUrl: fx.sourceUrl,
+      asOf: fx.asOf
+    }
+  ];
+}
+
+/**
+ * 単一の代表表示を返す（1件目のチップ／カード用）。
+ * @param {EstimatedViewerSpendResult|null|undefined} est
+ * @returns {EstimatedViewerSpendDisplayItem|null}
+ */
+export function formatEstimatedViewerSpendDisplay(est) {
+  const list = formatEstimatedViewerSpendDisplays(est);
+  return list.length > 0 ? list[0] : null;
 }
