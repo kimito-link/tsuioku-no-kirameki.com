@@ -29,6 +29,7 @@ import {
   estimateTwitchSpendFromComments,
   estimateTwitcastingSpendFromComments,
   estimateMixchSpendFromComments,
+  estimateTiktokSpendFromComments,
   formatEstimatedViewerSpendDisplays
 } from './estimatedViewerSpend.js';
 import { buildCommenterFollowAnalytics } from './commenterFollowAnalytics.js';
@@ -3516,6 +3517,9 @@ export function buildMarketingDashboardHtml(r, opts = {}) {
     }
     if (view.id === 'mixch') {
       return formatEstimatedViewerSpendDisplays(estimateMixchSpendFromComments(commentsRaw));
+    }
+    if (view.id === 'tiktok') {
+      return formatEstimatedViewerSpendDisplays(estimateTiktokSpendFromComments(commentsRaw));
     }
     return [];
   })();

@@ -19,6 +19,8 @@ import {
   accumulateTwitcastingGiftItem,
   estimateMixchCoinSpendJpy,
   accumulateMixchGiftItem,
+  estimateTiktokCoinSpendJpy,
+  accumulateTiktokGiftItem,
   normalizeTwitchSubTier,
   formatEstimatedViewerSpendDisplay,
   formatEstimatedViewerSpendDisplays
@@ -530,6 +532,7 @@ export function tallySupportItems(items) {
   const subTierCounts = { tier1: 0, tier2: 0, tier3: 0, prime: 0 };
   const tcConsumption = { ticketJpy: 0, ticketCount: 0, confirmedPt: 0, confirmedCount: 0, unknownPaidCount: 0 };
   const mxConsumption = { coins: 0, giftCount: 0, unknownGiftCount: 0 };
+  const ttConsumption = { coins: 0, giftCount: 0, unknownGiftCount: 0 };
   const t = {
     ready: true,
     superchatCount: 0,
@@ -544,6 +547,7 @@ export function tallySupportItems(items) {
     subTierCounts,
     tcConsumption,
     mxConsumption,
+    ttConsumption,
   };
   if (!Array.isArray(items)) return t;
   /** @param {unknown} rawTier @param {number} n */
@@ -584,6 +588,16 @@ export function tallySupportItems(items) {
       (currency === 'MXCOIN' || recCh.startsWith('mx:') || recPlat === 'mixch' || Boolean(rec.giftName || rec.ytGiftName))
     ) {
       accumulateMixchGiftItem(mxConsumption, rec);
+    }
+    const isNonTiktokRow =
+      (recPlat && recPlat !== 'tiktok') ||
+      (recCh && /^(?:tc|tw|kk|sr|mx|ww|ab):/i.test(recCh)) ||
+      (currency && currency !== 'TTCOIN');
+    if (
+      !isNonTiktokRow &&
+      (currency === 'TTCOIN' || recCh.startsWith('tt:') || recPlat === 'tiktok' || Boolean(rec.giftName || rec.ytGiftName))
+    ) {
+      accumulateTiktokGiftItem(ttConsumption, rec);
     }
     if (kind === 'superchat') t.superchatCount += 1;
     else if (kind === 'sticker') t.stickerCount += 1;
@@ -865,6 +879,10 @@ function supportChips(id, support) {
   }
   if (id === 'mixch') {
     const disps = formatEstimatedViewerSpendDisplays(estimateMixchCoinSpendJpy(support.mxConsumption));
+    return disps.map((d) => chip(d.key, d.label, d.text, '', d.title));
+  }
+  if (id === 'tiktok') {
+    const disps = formatEstimatedViewerSpendDisplays(estimateTiktokCoinSpendJpy(support.ttConsumption));
     return disps.map((d) => chip(d.key, d.label, d.text, '', d.title));
   }
   return [];
