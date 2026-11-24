@@ -34,6 +34,24 @@ export async function readStoredExportComments(lv) {
 }
 
 /**
+ * channelId 接頭辞から配信サービス識別子を補完する（row.platform が未保存の行向け）。
+ * @param {unknown} channelId
+ * @returns {string}
+ */
+function inferPlatformFromChannelId(channelId) {
+  const ch = String(channelId || '');
+  if (ch.startsWith('mx:')) return 'mixch';
+  if (ch.startsWith('tc:')) return 'twitcasting';
+  if (ch.startsWith('tw:')) return 'twitch';
+  if (ch.startsWith('kk:')) return 'kick';
+  if (ch.startsWith('sr:')) return 'showroom';
+  if (ch.startsWith('tt:')) return 'tiktok';
+  if (ch.startsWith('ww:')) return 'whowatch';
+  if (ch.startsWith('ab:')) return 'abema';
+  return '';
+}
+
+/**
  * @param {Record<string, unknown>} row
  * @param {number} index
  * @param {string} liveId
@@ -69,7 +87,7 @@ function exportCommentFromStoredRow(row, index, liveId) {
     ...(Array.isArray(row?.badges) && row.badges.length ? { badges: row.badges } : {}),
     subMonths: row?.subMonths,
     subEvent: row?.subEvent,
-    ytPlatform: String(row?.platform || ''),
+    ytPlatform: String(row?.platform || inferPlatformFromChannelId(row?.channelId)),
   };
 }
 

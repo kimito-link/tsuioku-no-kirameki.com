@@ -263,7 +263,8 @@ test('ミクチャのコメント・ギフト・公式の順位を記録し、�
   expect(await chip('eventRank')).toContain('7位');
   expect(await chip('liverRank')).toContain('ライバーランクpt');
   expect(await chip('eventPoint')).toBe('');
-  expect(await bodyText()).not.toMatch(/推定|広告pt|来場者数/);
+  expect(await chip('estimatedViewerSpend')).toContain('推定（視聴者の消費）約¥4,140');
+  expect(await bodyText()).not.toMatch(/推定同時接続|広告pt|来場者数/);
   await ext.locator('[data-nl-metric="level"]').locator('xpath=..').screenshot({ path: 'test-results/mixch-official-chips.png' });
 
   // コメビュ: ギフトはカードだけ(「ギフト」だけの行とカードの2行にしない・2026-11-08 PC 実測)
