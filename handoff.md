@@ -3,7 +3,7 @@ _Requested by **りんく** · [project thread](https://claude.ai/code/project/c
 
 # Handoff — 配信者にゆっくり顔を出さない (v0.1.2209)
 
-STATUS: 枝 `fix/ranking-avatar-no-yukkuri-flash`。ローカル commit 済み。マージしない（draft PR）。
+STATUS: 枝 `fix/ranking-avatar-no-yukkuri-flash`（PR #709 draft）。v0.1.2210 で dist をソースと揃えて作り直した。マージしない。
 ROOT_CAUSE: `supportGrowthAvatarLoad.pickDisplaySrc` は、まだ成功していない HTTP のアイコン URL に先にフォールバックを返す。popup のフォールバックは `identiconFallbackForAvatarUrl`（人ごとのゆっくり顔）。イベント順位の配信者タイル（`#northStarLaneBody-eventBroadcasters`）は、プローブ成功や描き直しの前にゆっくり顔が出ていた。実機 2026-11-24 21:33 JST（lv351880439）で上位10名がゆっくり顔、21:34 に本人アイコンへ変わった。「配信者」カードは iconUrl 空／onerror で identicon へ倒れる経路があった（21:33 のあいたん本人カードはすでに本人写真）。
 FIX:
 - イベント順位タイルに `isBroadcaster: true` を付け、未確定・失敗時は最後の本人アイコンか既存の中立「未取得」バッジ（`officialDomRankBadgeThumb`）を出す。応援者のゆっくり顔フォールバックは変えていない。
