@@ -27,7 +27,7 @@
 
 > 値が次の段へ届かない「断線」(broadcaster バグ型)は `npm run feature-map -- --check` が機械検知。
 
-## ⚠️ 役割コメントが無いソース 15 / 1354 件
+## ⚠️ 役割コメントが無いソース 15 / 1355 件
 - `docs/handoff/bench/bench-interval.mjs`
 - `docs/handoff/bench/bench-lane.mjs`
 - `extension-youtube/cloak-failsafe.js`
@@ -1171,7 +1171,7 @@
   - `status-live.mjs` — 状態速報(status.html の「AI共有」全文)を、コピー&貼り付けせずにターミナルへ取得する CLI。
   - `sync-lp-twitter-icon.mjs` — LP 右端コラボ用: src/images/icon/twitter-icon.png → extension/images/lp/twitter-icon.png
   - `vendor-visual-explainer.mjs` — Vendors nicobailon/visual-explainer (MIT) into .cursor/skills/visual-explainer/
-  - `vercel-ignore-build.sh`
+  - `vercel-ignore-build.mjs` — 役割: Vercel の「Ignored Build Step」(vercel.json の ignoreCommand)から呼ばれ、ビルドが要るかを決める。
   - `verify-bump.mjs` — extension bump 後の整合性チェッカー
   - `verify-deploy.mjs` — 「Chrome に配ったビルドが本当に今の版か」を照合する。
   - `verify-voice-isolated-extension.mjs` — 偽エンジンだけを向く拡張の一時コピーで、既存のverify:extensionを実行する。

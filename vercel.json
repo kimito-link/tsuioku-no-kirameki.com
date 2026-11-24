@@ -9,7 +9,7 @@
     { "source": "/live/kouhaku/", "destination": "/live/event/kouhaku-2026/", "permanent": true },
     { "source": "/live/kouhaku", "destination": "/live/event/kouhaku-2026/", "permanent": true }
   ],
-  "ignoreCommand": "bash scripts/vercel-ignore-build.sh",
+  "ignoreCommand": "node scripts/vercel-ignore-build.mjs --base=master --only-project=prj_8C5sFELWuUsuYj8HEAAKSGCSKBXD,tsuioku-no-kirameki.com tsuioku-no-kirameki/ app/ api/ src/ extension/images/ package.json",
   "headers": [
     {
       "source": "/(.*)",
