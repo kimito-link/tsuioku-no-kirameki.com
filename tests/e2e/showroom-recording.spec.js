@@ -272,6 +272,9 @@ test('SHOWROOM のコメント・ギフト・公式の順位を記録し、送�
   expect(await chipText('eventPoint')).toContain('123,456pt');
   expect(await chipText('quest')).toContain('Lv3');
   expect(await bodyText()).not.toMatch(/推定/);
+  // v0.1.2207: 記録したギフトの pt(円にしない)が公式の数より前に出る
+  await expect.poll(() => chipText('nativeTotal'), { timeout: 30_000 }).toMatch(/ギフト（記録）[\d,]+pt/);
+  expect(await ext.evaluate(() => document.querySelector('[data-nl-metric]')?.getAttribute('data-nl-metric') || '')).toBe('nativeTotal');
   await lane.first().screenshot({ path: 'test-results/showroom-event-board.png' });
   await ext.locator('[data-nl-metric="eventRank"]').locator('xpath=..').screenshot({ path: 'test-results/showroom-event-chips.png' });
 

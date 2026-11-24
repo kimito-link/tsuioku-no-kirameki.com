@@ -10,7 +10,7 @@ import { maskLabelForShare } from './privacyDisplay.js';
 import { yukkuriBroadcastSummaryEmbeddedCss } from './yukkuriBroadcastSummary.js';
 import { mangaBroadcastSummaryEmbeddedCss } from './mangaBroadcastSummary.js';
 import { buildMarketingEmbedScriptInnerText } from './marketingReportEmbed.js';
-import { speechCommentsForMarketing } from './marketingAggregate.js';
+import { speechCommentsForMarketing, isMarketingSupportRow } from './marketingAggregate.js';
 import { marketingViewFor } from './platform/marketingPlatformPlan.js';
 import {
   sectionParticipationForPlatform,
@@ -24,13 +24,9 @@ import { followerKpiTexts } from './platform/followerCountSample.js';
 import { followerSeriesForPlatform } from './platform/followerSampleStore.js';
 import {
   estimateNiconicoGiftSpendJpy,
-  estimateYoutubeSpendFromComments,
-  estimateKickSpendFromComments,
-  estimateTwitchSpendFromComments,
-  estimateTwitcastingSpendFromComments,
-  estimateMixchSpendFromComments,
-  estimateTiktokSpendFromComments,
-  formatEstimatedViewerSpendDisplays
+  estimateViewerSpendFromComments,
+  formatEstimatedViewerSpendDisplays,
+  formatEstimatedViewerSpendDisplay
 } from './estimatedViewerSpend.js';
 import { buildCommenterFollowAnalytics } from './commenterFollowAnalytics.js';
 import { buildUserProfileLinkedLabelHtml } from './userProfileLinkHtml.js';
@@ -978,6 +974,41 @@ function sectionKeyboardTypes(report) {
 </section>`;
 }
 
+const SUPPORT_COMPARE_PAST_CAP = 4;
+
+/**
+ * v0.1.2207: 前回までの配信との応援の比較の行(今回が先頭、その後に新しい順で過去 4 配信まで)。
+ *   応援の件数は isMarketingSupportRow の行数、推定は estimateViewerSpendFromComments(同じ式)。
+ *   行に ytKind が1つも無い過去の配信は、形が分からないので「—」(数を作らない)。
+ * @param {string} platformId
+ * @param {readonly unknown[]} current
+ * @param {readonly unknown[]} pastBroadcasts 新しい順(listRecentUniqueBroadcastLiveIds の 'prev')
+ * @returns {Array<{ label: string, isCurrent: boolean, supportCount: number | null, estimateText: string }>}
+ */
+export function buildSupportCompareRows(platformId, current, pastBroadcasts) {
+  /** @param {readonly unknown[]} rows @param {string} label @param {boolean} isCurrent */
+  const rowOf = (rows, label, isCurrent) => {
+    const list = Array.isArray(rows) ? rows : [];
+    let shaped = false;
+    let n = 0;
+    for (const c of list) {
+      if (!c || typeof c !== 'object') continue;
+      if ('ytKind' in c) shaped = true;
+      if (isMarketingSupportRow(c)) n += 1;
+    }
+    if (!shaped) return { label, isCurrent, supportCount: null, estimateText: '—' };
+    const disp = formatEstimatedViewerSpendDisplay(estimateViewerSpendFromComments(platformId, list));
+    return { label, isCurrent, supportCount: n, estimateText: disp ? disp.text : '—' };
+  };
+  const out = [rowOf(current, '今回', true)];
+  const past = Array.isArray(pastBroadcasts) ? pastBroadcasts.slice(0, SUPPORT_COMPARE_PAST_CAP) : [];
+  past.forEach((b, i) => {
+    const rec = /** @type {{ comments?: unknown }} */ (b || {});
+    out.push(rowOf(/** @type {readonly unknown[]} */ (rec.comments), i === 0 ? '前回' : `${i + 1}回前`, false));
+  });
+  return out;
+}
+
 /**
  * 0.1.24 (Y): 直近 N 配信の比較バー。
  * @param {ReturnType<typeof buildRecentBroadcastComparison>} cmp
@@ -1846,7 +1877,7 @@ ${itemChartHtml ? `<h3 class="mkt-subhead">アイテム別 ${unit === 'pt' ? 'pt
 
   return `<section class="mkt-section mkt-section--gift-ledger" id="mkt-gift-ledger">
 <h2>${view && view.giftWord ? escapeHtml(`${view.giftWord}の履歴`) : 'ギフト投げ履歴（誰が・何を・いくら）'}</h2>
-<p class="mkt-note">${view ? `${escapeHtml(`このPCの記録から、${view.giftWord}の送り主・内容・${unit}・時刻を一覧します。`)}${view.pointEstimate ? ' 円にそろえた列は推定です。' : ''}${view.mixchUnitNote ? ' コインの単位は未確認です。' : ''}` : 'ニコ生の「この番組へのギフト履歴」に近い形で、送り主・アイテム・pt・時刻を一覧します。マーケ DL 時に <strong>koken 公式 API で一括取得</strong>し、サイドバー「履歴」タブの DOM 取得とマージします。'}${summaryBits.length ? ` <strong>${escapeHtml(summaryBits.join(' / '))}</strong>` : ''}</p>
+<p class="mkt-note">${view ? `${escapeHtml(`このPCの記録から、${view.giftWord}の送り主・内容・${unit}・時刻を一覧します。`)}${view.pointEstimate ? ' 円にそろえた列は推定です。' : ''}` : 'ニコ生の「この番組へのギフト履歴」に近い形で、送り主・アイテム・pt・時刻を一覧します。マーケ DL 時に <strong>koken 公式 API で一括取得</strong>し、サイドバー「履歴」タブの DOM 取得とマージします。'}${summaryBits.length ? ` <strong>${escapeHtml(summaryBits.join(' / '))}</strong>` : ''}</p>
 <p class="mkt-spec-note">${escapeHtml(MARKETING_GIFT_LEDGER_DISPLAY_RULE_NOTE)} 台帳の投げ件数は <code>history</code> 行数が正本です（<code>totalCounts</code> はアイテム別回数の表示にのみ使用し、二重加算しません）。</p>
 ${chartsBlock}
 ${senderSection}
@@ -3457,8 +3488,8 @@ export function buildMarketingDashboardHtml(r, opts = {}) {
     { id: 'mkt-vpos', label: 'vpos 三分割（再生位置）' },
     { id: 'mkt-hour', label: '時間帯ヒートマップ' },
     { id: 'mkt-json', label: '表計算・ツール向け JSON' },
-    { id: 'mkt-support-flow', label: '登録・応援してくれた人の流れ' },
     { id: 'mkt-platform-dedicated', label: 'この配信の記録' },
+    { id: 'mkt-support-flow', label: '登録・応援してくれた人の流れ' },
     { id: 'mkt-streamer-moments', label: 'この配信の山' }
   ];
   if (view) {
@@ -3503,26 +3534,12 @@ export function buildMarketingDashboardHtml(r, opts = {}) {
         positiveMarketingNumber(giftMomentum?.totals?.totalPoints);
       return formatEstimatedViewerSpendDisplays(estimateNiconicoGiftSpendJpy(nicoGiftPts));
     }
-    if (view.id === 'youtube') {
-      return formatEstimatedViewerSpendDisplays(estimateYoutubeSpendFromComments(commentsRaw));
-    }
-    if (view.id === 'kick') {
-      return formatEstimatedViewerSpendDisplays(estimateKickSpendFromComments(commentsRaw));
-    }
-    if (view.id === 'twitch') {
-      return formatEstimatedViewerSpendDisplays(estimateTwitchSpendFromComments(commentsRaw));
-    }
-    if (view.id === 'twitcasting') {
-      return formatEstimatedViewerSpendDisplays(estimateTwitcastingSpendFromComments(commentsRaw));
-    }
-    if (view.id === 'mixch') {
-      return formatEstimatedViewerSpendDisplays(estimateMixchSpendFromComments(commentsRaw));
-    }
-    if (view.id === 'tiktok') {
-      return formatEstimatedViewerSpendDisplays(estimateTiktokSpendFromComments(commentsRaw));
-    }
-    return [];
+    return formatEstimatedViewerSpendDisplays(estimateViewerSpendFromComments(view.id, commentsRaw));
   })();
+  // v0.1.2207: 前回までの配信との応援の比較(同じサービスの直近 4 配信まで・同じ式)。重い書き出しでは計算しない。
+  const supportCompare = view && opts.slimForHeavyExport !== true
+    ? buildSupportCompareRows(view.id, commentsRaw, pastBroadcasts)
+    : null;
   const supportArrivalHtml = sectionSupportArrivalHtml({
     platformId: view ? view.id : 'niconico',
     comments: commentsRaw,
@@ -3532,8 +3549,8 @@ export function buildMarketingDashboardHtml(r, opts = {}) {
     ...(Array.isArray(opts.followerSamples) && opts.followerSamples.length ? { followerSamples: opts.followerSamples } : {}),
   });
   const bodyHtml = `${supportArrivalHtml ? `${supportArrivalHtml}\n` : ''}__NL_TOC_PLACEHOLDER__
-${sectionHeroCard(r, broadcastNarrative?.summaryLine || '', maskShare, view ? null : audienceGap) + (view ? sectionSupportFlowHtml(commentsRaw, view) + sectionPlatformDedicatedHtml(commentsRaw, view, pageCount, pageFacts) + sectionStreamerMomentsHtml(commentsRaw, view, sessionSummaryRows, pageCount) : '')}
-${idWrap('mkt-kpi', sectionKpi(r, view ? null : audienceGap, followerSeries, estimatedViewerSpendDisps))}
+${sectionHeroCard(r, broadcastNarrative?.summaryLine || '', maskShare, view ? null : audienceGap) + (view ? sectionPlatformDedicatedHtml(commentsRaw, view, pageCount, pageFacts, { estimatedSpends: estimatedViewerSpendDisps, supportCompare }) + sectionSupportFlowHtml(commentsRaw, view) + sectionStreamerMomentsHtml(commentsRaw, view, sessionSummaryRows, pageCount) : '')}
+${idWrap('mkt-kpi', sectionKpi(r, view ? null : audienceGap, followerSeries, view ? [] : estimatedViewerSpendDisps))}
 ${view ? sectionPlatformSummaryHtml(r, view, concurrentSeries, concurrentPeak, pageCount) : sectionMarketingDataSummary(marketingDataSummary)}
 ${view ? sectionParticipationForPlatform(r, view, pageCount) : sectionAudienceParticipationLead(audienceGap, r, supportParticipation)}
 ${view && view.hide.has('mkt-audience-gap') ? '' : sectionAudienceEngagementGap(audienceGap, r)}

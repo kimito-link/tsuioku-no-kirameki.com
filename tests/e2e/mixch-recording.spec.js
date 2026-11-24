@@ -263,7 +263,11 @@ test('ミクチャのコメント・ギフト・公式の順位を記録し、�
   expect(await chip('eventRank')).toContain('7位');
   expect(await chip('liverRank')).toContain('ライバーランクpt');
   expect(await chip('eventPoint')).toBe('');
-  expect(await chip('estimatedViewerSpend')).toContain('推定（視聴者の消費）約¥4,140');
+  expect(await chip('estimatedViewerSpend')).toContain('推定（視聴者の購入額）約¥4,140');
+  // v0.1.2207: 推定が先頭、続けてコイン(記録)・ギフト件数。公式の数(レベル等)はその後ろ
+  expect(await ext.evaluate(() => document.querySelector('[data-nl-metric]')?.getAttribute('data-nl-metric') || '')).toBe('estimatedViewerSpend');
+  expect(await chip('nativeTotal')).toMatch(/コイン（記録）3,450コイン/);
+  expect(await chip('paidGifts')).toMatch(/ギフト\d+件/);
   expect(await bodyText()).not.toMatch(/推定同時接続|広告pt|来場者数/);
   await ext.locator('[data-nl-metric="level"]').locator('xpath=..').screenshot({ path: 'test-results/mixch-official-chips.png' });
 

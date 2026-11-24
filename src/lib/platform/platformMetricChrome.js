@@ -430,6 +430,17 @@ export function applyPlatformMetricChrome(root, state) {
         if (el.getAttribute('title') !== chip.title) el.setAttribute('title', chip.title);
       } else if (el.hasAttribute('title')) el.removeAttribute('title');
     }
+    // ★v0.1.2207: 推定・合計を先頭に置く並び(panelExtraChips の順)を DOM にも反映する。後から来たチップ(公式の数の後に
+    //   数え終わった推定 等)は末尾に足されるので、順が違うときだけ並べ直す(同じなら触らない=見張りの無限ループを作らない)。
+    const placed = [...row.querySelectorAll('[data-nl-metric]')];
+    const order = extras.map((c) => c.key);
+    if (placed.length === order.length && placed.some((el, i) => el.getAttribute('data-nl-metric') !== order[i])) {
+      const anchor = ageChip && ageChip.parentElement === row ? ageChip : null;
+      for (const key of order) {
+        const el = row.querySelector(`[data-nl-metric="${key}"]`);
+        if (el) row.insertBefore(el, anchor);
+      }
+    }
   }
 
   for (const name of plan.hide) {

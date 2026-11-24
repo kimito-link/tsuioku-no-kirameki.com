@@ -1,9 +1,14 @@
 /**
  * ニコ生以外のマーケHTMLに足す章。見た目のクラスは既存の mkt-* を使う。
- * 数は渡された記録にあるものだけ。換算した円は出さない（台帳の列が「推定」と書く）。
+ * 数は渡された記録にあるものだけ。円は公式の値段が確認済みのものだけ「推定（視聴者の購入額）」として出典つきで出す。
  */
 
 import { escapeHtml } from '../htmlEscape.js';
+import {
+  ESTIMATED_VIEWER_SPEND_LABEL,
+  ESTIMATED_VIEWER_SPEND_EMPTY_NOTE,
+  ESTIMATED_VIEWER_SPEND_PLATFORMS
+} from '../estimatedViewerSpend.js';
 import { maskLabelForShare } from '../privacyDisplay.js';
 import { isMarketingSupportRow } from '../marketingAggregate.js';
 import { GIFT_MOMENT_FORBIDDEN_WORDS } from '../giftMomentAnalytics.js';
@@ -125,20 +130,32 @@ const CURRENCY_LABEL = Object.freeze({
   TCSCORE: 'スコア（記録）',
 });
 
+/** ギフト名の横に付ける、そのサービスの単位(個数そのものの WWITEM は付けない) */
+/** @type {Readonly<Record<string, string>>} */
+const GIFT_UNIT_LABEL = Object.freeze({ MXCOIN: 'コイン', TTCOIN: 'コイン', SRPT: 'pt' });
+
+const GIFT_NAME_CAP = 10;
+
+/**
+ * @typedef {{ label: string, isCurrent: boolean, supportCount: number | null, estimateText: string }} SupportCompareRow
+ */
+
 /**
  * @param {Array<Record<string, unknown>>} comments
- * @param {{ id: string, pageCountLabel: string, showMember: boolean, hideGift: boolean, pointEstimate: boolean, mixchUnitNote?: boolean }} view
+ * @param {{ id: string, pageCountLabel: string, showMember: boolean, hideGift: boolean, pointEstimate: boolean, giftWord?: string }} view
  * @param {number} pageCount
  * @param {object | null} [pageFacts]
+ * @param {{ estimatedSpends?: ReadonlyArray<{ key: string, label: string, text: string, note: string, sourceUrl: string }>, supportCompare?: ReadonlyArray<SupportCompareRow> | null }} [extra]
+ *   estimatedSpends: 推定の表示(先頭のカードにする・v0.1.2207)。supportCompare: 前回までの配信との応援の比較(今回が先頭)。
  */
-export function sectionPlatformDedicatedHtml(comments, view, pageCount, pageFacts = null) {
+export function sectionPlatformDedicatedHtml(comments, view, pageCount, pageFacts = null, extra = {}) {
   if (!view) return '';
   const rows = Array.isArray(comments) ? comments : [];
   /** @type {Map<string, number>} */
   const byCur = new Map();
   /** @type {Map<string, number>} */
   const extraKinds = new Map();
-  /** @type {Map<string, number>} */
+  /** @type {Map<string, { n: number, sum: number, unit: string }>} */
   const giftNames = new Map();
   /** @type {Map<string, number>} */
   const commentTypes = new Map();
@@ -156,6 +173,8 @@ export function sectionPlatformDedicatedHtml(comments, view, pageCount, pageFact
   let giftPieces = 0;
   let memberBadges = 0;
   let milestoneMax = 0;
+  /** ギフト・アイテムの名前がある応援の行数(件数のカード・v0.1.2207) */
+  let giftRows = 0;
   /** @type {number[]} */
   const months = [];
   for (const c of rows) {
@@ -174,7 +193,18 @@ export function sectionPlatformDedicatedHtml(comments, view, pageCount, pageFact
     const amt = Number(c.ytAmount);
     if (cur && Number.isFinite(amt) && amt > 0) byCur.set(cur, (byCur.get(cur) || 0) + amt);
     const giftName = String(c.ytGiftName || '').trim();
-    if (giftName) giftNames.set(giftName, (giftNames.get(giftName) || 0) + 1);
+    if (giftName) {
+      giftRows += 1;
+      // 量の多い順に並べるため、個数(giftCount)を足す。単位のあるサービスは単位の合計も持つ(v0.1.2207)
+      const gc = Number(c.ytGiftCount);
+      const pieces = Number.isFinite(gc) && gc > 0 ? Math.floor(gc) : 1;
+      const unit = GIFT_UNIT_LABEL[cur] || '';
+      const prev = giftNames.get(giftName) || { n: 0, sum: 0, unit };
+      prev.n += pieces;
+      if (unit && Number.isFinite(amt) && amt > 0) prev.sum += amt;
+      if (!prev.unit) prev.unit = unit;
+      giftNames.set(giftName, prev);
+    }
     if (EXTRA_KIND_LABEL[kind]) extraKinds.set(kind, (extraKinds.get(kind) || 0) + 1);
     if (kind === 'tw_milestone' && Number.isFinite(amt) && amt > 0) milestoneMax = Math.max(milestoneMax, Math.floor(amt));
     if (kind === 'tw_raid') {
@@ -210,10 +240,24 @@ export function sectionPlatformDedicatedHtml(comments, view, pageCount, pageFact
   }
   /** @type {Array<[string, string]>} */
   const cards = [];
+  // 推定（視聴者の購入額）を先頭に置く。0 のとき(式はあるのに値段が確認できる応援が無い)は「—」と注記(v0.1.2207)
+  const spends = Array.isArray(extra?.estimatedSpends) ? extra.estimatedSpends : [];
+  /** @type {string[]} */
+  const spendNotes = [];
+  if (spends.length) {
+    for (const sp of spends) {
+      cards.push([sp.label, sp.text]);
+      spendNotes.push(`${sp.note}（出典: ${sp.sourceUrl}）`);
+    }
+  } else if (ESTIMATED_VIEWER_SPEND_PLATFORMS.includes(view.id)) {
+    cards.push([ESTIMATED_VIEWER_SPEND_LABEL, '—']);
+    spendNotes.push(ESTIMATED_VIEWER_SPEND_EMPTY_NOTE);
+  }
   if (view.pageCountLabel && pageCount > 0) cards.push([view.pageCountLabel, `${pageCount.toLocaleString('ja-JP')}`]);
   for (const [cur, sum] of byCur) {
     cards.push([CURRENCY_LABEL[cur] || `${cur} の合計（記録）`, String(sum)]);
   }
+  if (giftRows > 0) cards.push([`${view.giftWord || 'ギフト'}の件数（記録）`, `${giftRows.toLocaleString('ja-JP')}件`]);
   if (subs > 0) cards.push(['新しいサブスク', `${subs}件`]);
   if (resubs > 0) cards.push(['継続のサブスク', `${resubs}件`]);
   if (giftSubs > 0) cards.push(['ギフトサブ', `${giftSubs}件`]);
@@ -229,9 +273,16 @@ export function sectionPlatformDedicatedHtml(comments, view, pageCount, pageFact
     const value = kind === 'tw_milestone' && milestoneMax > 0 ? `${n}件（${milestoneMax}回）` : `${n}件`;
     cards.push([label, value]);
   }
-  if (giftNames.size) {
-    const names = [...giftNames.entries()].slice(0, 6).map(([name, n]) => `${name} ×${n}`);
-    cards.push(['出ていた名前（記録）', names.join('、')]);
+  // 名前がそのサービスの決まった呼び名(ミクチャの「ギフト」等)1種類だけなら、内訳にならないので出さない
+  //   (「ギフトの件数（記録）」と同じ数になる・v0.1.2208)
+  const onlyName = giftNames.size === 1 ? [...giftNames.keys()][0] : '';
+  const genericOnly = Boolean(onlyName) && (onlyName === view.giftWord || onlyName === 'ギフト');
+  if (giftNames.size && !genericOnly) {
+    const names = [...giftNames.entries()]
+      .sort((a, b) => b[1].n - a[1].n || b[1].sum - a[1].sum)
+      .slice(0, GIFT_NAME_CAP)
+      .map(([name, g]) => `${name} ×${g.n.toLocaleString('ja-JP')}${g.unit && g.sum > 0 ? `（${Math.round(g.sum).toLocaleString('ja-JP')} ${g.unit}）` : ''}`);
+    cards.push(['ギフトの内訳（記録・多い順）', names.join('、')]);
   }
   if (commentTypes.size) {
     const types = [...commentTypes.entries()].slice(0, 6).map(([name, n]) => `${name} ×${n}`);
@@ -250,9 +301,8 @@ export function sectionPlatformDedicatedHtml(comments, view, pageCount, pageFact
   const estimate = view.pointEstimate
     ? '<p class="mkt-note">通貨ごとの合計は、チャットに書いてあった金額です。円への換算はしていません。円換算の列がある表は推定です。</p>'
     : '';
-  const unitNote = view.mixchUnitNote && byCur.has('MXCOIN')
-    ? '<p class="mkt-note">コインの単位は未確認です。</p>'
-    : '';
+  const spendNoteHtml = spendNotes.map((t) => `<p class="mkt-note">${escapeHtml(t)}</p>`).join('');
+  const compareHtml = supportCompareHtml(extra?.supportCompare);
   const inner = cards
     .map(
       ([label, value]) =>
@@ -262,9 +312,27 @@ export function sectionPlatformDedicatedHtml(comments, view, pageCount, pageFact
   return `<section class="mkt-section" id="mkt-platform-dedicated">
 <h2>この配信の記録</h2>
 <p class="mkt-note">このPCの記録に残っている数だけです。ページに無い数は出していません。</p>
-${estimate}${unitNote}
+${estimate}
 <div class="mkt-kpi-grid">${inner}</div>
+${spendNoteHtml}${compareHtml}
 </section>`;
+}
+
+/**
+ * 前回までの配信との応援の比較(今回 + 同じサービスの直近 4 配信まで)。記録の形が無い配信は「—」(作らない)。
+ * @param {ReadonlyArray<SupportCompareRow> | null | undefined} rows
+ */
+function supportCompareHtml(rows) {
+  if (!Array.isArray(rows) || rows.length < 2) return '';
+  const body = rows
+    .map((r) => {
+      const n = r.supportCount == null ? '—' : `${r.supportCount.toLocaleString('ja-JP')}件`;
+      return `<tr${r.isCurrent ? ' class="is-current"' : ''}><th>${escapeHtml(r.label)}</th><td>${escapeHtml(n)}</td><td>${escapeHtml(r.estimateText || '—')}</td></tr>`;
+    })
+    .join('');
+  return `<h3>前回までの配信との比較</h3>
+<p class="mkt-note">同じサービスの直近の配信を、このPCの記録から同じ式で数えています。記録の形が無い配信は「—」です。</p>
+<div class="mkt-table-scroll"><table class="mkt-rank"><thead><tr><th>配信</th><th>応援の件数</th><th>${escapeHtml(ESTIMATED_VIEWER_SPEND_LABEL)}</th></tr></thead><tbody>${body}</tbody></table></div>`;
 }
 
 const MOMENT_LIST_CAP = 6;

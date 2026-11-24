@@ -22,8 +22,10 @@ import {
   estimateTiktokCoinSpendJpy,
   accumulateTiktokGiftItem,
   normalizeTwitchSubTier,
-  formatEstimatedViewerSpendDisplay,
-  formatEstimatedViewerSpendDisplays
+  formatEstimatedViewerSpendDisplays,
+  ESTIMATED_VIEWER_SPEND_LABEL,
+  ESTIMATED_VIEWER_SPEND_EMPTY_TITLE,
+  ESTIMATED_VIEWER_SPEND_PLATFORMS
 } from '../estimatedViewerSpend.js';
 
 /** 能力表を持つサービス。ABEMA は記録の実装が別の変更にあるので、数字の枠だけを先に置く。 */
@@ -520,6 +522,9 @@ function formatMoney(amount, currency) {
   return { text: code ? `${code} ${text}` : text, unit: '' };
 }
 
+/** そのサービスの単位のまま合計する通貨(円にしない) */
+const NATIVE_UNIT_CURRENCIES = new Set(['SRPT', 'WWITEM', 'MXCOIN', 'TTCOIN']);
+
 /**
  * 記録の行から、画面に出してよい合計だけを数える。
  * membership_gift の giftCount が 0 の行は、まとめて贈った内訳なので足さない。
@@ -533,6 +538,9 @@ export function tallySupportItems(items) {
   const tcConsumption = { ticketJpy: 0, ticketCount: 0, confirmedPt: 0, confirmedCount: 0, unknownPaidCount: 0 };
   const mxConsumption = { coins: 0, giftCount: 0, unknownGiftCount: 0 };
   const ttConsumption = { coins: 0, giftCount: 0, unknownGiftCount: 0 };
+  /** そのサービスの単位の合計(SHOWROOM の pt・ふわっちの個数・ミクチャ/TikTok のコイン)。円にはしない(v0.1.2207) */
+  /** @type {Record<string, number>} */
+  const nativeTotals = {};
   const t = {
     ready: true,
     superchatCount: 0,
@@ -541,6 +549,17 @@ export function tallySupportItems(items) {
     membershipGiftCount: 0,
     raidCount: 0,
     raidViewers: 0,
+    /** 有料として数えられるギフト・アイテムの行数(SRPT / WWITEM / MXCOIN / TTCOIN / ツイキャスの有料アイテム)。無料のお茶は数えない */
+    paidGiftCount: 0,
+    /** 同じ行の個数(giftCount を足した数) */
+    paidGiftUnits: 0,
+    /** ミクチャのファン登録(mx_fan)の回数 */
+    fanCount: 0,
+    /** TikTok のフォロー(follow)の回数 */
+    followCount: 0,
+    /** Kick のホスト(kk_host)の回数と、届いた人数の合計 */
+    hostCount: 0,
+    hostViewers: 0,
     /** このPCで記録を始めた時刻(ms)。これより前の分は、過去を出さないサービスでは数えられない。0 = 分からない */
     firstRecordedAt: 0,
     amounts,
@@ -548,8 +567,15 @@ export function tallySupportItems(items) {
     tcConsumption,
     mxConsumption,
     ttConsumption,
+    nativeTotals,
   };
   if (!Array.isArray(items)) return t;
+  /** @param {number} units */
+  const addPaid = (units) => {
+    if (!(units > 0)) return;
+    t.paidGiftCount += 1;
+    t.paidGiftUnits += units;
+  };
   /** @param {unknown} rawTier @param {number} n */
   const addSubTier = (rawTier, n) => {
     if (n <= 0) return;
@@ -570,12 +596,23 @@ export function tallySupportItems(items) {
     if ((kind === 'superchat' || kind === 'sticker') && Number.isFinite(amount) && amount > 0 && currency) {
       amounts[currency] = Math.round(((amounts[currency] || 0) + amount) * 100) / 100;
     }
+    // SHOWROOM の pt・ふわっちの個数は、そのサービスの単位のまま合計する(値段は公式に無いので円にしない)
+    if (kind === 'superchat' && Number.isFinite(amount) && amount > 0 && NATIVE_UNIT_CURRENCIES.has(currency)) {
+      nativeTotals[currency] = Math.round(((nativeTotals[currency] || 0) + amount) * 100) / 100;
+      if (currency === 'SRPT' || currency === 'WWITEM') {
+        const gc = Number(rec.giftCount);
+        addPaid(currency === 'WWITEM' ? Math.floor(amount) : (Number.isFinite(gc) && gc > 0 ? Math.floor(gc) : 1));
+      }
+    }
     if (
       currency === 'TCSCORE' ||
       String(rec.channelId || '').startsWith('tc:') ||
       String(rec.ytPlatform || '').toLowerCase() === 'twitcasting'
     ) {
+      // 有料の個数は、推定の累積が数えた分(公式表のアイテム・有料の印のあるアイテム)の差で見る。無料のお茶は増えない
+      const before = (tcConsumption.ticketCount || 0) + tcConsumption.unknownPaidCount;
       accumulateTwitcastingGiftItem(tcConsumption, rec);
+      addPaid((tcConsumption.ticketCount || 0) + tcConsumption.unknownPaidCount - before);
     }
     const recPlat = String(rec.ytPlatform || rec.platform || '').trim().toLowerCase();
     const recCh = String(rec.channelId || '').trim();
@@ -587,7 +624,9 @@ export function tallySupportItems(items) {
       !isOtherServiceRow &&
       (currency === 'MXCOIN' || recCh.startsWith('mx:') || recPlat === 'mixch' || Boolean(rec.giftName || rec.ytGiftName))
     ) {
+      const before = mxConsumption.giftCount + mxConsumption.unknownGiftCount;
       accumulateMixchGiftItem(mxConsumption, rec);
+      addPaid(mxConsumption.giftCount + mxConsumption.unknownGiftCount - before);
     }
     const isNonTiktokRow =
       (recPlat && recPlat !== 'tiktok') ||
@@ -597,7 +636,9 @@ export function tallySupportItems(items) {
       !isNonTiktokRow &&
       (currency === 'TTCOIN' || recCh.startsWith('tt:') || recPlat === 'tiktok' || Boolean(rec.giftName || rec.ytGiftName))
     ) {
+      const before = ttConsumption.giftCount + ttConsumption.unknownGiftCount;
       accumulateTiktokGiftItem(ttConsumption, rec);
+      addPaid(ttConsumption.giftCount + ttConsumption.unknownGiftCount - before);
     }
     if (kind === 'superchat') t.superchatCount += 1;
     else if (kind === 'sticker') t.stickerCount += 1;
@@ -612,6 +653,13 @@ export function tallySupportItems(items) {
     } else if (kind === 'tw_raid') {
       t.raidCount += 1;
       if (Number.isFinite(amount) && amount > 0) t.raidViewers += Math.floor(amount);
+    } else if (kind === 'kk_host') {
+      t.hostCount += 1;
+      if (Number.isFinite(amount) && amount > 0) t.hostViewers += Math.floor(amount);
+    } else if (kind === 'mx_fan') {
+      t.fanCount += 1;
+    } else if (kind === 'follow') {
+      t.followCount += 1;
     }
   }
   return t;
@@ -796,7 +844,40 @@ function countSinceChip(id, support) {
 }
 
 /**
+ * 推定のチップ。値があればその表示(ツイキャスは円と pt の最大2つ)、式があるのに 0 なら「推定 —」(placeholder)。
+ *   ニコ生はここを通らない(0 のときは公式pt 待ちと区別できないので出さない・nicoEstimatedSpendChip.js)。
+ * @param {string} id
+ * @param {any} est formatEstimatedViewerSpendDisplays に渡す推定(null 可)
+ * @param {string} [extraTitle] placeholder の説明に足す文(例: Bits は円にしていない)
+ * @returns {Array<{ key: string, label: string, text: string, unit: string, placeholder: boolean, title: string }>}
+ */
+function estimateChips(id, est, extraTitle = '') {
+  const disps = formatEstimatedViewerSpendDisplays(est);
+  if (disps.length) {
+    return disps.map((d) => ({
+      key: d.key,
+      label: d.label,
+      text: d.text,
+      unit: '',
+      placeholder: false,
+      title: extraTitle && d.key === 'estimatedViewerSpend' ? `${d.title}${extraTitle}` : d.title,
+    }));
+  }
+  if (!ESTIMATED_VIEWER_SPEND_PLATFORMS.includes(id)) return [];
+  return [{
+    key: 'estimatedViewerSpend',
+    label: ESTIMATED_VIEWER_SPEND_LABEL,
+    text: '—',
+    unit: '',
+    placeholder: true,
+    title: `${ESTIMATED_VIEWER_SPEND_EMPTY_TITLE}${extraTitle}`,
+  }];
+}
+
+/**
  * 数えた合計のチップ。まだ数えていなければ出さない(0 と「まだ数えていない」を混ぜない)。
+ *   並び(v0.1.2207・全サービス共通): 推定 → そのサービスの単位の合計 → 件数 → 反応 → (公式の数) → 数え始め。
+ *   数え始めは panelExtraChips が公式の数の後ろに回す。
  * @param {string} id
  * @param {any} support
  * @returns {Array<{ key: string, label: string, text: string, unit: string, placeholder: boolean, title: string }>}
@@ -804,6 +885,7 @@ function countSinceChip(id, support) {
 function supportChips(id, support) {
   if (!support || support.ready !== true) return [];
   const amounts = support.amounts && typeof support.amounts === 'object' ? support.amounts : {};
+  const native = support.nativeTotals && typeof support.nativeTotals === 'object' ? support.nativeTotals : {};
   /** @param {string} prefer @param {string} unit */
   const money = (prefer, unit) => {
     const codes = Object.keys(amounts).filter((c) => Number(amounts[c]) > 0);
@@ -815,30 +897,42 @@ function supportChips(id, support) {
   };
   /** @param {string} key @param {string} label @param {string} text @param {string} unit @param {string} title */
   const chip = (key, label, text, unit, title) => ({ key, label, text, unit, placeholder: false, title });
+  /** @param {string} code */
+  const nativeTotal = (code) => formatInt(Math.max(0, Number(native[code]) || 0));
+  // 新しいチップの単位は数のすぐ後ろに付ける(横欄で単位が別の行に落ちると「60」「コイン」と2行に割れる・officialChips と同じ)
+  const paidRows = num(support.paidGiftCount) || 0;
+  const paidUnits = num(support.paidGiftUnits) || 0;
+  const unitsNote = paidUnits > paidRows ? `個数にすると ${formatInt(paidUnits)} 個です。` : '';
   if (id === 'youtube') {
     const paid = money('', '');
     const count = (num(support.superchatCount) || 0) + (num(support.stickerCount) || 0);
     const cap = platformCapability(id);
-    if ('superchatWhenPositive' in cap && cap.superchatWhenPositive && paid.text === '0' && count === 0) return [];
-    const out = [
-      chip(
+    // superchatWhenPositive はスパチャの欄にだけ効く(推定の「—」は出す・v0.1.2207)
+    const hideSuperchat = 'superchatWhenPositive' in cap && cap.superchatWhenPositive && paid.text === '0' && count === 0;
+    const out = estimateChips(id, estimateYoutubeSupportSpendJpy(amounts));
+    if (!hideSuperchat) {
+      out.push(chip(
         'superchat',
         'スパチャ',
         paid.text,
         paid.unit,
         `${RECORDED}スーパーチャット ${formatInt(support.superchatCount || 0)}・スーパーステッカー ${formatInt(support.stickerCount || 0)}。${paid.extra}`.trim(),
-      ),
-    ];
-    const estDisp = formatEstimatedViewerSpendDisplay(estimateYoutubeSupportSpendJpy(amounts));
-    if (estDisp) {
-      out.push(chip('estimatedViewerSpend', estDisp.label, estDisp.text, '', estDisp.title));
+      ));
     }
+    const members = num(support.membershipCount) || 0;
+    const memberGifts = num(support.membershipGiftCount) || 0;
+    if (members > 0) out.push(chip('members', 'メンバー加入', `${formatInt(members)}人`, '', RECORDED));
+    if (memberGifts > 0) out.push(chip('memberGifts', 'メンバーギフト', `${formatInt(memberGifts)}件`, '', RECORDED));
     return out.concat(countSinceChip(id, support));
   }
   if (id === 'twitch') {
     const bits = money('BITS', 'Bits');
-    const out = [
-      chip('bits', 'Bits', bits.text, '', `${RECORDED}${bits.extra}`.trim()),
+    const tierCounts = support.subTierCounts && typeof support.subTierCounts === 'object'
+      ? support.subTierCounts
+      : { tier1: (num(support.membershipCount) || 0) + (num(support.membershipGiftCount) || 0), tier2: 0, tier3: 0, prime: 0 };
+    const out = estimateChips(id, estimateTwitchSubSpendJpy(tierCounts), 'Bits は円にしていません。');
+    out.push(
+      chip('bits', 'Bits', bits.text, '', `${RECORDED}Bits は円にしていません。${bits.extra}`.trim()),
       chip('subs', 'サブスク', formatInt(num(support.membershipCount) || 0), '人', RECORDED),
       chip('gifts', 'ギフトサブ', formatInt(num(support.membershipGiftCount) || 0), '人', RECORDED),
       chip(
@@ -848,42 +942,63 @@ function supportChips(id, support) {
         '回',
         `${RECORDED}届いた人数の合計 ${formatInt(num(support.raidViewers) || 0)} 人。`,
       ),
-    ];
-    const tierCounts = support.subTierCounts && typeof support.subTierCounts === 'object'
-      ? support.subTierCounts
-      : { tier1: (num(support.membershipCount) || 0) + (num(support.membershipGiftCount) || 0), tier2: 0, tier3: 0, prime: 0 };
-    const estDisp = formatEstimatedViewerSpendDisplay(estimateTwitchSubSpendJpy(tierCounts));
-    if (estDisp) {
-      out.push(chip('estimatedViewerSpend', estDisp.label, estDisp.text, '', estDisp.title));
-    }
+    );
     return out.concat(countSinceChip(id, support));
   }
   if (id === 'kick') {
     const kicks = money('KICKS', 'Kicks');
-    const out = [
-      chip('kicks', 'Kicks', kicks.text, '', `${RECORDED}${kicks.extra}`.trim()),
+    const out = estimateChips(
+      id,
+      estimateKickSubSpendJpy({ subCount: support.membershipCount, giftSubCount: support.membershipGiftCount }),
+      'Kicks は円にしていません。',
+    );
+    out.push(
+      chip('kicks', 'Kicks', kicks.text, '', `${RECORDED}Kicks は円にしていません。${kicks.extra}`.trim()),
       chip('subs', 'サブスク', formatInt(num(support.membershipCount) || 0), '人', RECORDED),
       chip('gifts', 'ギフトサブ', formatInt(num(support.membershipGiftCount) || 0), '人', RECORDED),
-    ];
-    const estDisp = formatEstimatedViewerSpendDisplay(
-      estimateKickSubSpendJpy({ subCount: support.membershipCount, giftSubCount: support.membershipGiftCount })
+      chip(
+        'hosts',
+        'ホスト',
+        `${formatInt(num(support.hostCount) || 0)}回`,
+        '',
+        `${RECORDED}届いた人数の合計 ${formatInt(num(support.hostViewers) || 0)} 人。`,
+      ),
     );
-    if (estDisp) {
-      out.push(chip('estimatedViewerSpend', estDisp.label, estDisp.text, '', estDisp.title));
-    }
     return out.concat(countSinceChip(id, support));
   }
   if (id === 'twitcasting') {
-    const disps = formatEstimatedViewerSpendDisplays(estimateTwitcastingConsumptionPt(support.tcConsumption));
-    return disps.map((d) => chip(d.key, d.label, d.text, '', d.title));
+    const out = estimateChips(id, estimateTwitcastingConsumptionPt(support.tcConsumption));
+    out.push(chip('paidItems', 'アイテム（記録）', `${formatInt(paidRows)}件`, '', `${RECORDED}無料のお茶は数えていません。${unitsNote}`));
+    return out;
   }
-  if (id === 'mixch') {
-    const disps = formatEstimatedViewerSpendDisplays(estimateMixchCoinSpendJpy(support.mxConsumption));
-    return disps.map((d) => chip(d.key, d.label, d.text, '', d.title));
+  if (id === 'mixch' || id === 'tiktok') {
+    const est = id === 'mixch' ? estimateMixchCoinSpendJpy(support.mxConsumption) : estimateTiktokCoinSpendJpy(support.ttConsumption);
+    const code = id === 'mixch' ? 'MXCOIN' : 'TTCOIN';
+    const out = estimateChips(id, est);
+    out.push(
+      chip('nativeTotal', 'コイン（記録）', `${nativeTotal(code)}コイン`, '', `${RECORDED}ギフトのコインの合計です。コイン数が分からないギフトは入っていません。`),
+      chip('paidGifts', 'ギフト', `${formatInt(paidRows)}件`, '', `${RECORDED}${unitsNote}`),
+    );
+    if (id === 'mixch') {
+      const fans = num(support.fanCount) || 0;
+      if (fans > 0) out.push(chip('fanSignups', 'ファン登録', `${formatInt(fans)}人`, '', RECORDED));
+    } else {
+      const follows = num(support.followCount) || 0;
+      if (follows > 0) out.push(chip('follows', 'フォロー', `${formatInt(follows)}人`, '', RECORDED));
+    }
+    return out;
   }
-  if (id === 'tiktok') {
-    const disps = formatEstimatedViewerSpendDisplays(estimateTiktokCoinSpendJpy(support.ttConsumption));
-    return disps.map((d) => chip(d.key, d.label, d.text, '', d.title));
+  if (id === 'showroom') {
+    return [
+      chip('nativeTotal', 'ギフト（記録）', `${nativeTotal('SRPT')}pt`, '', `${RECORDED}SHOWROOM のギフトの pt です。円にはしていません。`),
+      chip('paidGifts', 'ギフト', `${formatInt(paidRows)}件`, '', `${RECORDED}${unitsNote}`),
+    ];
+  }
+  if (id === 'whowatch') {
+    return [
+      chip('nativeTotal', 'アイテム（記録）', `${nativeTotal('WWITEM')}個`, '', `${RECORDED}ふわっちのアイテムの個数です。値段は出ていないので円にはしていません。`),
+      chip('paidGifts', 'アイテム', `${formatInt(paidRows)}件`, '', RECORDED),
+    ];
   }
   return [];
 }
@@ -942,7 +1057,10 @@ function officialChips(id, official) {
 export function panelExtraChips(platformId, facts) {
   const id = resolvePlatformId(platformId);
   if (id === 'niconico') return [];
-  const chips = [...officialChips(id, facts?.official), ...supportChips(id, facts?.support)];
+  // 並び(v0.1.2207): 推定・合計・件数・反応(記録) → 公式の数 → 数え始め。いちばん知りたい応援の数を先頭に。
+  const support = supportChips(id, facts?.support);
+  const since = support.filter((c) => c.key === 'countSince');
+  const chips = [...support.filter((c) => c.key !== 'countSince'), ...officialChips(id, facts?.official), ...since];
   if (id === 'abema') {
     const n = num(facts?.commentCount);
     chips.push({
