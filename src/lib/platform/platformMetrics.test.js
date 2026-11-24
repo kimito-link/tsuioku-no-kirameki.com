@@ -147,7 +147,7 @@ describe('venueItemsForPlatform', () => {
       { kind: 'tw_raid', amount: 40 },
     ]);
     const items = venueItemsForPlatform('twitch', bag({ viewers: 10, support }));
-    expect(items.map((i) => i.label)).toEqual(['記録', '視聴者数', '経過', 'Bits', 'サブスク', 'ギフトサブ', 'レイド']);
+    expect(items.map((i) => i.label)).toEqual(['記録', '視聴者数', '経過', 'Bits', 'サブスク', 'ギフトサブ', 'レイド', '推定（視聴者の購入額）']);
     expect(items.find((i) => i.key === 'bits').text).toBe('300');
     expect(items.find((i) => i.key === 'raids').text).toBe('1');
     expect(items.find((i) => i.key === 'raids').title).toContain('40');
@@ -181,7 +181,7 @@ describe('venueItemsForPlatform', () => {
       { kind: 'membership_gift', giftCount: 1 },
     ]);
     const labels = venueItemsForPlatform('kick', bag({ support })).map((i) => i.label);
-    expect(labels).toEqual(['記録', '視聴者数', '経過', 'Kicks', 'サブスク', 'ギフトサブ']);
+    expect(labels).toEqual(['記録', '視聴者数', '経過', 'Kicks', 'サブスク', 'ギフトサブ', '推定（視聴者の購入額）']);
   });
 
   it('ABEMA は視聴数と公式コメント。ギフトは出さない', () => {

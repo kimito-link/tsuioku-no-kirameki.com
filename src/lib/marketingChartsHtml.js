@@ -25,6 +25,9 @@ import { followerSeriesForPlatform } from './platform/followerSampleStore.js';
 import {
   estimateNiconicoGiftSpendJpy,
   estimateYoutubeSpendFromComments,
+  estimateKickSpendFromComments,
+  estimateTwitchSpendFromComments,
+  estimateTwitcastingSpendFromComments,
   formatEstimatedViewerSpendDisplay
 } from './estimatedViewerSpend.js';
 import { buildCommenterFollowAnalytics } from './commenterFollowAnalytics.js';
@@ -3500,6 +3503,15 @@ export function buildMarketingDashboardHtml(r, opts = {}) {
     }
     if (view.id === 'youtube') {
       return formatEstimatedViewerSpendDisplay(estimateYoutubeSpendFromComments(commentsRaw));
+    }
+    if (view.id === 'kick') {
+      return formatEstimatedViewerSpendDisplay(estimateKickSpendFromComments(commentsRaw));
+    }
+    if (view.id === 'twitch') {
+      return formatEstimatedViewerSpendDisplay(estimateTwitchSpendFromComments(commentsRaw));
+    }
+    if (view.id === 'twitcasting') {
+      return formatEstimatedViewerSpendDisplay(estimateTwitcastingSpendFromComments(commentsRaw));
     }
     return null;
   })();
