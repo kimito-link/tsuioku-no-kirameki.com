@@ -21,12 +21,18 @@
  *     (a) ギフトの消費コイン × 1.2円（Web クレカ/Paidy 最小パック 400コイン＝480円・税込、2026-11-24 確認）→「推定（視聴者の消費）」
  *     (b) コイン数が不明なギフトは円換算せず「ほか n件は金額不明」と件数のみ表示
  *     ※ VIP の銀行振込・LINE Pay は別価格であり、キャンペーンの無料コインは含めない。
+ *   - TikTok LIVE（tiktok）:
+ *     (a) ギフトの消費コイン × 56/30円（ログイン後の Web チャージ画面 30コイン＝¥56、2026-11-24 確認）→「推定（視聴者の消費）」
+ *     (b) コイン数が不明なギフトは円換算せず「ほか n件は金額不明」と件数のみ表示
+ *     ※ ログイン後のみ表示。アプリ内課金は別価格。配信者の受取額（ダイヤ）ではない。
  *
  * ■対象外（確認できない値段は作らない・配信者の取り分を支払額と混同しない）:
  *   - ニコニ広告 pt、無料ポイント／無料ギフト、ツイキャスの無料お茶・応援アイテム・お団子スコア
  *   - Twitch Bits（1 Bit = 1セントは配信者の取り分であり、視聴者の購入支払額ではないため除外）
  *   - Kick Kicks（投げ銭単価が公式未確定のため除外）
- *   - SHOWROOM / TikTok / ふわっち / ABEMA のギフト・アイテム等（今回は対象外）
+ *   - SHOWROOM / ふわっち / ABEMA のギフト・アイテム等（今回は対象外）
+ *     ※ SHOWROOM: gift_list の point（記録は SRPT=point×個数）が G 単価と同じである公式の確証が無く、
+ *       買った G とおまけ G の区別も取得側に無いため、円換算しない（2026-11-24 調査）。
  *
  * - ytGiftToNico.js の固定為替は使わない。
  * - 配信者の手取り・分配率・控除額は一切算出・表示しない。
@@ -117,6 +123,17 @@ export const ESTIMATED_VIEWER_SPEND_RATES = Object.freeze({
     sourceName: 'ミクチャ公式 Web チャージ（クレカ/Paidy 最小パック 400コイン=480円・税込）',
     sourceUrl: 'https://mixch.tv/charge/coin?paidy',
     note: 'Web クレカ/Paidy 最小パック（400コイン=480円・税込、1コイン=1.2円、2026-11-24確認）による視聴者の消費推定です。VIPの銀行振込や別決済・大口パック・キャンペーンの無償コイン等により実際の支払と異なる場合があります。配信者の受取額ではありません。'
+  }),
+  // 出典: https://www.tiktok.com/coin （ログイン後の Web チャージ画面。30コイン＝¥56、600＝¥1,120、1,000＝¥1,860、5,000＝¥9,290。2026-11-24 確認）
+  // ※ ログイン後のみ表示。アプリ内課金は別価格。配信者の受取額（ダイヤ）ではない。
+  tiktokCoin: Object.freeze({
+    jpyPerCoin: 56 / 30, // 30コイン＝¥56 → 1コイン＝56/30円（約1.867円）
+    packCoins: 30,
+    packJpy: 56,
+    asOf: '2026-11-24',
+    sourceName: 'TikTok 公式 Web チャージ画面（最小パック 30コイン=56円）',
+    sourceUrl: 'https://www.tiktok.com/coin',
+    note: 'TikTok Web チャージ最小パック（30コイン=56円、1コイン≒1.867円、2026-11-24確認）による視聴者の消費推定です。大口パックやアプリ内課金では別価格のため実際の支払と異なる場合があります。配信者の受取額（ダイヤ）ではありません。'
   }),
   // 出典: https://www.ecb.europa.eu/stats/policy_and_exchange_rates/euro_reference_exchange_rates/html/index.en.html （2026-11-20 確定値）
   fx: Object.freeze({
@@ -213,7 +230,7 @@ export function normalizeTwitchSubTier(rawTier) {
 
 /**
  * @typedef {{
- *   platform: 'niconico' | 'youtube' | 'kick' | 'twitch' | 'twitcasting' | 'mixch',
+ *   platform: 'niconico' | 'youtube' | 'kick' | 'twitch' | 'twitcasting' | 'mixch' | 'tiktok',
  *   jpy: number,
  *   ticketJpy?: number,
  *   points?: number,
@@ -657,6 +674,116 @@ export function estimateMixchSpendFromComments(comments) {
 }
 
 /**
+ * TikTok LIVE の1行を累積オブジェクトへ加算する（純関数）。
+ * - コイン数が判明しているギフト（currency='TTCOIN' またはギフト行で amount > 0）は coins へ合算。
+ *   （受信時は createTtComboTracker が連打終了時に1回だけ ttGiftRow を出し、さらに同一連打 id が重複した場合も最大値のみ採用）
+ * - コイン数が分からないギフト（amount <= 0 かつ giftName あり、または kind='superchat'|'gift' / currency='TTCOIN'）は
+ *   円換算せず unknownGiftCount に件数のみ加算。
+ * - 通常コメント（kind='text' かつ giftName 無し）やフォロー通知（kind='follow'）は含めない。
+ * @param {{ coins: number, giftCount: number, unknownGiftCount: number, comboById?: Record<string, { coins: number, count: number, unk: number }> }} acc
+ * @param {Record<string, unknown>|null|undefined} row
+ */
+export function accumulateTiktokGiftItem(acc, row) {
+  if (!acc || !row || typeof row !== 'object') return;
+  const kind = String(row.ytKind ?? row.kind ?? '').trim().toLowerCase();
+  if (kind === 'follow' || kind === 'mx_fan' || kind === 'membership' || kind === 'membership_gift' || kind === 'tw_raid') {
+    return;
+  }
+  const cur = String(row.ytCurrency ?? row.currency ?? '').trim().toUpperCase();
+  if (cur && cur !== 'TTCOIN') return;
+  const rawCount = Number(row.ytGiftCount ?? row.giftCount);
+  const count = Number.isFinite(rawCount) && rawCount > 0 ? Math.floor(rawCount) : 1;
+  const rawAmount = Number(row.ytAmount ?? row.amount);
+  const hasGiftMarker =
+    cur === 'TTCOIN' ||
+    kind === 'superchat' ||
+    kind === 'gift' ||
+    Boolean(String(row.ytGiftName ?? row.giftName ?? '').trim());
+  if (!hasGiftMarker) return;
+
+  const rowId = String(row.id || '');
+  // tt-g-<userId>-<groupId(!=0)>-<giftId> の同一連打グループが複数行混入しても二重に足さない
+  if (/^tt-g-[^-]+-[1-9]\d*-\d+$/.test(rowId)) {
+    const map = acc.comboById || (acc.comboById = {});
+    const prev = map[rowId] || { coins: 0, count: 0, unk: 0 };
+    if (Number.isFinite(rawAmount) && rawAmount > 0) {
+      const c = Math.floor(rawAmount);
+      if (c > prev.coins) {
+        acc.coins += c - prev.coins;
+        prev.coins = c;
+      }
+      if (count > prev.count) {
+        acc.giftCount += count - prev.count;
+        prev.count = count;
+      }
+      if (prev.unk > 0) {
+        acc.unknownGiftCount = Math.max(0, acc.unknownGiftCount - prev.unk);
+        prev.unk = 0;
+      }
+    } else if (prev.coins === 0 && count > prev.unk) {
+      acc.unknownGiftCount += count - prev.unk;
+      prev.unk = count;
+    }
+    map[rowId] = prev;
+    return;
+  }
+
+  if (Number.isFinite(rawAmount) && rawAmount > 0) {
+    acc.coins += Math.floor(rawAmount);
+    acc.giftCount += count;
+  } else {
+    acc.unknownGiftCount += count;
+  }
+}
+
+/**
+ * TikTok LIVE の累積結果から視聴者の推定消費（1コイン=56/30円）と未知ギフト件数を算出する。
+ * ログイン後のみ表示される Web チャージ画面の価格を使用し、アプリ内課金は別価格、配信者の受取額（ダイヤ）ではない。
+ * @param {{ coins?: unknown, giftCount?: unknown, unknownGiftCount?: unknown }|null|undefined} summary
+ * @returns {EstimatedViewerSpendResult|null}
+ */
+export function estimateTiktokCoinSpendJpy(summary) {
+  if (!summary || typeof summary !== 'object') return null;
+  const coins = Math.max(0, Math.floor(Number(summary.coins) || 0));
+  const unknownPaidCount = Math.max(0, Math.floor(Number(summary.unknownGiftCount) || 0));
+  if (coins <= 0 && unknownPaidCount <= 0) return null;
+  const cfg = ESTIMATED_VIEWER_SPEND_RATES.tiktokCoin;
+  const jpy = coins > 0 ? Math.round((coins * cfg.packJpy) / cfg.packCoins) : 0;
+  if (jpy <= 0 && unknownPaidCount <= 0) return null;
+  return {
+    platform: 'tiktok',
+    jpy,
+    coins,
+    hasFxConversion: false,
+    asOf: cfg.asOf,
+    sourceName: cfg.sourceName,
+    sourceUrl: cfg.sourceUrl,
+    unconverted: [],
+    unknownPaidCount
+  };
+}
+
+/**
+ * TikTok LIVE のコメント配列からギフトコイン数・未知ギフト件数を集計して推定消費を算出する。
+ * @param {readonly unknown[]} comments
+ * @returns {EstimatedViewerSpendResult|null}
+ */
+export function estimateTiktokSpendFromComments(comments) {
+  if (!Array.isArray(comments) || !comments.length) return null;
+  const acc = { coins: 0, giftCount: 0, unknownGiftCount: 0 };
+  for (const row of comments) {
+    if (!row || typeof row !== 'object') continue;
+    const rec = /** @type {Record<string, unknown>} */ (row);
+    const plat = String(rec.ytPlatform || rec.platform || '').trim().toLowerCase();
+    if (plat && plat !== 'tiktok') continue;
+    const ch = String(rec.channelId || '').trim();
+    if (ch && /^(?:tc|tw|kk|sr|mx|ww|ab):/i.test(ch)) continue;
+    accumulateTiktokGiftItem(acc, rec);
+  }
+  return estimateTiktokCoinSpendJpy(acc);
+}
+
+/**
  * 会場・横欄・マーケレポート共通の表示アイテム配列を生成する。
  * - ツイキャスは「チケット基準の推定」（円・5種＋未知件数）と「推定（視聴者の消費）」（お茶爆50/100 pt）の最大2件を返す。
  * - 他サービスは1件を返す。配信者の手取りは一切表示しない。
@@ -736,6 +863,36 @@ export function formatEstimatedViewerSpendDisplays(est) {
           : unkPhrase;
     // ※ VIP の銀行振込・LINE Pay は別価格であり、キャンペーンの無料コインは含めない（画面文言には禁止語を含めない）
     const note = `ミクチャ Web クレカ/Paidy 最小パック（400コイン=480円・税込、${coinDetail}1コイン=1.2円、${cfg.asOf}確認）による視聴者の消費推定です。${unkSentence}VIPの銀行振込や別決済・大口パック・キャンペーンの無償コイン等により実際の支払と異なる場合があります。配信者の受取額ではありません。`;
+    return [
+      {
+        key: 'estimatedViewerSpend',
+        label: ESTIMATED_VIEWER_CONSUMPTION_LABEL,
+        text,
+        title: note,
+        note,
+        sourceUrl: cfg.sourceUrl,
+        asOf: cfg.asOf
+      }
+    ];
+  }
+
+  if (est.platform === 'tiktok') {
+    const jpy = Math.max(0, Math.round(Number(est.jpy) || 0));
+    const coins = Math.max(0, Math.floor(Number(est.coins) || 0));
+    const unk = Math.max(0, Math.floor(Number(est.unknownPaidCount) || 0));
+    if (jpy <= 0 && unk <= 0) return [];
+    const cfg = ESTIMATED_VIEWER_SPEND_RATES.tiktokCoin;
+    const unkPhrase = unk > 0 ? `ほか ${unk.toLocaleString('ja-JP')}件は金額不明` : '';
+    const unkSentence = unk > 0 ? `コイン数不明のギフト（${unkPhrase}）は円換算していません。` : '';
+    const coinDetail = coins > 0 ? `記録ギフト計 ${coins.toLocaleString('ja-JP')}コイン × ` : '';
+    const text =
+      jpy > 0 && unk > 0
+        ? `約¥${jpy.toLocaleString('ja-JP')}（${unkPhrase}）`
+        : jpy > 0
+          ? `約¥${jpy.toLocaleString('ja-JP')}`
+          : unkPhrase;
+    // ※ ログイン後のみ表示・アプリ内課金は別価格・配信者の受取額（ダイヤ）ではない（画面文言には禁止語を含めない）
+    const note = `TikTok Web チャージ最小パック（30コイン=56円、${coinDetail}1コイン≒1.867円、${cfg.asOf}確認）による視聴者の消費推定です。${unkSentence}大口パックやアプリ内課金では別価格のため実際の支払と異なる場合があります。配信者の受取額（ダイヤ）ではありません。`;
     return [
       {
         key: 'estimatedViewerSpend',

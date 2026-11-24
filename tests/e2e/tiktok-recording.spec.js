@@ -375,6 +375,9 @@ test('TikTok のコメント・ギフト・配信中の順位を記録し、送�
     await expect.poll(bodyText, { timeout: 30_000 }).toContain(want);
   }
   expect(await bodyText()).not.toMatch(/tt:\d|tt\.some|スパチャ|スーパーチャット|ギフトサブ/);
+  await expect
+    .poll(() => ext.evaluate(() => document.querySelector('[data-nl-metric="estimatedViewerSpend"]')?.textContent || ''), { timeout: 30_000 })
+    .toContain('推定（視聴者の消費）約¥958');
 
   // 配信が終わったら(status 4)終わった時刻を送る
   live = false;

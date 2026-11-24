@@ -18,6 +18,8 @@ import {
   estimateTwitcastingSpendFromComments,
   estimateMixchCoinSpendJpy,
   estimateMixchSpendFromComments,
+  estimateTiktokCoinSpendJpy,
+  estimateTiktokSpendFromComments,
   formatEstimatedViewerSpendDisplay,
   formatEstimatedViewerSpendDisplays
 } from './estimatedViewerSpend.js';
@@ -29,6 +31,7 @@ import { parseKickEvent } from './kick/kickChatParse.js';
 import { parseTwChatLine } from './twitch/twIrcParse.js';
 import { parseTcEvent } from './twitcasting/tcParse.js';
 import { parseMxMessage } from './mixch/mxParse.js';
+import { parseTtGift, parseTtChat, parseTtSocialFollow, ttGiftRow, createTtComboTracker } from './tiktok/ttParse.js';
 import { exportCommentsFromStoredRows } from './youtube/exportStoredComments.js';
 
 const ROOT = resolve(process.cwd());
@@ -57,6 +60,11 @@ describe('estimatedViewerSpend (L0 単価・日付付き為替・純粋計算)',
     expect(ESTIMATED_VIEWER_SPEND_RATES.mixchCoin.packJpy).toBe(480);
     expect(ESTIMATED_VIEWER_SPEND_RATES.mixchCoin.asOf).toBe('2026-11-24');
     expect(ESTIMATED_VIEWER_SPEND_RATES.mixchCoin.sourceUrl).toBe('https://mixch.tv/charge/coin?paidy');
+    expect(ESTIMATED_VIEWER_SPEND_RATES.tiktokCoin.jpyPerCoin).toBeCloseTo(56 / 30, 8);
+    expect(ESTIMATED_VIEWER_SPEND_RATES.tiktokCoin.packCoins).toBe(30);
+    expect(ESTIMATED_VIEWER_SPEND_RATES.tiktokCoin.packJpy).toBe(56);
+    expect(ESTIMATED_VIEWER_SPEND_RATES.tiktokCoin.asOf).toBe('2026-11-24');
+    expect(ESTIMATED_VIEWER_SPEND_RATES.tiktokCoin.sourceUrl).toBe('https://www.tiktok.com/coin');
     expect(ESTIMATED_VIEWER_SPEND_RATES.fx.asOf).toMatch(/^\d{4}-\d{2}-\d{2}$/);
     expect(ESTIMATED_VIEWER_SPEND_RATES.fx.sourceUrl).toMatch(/^https:\/\//);
     expect(ESTIMATED_VIEWER_SPEND_RATES.fx.feedUrl).toMatch(/^https:\/\//);
@@ -66,6 +74,9 @@ describe('estimatedViewerSpend (L0 単価・日付付き為替・純粋計算)',
     expect(src).not.toContain('ytAmountToPoints');
     expect(src).toContain('VIP の銀行振込・LINE Pay は別価格');
     expect(src).toContain('キャンペーンの無料コインは含めない');
+    expect(src).toContain('ログイン後のみ表示');
+    expect(src).toContain('アプリ内課金は別価格');
+    expect(src).toContain('配信者の受取額（ダイヤ）ではない');
   });
 
   it('ニコ生有料ギフトptを 1pt=1円 で推定し、0/未取得は null', () => {
@@ -357,7 +368,130 @@ describe('estimatedViewerSpend (L0 単価・日付付き為替・純粋計算)',
     expect(estimateMixchCoinSpendJpy({ coins: 0, unknownGiftCount: 0 })).toBeNull();
   });
 
-  it('会場と横欄のチップは対象6サービス（該当イベントあり時）のみに出し、Bits/Kicks単体や対象外サービスには出さない', () => {
+  it('TikTok LIVE: 30コイン → 56円（推定（視聴者の消費）約¥56）、コンボ1回分を二重に数えない、コイン不明は件数のみ', async () => {
+    const enc = new TextEncoder();
+    const varint = (v) => {
+      let x = BigInt(v);
+      const out = [];
+      do {
+        let b = Number(x & 0x7fn);
+        x >>= 7n;
+        if (x) b |= 0x80;
+        out.push(b);
+      } while (x);
+      return out;
+    };
+    const fv = (no, v) => [...varint((no << 3) | 0), ...varint(v)];
+    const fb = (no, b) => {
+      const bytes = typeof b === 'string' ? [...enc.encode(b)] : [...b];
+      return [...varint((no << 3) | 2), ...varint(bytes.length), ...bytes];
+    };
+    const av = 'https://p16-sign-sg.tiktokcdn.com/aweme/100x100/a.webp';
+    const gimg = 'https://p16-webcast.tiktokcdn.com/img/alisg/webcast-sg/resource/rose.png~tplv-obj.webp';
+    const ttUser = (id, nick, unique) => [...fv(1, BigInt(id)), ...fb(3, nick), ...fb(9, fb(1, av)), ...fb(38, unique)];
+    const ttCommon = (ms) => fb(1, fv(4, ms));
+    const buildGiftBuf = ({ giftId, count, end = false, group = 777, type = 1, diamond = 10, en = 'FingerHeart', uid = '21' }) =>
+      new Uint8Array([
+        ...ttCommon(1_762_640_002_000),
+        ...fv(2, giftId),
+        ...(end ? [] : fv(3, 1)),
+        ...fv(5, count),
+        ...fb(7, ttUser(uid, 'おくりて', 'giver')),
+        ...(end ? fv(9, 1) : []),
+        ...fv(11, group),
+        ...fb(
+          15,
+          [
+            ...fb(1, fb(1, gimg)),
+            ...fv(5, giftId),
+            ...fv(11, type),
+            ...(diamond > 0 ? fv(12, diamond) : []),
+            ...fb(16, en)
+          ]
+        )
+      ]);
+
+    // 1) コンボ（単価10コイン × 1→2→3連打終了 + 遅延重複フレーム）→ createTtComboTracker で3個分(30コイン=56円)を1回だけ計上
+    const combo = createTtComboTracker({ waitMs: 8000 });
+    const gStep1 = parseTtGift(buildGiftBuf({ giftId: 5655, count: 1, end: false, group: 777, diamond: 10 }));
+    const gStep2 = parseTtGift(buildGiftBuf({ giftId: 5655, count: 2, end: false, group: 777, diamond: 10 }));
+    const gStep3End = parseTtGift(buildGiftBuf({ giftId: 5655, count: 3, end: true, group: 777, diamond: 10 }));
+    const gLateDup = parseTtGift(buildGiftBuf({ giftId: 5655, count: 3, end: true, group: 777, diamond: 10 }));
+
+    expect(combo.push(/** @type {any} */ (gStep1), 0)).toEqual([]);
+    expect(combo.push(/** @type {any} */ (gStep2), 100)).toEqual([]);
+    const emitted = combo.push(/** @type {any} */ (gStep3End), 200);
+    expect(emitted).toHaveLength(1);
+    expect(combo.push(/** @type {any} */ (gLateDup), 300)).toEqual([]);
+
+    const finalComboRow = ttGiftRow(emitted[0], 'host.user');
+    const chatRow = parseTtChat(
+      new Uint8Array([...ttCommon(1_762_640_003_000), ...fb(2, ttUser('31', 'リスナー', 'fan1')), ...fb(3, 'すごい')]),
+      { msgId: '9001', uniqueId: 'host.user', nowMs: 1_762_640_003_000 }
+    );
+    const followRow = parseTtSocialFollow(
+      new Uint8Array([...ttCommon(1_762_640_004_000), ...fb(2, ttUser('32', 'フォロワー', 'fan2')), ...fb(8, 'フォローしました')]),
+      { msgId: '9002', uniqueId: 'host.user', nowMs: 1_762_640_004_000 }
+    );
+
+    const est30 = estimateTiktokSpendFromComments([finalComboRow, chatRow, followRow]);
+    expect(est30).not.toBeNull();
+    expect(est30?.platform).toBe('tiktok');
+    expect(est30?.coins).toBe(30);
+    expect(est30?.jpy).toBe(56);
+    expect(est30?.unknownPaidCount).toBe(0);
+
+    const disp30 = formatEstimatedViewerSpendDisplay(est30);
+    expect(disp30?.label).toBe('推定（視聴者の消費）');
+    expect(disp30?.text).toBe('約¥56');
+    expect(disp30?.sourceUrl).toBe('https://www.tiktok.com/coin');
+    expect(disp30?.asOf).toBe('2026-11-24');
+    for (const field of [disp30?.label, disp30?.text, disp30?.title, disp30?.note]) {
+      expect(field).not.toMatch(/紹介|有料|LINE|サポーター|手取り/);
+    }
+
+    // 2) 万一 同一コンボ groupId の途中行(10コイン・20コイン)と最終行(30コイン)が配列に混在しても二重計上しない
+    const midRow1 = ttGiftRow(/** @type {any} */ (gStep1), 'host.user');
+    const midRow2 = ttGiftRow(/** @type {any} */ (gStep2), 'host.user');
+    const estDedup = estimateTiktokSpendFromComments([midRow1, midRow2, finalComboRow]);
+    expect(estDedup?.coins).toBe(30);
+    expect(estDedup?.jpy).toBe(56);
+    const tallyDedup = tallySupportItems([midRow1, midRow2, finalComboRow]);
+    expect(tallyDedup.ttConsumption.coins).toBe(30);
+
+    // 3) コイン数不明のギフト（diamond=0 かつ gift/list 未掲載）→ 円換算せず件数のみ
+    const gUnknown = parseTtGift(buildGiftBuf({ giftId: 9999, count: 1, end: true, group: 888, type: 2, diamond: 0, en: 'MysteryBox' }));
+    const unknownRow = ttGiftRow(/** @type {any} */ (gUnknown), 'host.user');
+    expect(unknownRow.amount).toBe(0);
+    const estUnkOnly = estimateTiktokSpendFromComments([unknownRow, chatRow, followRow]);
+    expect(estUnkOnly?.coins).toBe(0);
+    expect(estUnkOnly?.jpy).toBe(0);
+    expect(estUnkOnly?.unknownPaidCount).toBe(1);
+    expect(formatEstimatedViewerSpendDisplay(estUnkOnly)?.text).toBe('ほか 1件は金額不明');
+
+    // 4) 30コイン + コイン不明ギフト1件（exportStoredComments 経由）
+    const exported = await exportCommentsFromStoredRows(
+      [
+        { ...finalComboRow, recordedAt: 1_000_000 },
+        { ...unknownRow, recordedAt: 1_001_000 },
+        { ...chatRow, recordedAt: 1_002_000 },
+        { ...followRow, recordedAt: 1_003_000 }
+      ],
+      'lv900000000099',
+      async () => {}
+    );
+    const estMixed = estimateTiktokSpendFromComments(exported);
+    expect(estMixed?.coins).toBe(30);
+    expect(estMixed?.jpy).toBe(56);
+    expect(estMixed?.unknownPaidCount).toBe(1);
+    expect(formatEstimatedViewerSpendDisplay(estMixed)?.text).toBe('約¥56（ほか 1件は金額不明）');
+
+    // 5) 通常コメント・フォロー通知のみ → null
+    expect(estimateTiktokSpendFromComments([chatRow, followRow])).toBeNull();
+    expect(estimateTiktokCoinSpendJpy({ coins: 0, unknownGiftCount: 0 })).toBeNull();
+  });
+
+  it('会場と横欄のチップは対象7サービス（該当イベントあり時）のみに出し、Bits/Kicks単体や対象外サービスには出さない', () => {
     const ytSupport = tallySupportItems([
       { kind: 'superchat', amount: 1000, currency: 'JPY', recordedAt: 1000 },
       { kind: 'sticker', amount: 5, currency: 'USD', recordedAt: 2000 }
@@ -417,7 +551,28 @@ describe('estimatedViewerSpend (L0 単価・日付付き為替・純粋計算)',
       text: '約¥480（ほか 1件は金額不明）'
     });
 
-    for (const excluded of ['showroom', 'tiktok', 'whowatch', 'abema']) {
+    // TikTok LIVE: 30コイン + 未知ギフト1件 → 推定（視聴者の消費）約¥56（ほか 1件は金額不明）が横欄・会場に出る
+    const ttSupport = tallySupportItems([
+      { id: 'tt-g-21-777-5655', kind: 'superchat', channelId: 'tt:21', currency: 'TTCOIN', amount: 30, giftName: 'ハート' },
+      { id: 'tt-g-22-888-9999', kind: 'text', channelId: 'tt:22', currency: '', amount: 0, giftName: 'MysteryBox' }
+    ]);
+    const ttChips = panelExtraChips('tiktok', { support: ttSupport });
+    expect(ttChips.find((c) => c.key === 'estimatedViewerSpend')).toMatchObject({
+      label: '推定（視聴者の消費）',
+      text: '約¥56（ほか 1件は金額不明）'
+    });
+    const ttVenue = venueItemsForPlatform('tiktok', {
+      records: { text: '4', isPlaceholder: false },
+      concurrent: { text: '77', isPlaceholder: false },
+      streamAge: { text: '15分', isPlaceholder: false },
+      facts: { viewers: 77, support: ttSupport }
+    });
+    expect(ttVenue?.find((i) => i.key === 'estimatedViewerSpend')).toMatchObject({
+      label: '推定（視聴者の消費）',
+      text: '約¥56（ほか 1件は金額不明）'
+    });
+
+    for (const excluded of ['showroom', 'whowatch', 'abema']) {
       const sup = tallySupportItems([{ kind: 'superchat', amount: 1000, currency: 'SRPT' }]);
       expect(panelExtraChips(excluded, { support: sup }).some((c) => c.key === 'estimatedViewerSpend')).toBe(false);
     }
@@ -444,7 +599,7 @@ describe('estimatedViewerSpend (L0 単価・日付付き為替・純粋計算)',
     expect(nicoWithGift.items.find((i) => i.key === 'estimatedViewerSpend')?.text).toBe('約¥1,200');
   });
 
-  it('マーケレポート HTML にニコ生・YouTube・Kick・Twitch・ツイキャス・ミクチャを出し、対象外には出さない', () => {
+  it('マーケレポート HTML にニコ生・YouTube・Kick・Twitch・ツイキャス・ミクチャ・TikTok LIVE を出し、対象外には出さない', () => {
     const tcComments = [
       { id: 'tc1', liveId: 'lv900000000012', text: 'お茶爆100', userId: 'u1', nickname: 'a', capturedAt: 1_700_000_000_000, ytPlatform: 'twitcasting', ytKind: 'superchat', ytCurrency: 'TCSCORE', ytGiftName: 'お茶爆100', badges: ['paid'] },
       { id: 'tc2', liveId: 'lv900000000012', text: '極茶爆1000', userId: 'u2', nickname: 'b', capturedAt: 1_700_000_000_000, ytPlatform: 'twitcasting', ytKind: 'superchat', ytCurrency: 'TCSCORE', ytGiftName: '極茶爆1000', badges: ['paid'] }
@@ -473,5 +628,18 @@ describe('estimatedViewerSpend (L0 単価・日付付き為替・純粋計算)',
     expect(mxHtml).toContain('約¥480（ほか 1件は金額不明）');
     expect(mxHtml).toContain('https://mixch.tv/charge/coin?paidy');
     expect(mxHtml).not.toContain('手取り');
+
+    const ttComments = [
+      { id: 'tt1', liveId: 'lv900000000099', text: 'ハート ×3', userId: '8000000021', nickname: 'a', capturedAt: 1_700_000_000_000, ytPlatform: 'tiktok', ytKind: 'superchat', ytAmount: 30, ytCurrency: 'TTCOIN', ytGiftName: 'ハート', ytGiftCount: 3 },
+      { id: 'tt2', liveId: 'lv900000000099', text: 'MysteryBox', userId: '8000000022', nickname: 'b', capturedAt: 1_700_000_001_000, ytPlatform: 'tiktok', ytKind: 'text', ytAmount: 0, ytCurrency: '', ytGiftName: 'MysteryBox' }
+    ];
+    const ttHtml = buildMarketingDashboardHtml(aggregateMarketingReport(ttComments, 'lv900000000099'), {
+      platform: 'tiktok',
+      commentsForAnalytics: ttComments
+    });
+    expect(ttHtml).toContain('推定（視聴者の消費）');
+    expect(ttHtml).toContain('約¥56（ほか 1件は金額不明）');
+    expect(ttHtml).toContain('https://www.tiktok.com/coin');
+    expect(ttHtml).not.toContain('手取り');
   });
 });
