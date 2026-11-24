@@ -379,6 +379,10 @@ test('Kick のチャットを記録し、送信も届く', async ({ context, rt 
     return { vis, attrs };
   });
   expect(left).toEqual({ vis: [], attrs: [] });
+  await expect
+    .poll(() => ext.evaluate(() => document.querySelector('[data-nl-metric="estimatedViewerSpend"]')?.textContent || ''), { timeout: 15_000 })
+    .toContain('推定（視聴者の購入額）約¥');
+  await ext.locator('.nl-official-nico-stats__row').screenshot({ path: 'test-results/kick-official-chips.png' });
 
   // 絵文字(KEKW)は名前 → 画像の対応を覚え、一覧では画像だけにする。印の名前は文字に残さない。
   expect((await sw.evaluate(async () => chrome.storage.local.get('yt_kk_emotes'))).yt_kk_emotes).toEqual({

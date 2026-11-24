@@ -11,7 +11,16 @@
 
 import { platformOfStreamKey, STREAM_PLATFORMS } from './streamPlatform.js';
 import { FOLLOWER_NOUN, followerKpiLabels } from './followerCountSample.js';
-import { estimateYoutubeSupportSpendJpy, formatEstimatedViewerSpendDisplay } from '../estimatedViewerSpend.js';
+import {
+  estimateYoutubeSupportSpendJpy,
+  estimateKickSubSpendJpy,
+  estimateTwitchSubSpendJpy,
+  estimateTwitcastingConsumptionPt,
+  accumulateTwitcastingGiftItem,
+  normalizeTwitchSubTier,
+  formatEstimatedViewerSpendDisplay,
+  formatEstimatedViewerSpendDisplays
+} from '../estimatedViewerSpend.js';
 
 /** 能力表を持つサービス。ABEMA は記録の実装が別の変更にあるので、数字の枠だけを先に置く。 */
 export const PLATFORM_METRIC_IDS = Object.freeze(['niconico', 'youtube', 'twitch', 'kick', 'abema', 'showroom', 'mixch', 'whowatch', 'twitcasting', 'tiktok']);
@@ -516,6 +525,8 @@ function formatMoney(amount, currency) {
 export function tallySupportItems(items) {
   /** @type {Record<string, number>} */
   const amounts = {};
+  const subTierCounts = { tier1: 0, tier2: 0, tier3: 0, prime: 0 };
+  const tcConsumption = { ticketJpy: 0, ticketCount: 0, confirmedPt: 0, confirmedCount: 0, unknownPaidCount: 0 };
   const t = {
     ready: true,
     superchatCount: 0,
@@ -527,24 +538,47 @@ export function tallySupportItems(items) {
     /** このPCで記録を始めた時刻(ms)。これより前の分は、過去を出さないサービスでは数えられない。0 = 分からない */
     firstRecordedAt: 0,
     amounts,
+    subTierCounts,
+    tcConsumption,
   };
   if (!Array.isArray(items)) return t;
+  /** @param {unknown} rawTier @param {number} n */
+  const addSubTier = (rawTier, n) => {
+    if (n <= 0) return;
+    const tier = normalizeTwitchSubTier(rawTier);
+    if (tier === 'Prime') subTierCounts.prime += n;
+    else if (tier === 'Tier 2') subTierCounts.tier2 += n;
+    else if (tier === 'Tier 3') subTierCounts.tier3 += n;
+    else subTierCounts.tier1 += n;
+  };
   for (const item of items) {
     if (!item || typeof item !== 'object') continue;
-    const at = Number(/** @type {{ recordedAt?: unknown }} */ (item).recordedAt);
+    const rec = /** @type {Record<string, unknown>} */ (item);
+    const at = Number(rec.recordedAt);
     if (Number.isFinite(at) && at > 0 && (t.firstRecordedAt === 0 || at < t.firstRecordedAt)) t.firstRecordedAt = at;
-    const kind = String(/** @type {{ kind?: unknown }} */ (item).kind || '');
-    const amount = Number(/** @type {{ amount?: unknown }} */ (item).amount);
-    const currency = String(/** @type {{ currency?: unknown }} */ (item).currency || '').trim().toUpperCase();
+    const kind = String(rec.kind || '');
+    const amount = Number(rec.amount);
+    const currency = String(rec.currency || '').trim().toUpperCase();
     if ((kind === 'superchat' || kind === 'sticker') && Number.isFinite(amount) && amount > 0 && currency) {
       amounts[currency] = Math.round(((amounts[currency] || 0) + amount) * 100) / 100;
     }
+    if (
+      currency === 'TCSCORE' ||
+      String(rec.channelId || '').startsWith('tc:') ||
+      String(rec.ytPlatform || '').toLowerCase() === 'twitcasting'
+    ) {
+      accumulateTwitcastingGiftItem(tcConsumption, rec);
+    }
     if (kind === 'superchat') t.superchatCount += 1;
     else if (kind === 'sticker') t.stickerCount += 1;
-    else if (kind === 'membership') t.membershipCount += 1;
-    else if (kind === 'membership_gift') {
-      const gc = Number(/** @type {{ giftCount?: unknown }} */ (item).giftCount);
-      t.membershipGiftCount += Number.isFinite(gc) ? Math.max(0, Math.floor(gc)) : 1;
+    else if (kind === 'membership') {
+      t.membershipCount += 1;
+      addSubTier(rec.subTier, 1);
+    } else if (kind === 'membership_gift') {
+      const gc = rec.giftPartOf ? 0 : Number(rec.giftCount);
+      const count = Number.isFinite(gc) ? Math.max(0, Math.floor(gc)) : 1;
+      t.membershipGiftCount += count;
+      addSubTier(rec.subTier, count);
     } else if (kind === 'tw_raid') {
       t.raidCount += 1;
       if (Number.isFinite(amount) && amount > 0) t.raidViewers += Math.floor(amount);
@@ -773,7 +807,7 @@ function supportChips(id, support) {
   }
   if (id === 'twitch') {
     const bits = money('BITS', 'Bits');
-    return [
+    const out = [
       chip('bits', 'Bits', bits.text, '', `${RECORDED}${bits.extra}`.trim()),
       chip('subs', 'サブスク', formatInt(num(support.membershipCount) || 0), '人', RECORDED),
       chip('gifts', 'ギフトサブ', formatInt(num(support.membershipGiftCount) || 0), '人', RECORDED),
@@ -784,15 +818,34 @@ function supportChips(id, support) {
         '回',
         `${RECORDED}届いた人数の合計 ${formatInt(num(support.raidViewers) || 0)} 人。`,
       ),
-    ].concat(countSinceChip(id, support));
+    ];
+    const tierCounts = support.subTierCounts && typeof support.subTierCounts === 'object'
+      ? support.subTierCounts
+      : { tier1: (num(support.membershipCount) || 0) + (num(support.membershipGiftCount) || 0), tier2: 0, tier3: 0, prime: 0 };
+    const estDisp = formatEstimatedViewerSpendDisplay(estimateTwitchSubSpendJpy(tierCounts));
+    if (estDisp) {
+      out.push(chip('estimatedViewerSpend', estDisp.label, estDisp.text, '', estDisp.title));
+    }
+    return out.concat(countSinceChip(id, support));
   }
   if (id === 'kick') {
     const kicks = money('KICKS', 'Kicks');
-    return [
+    const out = [
       chip('kicks', 'Kicks', kicks.text, '', `${RECORDED}${kicks.extra}`.trim()),
       chip('subs', 'サブスク', formatInt(num(support.membershipCount) || 0), '人', RECORDED),
       chip('gifts', 'ギフトサブ', formatInt(num(support.membershipGiftCount) || 0), '人', RECORDED),
-    ].concat(countSinceChip(id, support));
+    ];
+    const estDisp = formatEstimatedViewerSpendDisplay(
+      estimateKickSubSpendJpy({ subCount: support.membershipCount, giftSubCount: support.membershipGiftCount })
+    );
+    if (estDisp) {
+      out.push(chip('estimatedViewerSpend', estDisp.label, estDisp.text, '', estDisp.title));
+    }
+    return out.concat(countSinceChip(id, support));
+  }
+  if (id === 'twitcasting') {
+    const disps = formatEstimatedViewerSpendDisplays(estimateTwitcastingConsumptionPt(support.tcConsumption));
+    return disps.map((d) => chip(d.key, d.label, d.text, '', d.title));
   }
   return [];
 }

@@ -299,6 +299,10 @@ test('Twitch のチャットを記録し、送信も届く', async ({ context, i
   expect(text).not.toContain('データ源: youtube');
   // ランキング欄に YouTube の言葉(スパチャ・トップファン)を残さない(2026-11-07 実配信で残っていた)
   expect(text).not.toMatch(/スパチャ|スーパーチャット|トップファン/);
+  await expect
+    .poll(() => ext.evaluate(() => document.querySelector('[data-nl-metric="estimatedViewerSpend"]')?.textContent || ''), { timeout: 15_000 })
+    .toContain('推定（視聴者の購入額）約¥');
+  await ext.locator('.nl-official-nico-stats__row').screenshot({ path: 'test-results/twitch-official-chips.png' });
   // Twitch 公式の Bits ランキング(今月)が「ギフト貢献度」の欄に出る・記録から数えた言葉は出さない
   const all = await ext.evaluate(() => document.body.textContent || '');
   expect(all).toContain('Twitch 公式の Bits ランキング（今月）');
