@@ -24,6 +24,14 @@
 /** @type {ChangelogEntry[]} */
 const ARCHIVE_ENTRIES = [
   Object.freeze({
+    version: '0.1.2187',
+    date: '2026-11-23',
+    summary: '会場の Esc と部品の層の地図を今の実装に合わせる',
+    items: Object.freeze([
+      '拡張の動きは 0.1.2186 と同じです。会場をしまったときの Esc の試験を、送信中の一時退避も含めた今の判定に合わせ、部品の層の地図の数字を実測に合わせました。',
+    ])
+  }),
+  Object.freeze({
     version: '0.1.2186',
     date: '2026-11-23',
     summary: 'ミクチャの公式コメント欄を、小さい画面でも見つけられるように',

@@ -1,6 +1,17 @@
 <!-- claude-projects-attribution: {"github_login":"kimito-link"} -->
 _Requested by **りんく** · [project thread](https://claude.ai/code/project/chan_0156DiwJETNymYoDji7fmUqo?thread=cmsg_0156DiwJETNymYoDji7fmUqo19628oFJc2WRRV7rgfqxyr)_
 
+# Handoff — 配信者にゆっくり顔を出さない (v0.1.2209)
+
+STATUS: 枝 `fix/ranking-avatar-no-yukkuri-flash`。ローカル commit 済み。マージしない（draft PR）。
+ROOT_CAUSE: `supportGrowthAvatarLoad.pickDisplaySrc` は、まだ成功していない HTTP のアイコン URL に先にフォールバックを返す。popup のフォールバックは `identiconFallbackForAvatarUrl`（人ごとのゆっくり顔）。イベント順位の配信者タイル（`#northStarLaneBody-eventBroadcasters`）は、プローブ成功や描き直しの前にゆっくり顔が出ていた。実機 2026-11-24 21:33 JST（lv351880439）で上位10名がゆっくり顔、21:34 に本人アイコンへ変わった。「配信者」カードは iconUrl 空／onerror で identicon へ倒れる経路があった（21:33 のあいたん本人カードはすでに本人写真）。
+FIX:
+- イベント順位タイルに `isBroadcaster: true` を付け、未確定・失敗時は最後の本人アイコンか既存の中立「未取得」バッジ（`officialDomRankBadgeThumb`）を出す。応援者のゆっくり顔フォールバックは変えていない。
+- 「配信者」カードとバナーも identicon に倒さない。onerror は `neutral`。
+- 新しい permission / observer / timer / ネットワーク呼び出しは足していない。プローブは既存の `noteRemoteAttempt` のまま。
+FILES_CHANGED: src/lib/broadcasterAvatarDisplay.js(+test), src/lib/paintTopSupportRankStyleIntoElement.js(+test), src/lib/topSupportRankStripLines.js, src/extension/popup-entry.js, src/extension/popup/broadcasterCasterThumb.js, 版4か所（manifest / package / changelog(+archive) / LP index.html）, docs の地図（code-tree / feature-sitemap / repo-tree-map / layer-map）, extension/dist/*・app/dist・.dist-fingerprint.json, handoff.md
+TEST: npm test は地図再生成前に libAgentsDoc 1件だけ失敗（層の件数の表示が古かった）→ tree-map / layer-map 再生成後、対象試験・lint（既存 warning 2件のみ）・typecheck・verify:bump・check:dist-fresh・tree-map:check / layer-map:check / check:layer は合格。npm test 本体は 15,835 passed / 6 todo（地図更新前の 1 failed を除く）。
+
 # Handoff — 応援の数字を全サービスで「いちばん知りたい順」に (v0.1.2208)
 
 STATUS: PR #708（feat/support-summary-all-platforms）。レビューの指摘で v0.1.2208 に修正し、ローカル commit 済み・push 待ち（マージしない）

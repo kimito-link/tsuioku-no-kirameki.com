@@ -18,6 +18,15 @@
 /** @type {readonly ChangelogEntry[]} */
 export const EXTENSION_CHANGELOG = Object.freeze([
   Object.freeze({
+    version: '0.1.2209',
+    date: '2026-11-24',
+    summary: '配信者にゆっくり顔を出さない',
+    items: Object.freeze([
+      'イベント順位の上位10名と「配信者」カードで、本人のアイコンがまだ届いていないときや読み込みに失敗したときに、ゆっくり顔を出さず、直前まで出ていた本人のアイコンか、中立な「未取得」の印を出すようにしました。',
+    ])
+  }),
+  Object.freeze({
+
     version: '0.1.2208',
     date: '2026-11-24',
     summary: '応援の数字を全サービスで先頭に表示',
@@ -190,14 +199,6 @@ export const EXTENSION_CHANGELOG = Object.freeze([
     summary: '会場の本体ファイルを行数の上限内に収める',
     items: Object.freeze([
       '拡張の動きは 0.1.2186 と同じです。会場モードの本体ファイルが行数の上限を超えて試験が落ちていたので、送りの通過印を外す処理を小さな部品に移し、上限内に収めました。',
-    ])
-  }),
-  Object.freeze({
-    version: '0.1.2187',
-    date: '2026-11-23',
-    summary: '会場の Esc と部品の層の地図を今の実装に合わせる',
-    items: Object.freeze([
-      '拡張の動きは 0.1.2186 と同じです。会場をしまったときの Esc の試験を、送信中の一時退避も含めた今の判定に合わせ、部品の層の地図の数字を実測に合わせました。',
     ])
   })
 ]);

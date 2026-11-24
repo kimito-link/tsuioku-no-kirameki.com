@@ -26,7 +26,8 @@ import {
  *   count: number,
  *   avatarUrl?: string,
  *   rankHint?: number|null,
- *   hideIdLine?: boolean
+ *   hideIdLine?: boolean,
+ *   isBroadcaster?: boolean
  * }} TopSupportRankRoom
  */
 
@@ -43,7 +44,8 @@ import {
  *   idTitle: string,
  *   idShort: string,
  *   nameLine: string,
- *   fullLabelForTitle: string
+ *   fullLabelForTitle: string,
+ *   isBroadcaster?: boolean
  * }} TopSupportRankLineModel
  */
 
@@ -125,7 +127,7 @@ function shortDeterministicHash(s) {
  * @param {string} userKey
  * @returns {string} data:image/svg+xml URL
  */
-function officialDomRankBadgeThumb(placeNumber, userKey) {
+export function officialDomRankBadgeThumb(placeNumber, userKey) {
   const n =
     typeof placeNumber === 'number' &&
     Number.isFinite(placeNumber) &&
@@ -341,7 +343,8 @@ export function topSupportRankLineModels(stripRooms, opts) {
       idTitle,
       idShort,
       nameLine,
-      fullLabelForTitle
+      fullLabelForTitle,
+      ...(r?.isBroadcaster ? { isBroadcaster: true } : {})
     };
   });
 }

@@ -1,6 +1,9 @@
 /** @vitest-environment happy-dom */
 import { describe, it, expect } from 'vitest';
 import { renderTopSupportRankStripInto } from './paintTopSupportRankStyleIntoElement.js';
+import { officialDomRankBadgeThumb } from './topSupportRankStripLines.js';
+import { anonymousIdenticonDataUrl } from './anonymousIdenticon.js';
+import { resetBroadcasterAvatarMemoryForTests } from './broadcasterAvatarDisplay.js';
 
 /**
  * ★churn 根治(v0.1.1038)の回帰防止。
@@ -88,5 +91,45 @@ describe('renderTopSupportRankStripInto — churn 根治(freshness を diff-skip
     const fresh = el.querySelector('.nl-top-support-rank__freshness');
     expect(fresh?.querySelector('img')).toBeNull(); // HTML 化されない
     expect(fresh?.textContent).toBe('🕒 <img src=x onerror=alert(1)>');
+  });
+});
+
+describe('renderTopSupportRankStripInto — 配信者はゆっくり顔を出さない', () => {
+  it('プローブ未完了でもイベント配信者タイルの src は identicon ではなく未取得バッジ', () => {
+    resetBroadcasterAvatarMemoryForTests();
+    const el = document.createElement('div');
+    const identicon = anonymousIdenticonDataUrl('12345678', 64);
+    const usericon = 'https://secure-dcdn.cdn.nimg.jp/nicoaccount/usericon/123/12345678.jpg';
+    renderTopSupportRankStripInto(
+      el,
+      [
+        {
+          userKey: '12345678',
+          nickname: 'ミュート',
+          count: 100,
+          avatarUrl: usericon,
+          rankHint: 1,
+          isBroadcaster: true
+        }
+      ],
+      {
+        noteText: '公式ランキング上位10名（リアルタイム）',
+        unitSuffix: '💎',
+        ariaLabel: 'イベントランキング',
+        defaultThumbSrc: 'yukkuri.png',
+        anonymousFallbackThumbSrc: 'blank.png',
+        avatarLoadGuard: {
+          pickDisplaySrc: () => identicon,
+          noteRemoteAttempt: () => {}
+        }
+      }
+    );
+    const img = el.querySelector('img.nl-top-support-rank__thumb');
+    expect(img).toBeTruthy();
+    const src = img.getAttribute('src') || '';
+    expect(src).toBe(officialDomRankBadgeThumb(1, '12345678'));
+    expect(src).not.toBe(identicon);
+    expect(src).not.toContain('yukkuri');
+    expect(decodeURIComponent(src)).toContain('未取得');
   });
 });
