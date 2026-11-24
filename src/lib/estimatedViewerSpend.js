@@ -17,12 +17,16 @@
  *     (a) 公式アイテムチケット1枚の円（お茶爆50=500円 / お茶爆100=1,000円 / お茶爆300=3,000円 / お茶爆500=5,000円 / 極茶爆1000=10,000円）→「チケット基準の推定」
  *     (b) 公式確認済み消費pt（お茶爆50=500pt / お茶爆100=1,000pt。1pt≠1円のため pt 表記を残す）→「推定（視聴者の消費）」
  *     (c) 表にない有料アイテムは金額・ptに足さず「ほか n件は金額不明」と件数のみ表示
+ *   - ミクチャ（mixch）:
+ *     (a) ギフトの消費コイン × 1.2円（Web クレカ/Paidy 最小パック 400コイン＝480円・税込、2026-11-24 確認）→「推定（視聴者の消費）」
+ *     (b) コイン数が不明なギフトは円換算せず「ほか n件は金額不明」と件数のみ表示
+ *     ※ VIP の銀行振込・LINE Pay は別価格であり、キャンペーンの無料コインは含めない。
  *
  * ■対象外（確認できない値段は作らない・配信者の取り分を支払額と混同しない）:
  *   - ニコニ広告 pt、無料ポイント／無料ギフト、ツイキャスの無料お茶・応援アイテム・お団子スコア
  *   - Twitch Bits（1 Bit = 1セントは配信者の取り分であり、視聴者の購入支払額ではないため除外）
  *   - Kick Kicks（投げ銭単価が公式未確定のため除外）
- *   - SHOWROOM / ミクチャ / TikTok / ふわっち / ABEMA のギフト・アイテム等（今回は対象外）
+ *   - SHOWROOM / TikTok / ふわっち / ABEMA のギフト・アイテム等（今回は対象外）
  *
  * - ytGiftToNico.js の固定為替は使わない。
  * - 配信者の手取り・分配率・控除額は一切算出・表示しない。
@@ -102,6 +106,17 @@ export const ESTIMATED_VIEWER_SPEND_RATES = Object.freeze({
     sourceName: 'ツイキャス公式ヘルプ（特別収益対象アイテム消費ポイント）',
     sourceUrl: 'https://twitcasting.tv/helpcenter.php?pid=ANNOUNCE_JA_20250715',
     note: '公式で消費ptを確認できたアイテム（お茶爆50=500pt・お茶爆100=1,000pt、2026-11-24確認）のみ合算。1pt=1円ではないため円換算せずptで表示します。お団子スコアや無料のお茶・応援アイテムは含めません。'
+  }),
+  // 出典: https://mixch.tv/charge/coin?paidy （Web クレカ/Paidy 最小パック 400コイン＝480円・税込 → 1コイン＝1.2円、2026-11-24 確認）
+  // ※ VIP の銀行振込・LINE Pay は別価格であること、キャンペーンの無料コインは含めないこと。
+  mixchCoin: Object.freeze({
+    jpyPerCoin: 1.2, // Web クレカ/Paidy 最小パック 400コイン＝480円（税込）→ 1コイン＝1.2円
+    packCoins: 400,
+    packJpy: 480,
+    asOf: '2026-11-24',
+    sourceName: 'ミクチャ公式 Web チャージ（クレカ/Paidy 最小パック 400コイン=480円・税込）',
+    sourceUrl: 'https://mixch.tv/charge/coin?paidy',
+    note: 'Web クレカ/Paidy 最小パック（400コイン=480円・税込、1コイン=1.2円、2026-11-24確認）による視聴者の消費推定です。VIPの銀行振込や別決済・大口パック・キャンペーンの無償コイン等により実際の支払と異なる場合があります。配信者の受取額ではありません。'
   }),
   // 出典: https://www.ecb.europa.eu/stats/policy_and_exchange_rates/euro_reference_exchange_rates/html/index.en.html （2026-11-20 確定値）
   fx: Object.freeze({
@@ -198,10 +213,11 @@ export function normalizeTwitchSubTier(rawTier) {
 
 /**
  * @typedef {{
- *   platform: 'niconico' | 'youtube' | 'kick' | 'twitch' | 'twitcasting',
+ *   platform: 'niconico' | 'youtube' | 'kick' | 'twitch' | 'twitcasting' | 'mixch',
  *   jpy: number,
  *   ticketJpy?: number,
  *   points?: number,
+ *   coins?: number,
  *   usd?: number,
  *   hasFxConversion: boolean,
  *   asOf: string,
@@ -560,6 +576,87 @@ export function estimateTwitcastingSpendFromComments(comments) {
 }
 
 /**
+ * ミクチャの1行を累積オブジェクトへ加算する（純関数）。
+ * - コイン数が判明しているギフト（currency='MXCOIN' またはギフト行で amount > 0）は coins へ合算。
+ * - コイン数が分からないギフト（amount <= 0 かつ giftName あり、または kind='superchat'|'gift' / currency='MXCOIN'）は
+ *   円換算せず unknownGiftCount に件数のみ加算。
+ * - 通常コメント（kind='text' かつ giftName 無し）やファン登録（kind='mx_fan'）は含めない。
+ * @param {{ coins: number, giftCount: number, unknownGiftCount: number }} acc
+ * @param {Record<string, unknown>|null|undefined} row
+ */
+export function accumulateMixchGiftItem(acc, row) {
+  if (!acc || !row || typeof row !== 'object') return;
+  const kind = String(row.ytKind ?? row.kind ?? '').trim().toLowerCase();
+  if (kind === 'mx_fan' || kind === 'follow' || kind === 'membership' || kind === 'membership_gift' || kind === 'tw_raid') {
+    return;
+  }
+  const cur = String(row.ytCurrency ?? row.currency ?? '').trim().toUpperCase();
+  if (cur && cur !== 'MXCOIN') return;
+  const rawCount = Number(row.ytGiftCount ?? row.giftCount);
+  const count = Number.isFinite(rawCount) && rawCount > 0 ? Math.floor(rawCount) : 1;
+  const rawAmount = Number(row.ytAmount ?? row.amount);
+  const hasGiftMarker =
+    cur === 'MXCOIN' ||
+    kind === 'superchat' ||
+    kind === 'gift' ||
+    Boolean(String(row.ytGiftName ?? row.giftName ?? '').trim());
+  if (!hasGiftMarker) return;
+  if (Number.isFinite(rawAmount) && rawAmount > 0) {
+    acc.coins += Math.floor(rawAmount);
+    acc.giftCount += count;
+  } else {
+    acc.unknownGiftCount += count;
+  }
+}
+
+/**
+ * ミクチャの累積結果から視聴者の推定消費（1コイン=1.2円）と未知ギフト件数を算出する。
+ * VIP の銀行振込・LINE Pay は別価格であり、キャンペーンの無料コインは含めない。
+ * @param {{ coins?: unknown, giftCount?: unknown, unknownGiftCount?: unknown }|null|undefined} summary
+ * @returns {EstimatedViewerSpendResult|null}
+ */
+export function estimateMixchCoinSpendJpy(summary) {
+  if (!summary || typeof summary !== 'object') return null;
+  const coins = Math.max(0, Math.floor(Number(summary.coins) || 0));
+  const unknownPaidCount = Math.max(0, Math.floor(Number(summary.unknownGiftCount) || 0));
+  if (coins <= 0 && unknownPaidCount <= 0) return null;
+  const cfg = ESTIMATED_VIEWER_SPEND_RATES.mixchCoin;
+  const jpy = coins > 0 ? Math.round(coins * cfg.jpyPerCoin) : 0;
+  if (jpy <= 0 && unknownPaidCount <= 0) return null;
+  return {
+    platform: 'mixch',
+    jpy,
+    coins,
+    hasFxConversion: false,
+    asOf: cfg.asOf,
+    sourceName: cfg.sourceName,
+    sourceUrl: cfg.sourceUrl,
+    unconverted: [],
+    unknownPaidCount
+  };
+}
+
+/**
+ * ミクチャのコメント配列からギフトコイン数・未知ギフト件数を集計して推定消費を算出する。
+ * @param {readonly unknown[]} comments
+ * @returns {EstimatedViewerSpendResult|null}
+ */
+export function estimateMixchSpendFromComments(comments) {
+  if (!Array.isArray(comments) || !comments.length) return null;
+  const acc = { coins: 0, giftCount: 0, unknownGiftCount: 0 };
+  for (const row of comments) {
+    if (!row || typeof row !== 'object') continue;
+    const rec = /** @type {Record<string, unknown>} */ (row);
+    const plat = String(rec.ytPlatform || rec.platform || '').trim().toLowerCase();
+    if (plat && plat !== 'mixch') continue;
+    const ch = String(rec.channelId || '').trim();
+    if (ch && /^(?:tc|tw|kk|sr|tt|ww|ab):/i.test(ch)) continue;
+    accumulateMixchGiftItem(acc, rec);
+  }
+  return estimateMixchCoinSpendJpy(acc);
+}
+
+/**
  * 会場・横欄・マーケレポート共通の表示アイテム配列を生成する。
  * - ツイキャスは「チケット基準の推定」（円・5種＋未知件数）と「推定（視聴者の消費）」（お茶爆50/100 pt）の最大2件を返す。
  * - 他サービスは1件を返す。配信者の手取りは一切表示しない。
@@ -620,6 +717,36 @@ export function formatEstimatedViewerSpendDisplays(est) {
     }
 
     return items;
+  }
+
+  if (est.platform === 'mixch') {
+    const jpy = Math.max(0, Math.round(Number(est.jpy) || 0));
+    const coins = Math.max(0, Math.floor(Number(est.coins) || 0));
+    const unk = Math.max(0, Math.floor(Number(est.unknownPaidCount) || 0));
+    if (jpy <= 0 && unk <= 0) return [];
+    const cfg = ESTIMATED_VIEWER_SPEND_RATES.mixchCoin;
+    const unkPhrase = unk > 0 ? `ほか ${unk.toLocaleString('ja-JP')}件は金額不明` : '';
+    const unkSentence = unk > 0 ? `コイン数不明のギフト（${unkPhrase}）は円換算していません。` : '';
+    const coinDetail = coins > 0 ? `記録ギフト計 ${coins.toLocaleString('ja-JP')}コイン × ` : '';
+    const text =
+      jpy > 0 && unk > 0
+        ? `約¥${jpy.toLocaleString('ja-JP')}（${unkPhrase}）`
+        : jpy > 0
+          ? `約¥${jpy.toLocaleString('ja-JP')}`
+          : unkPhrase;
+    // ※ VIP の銀行振込・LINE Pay は別価格であり、キャンペーンの無料コインは含めない（画面文言には禁止語を含めない）
+    const note = `ミクチャ Web クレカ/Paidy 最小パック（400コイン=480円・税込、${coinDetail}1コイン=1.2円、${cfg.asOf}確認）による視聴者の消費推定です。${unkSentence}VIPの銀行振込や別決済・大口パック・キャンペーンの無償コイン等により実際の支払と異なる場合があります。配信者の受取額ではありません。`;
+    return [
+      {
+        key: 'estimatedViewerSpend',
+        label: ESTIMATED_VIEWER_CONSUMPTION_LABEL,
+        text,
+        title: note,
+        note,
+        sourceUrl: cfg.sourceUrl,
+        asOf: cfg.asOf
+      }
+    ];
   }
 
   if (!(est.jpy > 0)) return [];

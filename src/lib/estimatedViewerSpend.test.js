@@ -16,6 +16,8 @@ import {
   estimateTwitchSpendFromComments,
   estimateTwitcastingConsumptionPt,
   estimateTwitcastingSpendFromComments,
+  estimateMixchCoinSpendJpy,
+  estimateMixchSpendFromComments,
   formatEstimatedViewerSpendDisplay,
   formatEstimatedViewerSpendDisplays
 } from './estimatedViewerSpend.js';
@@ -26,6 +28,8 @@ import { buildMarketingDashboardHtml } from './marketingChartsHtml.js';
 import { parseKickEvent } from './kick/kickChatParse.js';
 import { parseTwChatLine } from './twitch/twIrcParse.js';
 import { parseTcEvent } from './twitcasting/tcParse.js';
+import { parseMxMessage } from './mixch/mxParse.js';
+import { exportCommentsFromStoredRows } from './youtube/exportStoredComments.js';
 
 const ROOT = resolve(process.cwd());
 
@@ -48,6 +52,11 @@ describe('estimatedViewerSpend (L0 単価・日付付き為替・純粋計算)',
     );
     expect(ESTIMATED_VIEWER_SPEND_RATES.twitcastingItemPt.asOf).toBe('2026-11-24');
     expect(ESTIMATED_VIEWER_SPEND_RATES.twitcastingItemPt.sourceUrl).toContain('ANNOUNCE_JA_20250715');
+    expect(ESTIMATED_VIEWER_SPEND_RATES.mixchCoin.jpyPerCoin).toBe(1.2);
+    expect(ESTIMATED_VIEWER_SPEND_RATES.mixchCoin.packCoins).toBe(400);
+    expect(ESTIMATED_VIEWER_SPEND_RATES.mixchCoin.packJpy).toBe(480);
+    expect(ESTIMATED_VIEWER_SPEND_RATES.mixchCoin.asOf).toBe('2026-11-24');
+    expect(ESTIMATED_VIEWER_SPEND_RATES.mixchCoin.sourceUrl).toBe('https://mixch.tv/charge/coin?paidy');
     expect(ESTIMATED_VIEWER_SPEND_RATES.fx.asOf).toMatch(/^\d{4}-\d{2}-\d{2}$/);
     expect(ESTIMATED_VIEWER_SPEND_RATES.fx.sourceUrl).toMatch(/^https:\/\//);
     expect(ESTIMATED_VIEWER_SPEND_RATES.fx.feedUrl).toMatch(/^https:\/\//);
@@ -55,6 +64,8 @@ describe('estimatedViewerSpend (L0 単価・日付付き為替・純粋計算)',
     const src = readFileSync(resolve(ROOT, 'src/lib/estimatedViewerSpend.js'), 'utf8');
     expect(src).not.toContain("from './youtube/ytGiftToNico");
     expect(src).not.toContain('ytAmountToPoints');
+    expect(src).toContain('VIP の銀行振込・LINE Pay は別価格');
+    expect(src).toContain('キャンペーンの無料コインは含めない');
   });
 
   it('ニコ生有料ギフトptを 1pt=1円 で推定し、0/未取得は null', () => {
@@ -273,7 +284,80 @@ describe('estimatedViewerSpend (L0 単価・日付付き為替・純粋計算)',
     expect(estimateTwitcastingConsumptionPt({ ticketJpy: 0, confirmedPt: 0, unknownPaidCount: 0 })).toBeNull();
   });
 
-  it('会場と横欄のチップは対象5サービス（該当イベントあり時）のみに出し、Bits/Kicks単体や対象外サービスには出さない', () => {
+  it('ミクチャ（mixch）: 400コイン → 480円（推定（視聴者の消費）約¥480）、未知のギフトは件数のみ、通常コメント・ファン登録は含めない', async () => {
+    const items = new Map([
+      ['501', { price: 200, resourceId: 1, imageUrl: '' }]
+    ]);
+    // 200コイン × 2個 = 400コイン → 480円
+    const knownGift = parseMxMessage(
+      { kind: 42, message_id: 'm-known', user_id: 13, name: 'ギフトさん', item_id: 501, count: 2, created: 1000 },
+      { userId: '999', items, nowMs: 1_000_000 }
+    );
+    // items 一覧にも item_price にも無い未知ギフト → amount=0, kind='text', giftName='ギフト'
+    const unknownGift = parseMxMessage(
+      { kind: 45, message_id: 'm-unk', user_id: 14, name: 'ふしぎ', item_id: 9999, count: 1, created: 1001 },
+      { userId: '999', items, nowMs: 1_001_000 }
+    );
+    const textComment = parseMxMessage(
+      { kind: 0, message_id: 'm-txt', user_id: 15, name: 'リスナー', body: 'わこつ', created: 1002 },
+      { userId: '999', items, nowMs: 1_002_000 }
+    );
+    const fanFollow = parseMxMessage(
+      { kind: 62, message_id: 'm-fan', user_id: 16, name: 'ファン', body: 'ファンになりました', created: 1003 },
+      { userId: '999', items, nowMs: 1_003_000 }
+    );
+
+    // 1) 400コイン → 480円
+    const est400 = estimateMixchSpendFromComments([knownGift, textComment, fanFollow]);
+    expect(est400).not.toBeNull();
+    expect(est400?.platform).toBe('mixch');
+    expect(est400?.coins).toBe(400);
+    expect(est400?.jpy).toBe(480);
+    expect(est400?.unknownPaidCount).toBe(0);
+
+    const disp400 = formatEstimatedViewerSpendDisplay(est400);
+    expect(disp400?.label).toBe('推定（視聴者の消費）');
+    expect(disp400?.text).toBe('約¥480');
+    expect(disp400?.sourceUrl).toBe('https://mixch.tv/charge/coin?paidy');
+    expect(disp400?.asOf).toBe('2026-11-24');
+    // 禁止語チェック（紹介・有料・LINE・サポーター・手取りをUI文言に入れない）
+    for (const field of [disp400?.label, disp400?.text, disp400?.title, disp400?.note]) {
+      expect(field).not.toMatch(/紹介|有料|LINE|サポーター|手取り/);
+    }
+
+    // 2) 未知のギフトのみ → 円換算せず件数のみ
+    const estUnkOnly = estimateMixchSpendFromComments([unknownGift, textComment, fanFollow]);
+    expect(estUnkOnly?.coins).toBe(0);
+    expect(estUnkOnly?.jpy).toBe(0);
+    expect(estUnkOnly?.unknownPaidCount).toBe(1);
+    const dispUnkOnly = formatEstimatedViewerSpendDisplay(estUnkOnly);
+    expect(dispUnkOnly?.label).toBe('推定（視聴者の消費）');
+    expect(dispUnkOnly?.text).toBe('ほか 1件は金額不明');
+    expect(dispUnkOnly?.note).not.toMatch(/紹介|有料|LINE|サポーター|手取り/);
+
+    // 3) 400コイン + 未知ギフト混在（exportStoredComments 経由でも同じ結果）
+    const exported = await exportCommentsFromStoredRows(
+      [
+        { ...knownGift, recordedAt: 1_000_000 },
+        { ...unknownGift, recordedAt: 1_001_000 },
+        { ...textComment, recordedAt: 1_002_000 },
+        { ...fanFollow, recordedAt: 1_003_000 }
+      ],
+      'lv900000000088',
+      async () => {}
+    );
+    const estMixed = estimateMixchSpendFromComments(exported);
+    expect(estMixed?.coins).toBe(400);
+    expect(estMixed?.jpy).toBe(480);
+    expect(estMixed?.unknownPaidCount).toBe(1);
+    expect(formatEstimatedViewerSpendDisplay(estMixed)?.text).toBe('約¥480（ほか 1件は金額不明）');
+
+    // 4) 通常コメント・ファン登録のみ → null
+    expect(estimateMixchSpendFromComments([textComment, fanFollow])).toBeNull();
+    expect(estimateMixchCoinSpendJpy({ coins: 0, unknownGiftCount: 0 })).toBeNull();
+  });
+
+  it('会場と横欄のチップは対象6サービス（該当イベントあり時）のみに出し、Bits/Kicks単体や対象外サービスには出さない', () => {
     const ytSupport = tallySupportItems([
       { kind: 'superchat', amount: 1000, currency: 'JPY', recordedAt: 1000 },
       { kind: 'sticker', amount: 5, currency: 'USD', recordedAt: 2000 }
@@ -312,7 +396,28 @@ describe('estimatedViewerSpend (L0 単価・日付付き為替・純粋計算)',
     expect(tcVenue?.find((i) => i.key === 'estimatedViewerSpend')?.text).toBe('約¥6,000');
     expect(tcVenue?.find((i) => i.key === 'estimatedViewerConsumption')?.text).toBe('約1,000pt');
 
-    for (const excluded of ['showroom', 'mixch', 'tiktok', 'whowatch', 'abema']) {
+    // ミクチャ: 400コイン + 未知ギフト1件 → 推定（視聴者の消費）約¥480（ほか 1件は金額不明）が横欄・会場に出る
+    const mxSupport = tallySupportItems([
+      { kind: 'superchat', channelId: 'mx:13', currency: 'MXCOIN', amount: 400, giftName: 'ギフト' },
+      { kind: 'text', channelId: 'mx:14', currency: '', amount: 0, giftName: 'ギフト' }
+    ]);
+    const mxChips = panelExtraChips('mixch', { support: mxSupport });
+    expect(mxChips.find((c) => c.key === 'estimatedViewerSpend')).toMatchObject({
+      label: '推定（視聴者の消費）',
+      text: '約¥480（ほか 1件は金額不明）'
+    });
+    const mxVenue = venueItemsForPlatform('mixch', {
+      records: { text: '4', isPlaceholder: false },
+      concurrent: { text: '30', isPlaceholder: false },
+      streamAge: { text: '12分', isPlaceholder: false },
+      facts: { viewers: 30, support: mxSupport }
+    });
+    expect(mxVenue?.find((i) => i.key === 'estimatedViewerSpend')).toMatchObject({
+      label: '推定（視聴者の消費）',
+      text: '約¥480（ほか 1件は金額不明）'
+    });
+
+    for (const excluded of ['showroom', 'tiktok', 'whowatch', 'abema']) {
       const sup = tallySupportItems([{ kind: 'superchat', amount: 1000, currency: 'SRPT' }]);
       expect(panelExtraChips(excluded, { support: sup }).some((c) => c.key === 'estimatedViewerSpend')).toBe(false);
     }
@@ -339,7 +444,7 @@ describe('estimatedViewerSpend (L0 単価・日付付き為替・純粋計算)',
     expect(nicoWithGift.items.find((i) => i.key === 'estimatedViewerSpend')?.text).toBe('約¥1,200');
   });
 
-  it('マーケレポート HTML にニコ生・YouTube・Kick・Twitch・ツイキャス（チケット基準円＋消費pt）を出し、対象外には出さない', () => {
+  it('マーケレポート HTML にニコ生・YouTube・Kick・Twitch・ツイキャス・ミクチャを出し、対象外には出さない', () => {
     const tcComments = [
       { id: 'tc1', liveId: 'lv900000000012', text: 'お茶爆100', userId: 'u1', nickname: 'a', capturedAt: 1_700_000_000_000, ytPlatform: 'twitcasting', ytKind: 'superchat', ytCurrency: 'TCSCORE', ytGiftName: 'お茶爆100', badges: ['paid'] },
       { id: 'tc2', liveId: 'lv900000000012', text: '極茶爆1000', userId: 'u2', nickname: 'b', capturedAt: 1_700_000_000_000, ytPlatform: 'twitcasting', ytKind: 'superchat', ytCurrency: 'TCSCORE', ytGiftName: '極茶爆1000', badges: ['paid'] }
@@ -355,5 +460,18 @@ describe('estimatedViewerSpend (L0 単価・日付付き為替・純粋計算)',
     expect(tcHtml).toContain('推定（視聴者の消費）');
     expect(tcHtml).toContain('約1,000pt');
     expect(tcHtml).not.toContain('手取り');
+
+    const mxComments = [
+      { id: 'mx1', liveId: 'lv900000000088', text: 'ギフト', userId: '8000000013', nickname: 'a', capturedAt: 1_700_000_000_000, ytPlatform: 'mixch', ytKind: 'superchat', ytAmount: 400, ytCurrency: 'MXCOIN', ytGiftName: 'ギフト' },
+      { id: 'mx2', liveId: 'lv900000000088', text: 'ギフト', userId: '8000000014', nickname: 'b', capturedAt: 1_700_000_001_000, ytPlatform: 'mixch', ytKind: 'text', ytAmount: 0, ytCurrency: '', ytGiftName: 'ギフト' }
+    ];
+    const mxHtml = buildMarketingDashboardHtml(aggregateMarketingReport(mxComments, 'lv900000000088'), {
+      platform: 'mixch',
+      commentsForAnalytics: mxComments
+    });
+    expect(mxHtml).toContain('推定（視聴者の消費）');
+    expect(mxHtml).toContain('約¥480（ほか 1件は金額不明）');
+    expect(mxHtml).toContain('https://mixch.tv/charge/coin?paidy');
+    expect(mxHtml).not.toContain('手取り');
   });
 });

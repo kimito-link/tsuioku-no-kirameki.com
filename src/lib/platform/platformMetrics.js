@@ -17,6 +17,8 @@ import {
   estimateTwitchSubSpendJpy,
   estimateTwitcastingConsumptionPt,
   accumulateTwitcastingGiftItem,
+  estimateMixchCoinSpendJpy,
+  accumulateMixchGiftItem,
   normalizeTwitchSubTier,
   formatEstimatedViewerSpendDisplay,
   formatEstimatedViewerSpendDisplays
@@ -527,6 +529,7 @@ export function tallySupportItems(items) {
   const amounts = {};
   const subTierCounts = { tier1: 0, tier2: 0, tier3: 0, prime: 0 };
   const tcConsumption = { ticketJpy: 0, ticketCount: 0, confirmedPt: 0, confirmedCount: 0, unknownPaidCount: 0 };
+  const mxConsumption = { coins: 0, giftCount: 0, unknownGiftCount: 0 };
   const t = {
     ready: true,
     superchatCount: 0,
@@ -540,6 +543,7 @@ export function tallySupportItems(items) {
     amounts,
     subTierCounts,
     tcConsumption,
+    mxConsumption,
   };
   if (!Array.isArray(items)) return t;
   /** @param {unknown} rawTier @param {number} n */
@@ -568,6 +572,18 @@ export function tallySupportItems(items) {
       String(rec.ytPlatform || '').toLowerCase() === 'twitcasting'
     ) {
       accumulateTwitcastingGiftItem(tcConsumption, rec);
+    }
+    const recPlat = String(rec.ytPlatform || rec.platform || '').trim().toLowerCase();
+    const recCh = String(rec.channelId || '').trim();
+    const isOtherServiceRow =
+      (recPlat && recPlat !== 'mixch') ||
+      (recCh && /^(?:tc|tw|kk|sr|tt|ww|ab):/i.test(recCh)) ||
+      (currency && currency !== 'MXCOIN');
+    if (
+      !isOtherServiceRow &&
+      (currency === 'MXCOIN' || recCh.startsWith('mx:') || recPlat === 'mixch' || Boolean(rec.giftName || rec.ytGiftName))
+    ) {
+      accumulateMixchGiftItem(mxConsumption, rec);
     }
     if (kind === 'superchat') t.superchatCount += 1;
     else if (kind === 'sticker') t.stickerCount += 1;
@@ -845,6 +861,10 @@ function supportChips(id, support) {
   }
   if (id === 'twitcasting') {
     const disps = formatEstimatedViewerSpendDisplays(estimateTwitcastingConsumptionPt(support.tcConsumption));
+    return disps.map((d) => chip(d.key, d.label, d.text, '', d.title));
+  }
+  if (id === 'mixch') {
+    const disps = formatEstimatedViewerSpendDisplays(estimateMixchCoinSpendJpy(support.mxConsumption));
     return disps.map((d) => chip(d.key, d.label, d.text, '', d.title));
   }
   return [];
