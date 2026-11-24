@@ -1238,7 +1238,7 @@
   - `src/extension/live-ranking-entry.js`
   - `tsuioku-no-kirameki/live/index.html`
   - `.github/workflows/live-ranking.yml`
-<details><summary>🗂 このカテゴリの全担当ファイル(自動分類) 363</summary>
+<details><summary>🗂 このカテゴリの全担当ファイル(自動分類) 364</summary>
 
 - `app/app.js` — スマホ閲覧用 status Web 版。
 - `app/live-view-block.js` — iPhone アプリの「🚩 見たくない人を隠す・報告する」(App Store の審査 1.2: ほかの人の書き込みを見せるアプリの決まり)。
@@ -1348,6 +1348,7 @@
 - `scripts/stage-youtube-submission.mjs` — YouTube Live 版 Chrome ウェブストア提出用 ZIP ステージングスクリプト
 - `scripts/sync-lp-twitter-icon.mjs` — LP 右端コラボ用: src/images/icon/twitter-icon.png → extension/images/lp/twitter-icon.png
 - `scripts/vendor-visual-explainer.mjs` — Vendors nicobailon/visual-explainer (MIT) into .cursor/skills/visual-explainer/
+- `scripts/vercel-ignore-build.mjs` — 役割: Vercel の「Ignored Build Step」(vercel.json の ignoreCommand)から呼ばれ、ビルドが要るかを決める。
 - `scripts/write-extension-placeholder-icons.mjs` — リポジトリに 256px アイコンしか無い環境向け: manifest 用の小さめ PNG を生成する。
 - `scripts/youtube-build.mjs` — YouTube 版の束ね方(esbuild の書き換えと入口の一覧)。2 か所から使う:
 - `src/build-globals.d.ts` — ビルド時に esbuild の `define` で注入される定数の型宣言。
@@ -1610,7 +1611,8 @@
 
 > changelog 全 20 版を「バグ系統」で束ねた枝。同系統をまた触るとき、過去の修正と「なぜ毎回触るか」を辿る(再発防止)。新しい順。
 
-### 💾 記録件数 (5版)
+### 💾 記録件数 (6版)
+- `v0.1.2206` 2026-11-24 — 推定（視聴者の消費）の対象をTikTok LIVEへ拡大
 - `v0.1.2205` 2026-11-24 — 推定（視聴者の消費）の対象をミクチャへ拡大
 - `v0.1.2203` 2026-11-24 — 推定購入額・消費をKick/Twitch/ツイキャスへ拡大
 - `v0.1.2202` 2026-11-24 — ニコ生会場の推定同時接続と記録件数の表示ずれを修正
@@ -1618,6 +1620,7 @@
 - `v0.1.2193` 2026-11-23 — 裏タブ中に届いたコメントを復帰時に直近3件と件数告知で読み上げ
 
 ### 🏟 会場・席 (12版)
+- `v0.1.2206` 2026-11-24 — 推定（視聴者の消費）の対象をTikTok LIVEへ拡大
 - `v0.1.2205` 2026-11-24 — 推定（視聴者の消費）の対象をミクチャへ拡大
 - `v0.1.2203` 2026-11-24 — 推定購入額・消費をKick/Twitch/ツイキャスへ拡大
 - `v0.1.2202` 2026-11-24 — ニコ生会場の推定同時接続と記録件数の表示ずれを修正
@@ -1629,12 +1632,12 @@
 - `v0.1.2188` 2026-11-23 — 会場の本体ファイルを行数の上限内に収める
 - `v0.1.2187` 2026-11-23 — 会場の Esc と部品の層の地図を今の実装に合わせる
 - `v0.1.2186` 2026-11-23 — ミクチャの公式コメント欄を、小さい画面でも見つけられるように
-- `v0.1.2185` 2026-11-23 — ミクチャでコメントを送っても、会場が閉じないようにする
 
 ### 🎈 吹き出し (1版)
 - `v0.1.2199` 2026-11-23 — 全サービスへ孤児タブ自動復帰・診断間引き・会場負荷抑制を横展開
 
-### 🎁 ギフト (4版)
+### 🎁 ギフト (5版)
+- `v0.1.2206` 2026-11-24 — 推定（視聴者の消費）の対象をTikTok LIVEへ拡大
 - `v0.1.2205` 2026-11-24 — 推定（視聴者の消費）の対象をミクチャへ拡大
 - `v0.1.2204` 2026-11-24 — ツイキャスのチケット基準円推定とTwitch出典裏取りを追加
 - `v0.1.2203` 2026-11-24 — 推定購入額・消費をKick/Twitch/ツイキャスへ拡大
