@@ -698,6 +698,11 @@ import { formatLaneCountOrderLine, makeLaneCountOrderState, orderLaneCandidatesB
 import { storyUserLaneMetaLines } from '../lib/storyUserLaneMeta.js';
 import { anonymousIdenticonDataUrl } from '../lib/anonymousIdenticon.js';
 import { identiconFallbackForAvatarUrl } from '../lib/avatarFallbackFromUrl.js';
+import {
+  bindCasterThumbElement,
+  bindNeutralAvatarError,
+  casterThumbImgHtml
+} from './popup/broadcasterCasterThumb.js';
 import { cachedAnonymousFace, getAvatarComposeStats, hydrateRecentAnonymousFaces, isAnonymousFaceShown, upgradeAnonymousAvatarImage, upgradeAnonymousAvatarImageFromFallback, upgradeAnonymousAvatarImages } from '../lib/avatarPartsComposer.js';
 import { noteHtmlWrittenElsewhere, removeAttrIfPresent, removeStylePropIfSet, setAttrFromSourceIfChanged, setAttrIfChanged, setClassFlag, setInnerHtmlIfChanged } from '../lib/domWriteIfChanged.js';
 import { buildHtmlReportDownloadFilename } from '../lib/exportDownloadFilename.js';
@@ -9834,11 +9839,9 @@ function renderWatchMetaCard(rawSnapshot, commentEntries = []) {
       casterFollow.textContent = followTarget.followLabel;
     }
     if (casterIcon) {
-      const face = anonymousIdenticonDataUrl(followTarget.name || '配信', 64);
-      casterIcon.src = followTarget.iconUrl || face;
+      bindCasterThumbElement(casterIcon, followTarget);
       casterIcon.alt = followTarget.name;
       casterIcon.style.display = '';
-      casterIcon.onerror = () => { const next = identiconFallbackForAvatarUrl(casterIcon.src) || face; if (next && casterIcon.src !== next) casterIcon.src = next; };
     }
     casterBanner.hidden = false;
   } else if (casterBanner) {
@@ -10046,25 +10049,22 @@ function renderRoomHeatSummary(totalRecent, activeUsers, heatPercent, heatText) 
 }
 
 /**
- * 配信者タイル（10 位の右に並ぶ「運営者アイコン + 名前 + フォロー」）の HTML を返す。
- * データが揃っていない（未取得・非公式ページ等）ときは空文字。
- * @returns {string}
- */
-/**
  * innerHTML の img はインライン onerror が CSP で動かないので、流し込み後に失敗を拾う。
  * 失敗が先に済んでいても、白い既定アイコンのまま残さない。
  * @param {ParentNode | null | undefined} root
  */
 function bindOnErrorHandlersWithin(root) {
   if (!root || typeof root.querySelectorAll !== 'function') return;
-  const imgs = root.querySelectorAll('img[data-on-error-hide="1"], img[data-on-error-fallback="blank"], img[data-on-error-fallback="face"]');
+  const imgs = root.querySelectorAll('img[data-on-error-hide="1"], img[data-on-error-fallback="blank"], img[data-on-error-fallback="face"], img[data-on-error-fallback="neutral"]');
   imgs.forEach((node) => {
     if (!(node instanceof HTMLImageElement)) return;
     // 二重バインド防止（再描画でも一度だけ）
     if (node.dataset.nlOnErrorBound === '1') return;
     node.dataset.nlOnErrorBound = '1';
 
-    if (node.dataset.onErrorFallback === 'face') {
+    if (node.dataset.onErrorFallback === 'neutral') {
+      bindNeutralAvatarError(node);
+    } else if (node.dataset.onErrorFallback === 'face') {
       const applyFace = () => {
         try {
           const face = identiconFallbackForAvatarUrl(node.currentSrc || node.src) || anonymousIdenticonDataUrl(node.dataset.fallbackName || '配信', 64);
@@ -10100,9 +10100,7 @@ function topSupportRankStripCasterTileHtml() {
     target.kind === 'channel'
       ? `配信者 ${nameWithLv}（クリックでチャンネルページ）`
       : `配信者 ${nameWithLv}（クリックでユーザーページ）`;
-  const face = anonymousIdenticonDataUrl(target.name || '配信', 64);
-  const iconHtml =
-    `<img class="nl-top-support-rank__caster-thumb" src="${escapeAttr(target.iconUrl || face)}" alt="" decoding="async" referrerpolicy="no-referrer" data-on-error-fallback="face" data-fallback-name="${escapeAttr(target.name || '配信')}" />`;
+  const iconHtml = casterThumbImgHtml(target, escapeAttr);
   return (
     `<div class="nl-top-support-rank__caster" role="listitem" title="${escapeAttr(fullTitle)}">` +
     `<span class="nl-top-support-rank__caster-label">配信者</span>` +
@@ -12255,7 +12253,9 @@ async function refreshNorthStarEventBroadcastersLaneAsync(liveId) {
             : undefined;
       return { ...row, contribution, ...(userPageUrl ? { userPageUrl } : {}) };
     });
-    const rooms = officialDomRankingRowsToStripRooms(contribRows, { userKeyKind: 'contrib' });
+    const rooms = officialDomRankingRowsToStripRooms(contribRows, { userKeyKind: 'contrib' }).map(
+      (r) => ({ ...r, isBroadcaster: true })
+    );
     paintTopSupportRankStyleIntoElement(body, rooms, {
       noteText: isEventLiveBoardActive() ? '公式ランキング上位10名（リアルタイム）' : 'イベントランキング上位10名（公式一覧に準拠）',
       unitSuffix: '💎',

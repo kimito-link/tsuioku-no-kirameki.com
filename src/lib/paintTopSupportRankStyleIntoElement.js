@@ -17,6 +17,11 @@
 import { topSupportRankLineModels } from './topSupportRankStripLines.js';
 import { escapeHtml, escapeAttr } from '../shared/html/escape.js';
 import { isHttpOrHttpsUrl, isAnonymousStyleNicoUserId } from './supportGrowthTileSrc.js';
+import {
+  lastKnownBroadcasterAvatar,
+  pickBroadcasterDisplaySrc,
+  rememberBroadcasterAvatar
+} from './broadcasterAvatarDisplay.js';
 
 /**
  * v0.1.618(改修A+差分): 最後に流し込んだ本体 HTML を要素ごとに覚えておく diff-skip キャッシュ。
@@ -158,7 +163,18 @@ export function renderTopSupportRankStripInto(el, rooms, opts) {
           ? `<span class="nl-top-support-rank__place" aria-hidden="true">${m.placeNumber}</span>`
           : `<span class="nl-top-support-rank__place nl-top-support-rank__place--empty" aria-hidden="true"></span>`;
       const full = escapeAttr(m.fullLabelForTitle);
-      const displayThumb = avatarLoadGuard.pickDisplaySrc(m.thumbSrc);
+      const displayThumb = m.isBroadcaster
+        ? pickBroadcasterDisplaySrc({
+            requestedSrc: m.thumbSrc,
+            guardDisplaySrc: avatarLoadGuard.pickDisplaySrc(m.thumbSrc),
+            lastKnownSrc: lastKnownBroadcasterAvatar(m.userKey),
+            placeNumber: m.placeNumber,
+            userKey: m.userKey
+          })
+        : avatarLoadGuard.pickDisplaySrc(m.thumbSrc);
+      if (m.isBroadcaster && isHttpOrHttpsUrl(displayThumb)) {
+        rememberBroadcasterAvatar(m.userKey, displayThumb);
+      }
       const thumbRp = isHttpOrHttpsUrl(displayThumb)
         ? ' referrerpolicy="no-referrer"'
         : '';
@@ -228,7 +244,9 @@ export function renderTopSupportRankStripInto(el, rooms, opts) {
       if (isHttpOrHttpsUrl(m.thumbSrc)) {
         avatarLoadGuard.noteRemoteAttempt(img, m.thumbSrc);
       }
-      if (typeof upgradeAnon === 'function') upgradeAnon(img, m.userKey, m.thumbSrc, 64);
+      if (!m.isBroadcaster && typeof upgradeAnon === 'function') {
+        upgradeAnon(img, m.userKey, m.thumbSrc, 64);
+      }
     });
   } else {
     // 本体は不変=list を貼り替えない(churn ゼロ)。freshness の "N秒前" だけ textContent で in-place 更新。

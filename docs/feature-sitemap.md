@@ -219,7 +219,7 @@
 
 - **応援レーン集約(誰が候補か)** — 保存コメント行を userId 単位に畳み込みレーン候補を作る唯一の集約正本(popup/venue 共通)
   - `src/lib/userLaneCandidatesFromStorage.js`
-<details><summary>🗂 このカテゴリの全担当ファイル(自動分類) 114</summary>
+<details><summary>🗂 このカテゴリの全担当ファイル(自動分類) 115</summary>
 
 - `api/event-ranking.js` — イベント💎ランキングの「公式更新以降 +X」「推定イベントpt」用のサーバ側スナップショット（2026-11-21）。
 - `scripts/council-trial.mjs` — 会議メンバー候補を「本番と同じ条件」で一斉に試す使い捨て計器。
@@ -227,6 +227,7 @@
 - `src/domain/lane/aggregate.js` — 応援ユーザーレーンの per-row → per-user 集約（純関数）。
 - `src/domain/observations/observationStore.js` — observationStore - StatObservation のメモリ常駐リングバッファ。
 - `src/domain/user/identity.js` — ニコ生ユーザー ID の「匿名性」判定と関連アイデンティティ・ユーティリティ。
+- `src/extension/popup/broadcasterCasterThumb.js` — 「配信者」カード／バナーのサムネ。ゆっくり顔へ倒さず、本人アイコンか中立な「未取得」を使う。
 - `src/extension/popup/nicoEstimatedSpendChip.js` — ニコ生横欄（.nl-official-nico-stats__row）へ「推定（視聴者の購入額）」チップを同期する。
 - `src/lib/auditionEventRankingApi.js` — audition 公式「イベント💎ランキング」無認証 JSON API の URL 組立 & 正規化（純関数）。
 - `src/lib/broadcastContext.js` — v0.1.793: 「この配信の配信者(broadcaster)情報」を 1 か所で型定義し、storage キー・
@@ -358,7 +359,7 @@
   - `src/lib/giftThrowProjectile.js`
 - **吹き出し寿命管理** — 会場の吹き出しの表示上限・追い出し(eviction)ライフサイクル
   - `src/lib/venueBubbleLifecycle.js`
-<details><summary>🗂 このカテゴリの全担当ファイル(自動分類) 313</summary>
+<details><summary>🗂 このカテゴリの全担当ファイル(自動分類) 314</summary>
 
 - `app/live-view-sound.js` — v0.1.1737: スマホの WEB版でギフトの効果音を鳴らす(拡張の会場モードと同じ音・同じ金額帯の選び方)。
 - `app/live-view-venue.js` — v0.1.1739: スマホの「かんたん会場モード」。右下の 🎪 を押すと全画面の会場になる。
@@ -414,6 +415,7 @@
 - `src/lib/avatarPartsComposer.js` — 匿名ユーザー用アバターのパーツ(髪/目/口など)定義と組み合わせ合成。
 - `src/lib/avatarRetrySweepThrottle.js` — 【層】L0 判定層(純粋関数・I/O禁止)
 - `src/lib/avatarUrlCompare.js` — アバター URL の比較用ヘルパ（純粋関数）。
+- `src/lib/broadcasterAvatarDisplay.js` — 【層】L0 判定層(純粋関数。記憶は任意のメモリ Map のみ・storage もネットワークも禁止)
 - `src/lib/bubblePlacement.js` — v0.1.1760: 吹き出しを「大事な表示に被らない場所」へ置く配置純関数(PC 会場・スマホ会場の共通)。
 - `src/lib/cardFreshnessNote.js` — カードの「鮮度」表示（最終更新からの経過）を作る純関数。
 - `src/lib/celebrationCharaAssets.js` — お祝い演出で使う3キャラ(りんく/こんた/混在)の画像パス定義。
@@ -1620,7 +1622,10 @@
 - `v0.1.2197` 2026-11-23 — YouTube チャットの監視を共通 Observer ハブへ統合
 - `v0.1.2193` 2026-11-23 — 裏タブ中に届いたコメントを復帰時に直近3件と件数告知で読み上げ
 
-### 🏟 会場・席 (12版)
+### 📥 コメント取得 (1版)
+- `v0.1.2210` 2026-11-24 — 配信者にゆっくり顔を出さない
+
+### 🏟 会場・席 (11版)
 - `v0.1.2208` 2026-11-24 — 応援の数字を全サービスで先頭に表示
 - `v0.1.2206` 2026-11-24 — 推定（視聴者の消費）の対象をTikTok LIVEへ拡大
 - `v0.1.2205` 2026-11-24 — 推定（視聴者の消費）の対象をミクチャへ拡大
@@ -1632,7 +1637,6 @@
 - `v0.1.2191` 2026-11-23 — 戻る・進むで復帰した視聴ページでも監視を再開するように修正
 - `v0.1.2190` 2026-11-23 — 裏タブや視聴ページの定期監視を共通スケジューラへ集約
 - `v0.1.2188` 2026-11-23 — 会場の本体ファイルを行数の上限内に収める
-- `v0.1.2187` 2026-11-23 — 会場の Esc と部品の層の地図を今の実装に合わせる
 
 ### 🎈 吹き出し (1版)
 - `v0.1.2199` 2026-11-23 — 全サービスへ孤児タブ自動復帰・診断間引き・会場負荷抑制を横展開
@@ -1655,9 +1659,6 @@
 ### 🩺 診断・状態速報 (2版)
 - `v0.1.2200` 2026-11-23 — 状態ダンプ（JSON）にニコ生以外のサービス計器・タブ一覧を追加
 - `v0.1.2199` 2026-11-23 — 全サービスへ孤児タブ自動復帰・診断間引き・会場負荷抑制を横展開
-
-### 🗺 地図・ドキュメント (1版)
-- `v0.1.2187` 2026-11-23 — 会場の Esc と部品の層の地図を今の実装に合わせる
 
 ### 🧊 storage安定 (1版)
 - `v0.1.2200` 2026-11-23 — 状態ダンプ（JSON）にニコ生以外のサービス計器・タブ一覧を追加

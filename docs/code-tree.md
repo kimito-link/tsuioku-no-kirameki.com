@@ -27,7 +27,7 @@
 
 > 値が次の段へ届かない「断線」(broadcaster バグ型)は `npm run feature-map -- --check` が機械検知。
 
-## ⚠️ 役割コメントが無いソース 15 / 1355 件
+## ⚠️ 役割コメントが無いソース 15 / 1357 件
 - `docs/handoff/bench/bench-interval.mjs`
 - `docs/handoff/bench/bench-lane.mjs`
 - `extension-youtube/cloak-failsafe.js`
@@ -1202,7 +1202,7 @@
   - `gift-coin-hq.wav`
   - `gift-register-hq.wav`
   - `gift-register.mp3`
-- 📁 **src/** (2629)
+- 📁 **src/** (2632)
   - 📁 **data/** (7)
     - 📁 **acquirers/** (2)
       - `laneFromStorage.js` — 応援レーン acquirer: chrome.storage.local(nls_comments) → laneStore の橋渡し。
@@ -1239,8 +1239,8 @@
       - `avatarResolver.test.js`
       - `identity.js` — ニコ生ユーザー ID の「匿名性」判定と関連アイデンティティ・ユーティリティ。
       - `nickname.js` — 表示名（ニックネーム）の「強弱」判定。
-  - 📁 **extension/** (122)
-    - 📁 **popup/** (23)
+  - 📁 **extension/** (123)
+    - 📁 **popup/** (24)
       - 📁 **init/** (4)
         - `devMonitorExport.js` — devMonitorExport — 開発モニタの「エクスポート/ダウンロード/較正データ消去」一式。
         - `devMonitorExport.test.js`
@@ -1251,6 +1251,7 @@
         - `htmlReportDocument.test.js`
       - `attachAiDiagButtonHandler.js` — attachAiDiagButtonHandler — 「AIで診断」ボタンの delegated listener を張る。
       - `attachAiDiagButtonHandler.test.js`
+      - `broadcasterCasterThumb.js` — 「配信者」カード／バナーのサムネ。ゆっくり顔へ倒さず、本人アイコンか中立な「未取得」を使う。
       - `eventLiveBoardPopup.js` — 2026-11-21 Phase 2: popup のイベント💎ボード（いまの順位・pt・次の順位まで）。popup-entry.js は
       - `nicoEstimatedSpendChip.js` — ニコ生横欄（.nl-official-nico-stats__row）へ「推定（視聴者の購入額）」チップを同期する。
       - `renderAcquisitionDashboard.js` — renderAcquisitionDashboard — 開発者モニタの「データ取得率」ダッシュボードを描く。
@@ -1547,7 +1548,7 @@
         - `logo_funlink_white_RGB_link_black.png`
         - `logo_funlink_white_RGB_maru_black.png`
     - `hero-connect-hub.svg`
-  - 📁 **lib/** (2309)
+  - 📁 **lib/** (2311)
     - 📁 **__snapshots__/** (4)
       - `marketing-abema-baseline.html`
       - `marketing-niconico.html`
@@ -1955,6 +1956,8 @@
     - `broadcastUrl.test.js`
     - `broadcastWaveformFingerprint.js` — L3: コメ波形フィンガープリント。
     - `broadcastWaveformFingerprint.test.js`
+    - `broadcasterAvatarDisplay.js` — 【層】L0 判定層(純粋関数。記憶は任意のメモリ Map のみ・storage もネットワークも禁止)
+    - `broadcasterAvatarDisplay.test.js`
     - `broadcasterCommentCount.js` — 「配信者本人のコメント数」を正しく算出する純関数(v0.1.838)。
     - `broadcasterCommentCount.test.js`
     - `broadcasterFollowTarget.js` — 配信者タイル / casterBanner で出す「配信者の page URL とアイコン」を、
