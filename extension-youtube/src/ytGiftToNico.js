@@ -7,9 +7,13 @@
 //   nls_gift_subapp_history_<lv> … 「この番組へのギフト履歴」
 //   nls_gift_history_throws_<lv> … 送り主ごとの回数と合計pt
 //   nls_koken_api_contrib_<lv>   … 「ギフト貢献度」(公式ランキングの代わり=YouTube の有料の応援の合計順)
-// pt は「円にしたおよその額」。YouTube は通貨がばらばらなので、目安のレートで円にそろえる(順位を比べられるように)。
+// pt は「円にしたおよその額」。YouTube は通貨がばらばらなので、円にそろえる(順位を比べられるように)。
+// ★v0.1.2207: 円の通貨は、推定（視聴者の購入額）と同じ ECB 基準為替(estimatedViewerSpend.js の jpyPerCurrencyUnit)を先に使う。
+//   以前は下の目安の表(USD 150 等)だけで、推定の円と順位の pt で別の値になっていた。ECB に無い通貨だけ下の表を使う。
 
-/** 目安のレート(1単位 → 円)。正確な為替ではない。知らない通貨はそのままの数を使う。 */
+import { jpyPerCurrencyUnit } from '../../src/lib/estimatedViewerSpend.js';
+
+/** 目安のレート(1単位 → 円)。ECB 基準為替に無い通貨と、数の単位(Bits 等)だけに使う。知らない通貨はそのままの数を使う。 */
 const JPY_PER_UNIT = /** @type {Record<string, number>} */ ({
   JPY: 1,
   USD: 150,
@@ -58,7 +62,9 @@ const JPY_PER_UNIT = /** @type {Record<string, number>} */ ({
 export function ytAmountToPoints(amount, currency) {
   const a = Number(amount);
   if (!Number.isFinite(a) || a <= 0) return 0;
-  const rate = JPY_PER_UNIT[String(currency || '').toUpperCase()] ?? 1;
+  const code = String(currency || '').toUpperCase();
+  // Bits・Kicks 等の数の単位は jpyPerCurrencyUnit が null を返すので、下の表(1)のまま
+  const rate = jpyPerCurrencyUnit(code) ?? JPY_PER_UNIT[code] ?? 1;
   return Math.max(0, Math.round(a * rate));
 }
 

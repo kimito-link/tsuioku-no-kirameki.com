@@ -1,5 +1,6 @@
 import { describe, it, expect } from 'vitest';
 import { buildYtGiftBags, ytAmountToPoints } from '../../../extension-youtube/src/ytGiftToNico.js';
+import { jpyPerCurrencyUnit } from '../estimatedViewerSpend.js';
 
 describe('buildYtGiftBags', () => {
   it('スーパーチャット等だけを集め、人ごとに合計して多い順に並べる', () => {
@@ -11,7 +12,8 @@ describe('buildYtGiftBags', () => {
     ];
     const g = buildYtGiftBags(entries, 'lv900000000001', { now: 5000 });
     expect(g.count).toBe(3);
-    expect(g.totalPoints).toBe(500 + 1500 + 200);
+    // v0.1.2207: USD は推定と同じ ECB 基準為替(2026-11-20・1 USD ≒ 158.64 円)。以前は目安の 150 円で 1,500
+    expect(g.totalPoints).toBe(500 + 1586 + 200);
     expect(g.koken?.rows.map((r) => r.name)).toEqual(['@b', '@a']);
     expect(g.giftUsers.find((u) => u.userId === '8000000001')?.throwCount).toBe(2);
     expect(g.subApp?.history.length).toBe(3);
@@ -20,6 +22,13 @@ describe('buildYtGiftBags', () => {
     const g = buildYtGiftBags([{ id: 'x', userId: '1', ytKind: 'text' }], 'lv1');
     expect(g.count).toBe(0);
     expect(g.koken).toBeNull();
+  });
+  it('円の通貨は推定と同じ ECB 基準為替を使い、ECB に無い通貨だけ目安の表を使う(v0.1.2207)', () => {
+    expect(ytAmountToPoints(1, 'USD')).toBe(Math.round(jpyPerCurrencyUnit('USD') || 0));
+    expect(ytAmountToPoints(10, 'EUR')).toBe(Math.round(10 * (jpyPerCurrencyUnit('EUR') || 0)));
+    // TWD は ECB の参照レートに無いので目安の表(4.7)
+    expect(jpyPerCurrencyUnit('TWD')).toBeNull();
+    expect(ytAmountToPoints(100, 'TWD')).toBe(470);
   });
   it('知らない通貨はそのままの数', () => {
     expect(ytAmountToPoints(3, 'XYZ')).toBe(3);

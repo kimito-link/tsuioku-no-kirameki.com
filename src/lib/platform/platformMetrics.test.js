@@ -131,12 +131,20 @@ describe('venueItemsForPlatform', () => {
     expect(paid.text).toBe('¥1,200');
     expect(paid.title).toContain('USD 5');
     expect(paid.title).toContain('このPCの記録');
-    expect(items.some((i) => i.key === 'members' || i.label === 'メンバー加入')).toBe(false);
+    // v0.1.2207: 推定が先頭、メンバー加入・メンバーギフトは 1 以上のとき出す
+    expect(items.map((i) => i.key).slice(3)).toEqual(['estimatedViewerSpend', 'superchat', 'members', 'memberGifts']);
+    expect(items.find((i) => i.key === 'members').text).toBe('1人');
+    expect(items.find((i) => i.key === 'memberGifts').text).toBe('4件');
   });
 
-  it('スパチャが無い YouTube は、0円の枠を出さない', () => {
+  it('スパチャが無い YouTube は、0円の枠を出さず「推定 —」だけ出す(v0.1.2207)', () => {
     const items = venueItemsForPlatform('youtube', bag({ support: tallySupportItems([]) }));
-    expect(items.map((i) => i.label)).toEqual(['記録', '同時視聴者数', '経過']);
+    expect(items.map((i) => i.label)).toEqual(['記録', '同時視聴者数', '経過', '推定（視聴者の購入額）']);
+    const est = items.find((i) => i.key === 'estimatedViewerSpend');
+    expect(est.text).toBe('—');
+    expect(est.isPlaceholder).toBe(true);
+    expect(est.title).toContain('値段が公式で確認できる応援が来たら表示します');
+    expect(items.some((i) => i.text === '¥0')).toBe(false);
   });
 
   it('Twitch は Bits・サブスク・ギフトサブ・レイド', () => {
@@ -147,7 +155,8 @@ describe('venueItemsForPlatform', () => {
       { kind: 'tw_raid', amount: 40 },
     ]);
     const items = venueItemsForPlatform('twitch', bag({ viewers: 10, support }));
-    expect(items.map((i) => i.label)).toEqual(['記録', '視聴者数', '経過', 'Bits', 'サブスク', 'ギフトサブ', 'レイド', '推定（視聴者の購入額）']);
+    expect(items.map((i) => i.label)).toEqual(['記録', '視聴者数', '経過', '推定（視聴者の購入額）', 'Bits', 'サブスク', 'ギフトサブ', 'レイド']);
+    expect(items.find((i) => i.key === 'estimatedViewerSpend').title).toContain('Bits は円にしていません');
     expect(items.find((i) => i.key === 'bits').text).toBe('300');
     expect(items.find((i) => i.key === 'raids').text).toBe('1');
     expect(items.find((i) => i.key === 'raids').title).toContain('40');
@@ -181,7 +190,39 @@ describe('venueItemsForPlatform', () => {
       { kind: 'membership_gift', giftCount: 1 },
     ]);
     const labels = venueItemsForPlatform('kick', bag({ support })).map((i) => i.label);
-    expect(labels).toEqual(['記録', '視聴者数', '経過', 'Kicks', 'サブスク', 'ギフトサブ', '推定（視聴者の購入額）']);
+    expect(labels).toEqual(['記録', '視聴者数', '経過', '推定（視聴者の購入額）', 'Kicks', 'サブスク', 'ギフトサブ', 'ホスト']);
+  });
+
+  it('Kick のホストは回数と人数を数える(v0.1.2207)', () => {
+    const support = tallySupportItems([
+      { kind: 'kk_host', amount: 25 },
+      { kind: 'kk_host', amount: 5 },
+    ]);
+    expect(support.hostCount).toBe(2);
+    expect(support.hostViewers).toBe(30);
+    const host = panelExtraChips('kick', { support }).find((c) => c.key === 'hosts');
+    expect(host.text).toBe('2回');
+    expect(host.title).toContain('30');
+    // サブが 0 なら推定は「—」(¥0 にしない)
+    const est = panelExtraChips('kick', { support }).find((c) => c.key === 'estimatedViewerSpend');
+    expect(est.text).toBe('—');
+    expect(est.placeholder).toBe(true);
+    expect(est.title).toContain('Kicks は円にしていません');
+  });
+
+  it('まだ数えていない(ready でない)ときは「推定 —」も出さない', () => {
+    for (const id of ['youtube', 'twitch', 'kick', 'twitcasting', 'mixch', 'tiktok', 'showroom', 'whowatch']) {
+      expect(panelExtraChips(id, { support: null })).toEqual([]);
+      expect(panelExtraChips(id, { support: { ready: false } })).toEqual([]);
+    }
+  });
+
+  it('推定と合計は公式の数より前、数え始めは最後(v0.1.2207)', () => {
+    const t0 = new Date(2026, 10, 16, 13, 2).getTime();
+    const support = tallySupportItems([{ kind: 'superchat', amount: 500, currency: 'JPY', recordedAt: t0 }]);
+    const keys = panelExtraChips('youtube', { support, official: { fans: 10 } }).map((c) => c.key);
+    expect(keys[0]).toBe('estimatedViewerSpend');
+    expect(keys.at(-1)).toBe('countSince');
   });
 
   it('ABEMA は視聴数と公式コメント。ギフトは出さない', () => {

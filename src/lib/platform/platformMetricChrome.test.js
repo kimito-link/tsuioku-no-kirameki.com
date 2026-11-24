@@ -78,7 +78,10 @@ describe('applyPlatformMetricChrome', () => {
     expect(root.querySelector('#officialStatNicoGiftPts').parentElement.hidden).toBe(true);
     expect(root.querySelector('#officialStatNicoStreamAge').parentElement.hidden).toBe(false);
     expect(root.querySelector('[data-nl-metric="superchat"] .nl-official-nico-stats__val').textContent).toBe('¥500');
-    expect(root.querySelector('[data-nl-metric="members"]')).toBeNull();
+    // v0.1.2207: メンバー加入は 1 以上なら出す(以前は出さなかった)。推定がスパチャより前
+    expect(root.querySelector('[data-nl-metric="members"] .nl-official-nico-stats__val').textContent).toBe('1人');
+    const keys = [...root.querySelectorAll('[data-nl-metric]')].map((el) => el.getAttribute('data-nl-metric'));
+    expect(keys).toEqual(['estimatedViewerSpend', 'superchat', 'members']);
     expect(root.documentElement.classList.contains('nl-cap-youtube')).toBe(true);
     expect(root.querySelector('[data-lane="adRanking"]').hidden).toBe(true);
     expect(root.querySelector('#giftRankingFetchPrompt').hidden).toBe(true);
@@ -88,6 +91,22 @@ describe('applyPlatformMetricChrome', () => {
     expect(root.querySelector('[data-lane="giftHistory"] .nl-north-star-lane__label').textContent).toContain('スーパーチャット・ギフト');
     expect(root.querySelector('[data-nl-trio-slot="konta"]').getAttribute('title')).not.toContain('広告');
     expect(root.querySelector('#watchConcurrentCard .nl-live-stat-icon').getAttribute('title')).not.toContain('広告');
+  });
+
+  it('後から来た推定のチップも先頭に並べ直す(v0.1.2207)', () => {
+    const root = mount();
+    // 数える前: 公式の数だけ
+    applyPlatformMetricChrome(root, { platform: 'mixch', facts: { official: { level: 3 } } });
+    const before = [...root.querySelectorAll('[data-nl-metric]')].map((el) => el.getAttribute('data-nl-metric'));
+    expect(before).toEqual(['level']);
+    // 数え終わった後: 推定 → コイン → ギフト → 公式の数
+    applyPlatformMetricChrome(root, {
+      platform: 'mixch',
+      facts: { official: { level: 3 }, support: tallySupportItems([{ kind: 'superchat', amount: 400, currency: 'MXCOIN', channelId: 'mx:1', giftName: 'バラ' }]) },
+    });
+    const after = [...root.querySelectorAll('[data-nl-metric]')].map((el) => el.getAttribute('data-nl-metric'));
+    expect(after).toEqual(['estimatedViewerSpend', 'nativeTotal', 'paidGifts', 'level']);
+    expect(root.querySelector('[data-nl-metric="estimatedViewerSpend"] .nl-official-nico-stats__val').textContent).toBe('約¥480');
   });
 
   it('記録にスパチャが1件も無いうちはギフト欄を出さず、来たら出す', () => {

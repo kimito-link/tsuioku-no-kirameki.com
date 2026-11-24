@@ -104,7 +104,10 @@ describe('サービスごとの記録の章', () => {
       { ytKind: 'superchat', ytAmount: 300, ytCurrency: 'MXCOIN', ytGiftName: 'ギフト', userId: '8' },
     ], /** @type {NonNullable<ReturnType<typeof marketingViewFor>>} */ (marketingViewFor('mixch')), 0, { official: { level: 12, fans: 40 } });
     expect(mx).toContain('ファン登録');
-    expect(mx).toContain('コインの単位は未確認です');
+    expect(mx).not.toContain('コインの単位は未確認です');
+    // v0.1.2207: 推定のカードが先頭。推定が渡されていない(0)ときは「—」と注記
+    expect(mx.indexOf('推定（視聴者の購入額）')).toBeLessThan(mx.indexOf('ファン登録'));
+    expect(mx).toContain('この記録には、値段が公式で確認できる応援がありません。');
     expect(mx).toContain('ページのレベル');
     expect(mx).toContain('ページのファン');
 
@@ -246,5 +249,56 @@ describe('配信の山', () => {
       { ytKind: 'superchat', ytCurrency: 'TCSCORE', ytAmount: 0, capturedAt: T0 },
     ], /** @type {NonNullable<ReturnType<typeof marketingViewFor>>} */ (marketingViewFor('twitcasting')), [], 0);
     expect(tc).toContain('金額は記録にありません');
+  });
+});
+
+describe('この配信の記録: 推定・ギフトの多い順・前回との比較 (v0.1.2207)', () => {
+  const view = (/** @type {string} */ id) => /** @type {NonNullable<ReturnType<typeof marketingViewFor>>} */ (marketingViewFor(id));
+
+  it('推定のカードを先頭に置き、出典を注記に出す', () => {
+    const html = sectionPlatformDedicatedHtml(
+      [{ ytKind: 'superchat', ytAmount: 400, ytCurrency: 'MXCOIN', ytGiftName: 'バラ', userId: '1' }],
+      view('mixch'),
+      0,
+      null,
+      { estimatedSpends: [{ key: 'estimatedViewerSpend', label: '推定（視聴者の購入額）', text: '約¥480', note: 'ミクチャの推定です。', sourceUrl: 'https://mixch.tv/charge/coin?paidy' }] },
+    );
+    const grid = html.slice(html.indexOf('mkt-kpi-grid'));
+    expect(grid.indexOf('約¥480')).toBeLessThan(grid.indexOf('コイン（記録）'));
+    expect(html).toContain('（出典: https://mixch.tv/charge/coin?paidy）');
+  });
+
+  it('推定の式が無い SHOWROOM には推定のカードを出さない', () => {
+    const html = sectionPlatformDedicatedHtml(
+      [{ ytKind: 'superchat', ytAmount: 30, ytCurrency: 'SRPT', ytGiftName: 'ハート', ytGiftCount: 3, userId: '1' }],
+      view('showroom'),
+      0,
+    );
+    expect(html).not.toContain('推定（視聴者の購入額）');
+    expect(html).toContain('ハート ×3（30 pt）');
+    expect(html).toContain('の件数（記録）');
+  });
+
+  it('ギフト名は個数の多い順に上位 10 まで、単位の合計つき', () => {
+    /** @type {Array<Record<string, unknown>>} */
+    const rows = [];
+    for (let i = 0; i < 12; i += 1) rows.push({ ytKind: 'superchat', ytAmount: 10, ytCurrency: 'TTCOIN', ytGiftName: `G${i}`, userId: String(i) });
+    rows.push({ ytKind: 'superchat', ytAmount: 1200, ytCurrency: 'TTCOIN', ytGiftName: 'バラ', ytGiftCount: 120, userId: 'x' });
+    const html = sectionPlatformDedicatedHtml(rows, view('tiktok'), 0);
+    expect(html).toContain('バラ ×120（1,200 コイン）、G0');
+    expect(html).not.toContain('G10');
+  });
+
+  it('前回との比較を表にし、形の無い配信は「—」', () => {
+    const html = sectionPlatformDedicatedHtml([{ ytKind: 'membership', userId: '1' }], view('twitch'), 0, null, {
+      supportCompare: [
+        { label: '今回', isCurrent: true, supportCount: 3, estimateText: '約¥792' },
+        { label: '前回', isCurrent: false, supportCount: 1, estimateText: '—' },
+        { label: '2回前', isCurrent: false, supportCount: null, estimateText: '—' },
+      ],
+    });
+    expect(html).toContain('前回までの配信との比較');
+    expect(html).toContain('<th>今回</th><td>3件</td><td>約¥792</td>');
+    expect(html).toContain('<th>2回前</th><td>—</td><td>—</td>');
   });
 });

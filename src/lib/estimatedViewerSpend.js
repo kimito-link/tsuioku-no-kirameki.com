@@ -43,6 +43,14 @@
 export const ESTIMATED_VIEWER_SPEND_LABEL = '推定（視聴者の購入額）';
 export const ESTIMATED_VIEWER_CONSUMPTION_LABEL = '推定（視聴者の消費）';
 export const ESTIMATED_TICKET_BASIS_LABEL = 'チケット基準の推定';
+/** ツイキャスのお茶爆の消費pt。円ではないので、円の推定と同じ言葉にしない（v0.1.2207）。 */
+export const TWITCASTING_CONSUMPTION_PT_LABEL = 'お茶爆の消費pt（推定）';
+/** 推定の式があるのに、値段が公式で確認できる応援がまだ無いとき（横欄・会場の「推定 —」）の説明 */
+export const ESTIMATED_VIEWER_SPEND_EMPTY_TITLE = 'このPCの記録に、値段が公式で確認できる応援が来たら表示します。';
+/** マーケの「この配信の記録」で推定が 0 のときの注記 */
+export const ESTIMATED_VIEWER_SPEND_EMPTY_NOTE = 'この記録には、値段が公式で確認できる応援がありません。';
+/** 円の推定の式があるサービス（ニコ生は公式pt待ちと区別できないので、0 のときの「—」は出さない） */
+export const ESTIMATED_VIEWER_SPEND_PLATFORMS = Object.freeze(['youtube', 'twitch', 'kick', 'twitcasting', 'mixch', 'tiktok']);
 
 /**
  * 価格・消費pt・為替の正本（すべて確認日付と公式一次出典 URL を明記）。
@@ -784,8 +792,36 @@ export function estimateTiktokSpendFromComments(comments) {
 }
 
 /**
+ * ニコ生以外のサービスの記録（コメント配列）から、そのサービスの式で推定を出す。式が無いサービスは null。
+ * マーケの KPI・「この配信の記録」・前回との比較で同じ式を使うための入口（v0.1.2207）。
+ * @param {string} platformId
+ * @param {readonly unknown[]} comments
+ * @returns {EstimatedViewerSpendResult|null}
+ */
+export function estimateViewerSpendFromComments(platformId, comments) {
+  switch (String(platformId || '')) {
+    case 'youtube':
+      return estimateYoutubeSpendFromComments(comments);
+    case 'kick':
+      return estimateKickSpendFromComments(comments);
+    case 'twitch':
+      return estimateTwitchSpendFromComments(comments);
+    case 'twitcasting':
+      return estimateTwitcastingSpendFromComments(comments);
+    case 'mixch':
+      return estimateMixchSpendFromComments(comments);
+    case 'tiktok':
+      return estimateTiktokSpendFromComments(comments);
+    default:
+      return null;
+  }
+}
+
+/**
  * 会場・横欄・マーケレポート共通の表示アイテム配列を生成する。
- * - ツイキャスは「チケット基準の推定」（円・5種＋未知件数）と「推定（視聴者の消費）」（お茶爆50/100 pt）の最大2件を返す。
+ * - ツイキャスは「推定（視聴者の購入額）」（チケット基準の円・5種＋未知件数。チケット基準であることは title / note に書く）と
+ *   「お茶爆の消費pt（推定）」（お茶爆50/100 pt）の最大2件を返す。
+ * - 円のラベルは全サービス「推定（視聴者の購入額）」1つにそろえる（v0.1.2207）。
  * - 他サービスは1件を返す。配信者の手取りは一切表示しない。
  * @param {EstimatedViewerSpendResult|null|undefined} est
  * @returns {EstimatedViewerSpendDisplayItem[]}
@@ -817,7 +853,7 @@ export function formatEstimatedViewerSpendDisplays(est) {
       const note = `ツイキャス公式アイテムチケット1枚の価格（お茶爆50=500円・お茶爆100=1,000円・お茶爆300=3,000円・お茶爆500=5,000円・極茶爆1000=10,000円、${ticketCfg.asOf}確認）によるチケット基準の推定です。${unkSentence}ポイント購入・アプリ内課金・オートチャージでは実際の支払と異なる場合があります。お団子スコアや無料のお茶・応援アイテムは含めません。配信者の受取額ではありません。`;
       items.push({
         key: 'estimatedViewerSpend',
-        label: ESTIMATED_TICKET_BASIS_LABEL,
+        label: ESTIMATED_VIEWER_SPEND_LABEL,
         text,
         title: note,
         note,
@@ -834,7 +870,7 @@ export function formatEstimatedViewerSpendDisplays(est) {
       const ptNote = `ツイキャスの公式確認済み有料アイテム（お茶爆50=500pt・お茶爆100=1,000pt、${ptCfg.asOf}確認）から算出した視聴者の消費ポイント推定です。1pt=1円ではないため円換算していません。${attachUnkHere ? unkSentence : ''}お団子スコアや無料のお茶・応援アイテムは含めません。配信者の受取額ではありません。`;
       items.push({
         key: 'estimatedViewerConsumption',
-        label: ESTIMATED_VIEWER_CONSUMPTION_LABEL,
+        label: TWITCASTING_CONSUMPTION_PT_LABEL,
         text: ptText,
         title: ptNote,
         note: ptNote,
@@ -866,7 +902,7 @@ export function formatEstimatedViewerSpendDisplays(est) {
     return [
       {
         key: 'estimatedViewerSpend',
-        label: ESTIMATED_VIEWER_CONSUMPTION_LABEL,
+        label: ESTIMATED_VIEWER_SPEND_LABEL,
         text,
         title: note,
         note,
@@ -896,7 +932,7 @@ export function formatEstimatedViewerSpendDisplays(est) {
     return [
       {
         key: 'estimatedViewerSpend',
-        label: ESTIMATED_VIEWER_CONSUMPTION_LABEL,
+        label: ESTIMATED_VIEWER_SPEND_LABEL,
         text,
         title: note,
         note,

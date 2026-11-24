@@ -1347,3 +1347,23 @@ describe('手が空いたときに章を描いておく(v0.1.1857)', () => {
     expect(secs.every((el) => el.style.contentVisibility === 'visible')).toBe(true);
   });
 });
+
+describe('buildSupportCompareRows (v0.1.2207)', () => {
+  it('今回と過去 4 配信まで、同じ式で応援の件数と推定を並べる。形の無い配信は「—」', async () => {
+    const { buildSupportCompareRows } = await import('./marketingChartsHtml.js');
+    const sub = { ytKind: 'membership', ytPlatform: 'twitch', subTier: '1000' };
+    const text = { ytKind: 'text', ytPlatform: 'twitch' };
+    const rows = buildSupportCompareRows('twitch', [sub, sub, text], [
+      { liveId: 'a', comments: [text] },
+      { liveId: 'b', comments: [{ text: 'ytKind の無い古い形' }] },
+      { liveId: 'c', comments: [sub] },
+      { liveId: 'd', comments: [sub] },
+      { liveId: 'e', comments: [sub] },
+    ]);
+    expect(rows.map((r) => r.label)).toEqual(['今回', '前回', '2回前', '3回前', '4回前']);
+    expect(rows[0].supportCount).toBe(2);
+    expect(rows[0].estimateText).toMatch(/^約¥/);
+    expect(rows[1]).toMatchObject({ supportCount: 0, estimateText: '—' });
+    expect(rows[2]).toMatchObject({ supportCount: null, estimateText: '—' });
+  });
+});

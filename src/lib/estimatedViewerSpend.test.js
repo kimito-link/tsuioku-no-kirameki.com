@@ -3,8 +3,7 @@ import { readFileSync } from 'node:fs';
 import { resolve } from 'node:path';
 import {
   ESTIMATED_VIEWER_SPEND_LABEL,
-  ESTIMATED_VIEWER_CONSUMPTION_LABEL,
-  ESTIMATED_TICKET_BASIS_LABEL,
+  TWITCASTING_CONSUMPTION_PT_LABEL,
   ESTIMATED_VIEWER_SPEND_RATES,
   jpyPerCurrencyUnit,
   estimateNiconicoGiftSpendJpy,
@@ -253,12 +252,12 @@ describe('estimatedViewerSpend (L0 単価・日付付き為替・純粋計算)',
     expect(est50And100?.unknownPaidCount).toBe(0);
     const disps50And100 = formatEstimatedViewerSpendDisplays(est50And100);
     expect(disps50And100).toHaveLength(2);
-    expect(disps50And100[0].label).toBe(ESTIMATED_TICKET_BASIS_LABEL);
+    expect(disps50And100[0].label).toBe(ESTIMATED_VIEWER_SPEND_LABEL);
     expect(disps50And100[0].text).toBe('約¥1,500');
     expect(disps50And100[0].note).toContain('ポイント購入・アプリ内課金・オートチャージでは実際の支払と異なる場合');
     expect(disps50And100[0].note).toContain('配信者の受取額ではありません');
     expect(disps50And100[0].sourceUrl).toBe('https://twitcasting.tv/helpcenter.php?pid=HELP_TICKET_ITEM_TABLE');
-    expect(disps50And100[1].label).toBe(ESTIMATED_VIEWER_CONSUMPTION_LABEL);
+    expect(disps50And100[1].label).toBe(TWITCASTING_CONSUMPTION_PT_LABEL);
     expect(disps50And100[1].text).toBe('約1,500pt');
 
     // 2) 5種すべて（500 + 1,000 + 3,000 + 5,000 + 10,000 = 19,500円、pt はお茶爆50/100分の1,500ptのみ）
@@ -267,8 +266,8 @@ describe('estimatedViewerSpend (L0 単価・日付付き為替・純粋計算)',
     expect(estAll5?.points).toBe(1500);
     expect(estAll5?.unknownPaidCount).toBe(0);
     const dispsAll5 = formatEstimatedViewerSpendDisplays(estAll5);
-    expect(dispsAll5[0]).toMatchObject({ label: 'チケット基準の推定', text: '約¥19,500' });
-    expect(dispsAll5[1]).toMatchObject({ label: '推定（視聴者の消費）', text: '約1,500pt' });
+    expect(dispsAll5[0]).toMatchObject({ label: '推定（視聴者の購入額）', text: '約¥19,500' });
+    expect(dispsAll5[1]).toMatchObject({ label: 'お茶爆の消費pt（推定）', text: '約1,500pt' });
 
     // 3) お茶爆300/500/極茶爆1000 のみ（pt確認対象外）→ チケット基準の円のみ出て、勝手なptは作らない
     const est300Only = estimateTwitcastingSpendFromComments([ocha300, kiwami1000]);
@@ -276,7 +275,7 @@ describe('estimatedViewerSpend (L0 単価・日付付き為替・純粋計算)',
     expect(est300Only?.points).toBe(0);
     const disps300Only = formatEstimatedViewerSpendDisplays(est300Only);
     expect(disps300Only).toHaveLength(1);
-    expect(disps300Only[0]).toMatchObject({ label: 'チケット基準の推定', text: '約¥13,000' });
+    expect(disps300Only[0]).toMatchObject({ label: '推定（視聴者の購入額）', text: '約¥13,000' });
 
     // 4) 未知の有料アイテム混在 → 円にもptにも足さず「ほか 1件は金額不明」
     const estMixed = estimateTwitcastingSpendFromComments([ocha100, unknownPaid, freeTea, freeStar]);
@@ -288,7 +287,7 @@ describe('estimatedViewerSpend (L0 単価・日付付き為替・純粋計算)',
     const estUnknownOnly = estimateTwitcastingSpendFromComments([unknownPaid, freeTea, freeStar]);
     const dispsUnknown = formatEstimatedViewerSpendDisplays(estUnknownOnly);
     expect(dispsUnknown).toHaveLength(1);
-    expect(dispsUnknown[0]).toMatchObject({ label: 'チケット基準の推定', text: 'ほか 1件は金額不明' });
+    expect(dispsUnknown[0]).toMatchObject({ label: '推定（視聴者の購入額）', text: 'ほか 1件は金額不明' });
 
     // 6) 無料お茶・お団子スコアのみ → null（出さない）
     expect(estimateTwitcastingSpendFromComments([freeTea, freeStar])).toBeNull();
@@ -327,7 +326,7 @@ describe('estimatedViewerSpend (L0 単価・日付付き為替・純粋計算)',
     expect(est400?.unknownPaidCount).toBe(0);
 
     const disp400 = formatEstimatedViewerSpendDisplay(est400);
-    expect(disp400?.label).toBe('推定（視聴者の消費）');
+    expect(disp400?.label).toBe('推定（視聴者の購入額）');
     expect(disp400?.text).toBe('約¥480');
     expect(disp400?.sourceUrl).toBe('https://mixch.tv/charge/coin?paidy');
     expect(disp400?.asOf).toBe('2026-11-24');
@@ -342,7 +341,7 @@ describe('estimatedViewerSpend (L0 単価・日付付き為替・純粋計算)',
     expect(estUnkOnly?.jpy).toBe(0);
     expect(estUnkOnly?.unknownPaidCount).toBe(1);
     const dispUnkOnly = formatEstimatedViewerSpendDisplay(estUnkOnly);
-    expect(dispUnkOnly?.label).toBe('推定（視聴者の消費）');
+    expect(dispUnkOnly?.label).toBe('推定（視聴者の購入額）');
     expect(dispUnkOnly?.text).toBe('ほか 1件は金額不明');
     expect(dispUnkOnly?.note).not.toMatch(/紹介|有料|LINE|サポーター|手取り/);
 
@@ -442,7 +441,7 @@ describe('estimatedViewerSpend (L0 単価・日付付き為替・純粋計算)',
     expect(est30?.unknownPaidCount).toBe(0);
 
     const disp30 = formatEstimatedViewerSpendDisplay(est30);
-    expect(disp30?.label).toBe('推定（視聴者の消費）');
+    expect(disp30?.label).toBe('推定（視聴者の購入額）');
     expect(disp30?.text).toBe('約¥56');
     expect(disp30?.sourceUrl).toBe('https://www.tiktok.com/coin');
     expect(disp30?.asOf).toBe('2026-11-24');
@@ -500,11 +499,12 @@ describe('estimatedViewerSpend (L0 単価・日付付き為替・純粋計算)',
       '推定（視聴者の購入額）'
     );
 
+    // v0.1.2207: Bits / Kicks だけ(サブ 0)は円にしないので「推定 —」(placeholder)。¥0 は出さない
     const twBitsOnly = tallySupportItems([{ kind: 'superchat', amount: 500, currency: 'BITS', recordedAt: 1000 }]);
-    expect(panelExtraChips('twitch', { support: twBitsOnly }).some((c) => c.key === 'estimatedViewerSpend')).toBe(false);
+    expect(panelExtraChips('twitch', { support: twBitsOnly }).find((c) => c.key === 'estimatedViewerSpend')).toMatchObject({ text: '—', placeholder: true });
 
     const kkKicksOnly = tallySupportItems([{ kind: 'superchat', amount: 500, currency: 'KICKS', recordedAt: 1000 }]);
-    expect(panelExtraChips('kick', { support: kkKicksOnly }).some((c) => c.key === 'estimatedViewerSpend')).toBe(false);
+    expect(panelExtraChips('kick', { support: kkKicksOnly }).find((c) => c.key === 'estimatedViewerSpend')).toMatchObject({ text: '—', placeholder: true });
 
     // ツイキャス: チケット基準の推定（円）と 推定（視聴者の消費）（pt）の両チップが横欄・会場に出る
     const tcSupport = tallySupportItems([
@@ -513,11 +513,11 @@ describe('estimatedViewerSpend (L0 単価・日付付き為替・純粋計算)',
     ]);
     const tcChips = panelExtraChips('twitcasting', { support: tcSupport });
     expect(tcChips.find((c) => c.key === 'estimatedViewerSpend')).toMatchObject({
-      label: 'チケット基準の推定',
+      label: '推定（視聴者の購入額）',
       text: '約¥6,000'
     });
     expect(tcChips.find((c) => c.key === 'estimatedViewerConsumption')).toMatchObject({
-      label: '推定（視聴者の消費）',
+      label: 'お茶爆の消費pt（推定）',
       text: '約1,000pt'
     });
 
@@ -537,7 +537,7 @@ describe('estimatedViewerSpend (L0 単価・日付付き為替・純粋計算)',
     ]);
     const mxChips = panelExtraChips('mixch', { support: mxSupport });
     expect(mxChips.find((c) => c.key === 'estimatedViewerSpend')).toMatchObject({
-      label: '推定（視聴者の消費）',
+      label: '推定（視聴者の購入額）',
       text: '約¥480（ほか 1件は金額不明）'
     });
     const mxVenue = venueItemsForPlatform('mixch', {
@@ -547,7 +547,7 @@ describe('estimatedViewerSpend (L0 単価・日付付き為替・純粋計算)',
       facts: { viewers: 30, support: mxSupport }
     });
     expect(mxVenue?.find((i) => i.key === 'estimatedViewerSpend')).toMatchObject({
-      label: '推定（視聴者の消費）',
+      label: '推定（視聴者の購入額）',
       text: '約¥480（ほか 1件は金額不明）'
     });
 
@@ -558,7 +558,7 @@ describe('estimatedViewerSpend (L0 単価・日付付き為替・純粋計算)',
     ]);
     const ttChips = panelExtraChips('tiktok', { support: ttSupport });
     expect(ttChips.find((c) => c.key === 'estimatedViewerSpend')).toMatchObject({
-      label: '推定（視聴者の消費）',
+      label: '推定（視聴者の購入額）',
       text: '約¥56（ほか 1件は金額不明）'
     });
     const ttVenue = venueItemsForPlatform('tiktok', {
@@ -568,7 +568,7 @@ describe('estimatedViewerSpend (L0 単価・日付付き為替・純粋計算)',
       facts: { viewers: 77, support: ttSupport }
     });
     expect(ttVenue?.find((i) => i.key === 'estimatedViewerSpend')).toMatchObject({
-      label: '推定（視聴者の消費）',
+      label: '推定（視聴者の購入額）',
       text: '約¥56（ほか 1件は金額不明）'
     });
 
@@ -612,7 +612,7 @@ describe('estimatedViewerSpend (L0 単価・日付付き為替・純粋計算)',
     expect(tcHtml).toContain('約¥11,000');
     expect(tcHtml).toContain('HELP_TICKET_ITEM_TABLE');
     expect(tcHtml).toContain('ポイント購入・アプリ内課金・オートチャージでは実際の支払と異なる場合');
-    expect(tcHtml).toContain('推定（視聴者の消費）');
+    expect(tcHtml).toContain('お茶爆の消費pt（推定）');
     expect(tcHtml).toContain('約1,000pt');
     expect(tcHtml).not.toContain('手取り');
 
@@ -624,7 +624,7 @@ describe('estimatedViewerSpend (L0 単価・日付付き為替・純粋計算)',
       platform: 'mixch',
       commentsForAnalytics: mxComments
     });
-    expect(mxHtml).toContain('推定（視聴者の消費）');
+    expect(mxHtml).toContain('推定（視聴者の購入額）');
     expect(mxHtml).toContain('約¥480（ほか 1件は金額不明）');
     expect(mxHtml).toContain('https://mixch.tv/charge/coin?paidy');
     expect(mxHtml).not.toContain('手取り');
@@ -637,7 +637,7 @@ describe('estimatedViewerSpend (L0 単価・日付付き為替・純粋計算)',
       platform: 'tiktok',
       commentsForAnalytics: ttComments
     });
-    expect(ttHtml).toContain('推定（視聴者の消費）');
+    expect(ttHtml).toContain('推定（視聴者の購入額）');
     expect(ttHtml).toContain('約¥56（ほか 1件は金額不明）');
     expect(ttHtml).toContain('https://www.tiktok.com/coin');
     expect(ttHtml).not.toContain('手取り');
