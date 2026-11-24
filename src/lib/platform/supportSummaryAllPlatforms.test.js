@@ -31,7 +31,7 @@ describe('パーサの行 → 横欄・会場のチップ(全サービス)', () 
     const tea = { ...gift, id: 'g2', isPaidGift: false, item: { name: 'お茶ｘ10', image: '', showsSenderInfo: true } };
     const rows = [parseTcEvent(gift, { user: 'host' }), parseTcEvent(tea, { user: 'host' })];
     const chips = chipsOf('twitcasting', rows);
-    expect(chips.map((c) => c.label)).toEqual([EST, 'お茶爆の消費pt（推定）', '有料アイテム']);
+    expect(chips.map((c) => c.label)).toEqual([EST, 'お茶爆の消費pt（推定）', 'アイテム（記録）']);
     expect(textOf(chips, 'estimatedViewerSpend')).toBe('約¥1,000');
     expect(chips[0].title).toContain('チケット基準');
     expect(textOf(chips, 'estimatedViewerConsumption')).toBe('約1,000pt');

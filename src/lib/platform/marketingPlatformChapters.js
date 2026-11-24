@@ -273,12 +273,16 @@ export function sectionPlatformDedicatedHtml(comments, view, pageCount, pageFact
     const value = kind === 'tw_milestone' && milestoneMax > 0 ? `${n}件（${milestoneMax}回）` : `${n}件`;
     cards.push([label, value]);
   }
-  if (giftNames.size) {
+  // 名前がそのサービスの決まった呼び名(ミクチャの「ギフト」等)1種類だけなら、内訳にならないので出さない
+  //   (「ギフトの件数（記録）」と同じ数になる・v0.1.2208)
+  const onlyName = giftNames.size === 1 ? [...giftNames.keys()][0] : '';
+  const genericOnly = Boolean(onlyName) && (onlyName === view.giftWord || onlyName === 'ギフト');
+  if (giftNames.size && !genericOnly) {
     const names = [...giftNames.entries()]
       .sort((a, b) => b[1].n - a[1].n || b[1].sum - a[1].sum)
       .slice(0, GIFT_NAME_CAP)
       .map(([name, g]) => `${name} ×${g.n.toLocaleString('ja-JP')}${g.unit && g.sum > 0 ? `（${Math.round(g.sum).toLocaleString('ja-JP')} ${g.unit}）` : ''}`);
-    cards.push(['出ていた名前（記録）', names.join('、')]);
+    cards.push(['ギフトの内訳（記録・多い順）', names.join('、')]);
   }
   if (commentTypes.size) {
     const types = [...commentTypes.entries()].slice(0, 6).map(([name, n]) => `${name} ×${n}`);

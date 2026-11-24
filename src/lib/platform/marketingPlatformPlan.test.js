@@ -302,3 +302,25 @@ describe('この配信の記録: 推定・ギフトの多い順・前回との�
     expect(html).toContain('<th>2回前</th><td>—</td><td>—</td>');
   });
 });
+
+describe('ギフトの内訳のカード (v0.1.2208)', () => {
+  const view = (/** @type {string} */ id) => /** @type {NonNullable<ReturnType<typeof marketingViewFor>>} */ (marketingViewFor(id));
+
+  it('名前が決まった呼び名(ミクチャの「ギフト」)1種類だけなら内訳のカードを出さず、件数のカードだけ', () => {
+    const html = sectionPlatformDedicatedHtml([
+      { ytKind: 'superchat', ytAmount: 30, ytCurrency: 'MXCOIN', ytGiftName: 'ギフト', userId: '1' },
+      { ytKind: 'superchat', ytAmount: 30, ytCurrency: 'MXCOIN', ytGiftName: 'ギフト', userId: '2' },
+    ], view('mixch'), 0);
+    expect(html).not.toContain('ギフトの内訳（記録・多い順）');
+    expect(html).not.toContain('出ていた名前（記録）');
+    expect(html).toContain('ギフトの件数（記録）');
+  });
+
+  it('名前が分かるときは「ギフトの内訳（記録・多い順）」として出す', () => {
+    const html = sectionPlatformDedicatedHtml([
+      { ytKind: 'superchat', ytAmount: 30, ytCurrency: 'TTCOIN', ytGiftName: 'バラ', ytGiftCount: 30, userId: '1' },
+    ], view('tiktok'), 0);
+    expect(html).toContain('<span class="mkt-kpi__label">ギフトの内訳（記録・多い順）</span>');
+    expect(html).toContain('バラ ×30（30 コイン）');
+  });
+});

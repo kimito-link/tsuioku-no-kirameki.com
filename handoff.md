@@ -1,9 +1,14 @@
 <!-- claude-projects-attribution: {"github_login":"kimito-link"} -->
 _Requested by **りんく** · [project thread](https://claude.ai/code/project/chan_0156DiwJETNymYoDji7fmUqo?thread=cmsg_0156DiwJETNymYoDji7fmUqo19628oFJc2WRRV7rgfqxyr)_
 
-# Handoff — 応援の数字を全サービスで「いちばん知りたい順」に (v0.1.2207)
+# Handoff — 応援の数字を全サービスで「いちばん知りたい順」に (v0.1.2208)
 
-STATUS: ブランチ feat/support-summary-all-platforms（master 660d494e6 起点・v0.1.2207）にローカル commit 済み・push と下書き PR 作成待ち（マージしない）
+STATUS: PR #708（feat/support-summary-all-platforms）。レビューの指摘で v0.1.2208 に修正し、ローカル commit 済み・push 待ち（マージしない）
+FIX_708（v0.1.2208・2026-11-24）:
+- origin/master（f34edf68e・#706 #707）を取り込み。ぶつかった docs/feature-sitemap.* は手で直さず npm run tree-map で作り直した（ぶつかったままの状態で作ると件数が3重に数えられたので、解消後にもう一度作り直してマージのコミットに入れた）。
+- ツイキャスのチップのラベル「有料アイテム」→「アイテム（記録）」（拡張の画面に「有料」を出さない。key は paidItems・title の「無料のお茶は数えていません。」はそのまま）。
+- マーケ「この配信の記録」のギフト名のカード「出ていた名前（記録）」→「ギフトの内訳（記録・多い順）」。名前がそのサービスの決まった呼び名（view.giftWord または「ギフト」）1種類だけのときはカードを出さない（ミクチャは常に「ギフト」で、「ギフトの件数（記録）」と重なるため）。試験を2つ足した。
+- 版 0.1.2208（manifest・package・changelog（0.1.2207 の項目を 0.1.2208 として、上の2つを1行ずつ足した。0.1.2207 は出していないので項目は1つにまとめた）・LP の index.html）。
 ROOT_CAUSE: 推定額はどのサービスも記録→tallySupportItems→supportChips/panelExtraChips→横欄・会場、マーケまでつながっていたが、(1) 0 のときチップごと消えていた（YouTube はスパチャ 0 で欄ごと消えた）、(2) SHOWROOM・ふわっちは supportChips に枝が無く応援の数が1つも出なかった、(3) ラベルが3種類（推定（視聴者の購入額）/ 推定（視聴者の消費）/ チケット基準の推定）あった、(4) 公式の数が推定より先に並んでいた。マーケは推定が KPI にしか無く、ギフト名が出た順の上位6、ミクチャに「コインの単位は未確認です」が残り、前回比がコメント数だけだった。
 FILES_CHANGED: src/lib/estimatedViewerSpend.js, src/lib/platform/platformMetrics.js, src/lib/platform/platformMetricChrome.js, src/lib/platform/marketingPlatformChapters.js, src/lib/platform/marketingPlatformPlan.js, src/lib/marketingChartsHtml.js, extension-youtube/src/ytGiftToNico.js, 試験（estimatedViewerSpend / platformMetrics / platformMetricChrome / marketingPlatformPlan / marketingChartsHtml / ytGiftToNico / 新規 supportSummaryAllPlatforms.test.js・マーケのスナップショット3つ・e2e の mixch/tiktok/showroom/twitcasting）、版4か所（extension/manifest.json・package.json・src/lib/changelog.js(+changelog-archive.js)・tsuioku-no-kirameki/index.html）、extension/dist/*・app/dist/live-view.js・extension/background.js・.dist-fingerprint.json、docs の地図（code-tree / feature-sitemap / repo-tree-map）、handoff.md
 CHANGES:
@@ -28,14 +33,15 @@ CHANGES:
   - マーケのスナップショット（youtube / twitch / abema）→ 記録の章が流れの章の前・推定は記録の章の先頭・KPI に推定なし
   - e2e twitcasting / mixch / tiktok → ラベルが統一ラベルに
 TESTS_RUN: npm test / npm run lint / npm run typecheck / npm run verify:bump / npm run build → npm run check:dist-fresh / npm run tree-map:check / npm run layer-map:check / npm run check:layer / verify:extension（絶対パス）/ playwright e2e 8本（youtube-concurrent-viewers・twitch・kick・twitcasting・mixch・tiktok・showroom・whowatch-recording）/ 一時プロファイルでの本物のページ確認
-TEST_RESULT: （単位の修正後に全部やり直した結果）npm test 1,377 files / 15,821 passed（3 skipped・6 todo）、lint 0 errors（既存の warning 2件は venueBubbleVoiceSync.sim.test.js）、typecheck 0 errors、verify:bump 全7ステップ OK（0.1.2207）、check:dist-fresh OK、tree-map:check / layer-map:check / check:layer OK、verify:extension 合格（全画面・全差し込み先）、e2e 8本 11試験すべて合格（--workers=1・修正の前後で2回）。★並列で回した1回目は twitch と twitcasting が「記録が0行」で落ち、直列の2回目は別の3試験が落ちたが、どれも記録が届く前の段階で、単独・直列の3回目ではすべて合格（master 660d494e6 の twitch 単独も合格）。今回足したチップのアサーションまで届いた回は落ちていない。
+TEST_RESULT_2208: npm test 1,377 files / 15,823 passed（3 skipped・6 todo）、lint・typecheck 0 errors、verify:bump OK（0.1.2208）、build → check:dist-fresh OK、tree-map:check / layer-map:check / check:layer OK、verify キット（絶対パス）合格。e2e は8本を続けて回すと「記録が0行」（記録の段階・今回の変更より前）で落ちる試験が回ごとに変わった（1〜4本・単独では合格する回と落ちる回がある）。同じ8本を今の master（f34edf68e）で回しても mixch が同じ「記録が0行」で落ちた。この時の PC は CPU 61%・chrome/node が173個で混んでいた。今回足したチップやラベルのアサーション（ツイキャスの「アイテム（記録）」・ミクチャ/TikTok/SHOWROOM のチップ）まで届いた回は落ちていない。CI の e2e の結果で確かめるのがよい。
+TEST_RESULT_2207: （単位の修正後に全部やり直した結果）npm test 1,377 files / 15,821 passed（3 skipped・6 todo）、lint 0 errors（既存の warning 2件は venueBubbleVoiceSync.sim.test.js）、typecheck 0 errors、verify:bump 全7ステップ OK（0.1.2207）、check:dist-fresh OK、tree-map:check / layer-map:check / check:layer OK、verify:extension 合格（全画面・全差し込み先）、e2e 8本 11試験すべて合格（--workers=1・修正の前後で2回）。★並列で回した1回目は twitch と twitcasting が「記録が0行」で落ち、直列の2回目は別の3試験が落ちたが、どれも記録が届く前の段階で、単独・直列の3回目ではすべて合格（master 660d494e6 の twitch 単独も合格）。今回足したチップのアサーションまで届いた回は落ちていない。
 REAL_PAGE_CHECK: 一時プロファイルの Chromium（普段の Chrome には触れていない）で本物の配信を開き、横欄・会場の帯・マーケの「この配信の記録」を撮った（スクショは手元の作業フォルダ・コミットしていない）。
   - Twitch（indegnasen0706・視聴者 14,000 人台）: サブが来る前は「推定（視聴者の購入額）—」→ Bits 0 → サブスク 0人 → ギフトサブ 0人 → レイド 0回 → 数え始め。継続サブが1件来た回は「約¥792」（Tier1 $4.99）。マーケの記録の章も先頭に約¥792と出典。
   - ミクチャ（u/17424506）: 推定 約¥72 → コイン（記録）60コイン → ギフト 4件 → 公式のレベル・ファン・ガチファン・ライバーランクpt・イベント順位。マーケは推定 → コイン → ギフト名 → ページの数 → 出典の注記。
   - SHOWROOM（iseshuri）: ギフト（記録）2,896pt → ギフト 33件 → イベント順位 5位・イベントpt・目標Lv13。推定は出ない。マーケのギフト名は個数の多い順（ぷっくり13 ×65（650 pt）…）。
   - TikTok はログインしていない一覧から配信ページを自動で選べず未確認（ミクチャで代えた。TikTok は e2e で確認）。前回比の表は一時プロファイルに過去の配信が無いので本物のページでは未確認（単体試験で確認）。
 REMAINING_RISKS: e2e が並列だと記録の段階で不安定（今回の変更より前の段階）。本物のページで、ギフトが来ている配信の推定の値そのものは配信次第。
-NEXT_ACTION: りんくさんが PowerShell で push と下書き PR を作る（コマンドはスレッドに出してある）。CI の緑を確認してから、りんくさんの OK のあとマージ。
+NEXT_ACTION: りんくさんが PowerShell で push する（コマンドはスレッドに出してある）。CI の緑を確認してから、りんくさんの OK のあとマージ。
 LAST_WORKED_ON: 2026-11-24
 WORKED_BY: Claude Code（りんくさんの PC・Remote Control）
 MACHINE_NOTES: worktree=..\_worktrees\tsuioku-no-kirameki.com\support-summary-all（branch: feat/support-summary-all-platforms, base: master 660d494e6）。node_modules は本体へのジャンクション。本体チェックアウトの未コミット変更には触れていない。

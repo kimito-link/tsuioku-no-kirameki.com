@@ -283,7 +283,7 @@ test('ツイキャスのコメント・ギフト(🍡)・ページの数を記�
   expect(laneText).not.toMatch(/\d\s*pt\b/);
   expect(await chip('estimatedViewerSpend')).toContain('推定（視聴者の購入額）約¥1,000');
   expect(await chip('estimatedViewerSpend')).toContain('チケット基準');
-  expect(await chip('paidItems')).toMatch(/有料アイテム\d+件/);
+  expect(await chip('paidItems')).toMatch(/アイテム（記録）\d+件/);
   expect(await chip('estimatedViewerConsumption')).toContain('お茶爆の消費pt（推定）約1,000pt');
   expect(await bodyText()).not.toMatch(/推定同時接続|広告pt|来場者数/);
   await ext.locator('[data-nl-metric="totalViews"]').locator('xpath=..').screenshot({ path: 'test-results/twitcasting-official-chips.png' });

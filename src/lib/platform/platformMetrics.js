@@ -968,7 +968,7 @@ function supportChips(id, support) {
   }
   if (id === 'twitcasting') {
     const out = estimateChips(id, estimateTwitcastingConsumptionPt(support.tcConsumption));
-    out.push(chip('paidItems', '有料アイテム', `${formatInt(paidRows)}件`, '', `${RECORDED}無料のお茶は数えていません。${unitsNote}`));
+    out.push(chip('paidItems', 'アイテム（記録）', `${formatInt(paidRows)}件`, '', `${RECORDED}無料のお茶は数えていません。${unitsNote}`));
     return out;
   }
   if (id === 'mixch' || id === 'tiktok') {

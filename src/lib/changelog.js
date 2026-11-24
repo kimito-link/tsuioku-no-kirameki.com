@@ -18,7 +18,7 @@
 /** @type {readonly ChangelogEntry[]} */
 export const EXTENSION_CHANGELOG = Object.freeze([
   Object.freeze({
-    version: '0.1.2207',
+    version: '0.1.2208',
     date: '2026-11-24',
     summary: '応援の数字を全サービスで先頭に表示',
     items: Object.freeze([
@@ -27,6 +27,8 @@ export const EXTENSION_CHANGELOG = Object.freeze([
       'SHOWROOM のギフトの pt・ふわっちのアイテムの個数・ミクチャと TikTok のコイン・ギフト件数・ファン登録・フォロー・Kick のホスト・YouTube のメンバー加入とメンバーギフトも出すようにしました。Bits・Kicks・pt・個数は円にしていません。',
       'マーケレポートの「この配信の記録」の先頭に推定（出典つき）を置き、ギフトの名前を多い順の上位10に、前回までの配信との応援の比較を足しました。',
       'YouTube の外国通貨のスパチャを順位の pt にするときも、推定と同じ為替（ECB 2026-11-20）を使うようにしました。外国通貨のスパチャの順位の pt が少し変わります。',
+      'ツイキャスの横欄・会場のアイテムの件数は「アイテム（記録）」と表示します（無料のお茶は数えません）。',
+      'マーケレポートのギフトの名前は「ギフトの内訳（記録・多い順）」として出し、名前が「ギフト」だけのとき（ミクチャ）は件数のカードと重ならないよう出さないようにしました。',
     ])
   }),
   Object.freeze({
