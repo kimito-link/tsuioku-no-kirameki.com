@@ -11,7 +11,7 @@
 // ★v0.1.2207: 円の通貨は、推定（視聴者の購入額）と同じ ECB 基準為替(estimatedViewerSpend.js の jpyPerCurrencyUnit)を先に使う。
 //   以前は下の目安の表(USD 150 等)だけで、推定の円と順位の pt で別の値になっていた。ECB に無い通貨だけ下の表を使う。
 
-import { jpyPerCurrencyUnit } from '../../src/lib/estimatedViewerSpend.js';
+import { jpyPerCurrencyUnit, isSupportEventRow, SUPPORT_EVENT_KINDS } from '../../src/lib/estimatedViewerSpend.js';
 
 /** 目安のレート(1単位 → 円)。ECB 基準為替に無い通貨と、数の単位(Bits 等)だけに使う。知らない通貨はそのままの数を使う。 */
 const JPY_PER_UNIT = /** @type {Record<string, number>} */ ({
@@ -113,7 +113,7 @@ export function ytAmountLabel(amount, currency) {
 
 /** @param {string} kind */
 export function isYtPaidKind(kind) {
-  return Object.prototype.hasOwnProperty.call(ITEM_NAME, String(kind || ''));
+  return SUPPORT_EVENT_KINDS.includes(String(kind || ''));
 }
 
 /**
@@ -127,7 +127,9 @@ export function isYtPaidKind(kind) {
 export function buildYtGiftBags(entries, lv, opts = {}) {
   const now = Number(opts.now) || Date.now();
   const beginSec = Number(opts.startedAt) > 0 ? Math.floor(Number(opts.startedAt) / 1000) : 0;
-  const paid = (Array.isArray(entries) ? entries : []).filter((e) => isYtPaidKind(String(e?.ytKind || '')));
+  // 投げの演出(ギフトの1件ずつ)にする行は、数字と同じ決まり(estimatedViewerSpend.js の isSupportEventRow)で選ぶ。
+  //   演出だけ出て数字が動かない/数字だけ動いて演出が出ない、を作らない(v0.1.2225)
+  const paid = (Array.isArray(entries) ? entries : []).filter((e) => isSupportEventRow(e));
 
   /** @type {any[]} */
   const events = [];
@@ -143,7 +145,7 @@ export function buildYtGiftBags(entries, lv, opts = {}) {
     const uid = String(e.userId || '').trim();
     const nickname = String(e.nickname || '').trim();
     const kind = String(e.ytKind || '');
-    const baseItemName = PLATFORM_ITEM_NAME[String(e.ytPlatform || '')]?.[kind] || ITEM_NAME[kind];
+    const baseItemName = PLATFORM_ITEM_NAME[String(e.ytPlatform || '')]?.[kind] || ITEM_NAME[kind] || 'ギフト';
     const amountLabel = ytAmountLabel(Number(e.ytAmount || 0), String(e.ytCurrency || ''));
     // 投げ一覧の「アイテム」に元の金額を添える(例: スーパーチャット $5.00)。種類ごとの合計は元の名前で数える
     // YouTube の新しい「ギフト」(ジュエルのスタンプ)はギフトの名前と絵がある(例: ハイ)。金額は出ないので pt は 0

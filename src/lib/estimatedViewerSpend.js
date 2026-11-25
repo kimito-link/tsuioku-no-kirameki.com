@@ -1032,3 +1032,34 @@ export function formatEstimatedViewerSpendDisplay(est) {
   const list = formatEstimatedViewerSpendDisplays(est);
   return list.length > 0 ? list[0] : null;
 }
+
+/**
+ * 【正本】応援1件の見分け(v0.1.2225)。会場の演出(投げ・効果音)と、数字(横の欄・会場の帯のチップ・振り返り)が
+ *   同じ物を数えるための、ただ1つの決まり。ここで「応援」と答えた行は、必ずどれかの数字を動かす。
+ *   (2026-11-25 りんくさん: YouTube で投げと効果音は出るのにスパチャの数字が動かない。ジュエルのギフトはどの数字にも入らず、
+ *    主の通貨以外のスパチャは主の通貨の合計を動かさなかった)
+ *   値段はここでは決めない(推定の値段は上の表だけ。値段が分からない応援は件数だけ数える)。
+ */
+export const SUPPORT_EVENT_KINDS = Object.freeze(['superchat', 'sticker', 'membership', 'membership_gift', 'yt_gift']);
+
+/** ギフトの名前だけ分かって値段が分からない行(kind=text)も応援として数えるサービス(記録の配信キーの頭・ytPlatform) */
+const NAMED_GIFT_PLATFORM_PREFIX = Object.freeze({ showroom: 'sr:', mixch: 'mx:', tiktok: 'tt:', whowatch: 'ww:', twitcasting: 'tc:' });
+
+/**
+ * 記録の行(kind/giftName/channelId)と、会場に渡す形の行(ytKind/ytGiftName/ytPlatform)のどちらでも答える。
+ * @param {unknown} row
+ * @returns {boolean}
+ */
+export function isSupportEventRow(row) {
+  if (!row || typeof row !== 'object') return false;
+  const r = /** @type {Record<string, unknown>} */ (row);
+  const kind = String(r.ytKind ?? r.kind ?? '').trim().toLowerCase();
+  if (SUPPORT_EVENT_KINDS.includes(kind)) return true;
+  if (kind && kind !== 'text') return false;
+  // 一覧に無いギフト(SHOWROOM)・コイン数の分からないギフト(ミクチャ/TikTok)は kind=text で記録される。名前があれば投げられた応援
+  if (!String(r.ytGiftName ?? r.giftName ?? '').trim()) return false;
+  const plat = String(r.ytPlatform ?? r.platform ?? '').trim().toLowerCase();
+  if (plat) return Object.prototype.hasOwnProperty.call(NAMED_GIFT_PLATFORM_PREFIX, plat);
+  const ch = String(r.channelId ?? r.userId ?? '').trim().toLowerCase();
+  return Object.values(NAMED_GIFT_PLATFORM_PREFIX).some((p) => ch.startsWith(p));
+}

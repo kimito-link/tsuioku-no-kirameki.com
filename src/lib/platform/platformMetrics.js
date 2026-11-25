@@ -25,7 +25,8 @@ import {
   formatEstimatedViewerSpendDisplays,
   ESTIMATED_VIEWER_SPEND_LABEL,
   ESTIMATED_VIEWER_SPEND_EMPTY_TITLE,
-  ESTIMATED_VIEWER_SPEND_PLATFORMS
+  ESTIMATED_VIEWER_SPEND_PLATFORMS,
+  isSupportEventRow
 } from '../estimatedViewerSpend.js';
 
 /** 能力表を持つサービス。ABEMA は記録の実装が別の変更にあるので、数字の枠だけを先に置く。 */
@@ -557,6 +558,12 @@ export function tallySupportItems(items) {
     fanCount: 0,
     /** TikTok のフォロー(follow)の回数 */
     followCount: 0,
+    /** YouTube の「ギフト」(ジュエルで送るスタンプ・kind=yt_gift)の件数。値段は出ないので件数だけ(v0.1.2225) */
+    ytGiftCount: 0,
+    /** 会場の投げの演出が出る応援の行数(isSupportEventRow・演出と同じ決まり)。この数が増えたら、どれかのチップが必ず動く(v0.1.2225) */
+    supportEventCount: 0,
+    /** そのうちメンバー・サブスク以外(スパチャ・ステッカー・ギフト・アイテム)の行数。ギフトのサービスの「件数」のチップに使う */
+    giftEventCount: 0,
     /** Kick のホスト(kk_host)の回数と、届いた人数の合計 */
     hostCount: 0,
     hostViewers: 0,
@@ -640,8 +647,13 @@ export function tallySupportItems(items) {
       accumulateTiktokGiftItem(ttConsumption, rec);
       addPaid(ttConsumption.giftCount + ttConsumption.unknownGiftCount - before);
     }
+    if (isSupportEventRow(rec)) {
+      t.supportEventCount += 1;
+      if (kind !== 'membership' && kind !== 'membership_gift') t.giftEventCount += 1;
+    }
     if (kind === 'superchat') t.superchatCount += 1;
     else if (kind === 'sticker') t.stickerCount += 1;
+    else if (kind === 'yt_gift') t.ytGiftCount += 1;
     else if (kind === 'membership') {
       t.membershipCount += 1;
       addSubTier(rec.subTier, 1);
@@ -900,7 +912,9 @@ function supportChips(id, support) {
   /** @param {string} code */
   const nativeTotal = (code) => formatInt(Math.max(0, Number(native[code]) || 0));
   // 新しいチップの単位は数のすぐ後ろに付ける(横欄で単位が別の行に落ちると「60」「コイン」と2行に割れる・officialChips と同じ)
-  const paidRows = num(support.paidGiftCount) || 0;
+  // 件数のチップは、会場の投げの演出と同じ決まりで数えた行数(isSupportEventRow・v0.1.2225)。
+  //   前は値段の表で数えた行だけで、ツイキャスのお茶・SHOWROOM の一覧に無いギフトは演出が出ても件数が動かなかった
+  const paidRows = Math.max(num(support.giftEventCount) || 0, num(support.paidGiftCount) || 0);
   const paidUnits = num(support.paidGiftUnits) || 0;
   const unitsNote = paidUnits > paidRows ? `個数にすると ${formatInt(paidUnits)} 個です。` : '';
   if (id === 'youtube') {
@@ -911,10 +925,13 @@ function supportChips(id, support) {
     const hideSuperchat = 'superchatWhenPositive' in cap && cap.superchatWhenPositive && paid.text === '0' && count === 0;
     const out = estimateChips(id, estimateYoutubeSupportSpendJpy(amounts));
     if (!hideSuperchat) {
+      // ★v0.1.2225: 件数を添える。合計はいちばん多い通貨だけなので、ほかの通貨のスパチャ(メキシコの配信の USD 等)が来ても
+      //   数字が動かなかった(投げと効果音は出るのに・2026-11-25 りんくさん)。件数は通貨によらず1件ごとに必ず増える
+      const countText = `${formatInt(count)}件`;
       out.push(chip(
         'superchat',
         'スパチャ',
-        paid.text,
+        count > 0 ? (paid.text === '0' ? countText : `${paid.text} · ${countText}`) : paid.text,
         paid.unit,
         `${RECORDED}スーパーチャット ${formatInt(support.superchatCount || 0)}・スーパーステッカー ${formatInt(support.stickerCount || 0)}。${paid.extra}`.trim(),
       ));
@@ -923,6 +940,9 @@ function supportChips(id, support) {
     const memberGifts = num(support.membershipGiftCount) || 0;
     if (members > 0) out.push(chip('members', 'メンバー加入', `${formatInt(members)}人`, '', RECORDED));
     if (memberGifts > 0) out.push(chip('memberGifts', 'メンバーギフト', `${formatInt(memberGifts)}件`, '', RECORDED));
+    // YouTube の「ギフト」(ジュエル)。会場では投げと効果音が出るのに、どの数字にも入っていなかった(v0.1.2225)。値段は出ないので件数だけ
+    const ytGifts = num(support.ytGiftCount) || 0;
+    if (ytGifts > 0) out.push(chip('ytGifts', 'ギフト', `${formatInt(ytGifts)}件`, '', `${RECORDED}YouTube のギフト（ジュエル）は値段が出ていないので、円にも推定にも入れていません。`));
     return out.concat(countSinceChip(id, support));
   }
   if (id === 'twitch') {
@@ -968,7 +988,7 @@ function supportChips(id, support) {
   }
   if (id === 'twitcasting') {
     const out = estimateChips(id, estimateTwitcastingConsumptionPt(support.tcConsumption));
-    out.push(chip('paidItems', 'アイテム（記録）', `${formatInt(paidRows)}件`, '', `${RECORDED}無料のお茶は数えていません。${unitsNote}`));
+    out.push(chip('paidItems', 'アイテム（記録）', `${formatInt(paidRows)}件`, '', `${RECORDED}お茶も入っています。推定には、値段の分かるアイテムだけを入れています。${unitsNote}`));
     return out;
   }
   if (id === 'mixch' || id === 'tiktok') {

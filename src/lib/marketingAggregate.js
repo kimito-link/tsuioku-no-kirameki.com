@@ -7,6 +7,7 @@ import { extractNiconicoUserIdFromIconUrl } from '../shared/avatar/avatarUrlGuar
 import { isSameAvatarUrl } from './avatarUrlCompare.js';
 import { parseArrivalCommentText } from './parseArrivalComment.js';
 import { createArrivalNoticeGate } from './arrivalNoticeRows.js';
+import { isSupportEventRow } from './estimatedViewerSpend.js';
 
 /**
  * @typedef {{
@@ -167,7 +168,9 @@ export function isMarketingSupportRow(c) {
   if (!c || typeof c !== 'object') return false;
   const k = /** @type {{ ytKind?: unknown }} */ (c).ytKind;
   if (k == null || k === '') return false;
-  return String(k) !== 'text';
+  // 値段の分からないギフト(kind=text・名前あり)も、会場で投げの演出が出る応援なので振り返りに入れる(isSupportEventRow・v0.1.2225)
+  if (String(k) === 'text') return isSupportEventRow(c);
+  return true;
 }
 
 /**
