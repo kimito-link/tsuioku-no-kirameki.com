@@ -24,6 +24,15 @@
 /** @type {ChangelogEntry[]} */
 const ARCHIVE_ENTRIES = [
   Object.freeze({
+    version: '0.1.2192',
+    date: '2026-11-23',
+    summary: '戻る復帰時に配信の記録を再接続し、Twitch IRC 無通信を監視',
+    items: Object.freeze([
+      'Twitch・Kick・ミクチャ・SHOWROOM でページ離脱（pagehide）後に戻る・進むやタブ復帰したとき、同じ配信でも記録と読み上げを確実に再接続するように修正しました。',
+      'Twitch のチャット（IRC）にも無通信の見張りを追加し、裏タブでは間隔を広げつつ表に戻ったらすぐ切断・再接続を検査するようにしました。',
+    ])
+  }),
+  Object.freeze({
     version: '0.1.2191',
     date: '2026-11-23',
     summary: '戻る・進むで復帰した視聴ページでも監視を再開するように修正',

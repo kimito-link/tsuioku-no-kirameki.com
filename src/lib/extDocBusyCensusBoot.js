@@ -27,7 +27,8 @@ import {
   noteOnChanged,
   approxJsonBytes,
   summarizeDocCensus,
-  foldRecentLagMs
+  foldRecentLagMs,
+  shouldCensusCountOnChanged
 } from './extDocBusyCensus.js';
 import { EXT_CENSUS_MESSAGE_TYPE } from './extProcessCensusKey.js';
 
@@ -109,7 +110,8 @@ export function startExtDocBusyCensus(env) {
   cleanups.push(() => clearInterval(hb));
 
   // ③ storage.onChanged をキー族別に数える(バイトは族ごと 30 秒に 1 回だけ測る)。
-  try {
+  //   v0.1.2215: 自分では onChanged を聞かない文書では数えない(計器のためだけに全文を受け取らない・shouldCensusCountOnChanged)。
+  if (shouldCensusCountOnChanged(census.s)) try {
     env.chromeApi?.storage?.onChanged?.addListener?.((/** @type {Record<string, any>} */ changes, /** @type {string} */ area) => {
       if (area !== 'local' || !changes) return;
       try {

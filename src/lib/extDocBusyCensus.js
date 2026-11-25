@@ -373,3 +373,23 @@ export function readExtDocRecentLagMs() {
     return 0;
   }
 }
+
+/**
+ * v0.1.2215: storage.onChanged を数えない文書。
+ * ■ なぜ: onChanged は「聞いている文書」ごとに、書かれた値(コメントのテール 最大2,000行など)を丸ごと受け取って作り直す。
+ *   次の文書は自分では onChanged を聞いておらず、この計器だけが聞いていた=計器のためだけに、記録が書かれるたびに
+ *   全文を受け取っていた。とくに offscreen は IndexedDB の書き手で、記録の通り道そのもの。
+ *   - offscreen(IndexedDB の書き手) / sidepanel(横の欄の外枠。中身の popup は別文書で自分で聞く)
+ *   - voice-native-guide / marketing-export(開いている間だけの画面)
+ * ■ この文書で onChanged を使い始めたら、ここから外すこと(extDocBusyCensusOnChangedSkip.test.js が dist で見張る)。
+ */
+export const EXT_CENSUS_ONCHANGED_SKIP_SURFACES = Object.freeze(['offscreen', 'sidepanel', 'voice-native-guide', 'marketing-export']);
+
+/**
+ * この文書で storage.onChanged を数えるか。
+ * @param {string} surface detectExtSurface の結果
+ * @returns {boolean}
+ */
+export function shouldCensusCountOnChanged(surface) {
+  return !EXT_CENSUS_ONCHANGED_SKIP_SURFACES.includes(String(surface || ''));
+}
