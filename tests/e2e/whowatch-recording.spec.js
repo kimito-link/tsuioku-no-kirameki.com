@@ -208,7 +208,10 @@ test('ふわっちの配信とコメントを記録し、送信も届く', async
   await expect.poll(() => chip('eventRank'), { timeout: 30_000 }).toContain('2位');
   expect(await chip('eventRank')).toContain('テストイベントB 12位');
   expect(await chip('totalViews')).toContain('4,567');
-  expect(await bodyText()).not.toMatch(/推定|広告pt|来場者数/);
+  // v0.1.2225(2026-11-25 りんくさん決定): 受取（推定）の欄はどのサービスも同じ場所。ふわっちは値段も取り分も非公開なので
+  //   「—（公式の率が非公開）」だけ。金額(約¥)や視聴者の購入額の推定は作らない
+  expect(await chip('estimatedStreamerTakeHome')).toMatch(/^推定（配信者の受取）—（公式の率が非公開）\|/);
+  expect((await bodyText()).replaceAll('推定（配信者の受取）', '')).not.toMatch(/推定|約¥|広告pt|来場者数/);
 
   // 配信が終わったと分かったら、終わった時刻を送って読むのをやめる
   ended = true;

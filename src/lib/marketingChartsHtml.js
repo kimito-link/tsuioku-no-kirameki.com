@@ -32,7 +32,7 @@ import {
 } from './estimatedViewerSpend.js';
 
 /** 振り返りで受取（推定）を出すサービス(応援を記録するサービス。金額は公式の率がある YouTube・Kick・Twitch だけ) */
-const MARKETING_TAKE_HOME_PLATFORMS = new Set(['youtube', 'twitch', 'kick', 'twitcasting', 'mixch', 'tiktok']);
+const MARKETING_TAKE_HOME_PLATFORMS = new Set(['youtube', 'twitch', 'kick', 'twitcasting', 'mixch', 'tiktok', 'showroom', 'whowatch']);
 import { buildCommenterFollowAnalytics } from './commenterFollowAnalytics.js';
 import { buildUserProfileLinkedLabelHtml } from './userProfileLinkHtml.js';
 import {
@@ -3537,7 +3537,9 @@ export function buildMarketingDashboardHtml(r, opts = {}) {
       const nicoGiftPts =
         positiveMarketingNumber(opts.officialEventDomBundle?.programStats?.giftPoints) ||
         positiveMarketingNumber(giftMomentum?.totals?.totalPoints);
-      return formatEstimatedViewerSpendDisplays(estimateNiconicoGiftSpendJpy(nicoGiftPts));
+      const nicoTh = formatStreamerTakeHomeDisplay('niconico', null);
+      return [...formatEstimatedViewerSpendDisplays(estimateNiconicoGiftSpendJpy(nicoGiftPts)),
+        { key: nicoTh.key, label: nicoTh.label, text: nicoTh.text, title: nicoTh.title, note: nicoTh.note, sourceUrl: '', asOf: '' }];
     }
     const viewer = formatEstimatedViewerSpendDisplays(estimateViewerSpendFromComments(view.id, commentsRaw));
     // 配信者の受取（推定）。公式の率・単価があるサービス(YouTube・Kick・Twitch)だけ金額、ほかは理由つきの「—」(v0.1.2225)

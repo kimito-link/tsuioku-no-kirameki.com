@@ -12,6 +12,9 @@ import {
 const usd = /** @type {number} */ (jpyPerCurrencyUnit('USD'));
 
 describe('配信者の受取（推定）', () => {
+  it('率のあるサービスで応援がまだ無いときは「—」だけ(非公開とは書かない)', () => {
+    for (const id of ['youtube', 'kick', 'twitch']) expect(formatStreamerTakeHomeDisplay(id, null).text).toBe('—');
+  });
   it('YouTube: スパチャ・ステッカーの推定購入額の 70%。手数料・税差引前の目安と出典を添える', () => {
     const amounts = { JPY: 1000, USD: 10 };
     const viewer = /** @type {any} */ (estimateYoutubeSupportSpendJpy(amounts)).jpy;
@@ -33,11 +36,11 @@ describe('配信者の受取（推定）', () => {
     expect(estimateStreamerTakeHomeJpy('twitch', { amounts: { BITS: 500 } })?.usd).toBe(5);
     expect(estimateStreamerTakeHomeJpy('twitch', { amounts: {}, membershipCount: 9 })).toBeNull();
   });
-  it('公式の率が無いサービスは出さない(「—」と理由)', () => {
+  it('公式の率が無いサービスは金額を作らず「—（公式の率が非公開）」と理由', () => {
     for (const id of ['showroom', 'mixch', 'tiktok', 'whowatch', 'twitcasting', 'niconico']) {
       expect(estimateStreamerTakeHomeJpy(id, { amounts: { SRPT: 1000, MXCOIN: 1000 }, membershipCount: 3 })).toBeNull();
       const d = formatStreamerTakeHomeDisplay(id, null);
-      expect(d.text).toBe('—');
+      expect(d.text).toBe('—（公式の率が非公開）');
       expect(d.title).toContain('公式に公開していない');
     }
   });

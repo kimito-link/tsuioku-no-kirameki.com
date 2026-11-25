@@ -1172,6 +1172,9 @@ export function estimateStreamerTakeHomeFromComments(platformId, comments) {
   return estimateStreamerTakeHomeJpy(platformId, { amounts, membershipCount, membershipGiftCount });
 }
 
+/** 公式が配信者の取り分を公開していないサービスの受取の欄(全サービス同じ場所に置く・2026-11-25 りんくさん決定) */
+export const STREAMER_TAKE_HOME_UNDISCLOSED_TEXT = '—（公式の率が非公開）';
+
 /**
  * 受取（推定）の表示。式があるのに材料が無ければ「—」（placeholder）。式の無いサービスは理由つきの「—」。
  * @param {string} platformId
@@ -1185,8 +1188,9 @@ export function formatStreamerTakeHomeDisplay(platformId, est) {
     const note = `${est.note}${fxNote}${STREAMER_TAKE_HOME_CAVEAT}出典: ${est.sourceName}（${est.asOf} 確認）`;
     return { ...base, text: `約¥${est.jpy.toLocaleString('ja-JP')}`, title: note, note, sourceUrl: est.sourceUrl, asOf: est.asOf, placeholder: false };
   }
-  const why = STREAMER_TAKE_HOME_PLATFORMS.includes(platformId)
+  const hasRate = STREAMER_TAKE_HOME_PLATFORMS.includes(platformId);
+  const why = hasRate
     ? '公式の率・単価で数えられる応援がこのPCの記録に来たら表示します。'
-    : 'このサービスは配信者の取り分（率・単価）を公式に公開していないので出していません。件数と pt だけ数えています。';
-  return { ...base, text: '—', title: why, note: why, sourceUrl: '', asOf: '', placeholder: true };
+    : 'このサービスは配信者の取り分（率・単価）を公式に公開していないので、金額は出していません。件数と pt だけ数えています。';
+  return { ...base, text: hasRate ? '—' : STREAMER_TAKE_HOME_UNDISCLOSED_TEXT, title: why, note: why, sourceUrl: '', asOf: '', placeholder: true };
 }

@@ -36,7 +36,9 @@ describe('buildVenueStatStripModel', () => {
     const m = buildVenueStatStripModel(mirror(), { liveId: 'LV123', nowMs: NOW, recordedCount: 999 });
     expect(m.source).toBe('mirror');
     expect(m.stale).toBe(false);
-    expect(m.items.map((i) => i.label)).toEqual(['記録', '推定同時接続', '来場者数', '来場', '本家コメ', '経過', '広告pt', 'ギフトpt', '推定（視聴者の購入額）']);
+    expect(m.items.map((i) => i.label)).toEqual(['記録', '推定同時接続', '来場者数', '来場', '本家コメ', '経過', '広告pt', 'ギフトpt', '推定（視聴者の購入額）', '推定（配信者の受取）']);
+    // 受取: ニコ生は奨励金の計算が非公開なので金額を作らない(v0.1.2225)
+    expect(byKey(m).estimatedStreamerTakeHome.text).toBe('—（公式の率が非公開）');
     const k = byKey(m);
     expect(k.records.text).toBe('999'); // 正本と鏡があるときは大きい方（凍った「記録 1」で正本を潰さない）
     expect(k.concurrent.text).toBe('108');
@@ -80,7 +82,7 @@ describe('buildVenueStatStripModel', () => {
     const m = buildVenueStatStripModel(null, { liveId: 'lv123', nowMs: NOW });
     expect(m.source).toBe('none');
     for (const it of m.items) {
-      expect(it.text).toBe('—');
+      expect(it.text).toBe(it.key === 'estimatedStreamerTakeHome' ? '—（公式の率が非公開）' : '—');
       expect(it.isPlaceholder).toBe(true);
       expect(it.unit).toBe('');
     }
@@ -88,7 +90,7 @@ describe('buildVenueStatStripModel', () => {
 
   it('壊れた鏡(フィールドが無い・型違い)でも落ちない', () => {
     const m = buildVenueStatStripModel({ liveId: 'lv123', capturedAt: NOW, concurrent: 'x', official: 5 }, { liveId: 'lv123', nowMs: NOW });
-    expect(m.items).toHaveLength(8);
+    expect(m.items).toHaveLength(9);
     expect(byKey(m).concurrent.text).toBe('—');
   });
 });
@@ -101,7 +103,7 @@ describe('createVenueStatStrip', () => {
     expect(strip.el.querySelector('[data-stat="records"] .nlsb-stat__val').textContent).toBe('81');
     expect(strip.el.querySelector('[data-stat="streamAge"] .nlsb-stat__val').textContent).toBe('2時間36分');
     expect(strip.el.dataset.source).toBe('mirror');
-    expect(strip.el.querySelectorAll('.nlsb-stat')).toHaveLength(9);
+    expect(strip.el.querySelectorAll('.nlsb-stat')).toHaveLength(10);
     expect(strip.paint(buildVenueStatStripModel(mirror(), { liveId: 'lv123', nowMs: NOW + 1000 }))).toBe(false);
   });
 
@@ -173,7 +175,7 @@ describe('パネルを開かなくても数字が付く(会場が自分で作っ
     expect(strip.el.querySelector('[data-stat="adPts"]')).toBeNull();
     expect(strip.el.querySelector('[data-stat="concurrent"] .nlsb-stat__label').textContent).toBe('同時視聴者数');
     expect(strip.paint(buildVenueStatStripModel(mirror(), { liveId: 'lv123', nowMs: NOW }))).toBe(true);
-    expect(strip.el.querySelectorAll('.nlsb-stat')).toHaveLength(9);
+    expect(strip.el.querySelectorAll('.nlsb-stat')).toHaveLength(10);
   });
 
   it('YouTube の会場は、ニコ生の形の鏡が同じ配信でも来場や広告ptを出さない', () => {

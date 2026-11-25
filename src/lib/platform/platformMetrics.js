@@ -911,9 +911,10 @@ function supportChips(id, support) {
   return [...base.slice(0, at), takeHomeChip(id, support), ...base.slice(at)];
 }
 
-/** 受取（推定）のチップを出すサービス。推定（視聴者の購入額）の欄があるサービスだけ(式があるのは YouTube・Kick・Twitch。
- *   ほかは理由つきの「—」)。SHOWROOM・ふわっちは円の推定を出さない決まり(件数と pt だけ)なので受取も出さない(v0.1.2225) */
-const TAKE_HOME_CHIP_PLATFORMS = new Set(['youtube', 'twitch', 'kick', 'twitcasting', 'mixch', 'tiktok']);
+/** 受取（推定）のチップを出すサービス=応援を記録する全サービス。同じ場所(推定の後ろ・無ければ先頭)に置く。
+ *   金額は公式の率・単価がある YouTube・Kick・Twitch だけ。ほかは「—（公式の率が非公開）」(2026-11-25 りんくさん決定)。
+ *   ニコ生は横欄(nicoEstimatedSpendChip.js)・会場の帯(venueStatStrip.js)で同じ欄を出す。ABEMA は応援を記録しないので出さない。 */
+const TAKE_HOME_CHIP_PLATFORMS = new Set(['youtube', 'twitch', 'kick', 'twitcasting', 'mixch', 'tiktok', 'showroom', 'whowatch']);
 
 /** @param {string} id @param {any} support */
 function supportChipsBase(id, support) {
