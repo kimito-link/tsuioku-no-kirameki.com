@@ -27,7 +27,7 @@
 
 > 値が次の段へ届かない「断線」(broadcaster バグ型)は `npm run feature-map -- --check` が機械検知。
 
-## ⚠️ 役割コメントが無いソース 15 / 1357 件
+## ⚠️ 役割コメントが無いソース 15 / 1359 件
 - `docs/handoff/bench/bench-interval.mjs`
 - `docs/handoff/bench/bench-lane.mjs`
 - `extension-youtube/cloak-failsafe.js`
@@ -1202,7 +1202,7 @@
   - `gift-coin-hq.wav`
   - `gift-register-hq.wav`
   - `gift-register.mp3`
-- 📁 **src/** (2632)
+- 📁 **src/** (2640)
   - 📁 **data/** (7)
     - 📁 **acquirers/** (2)
       - `laneFromStorage.js` — 応援レーン acquirer: chrome.storage.local(nls_comments) → laneStore の橋渡し。
@@ -1548,7 +1548,7 @@
         - `logo_funlink_white_RGB_link_black.png`
         - `logo_funlink_white_RGB_maru_black.png`
     - `hero-connect-hub.svg`
-  - 📁 **lib/** (2311)
+  - 📁 **lib/** (2319)
     - 📁 **__snapshots__/** (4)
       - `marketing-abema-baseline.html`
       - `marketing-niconico.html`
@@ -1659,11 +1659,14 @@
       - `supportArrival.js` — 【層】L0 判定層(純粋関数・I/O禁止)
       - `supportArrival.test.js`
       - `supportSummaryAllPlatforms.test.js`
-    - 📁 **showroom/** (4)
+    - 📁 **showroom/** (7)
       - `srCommentInput.js` — SHOWROOM の公式コメント欄を探す(会場の「ここから発言」は拾わない)。
       - `srCommentInput.test.js`
       - `srParse.js` — SHOWROOM の配信・コメント・ギフトを、YouTube 版の記録と同じ形にする(純関数)
       - `srParse.test.js`
+      - `srSendConfirm.js` — SHOWROOM の送信確認で「今の公式の欄」を読む。
+      - `srSendConfirm.test.js`
+      - `srSendPath.wiring.test.js`
     - 📁 **tiktok/** (5)
       - `ttParse.js` — TikTok LIVE の配信・コメント・ギフトを、YouTube 版の記録と同じ形にする(純関数)
       - `ttParse.real.test.js`
@@ -3611,6 +3614,7 @@
     - `venueHeadlessVoiceItem.test.js`
     - `venueHeat.js` — v0.1.732: 会場モードの「熱量の色温度」純関数。
     - `venueHeat.test.js`
+    - `venueHeatPaint.test.js`
     - `venueHoverCard.js` — 会場アイコンのホバープレビューカード(純ロジック+DOMビルダー)。
     - `venueHoverCard.test.js`
     - `venueHoverCard.wiring.test.js`
@@ -3640,6 +3644,7 @@
     - `venueLiveOpenWiring.wiring.test.js`
     - `venueLiveRoster.js` — v0.1.754 会場の3時間安定化(星野ロミ・メソッド会議の本質解・6体ほぼ全会一致):
     - `venueLiveRoster.test.js`
+    - `venueLowSpecPaint.wiring.test.js`
     - `venueMirrorAdoptWiring.test.js`
     - `venueMirrorAgeNotice.test.js`
     - `venueMirrorAvatarEnrich.js` — 会場行の avatar を「①の実描画鏡(laneMirror)が解決済みの顔URL」で
@@ -3694,6 +3699,8 @@
     - `venueSpeechCensusWiring.wiring.test.js`
     - `venueSpeechPanelIdentity.wiring.test.js`
     - `venueSpeechPanelWidth.wiring.test.js`
+    - `venueSpeechPollGate.js` — 会場の0.8秒ごとの発言読み(pollSpeech)で、storage の読み直しを省いてよいか(純関数)。
+    - `venueSpeechPollGate.test.js`
     - `venueSpeechStats.js` — 会場の発言パネルに出す「この人の応援(ギフト・広告)」の一行(純関数・DOM 非依存)。v0.1.1658。
     - `venueSpeechStats.test.js`
     - `venueSpeechStreak.js` — 「会話の連鎖」(2026-06-15 会議の最大多数決の本命・弱点A/C):
@@ -3755,6 +3762,7 @@
     - `voiceDiag.js` — ★v0.1.1328: この診断を「新鮮」とみなす上限。これを大きく超えたら化石値として数値を伏せる。
     - `voiceDiag.test.js`
     - `voiceDiagKey.js` — 会場モード(comeview)の読み上げ診断 storage キーの正本(producer=comeview / consumer=status で共有)。
+    - `voiceDiagVenuePollSkip.test.js`
     - `voiceEngineActivity.js` — 会場とコメビュで「VOICEVOX がいま使われているか」を分け合う(v0.1.1781)。
     - `voiceEngineActivity.test.js`
     - `voiceEngineOverload.js` — VOICEVOX が混みすぎて合成が時間切れを続けるときの切り替え(純関数)。
