@@ -27,7 +27,7 @@
 
 > 値が次の段へ届かない「断線」(broadcaster バグ型)は `npm run feature-map -- --check` が機械検知。
 
-## ⚠️ 役割コメントが無いソース 15 / 1370 件
+## ⚠️ 役割コメントが無いソース 15 / 1365 件
 - `docs/handoff/bench/bench-interval.mjs`
 - `docs/handoff/bench/bench-lane.mjs`
 - `extension-youtube/cloak-failsafe.js`
@@ -246,7 +246,7 @@
     - `2026-10-06.md`
     - `2026-10-12.md`
     - `2026-10-14.md`
-- 📁 **docs/** (386)
+- 📁 **docs/** (372)
   - 📁 **article-assets/** (87)
     - 📁 **venue-frames/** (12)
       - `f01.png`
@@ -568,10 +568,6 @@
   - `backfill-complete-loading-flow.html`
   - `bug-investigation-loading-scroll-2026-07-10.html`
   - `code-tree.html`
-  - `code-tree.html`
-  - `code-tree.html`
-  - `code-tree.md`
-  - `code-tree.md`
   - `code-tree.md`
   - `codex-commenter-follow-analytics-v0535.md`
   - `codex-event-lane-stuck-fix-v0613.md`
@@ -594,18 +590,12 @@
   - `dist-fingerprint-gate-IMPLEMENTATION-HANDOFF.md`
   - `extension-bump-checklist.md`
   - `feature-sitemap.html`
-  - `feature-sitemap.html`
-  - `feature-sitemap.html`
-  - `feature-sitemap.md`
-  - `feature-sitemap.md`
   - `feature-sitemap.md`
   - `inline-popup-sync.md`
   - `investigation-prompt-popup-not-appearing.md`
   - `kb-web-perf-diagnosis.md`
   - `koken-contrib-hidden-tab-stuck-fix-v0616.md`
   - `lane-architecture-redesign.md`
-  - `layer-map.html`
-  - `layer-map.html`
   - `layer-map.html`
   - `live-comment-heat-chips-DESIGN.md`
   - `live-comment-heat-chips-IMPLEMENTATION-HANDOFF.md`
@@ -634,10 +624,6 @@
   - `referral-commission.md`
   - `reliability-backlog-phase-b.md`
   - `repo-tree-map.html`
-  - `repo-tree-map.html`
-  - `repo-tree-map.html`
-  - `repo-tree-map.md`
-  - `repo-tree-map.md`
   - `repo-tree-map.md`
   - `research-nicolive-pc-comments.md`
   - `self-improvement-loop-DESIGN.md`
@@ -648,7 +634,7 @@
   - `venue-pop-parity-loop-flow.html`
   - `visual-explainer.md`
   - `voice-quality-pipeline-flow.html`
-- 📁 **extension/** (149)
+- 📁 **extension/** (145)
   - 📁 **data/** (1)
     - `ouen-banner.json`
   - 📁 **images/** (87)
@@ -790,12 +776,8 @@
     - `voice-complete.mp3`
     - `voice-watch.mp3`
   - `background.js` — MV3 Service Worker
-  - `background.js` — MV3 Service Worker
-  - `background.js` — MV3 Service Worker
   - `comeview.html`
   - `live-view.html`
-  - `manifest.json`
-  - `manifest.json`
   - `manifest.json`
   - `marketing-export-guard.js` — マーケ分析タブ(marketing-export.html)の「何があっても開く」保険。
   - `marketing-export.html`
@@ -1220,7 +1202,7 @@
   - `gift-coin-hq.wav`
   - `gift-register-hq.wav`
   - `gift-register.mp3`
-- 📁 **src/** (2655)
+- 📁 **src/** (2654)
   - 📁 **data/** (7)
     - 📁 **acquirers/** (2)
       - `laneFromStorage.js` — 応援レーン acquirer: chrome.storage.local(nls_comments) → laneStore の橋渡し。
@@ -1567,7 +1549,7 @@
         - `logo_funlink_white_RGB_link_black.png`
         - `logo_funlink_white_RGB_maru_black.png`
     - `hero-connect-hub.svg`
-  - 📁 **lib/** (2333)
+  - 📁 **lib/** (2332)
     - 📁 **__snapshots__/** (4)
       - `marketing-abema-baseline.html`
       - `marketing-niconico.html`
@@ -1850,6 +1832,8 @@
     - `appStoreBadges.test.js`
     - `appliedEntriesMemo.js` — 大きな記録で「同じ行・同じ控え」なら、正規化と名前・顔の重ね直しの結果を使い回す(v0.1.2023)。
     - `appliedEntriesMemo.test.js`
+    - `applyPopupWindowBounds.js` — 別ウィンドウ popup の外形（幅・高さ）を chrome.windows に渡すための小さな手続き。
+    - `applyPopupWindowBounds.test.js`
     - `arrivalEffect.js` — ニコ生「来場」システムメッセージ(parseArrivalComment.js でパース済み)を、パチンコの
     - `arrivalEffect.test.js`
     - `arrivalNoticeRows.js` — 来場通知を、サイドパネルの内訳と分析レポートで同じ行として数える。
@@ -2025,10 +2009,6 @@
     - `censusWatch.js` — 状態速報の「拡張プロセスの忙しさ(文書別)」を、数字だけで機械的に読む純関数(2026-10-20)。
     - `censusWatch.test.js`
     - `changelog-archive.js` — 追憶のきらめき 更新履歴アーカイブ（popup のバンドル外）。
-    - `changelog-archive.js` — 追憶のきらめき 更新履歴アーカイブ（popup のバンドル外）。
-    - `changelog-archive.js` — 追憶のきらめき 更新履歴アーカイブ（popup のバンドル外）。
-    - `changelog.js` — 拡張の更新履歴データと semver 比較ヘルパ。
-    - `changelog.js` — 拡張の更新履歴データと semver 比較ヘルパ。
     - `changelog.js` — 拡張の更新履歴データと semver 比較ヘルパ。
     - `changelog.test.js`
     - `changelogBundleBudget.test.js`
@@ -2998,6 +2978,7 @@
     - `paintCompletionPipeline.test.js`
     - `paintCompletionProbe.js` — paintCompletionProbe — 「JSが返った時点」でなく【画面に出るまで】を測る(v0.1.1320)。
     - `paintCompletionProbe.test.js`
+    - `paintIsolationStatCards.test.js`
     - `paintPerfLog.js` — v0.1.725: 描画(paint)コストの軽量リングバッファ記録(純関数)。
     - `paintPerfLog.test.js`
     - `paintTopSupportRankStyleIntoElement.js` — 応援帯・公式値レーン（貢献度等）で共通の `nl-top-support-rank` ブロック描画。
@@ -4076,7 +4057,7 @@
   - `kouhaku_og.py`
   - `og-live-compose.py`
   - `render-og.js` — 追憶の煌めき LP 用 OG 画像（1200×630）を生成する。
-- 📁 **tsuioku-no-kirameki/** (84)
+- 📁 **tsuioku-no-kirameki/** (82)
   - 📁 **articles/** (14)
     - 📁 **role-separation-design/** (2)
       - 📁 **img/** (1)
@@ -4170,8 +4151,6 @@
   - `.htaccess`
   - `google7e3e79636d884c2.html`
   - `google7e3e79636d884c2f.html`
-  - `index.html`
-  - `index.html`
   - `index.html`
   - `privacy.html`
   - `robots.txt`
