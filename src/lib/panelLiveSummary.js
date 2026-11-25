@@ -199,3 +199,59 @@ export function watchSnapshotFromPanelSummary(summary) {
 }
 
 export { normalizeSummaryRecentRows, SUMMARY_RECENT_ROWS_MAX };
+
+/**
+ * content の軽量サマリで snapshot の数値（公式・来場・同接）だけを補完する。
+ * タイトル等は panel 側が空のため、既存 snapshot を上書きしない。
+ * v0.1.2228: popup-entry.js から中身を変えずに移した(巨大 entry の行数ラチェット)。
+ *
+ * @template {object} T
+ * @param {T|null} snapshot
+ * @param {unknown} panelSummary
+ * @returns {T|null}
+ */
+export function mergeWatchSnapshotWithPanelSummary(snapshot, panelSummary) {
+  if (!isPanelLiveSummary(panelSummary)) return snapshot;
+  const fromPanel = watchSnapshotFromPanelSummary(
+    /** @type {ReturnType<buildPanelLiveSummary>} */ (
+      panelSummary
+    )
+  );
+  if (!fromPanel) return snapshot;
+  if (!snapshot || typeof snapshot !== 'object') {
+    return /** @type {T} */ (/** @type {unknown} */ (fromPanel));
+  }
+  const out = { ...snapshot };
+  for (const field of [
+    'officialCommentCount',
+    'viewerCountFromDom',
+    'recentActiveUsers',
+    'streamAgeMin',
+    'officialStatsUpdatedAt',
+    'officialStatsFreshnessMs',
+    'officialCommentStatsUpdatedAt',
+    'officialCommentStatsFreshnessMs',
+    'officialViewerIntervalMs',
+    'officialStatisticsCommentsDelta',
+    'officialReceivedCommentsDelta',
+    'officialCommentSampleWindowMs',
+    'officialCaptureRatio'
+  ]) {
+    const value = /** @type {Record<string, unknown>} */ (fromPanel)[field];
+    if (typeof value === 'number' && Number.isFinite(value)) {
+      /** @type {Record<string, unknown>} */ (out)[field] = value;
+    }
+  }
+  // 古い panel / snapshot の officialViewerCount:0 は同接 direct を壊すため載せない。
+  const ovc = /** @type {Record<string, unknown>} */ (fromPanel).officialViewerCount;
+  if (
+    typeof ovc === 'number' &&
+    Number.isFinite(ovc) &&
+    ovc > 0
+  ) {
+    /** @type {Record<string, unknown>} */ (out).officialViewerCount = ovc;
+  } else if (ovc === 0 || ovc === null) {
+    delete /** @type {Record<string, unknown>} */ (out).officialViewerCount;
+  }
+  return /** @type {T} */ (out);
+}

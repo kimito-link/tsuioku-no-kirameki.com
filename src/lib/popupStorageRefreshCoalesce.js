@@ -31,6 +31,7 @@
  *   throttleMs?: number,
  *   slowThrottleMs?: number,
  *   maxAdaptiveMs?: number,
+ *   minIntervalMs?: () => number,
  *   deps?: Partial<CoalesceDeps>
  * }} [opts]
  */
@@ -63,7 +64,19 @@ export function createCoalescedRefreshScheduler(opts = {}) {
   const CYCLE_MIN_COST_MS = 1000;
   /** 描き直し1回まるごとの時間のならし(ms)。0 = 軽い/まだ測っていない */
   let cycleCostEma = 0;
-  const highFreqMs = () => Math.max(throttleMs, Math.min(maxAdaptiveMs, Math.round(Math.max(paintCostEma, cycleCostEma) * COST_FACTOR)));
+  // ★v0.1.2226: 外から渡す「いまの最短間隔」(横の欄は renderCadence.js の共通の決まり=文書の心拍が詰まり気味なら 400/800ms)。
+  //   渡さないとき・読めないときは 0 = 今までと同じ。maxAdaptiveMs と同じく上限で頭打ち。
+  const minIntervalFn = typeof opts.minIntervalMs === 'function' ? opts.minIntervalMs : null;
+  const externalMinMs = () => {
+    if (!minIntervalFn) return 0;
+    try {
+      const v = Number(minIntervalFn());
+      return Number.isFinite(v) && v > 0 ? Math.min(maxAdaptiveMs, v) : 0;
+    } catch {
+      return 0;
+    }
+  };
+  const highFreqMs = () => Math.max(throttleMs, externalMinMs(), Math.min(maxAdaptiveMs, Math.round(Math.max(paintCostEma, cycleCostEma) * COST_FACTOR)));
 
   // 未描画状態は「十分昔に描画した」と等価に扱い、初回の先行描画を必ず通す。
   let lastPaintAt = Number.NEGATIVE_INFINITY;
