@@ -3091,7 +3091,7 @@ function commentTickerDisplayLabel(entry, liveId, entries) {
 
 /** v0.1.1226: ティッカー選定の計器と、直前に選ばれた userId(1人占拠の防止・匿名には効かせない)。 */
 const _tickerPickDiag = makeTickerPickDiag();
-// v0.1.2227: 「直前の人」は7秒バケット単位(同じバケットの中で A↔B を交互に書き直さない)。
+// v0.1.2228: 「直前の人」は7秒バケット単位(同じバケットの中で A↔B を交互に書き直さない)。
 const _tickerLastUser = createTickerLastUserTracker();
 
 /** @param {PopupCommentEntry[]} comments */
@@ -8620,7 +8620,7 @@ function applyStoryGrowthIconAttributes(img, index, isNew, accent) {
   // v0.1.1691: 匿名の仮の顔(SVG)が要求されたとき、メモリに合成済みの顔(PNG)があれば最初からそれを出す(作り直したマスでも仮顔→本顔の差し替えが出ない。レーンと同じ型)。
   const cachedFace = requestedTile.startsWith('data:image/svg+xml') ? cachedAnonymousFace(entry?.userId) : '';
   const displayTile = cachedFace || storyAvatarLoadGuard.pickDisplaySrc(requestedTile);
-  // v0.1.2227 STORY_GROWTH_CELL_MEMO: 書く中身を決める値(顔の読み込み結果・いまの src も含む)が前回と全部同じマスは何も書かない。
+  // v0.1.2228 STORY_GROWTH_CELL_MEMO: 書く中身を決める値(顔の読み込み結果・いまの src も含む)が前回と全部同じマスは何も書かない。
   const memoVals = storyGrowthCellMemoValues(img, entry, index, isNew, accent, stable, selected, requestedTile, displayTile);
   if (accent && STORY_GROWTH_CELL_MEMO.same(img, memoVals)) return; // accent 無し(窓全体に依存)は毎回書く
   // v0.1.1683: 同じ人の合成済みの顔(PNG)が出ているマスは、SVG の仮の顔へ戻して差し替え直さない(無駄な代入とちらつきを止める)。
@@ -8729,7 +8729,7 @@ function createStoryGrowthCell(isNew, index, accent) {
   return cell;
 }
 
-/** v0.1.2227: この syncStoryGrowth で作ったばかりのアイコン(同じ accent で書いた直後=patch で書き直さない。入口と patch の最後で空にする)。 @type {Set<HTMLImageElement>} */
+/** v0.1.2228: この syncStoryGrowth で作ったばかりのアイコン(同じ accent で書いた直後=patch で書き直さない。入口と patch の最後で空にする)。 @type {Set<HTMLImageElement>} */
 const STORY_GROWTH_FRESH_IMGS = new Set();
 
 /**
@@ -16326,7 +16326,7 @@ async function refresh() {
    *   幕だけ t+1238ms まで残る=約1.2秒「中身が見えない」。冪等なので後続は no-op。
    */
   if (shouldRevealCloakAfterFirstPaint({ snapshotCacheHit, freshRefresh: isFreshRefresh() }).revealNow) {
-    // ★v0.1.2227 CACHE_HIT_SINGLE_PAINT: ここでは描かない。下の本描画まで await が無く同じ仕事で続く=以前は同じ描き直しを2回していた。
+    // ★v0.1.2228 CACHE_HIT_SINGLE_PAINT: ここでは描かない。下の本描画まで await が無く同じ仕事で続く=以前は同じ描き直しを2回していた。
     //   await を足すならここで描く形に戻す(popupCacheHitSinglePaint.wiring.test.js)。
   }
 
@@ -17794,7 +17794,7 @@ const coalescedRefreshScheduler = createCoalescedRefreshScheduler({
   //   1.5秒ごとに描き直すと画面が描き直しだけで埋まる。軽い配信(1回 150ms 未満)は 450ms のまま。
   // ★v0.1.1985: 上限を 20秒→60秒に(定期の見回りの門と同じ上限)。間隔は「描き直し1回まるごとの時間」の3倍でも決まるようになった。
   maxAdaptiveMs: 60_000,
-  // ★v0.1.2227: 会場・応援レーンと同じ決まり(renderCadence.js)にも従う=心拍が固まりかけ(200ms 以上)なら 800ms に1回まで。コメントは捨てない。
+  // ★v0.1.2228: 会場・応援レーンと同じ決まり(renderCadence.js)にも従う=心拍が固まりかけ(200ms 以上)なら 800ms に1回まで。コメントは捨てない。
   minIntervalMs: () => resolveListRenderGapMs({ baseMs: 0, recentLagMs: readExtDocRecentLagMs() })
 });
 /**

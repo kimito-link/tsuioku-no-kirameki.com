@@ -1,5 +1,5 @@
 // elementValuesMemo.js — 要素ごとに「前回書いたときの値の並び」を控え、全部同じなら書かずに済ませるための小さな台帳。
-// v0.1.2227: 応援マスのアイコン(popup-entry の applyStoryGrowthIconAttributes)で使う。要素が消えれば控えも消える(WeakMap)。
+// v0.1.2228: 応援マスのアイコン(popup-entry の applyStoryGrowthIconAttributes)で使う。要素が消えれば控えも消える(WeakMap)。
 
 /**
  * @template {object} K

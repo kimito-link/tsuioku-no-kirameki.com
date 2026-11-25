@@ -64,7 +64,7 @@ describe('panelLiveSummary', () => {
   });
 });
 
-describe('mergeWatchSnapshotWithPanelSummary(v0.1.2227 popup-entry から移設・中身は同じ)', () => {
+describe('mergeWatchSnapshotWithPanelSummary(v0.1.2228 popup-entry から移設・中身は同じ)', () => {
   it('panel の数値だけで上書きし、タイトル等は残す。同接 0 は載せない', async () => {
     const { mergeWatchSnapshotWithPanelSummary: merge, buildPanelLiveSummary: build } = await import('./panelLiveSummary.js');
     const summary = build({ liveId: 'lv1', recordedCount: 3, officialCount: 120, officialViewerCount: 0, updatedAt: 1 });

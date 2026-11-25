@@ -203,7 +203,7 @@ export { normalizeSummaryRecentRows, SUMMARY_RECENT_ROWS_MAX };
 /**
  * content の軽量サマリで snapshot の数値（公式・来場・同接）だけを補完する。
  * タイトル等は panel 側が空のため、既存 snapshot を上書きしない。
- * v0.1.2227: popup-entry.js から中身を変えずに移した(巨大 entry の行数ラチェット)。
+ * v0.1.2228: popup-entry.js から中身を変えずに移した(巨大 entry の行数ラチェット)。
  *
  * @template {object} T
  * @param {T|null} snapshot
