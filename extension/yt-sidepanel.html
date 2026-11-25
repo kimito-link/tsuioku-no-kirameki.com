@@ -2859,6 +2859,19 @@
         opacity: 0.85;
       }
 
+      /*
+       * v0.1.2221 PAINT_ISOLATION_STAT_CARDS: コメントが1件届くたびに数字が変わる3枚のカード(記録した件数・同接など)を、
+       *   それぞれ独立した描画の層にする。これまでは横の欄の大きな層の一部として描かれていて、数字が1つ変わるだけで
+       *   周りまで描き直し(ラスタ)が走っていた。層を分けると、変わったカードだけを描き直す。
+       *   箱の実測(GPU切り・8コメ/秒・横の欄+視聴ページ内パネル): 拡張のラスタ時間 1890ms→1104ms/10秒(約4割減)。
+       *   見た目は変わらない(transform の値は付けない=位置・大きさは今のまま)。カードの中に position:fixed の子は無い
+       *   (will-change:transform は fixed の基準を変えるため、カードの中へ fixed の部品を入れないこと)。
+       */
+      #liveStatCards,
+      #liveStatCards > .nl-live-stat-card {
+        will-change: transform;
+      }
+
       .nl-live-stat-cards {
         display: grid;
         grid-template-columns: repeat(3, 1fr);
