@@ -24,6 +24,15 @@
 /** @type {ChangelogEntry[]} */
 const ARCHIVE_ENTRIES = [
   Object.freeze({
+    version: '0.1.2195',
+    date: '2026-11-23',
+    summary: '読み上げONのVOICEVOX未接続時は裏タブの未読を保持',
+    items: Object.freeze([
+      '読み上げを ON にしたまま VOICEVOX 未接続で表タブへ戻ったとき、裏タブ中に溜まった未読バッファを捨てないように修正しました。',
+      '利用者が読み上げを OFF にした瞬間（onToggle）および OFF のまま復帰したときだけ未読バッファをクリアします。',
+    ])
+  }),
+  Object.freeze({
     version: '0.1.2193',
     date: '2026-11-23',
     summary: '裏タブ中に届いたコメントを復帰時に直近3件と件数告知で読み上げ',

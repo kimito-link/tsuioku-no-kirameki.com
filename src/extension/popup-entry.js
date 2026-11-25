@@ -552,6 +552,7 @@ import {
 } from '../lib/viewerCountProbeMerge.js';
 import { yieldToBrowserPaint } from '../lib/yieldToBrowserPaint.js';
 import { createCoalescedRepaintScheduler } from '../lib/coalescedRepaintScheduler.js';
+import { resolveListRenderGapMs, createArrivalRateMeter } from '../lib/renderCadence.js'; import { readExtDocRecentLagMs } from '../lib/extDocBusyCensus.js';
 import { buildStorageRefreshTriggerTag } from '../lib/storageRefreshTriggerKey.js';
 import { prefersReducedMotion } from '../lib/prefersReducedMotion.js';
 import { pushLaneTileSample, summarizeLaneTileOscillation } from '../lib/laneTileOscillation.js';
@@ -5615,8 +5616,7 @@ const _instantPushSentAtByCommentNo = new Map();
  */
 const _instantPushRepaintScheduler = createCoalescedRepaintScheduler(
   () => repaintStoryUserLaneWithInstantPushBuffer(),
-  { minIntervalMs: () => (_panelHidden() ? 1500 : 0) } // v0.1.1816: 隠れている間は1.5秒に1回まで(会場の席の鏡を書くので止めない・理由は scheduler の JSDoc)
-);
+  { minIntervalMs: () => (_panelHidden() ? 1500 : resolveListRenderGapMs({ baseMs: 0, recentLagMs: readExtDocRecentLagMs(), busyChat: _instantPushArrival.isBusy(Date.now()) })) }); const _instantPushArrival = createArrivalRateMeter(); // v0.1.1816: 隠れている間は1.5秒に1回まで(会場の席の鏡を書くので止めない)。v0.1.2218: 見えていてもコメントが速い/詰まり気味なら共通の決まり(renderCadence.js・会場と同じ)で束ねる。件数は届いた数から(タイマーなし)
 /** パネルが「見えているか」(親 content が伝える+document.hidden)。★定期処理はすべてこの判定で止める。 */
 const _panelActivity = createPanelActivity({ isDocHidden: () => typeof document !== 'undefined' && document.hidden === true });
 const _panelHidden = () => _panelActivity.isHidden();
@@ -5876,7 +5876,7 @@ function handleInstantCommentPushMessage(event) {
   // 2026-09-21(段A): 同期直呼びをやめ rAF 束ねに委譲(coalescedRepaintScheduler.js)。
   //   同一tick~同一フレーム内に複数回このハンドラが呼ばれても、実際の repaint(重いDOM再構築)は
   //   1フレームに1回で済む。nonce検証・merge・計器記録(上記まで)は従来通り完全に同期。
-  _instantPushRepaintScheduler.schedule();
+  _instantPushArrival.note(cappedRows.length, handlerAt); _instantPushRepaintScheduler.schedule();
 }
 
 /**
