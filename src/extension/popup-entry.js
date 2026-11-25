@@ -3,6 +3,7 @@
 // v0.1.1580: 拡張プロセスの忙しさ台帳(文書別・ページを開かなくても犯人を名指しする)。import するだけで起動。
 import { createShortLivedMemo } from '../lib/shortLivedMemo.js';
 import { replayClassAnimation } from '../lib/replayClassAnimation.js';
+import { createElementValuesMemo } from '../lib/elementValuesMemo.js';
 import '../lib/extDocBusyCensusBoot.js';
 // v0.1.1686: ちらつき計(サイドパネルの popup だけ・画面の書き換えを数えて状態速報に出す)。import するだけで起動。
 import '../lib/flickerMeterBoot.js';
@@ -489,7 +490,8 @@ import {
 import {
   panelSummaryStorageKey,
   isPanelLiveSummary,
-  watchSnapshotFromPanelSummary
+  watchSnapshotFromPanelSummary,
+  mergeWatchSnapshotWithPanelSummary
 } from '../lib/panelLiveSummary.js';
 import { resolveStoryDiagTotal } from '../lib/storyDiagTotalSource.js';
 import { perfDiagStorageKey, buildPerfDiag } from '../lib/perfDiag.js';
@@ -1246,14 +1248,12 @@ function triggerCharaReaction(iconEl, { delta, thresholds, images }) {
   const bounceClass = `nl-chara-bounce-${rank}`;
 
   /** @type {HTMLImageElement} */ (iconEl).src = images[rank];
-  // v0.1.2223: 強制レイアウト(void offsetWidth)をやめた。同じ段の弾みが動いている最中なら続ける。
   replayClassAnimation(iconEl, bounceClass, CHARA_BOUNCE_CLASSES);
 
   const prev = _charaRevertTimers.get(iconEl);
   if (prev) clearTimeout(prev);
   _charaRevertTimers.set(iconEl, window.setTimeout(() => {
     /** @type {HTMLImageElement} */ (iconEl).src = images.default;
-    // 弾み(最長0.55秒)は終わっている=外しておけば、次のコメントで付けるだけで最初から弾む。
     for (const c of CHARA_BOUNCE_CLASSES) iconEl.classList.remove(c);
     _charaRevertTimers.delete(iconEl);
   }, 600));
@@ -3091,7 +3091,7 @@ function commentTickerDisplayLabel(entry, liveId, entries) {
 
 /** v0.1.1226: ティッカー選定の計器と、直前に選ばれた userId(1人占拠の防止・匿名には効かせない)。 */
 const _tickerPickDiag = makeTickerPickDiag();
-// v0.1.2226: 「直前の人」はバケット単位で決める(同じバケットの中で A↔B を交互に書き直さない・pickTickerHighlight.js)。
+// v0.1.2227: 「直前の人」は7秒バケット単位(同じバケットの中で A↔B を交互に書き直さない)。
 const _tickerLastUser = createTickerLastUserTracker();
 
 /** @param {PopupCommentEntry[]} comments */
@@ -5362,7 +5362,6 @@ function triggerStoryFaceHop(avatarsEl) {
   }
   const face = avatarsEl.querySelector('.nl-story-face');
   if (!face) return;
-  // v0.1.2223: 強制レイアウト(void offsetWidth)をやめた。跳ねている最中なら続ける(後始末タイマーは張り直す)。
   replayClassAnimation(face, 'is-hop');
   STORY_HOP_STATE.clearTimer = window.setTimeout(() => {
     face.classList.remove('is-hop');
@@ -8621,12 +8620,9 @@ function applyStoryGrowthIconAttributes(img, index, isNew, accent) {
   // v0.1.1691: 匿名の仮の顔(SVG)が要求されたとき、メモリに合成済みの顔(PNG)があれば最初からそれを出す(作り直したマスでも仮顔→本顔の差し替えが出ない。レーンと同じ型)。
   const cachedFace = requestedTile.startsWith('data:image/svg+xml') ? cachedAnonymousFace(entry?.userId) : '';
   const displayTile = cachedFace || storyAvatarLoadGuard.pickDisplaySrc(requestedTile);
-  // v0.1.2223 STORY_GROWTH_CELL_MEMO: 書く中身を決める値が前回と全部同じマスは、何も書かない。
-  //   以前はコメント1件ごとに全マス(最大で数百)を書き直し、読み込み途中の顔の読み込みもやり直していた。
-  //   顔の読み込み結果・合成済みの顔・いまの src も値に含める=どれかが変われば従来どおり書き直す。
+  // v0.1.2227 STORY_GROWTH_CELL_MEMO: 書く中身を決める値(顔の読み込み結果・いまの src も含む)が前回と全部同じマスは何も書かない。
   const memoVals = storyGrowthCellMemoValues(img, entry, index, isNew, accent, stable, selected, requestedTile, displayTile);
-  // accent が無い呼び出し(従来の per-cell 計算)は窓全体に依存するので、比べずに毎回書く。
-  if (accent && sameStoryGrowthCellMemo(img, memoVals)) return;
+  if (accent && STORY_GROWTH_CELL_MEMO.same(img, memoVals)) return; // accent 無し(窓全体に依存)は毎回書く
   // v0.1.1683: 同じ人の合成済みの顔(PNG)が出ているマスは、SVG の仮の顔へ戻して差し替え直さない(無駄な代入とちらつきを止める)。
   if (!isAnonymousFaceShown(img, entry?.userId, displayTile)) {
     storyGrowthImgAssignSrc(img, displayTile);
@@ -8701,46 +8697,16 @@ function applyStoryGrowthIconAttributes(img, index, isNew, accent) {
       : `${index + 1}件目`
   );
   setAttrIfChanged(img, 'alt', '');
-  // 書き終えた後の src(代入や読み込みの判断で変わる)で控える。
-  memoVals[memoVals.length - 1] = img.getAttribute('src') || '';
+  memoVals[memoVals.length - 1] = img.getAttribute('src') || ''; // 書き終えた後の src で控える
   STORY_GROWTH_CELL_MEMO.set(img, memoVals);
 }
 
-/** @type {WeakMap<HTMLImageElement, unknown[]>} */
-const STORY_GROWTH_CELL_MEMO = new WeakMap();
-
-/**
- * マスに書く中身を決める値(安い順に並べる)。最後の要素は「いまの src」。
- * @returns {unknown[]}
- */
+const STORY_GROWTH_CELL_MEMO = createElementValuesMemo();
+/** マスに書く中身を決める値。最後の要素は「いまの src」。 @returns {unknown[]} */
 function storyGrowthCellMemoValues(img, entry, index, isNew, accent, stable, selected, requestedTile, displayTile) {
-  return [
-    entry ? 1 : 0,
-    index,
-    isNew,
-    stable,
-    selected,
-    requestedTile,
-    displayTile,
-    accent ? accent.ordinal : -1,
-    accent ? accent.total : -1,
-    (STORY_GROWTH_STATE.sourceOffset || 0) > 0,
-    storyHoverPreviewEnabled(),
-    STORY_SOURCE_STATE.liveId,
-    entry?.commentNo,
-    entry?.userId,
-    entry?.text,
-    storyGrowthDisplayLabel(entry, STORY_SOURCE_STATE.liveId),
-    img.getAttribute('src') || ''
-  ];
-}
-
-/** @param {HTMLImageElement} img @param {unknown[]} vals */
-function sameStoryGrowthCellMemo(img, vals) {
-  const prev = STORY_GROWTH_CELL_MEMO.get(img);
-  if (!prev || prev.length !== vals.length) return false;
-  for (let i = 0; i < vals.length; i += 1) if (prev[i] !== vals[i]) return false;
-  return true;
+  return [entry ? 1 : 0, index, isNew, stable, selected, requestedTile, displayTile, accent ? accent.ordinal : -1, accent ? accent.total : -1,
+    (STORY_GROWTH_STATE.sourceOffset || 0) > 0, storyHoverPreviewEnabled(), STORY_SOURCE_STATE.liveId, entry?.commentNo, entry?.userId, entry?.text,
+    storyGrowthDisplayLabel(entry, STORY_SOURCE_STATE.liveId), img.getAttribute('src') || ''];
 }
 
 /**
@@ -8763,14 +8729,7 @@ function createStoryGrowthCell(isNew, index, accent) {
   return cell;
 }
 
-/**
- * v0.1.2223 STORY_GROWTH_NO_FORCED_REFLOW: この syncStoryGrowth の中で作ったばかりのアイコン。
- *   createStoryGrowthCell が同じ窓・同じ accent で属性を書いた直後なので、続く patch では書き直さない。
- *   syncStoryGrowth の入口と patch の最後で空にする(作った回の中だけ有効=古い値のまま飛ばすことはない)。
- *   あわせて patch の「is-new」は、付いていなければ付けるだけにした(以前は毎回 `void last.offsetWidth` で
- *   レイアウトを強制していた。遅い PC の実測(4倍遅い CPU・8コメ/秒)で、横の欄の処理の約1割がこれだった)。
- * @type {Set<HTMLImageElement>}
- */
+/** v0.1.2227: この syncStoryGrowth で作ったばかりのアイコン(同じ accent で書いた直後=patch で書き直さない。入口と patch の最後で空にする)。 @type {Set<HTMLImageElement>} */
 const STORY_GROWTH_FRESH_IMGS = new Set();
 
 /**
@@ -8814,7 +8773,6 @@ function patchStoryGrowthIconsFromSource(root, opts = {}) {
   } catch { /* 計器の失敗は描画を止めない */ }
   for (let i = 0; i < n; i += 1) {
     const img = /** @type {HTMLImageElement} */ (imgs[i]);
-    // 作ったばかりのマスは createStoryGrowthCell が同じ窓・同じ accent で書いた直後=書き直さない。
     if (STORY_GROWTH_FRESH_IMGS.has(img)) continue;
     applyStoryGrowthIconAttributes(img, i, false, {
       ordinal: accent.ordinals[i] || 0,
@@ -8824,7 +8782,6 @@ function patchStoryGrowthIconsFromSource(root, opts = {}) {
   noteStoryGrowthIdentitiesNow(n);
   if (opts.pulseLast && n > 0) {
     const last = /** @type {HTMLImageElement} */ (imgs[n - 1]);
-    // 強制レイアウトなしで鳴らす(作ったばかりのマスは is-new 無し=付けるだけで最初から動く)。
     if (replayClassAnimation(last, 'is-new')) window.setTimeout(() => last.classList.remove('is-new'), 820);
   }
   STORY_GROWTH_FRESH_IMGS.clear();
@@ -9712,60 +9669,6 @@ function paintOfficialNdgrGiftCard(snap) {
 
 let _prevConcurrentEstimated = /** @type {number|null} */ (null);
 let _prevViewerCount = /** @type {number|null} */ (null);
-
-/**
- * content の軽量サマリで snapshot の数値（公式・来場・同接）だけを補完する。
- * タイトル等は panel 側が空のため、既存 snapshot を上書きしない。
- *
- * @param {WatchPageSnapshot|null} snapshot
- * @param {unknown} panelSummary
- * @returns {WatchPageSnapshot|null}
- */
-function mergeWatchSnapshotWithPanelSummary(snapshot, panelSummary) {
-  if (!isPanelLiveSummary(panelSummary)) return snapshot;
-  const fromPanel = watchSnapshotFromPanelSummary(
-    /** @type {ReturnType<import('../lib/panelLiveSummary.js').buildPanelLiveSummary>} */ (
-      panelSummary
-    )
-  );
-  if (!fromPanel) return snapshot;
-  if (!snapshot || typeof snapshot !== 'object') {
-    return /** @type {WatchPageSnapshot} */ (fromPanel);
-  }
-  const out = { ...snapshot };
-  for (const field of [
-    'officialCommentCount',
-    'viewerCountFromDom',
-    'recentActiveUsers',
-    'streamAgeMin',
-    'officialStatsUpdatedAt',
-    'officialStatsFreshnessMs',
-    'officialCommentStatsUpdatedAt',
-    'officialCommentStatsFreshnessMs',
-    'officialViewerIntervalMs',
-    'officialStatisticsCommentsDelta',
-    'officialReceivedCommentsDelta',
-    'officialCommentSampleWindowMs',
-    'officialCaptureRatio'
-  ]) {
-    const value = /** @type {Record<string, unknown>} */ (fromPanel)[field];
-    if (typeof value === 'number' && Number.isFinite(value)) {
-      /** @type {Record<string, unknown>} */ (out)[field] = value;
-    }
-  }
-  // 古い panel / snapshot の officialViewerCount:0 は同接 direct を壊すため載せない。
-  const ovc = /** @type {Record<string, unknown>} */ (fromPanel).officialViewerCount;
-  if (
-    typeof ovc === 'number' &&
-    Number.isFinite(ovc) &&
-    ovc > 0
-  ) {
-    out.officialViewerCount = ovc;
-  } else if (ovc === 0 || ovc === null) {
-    delete /** @type {Record<string, unknown>} */ (out).officialViewerCount;
-  }
-  return /** @type {WatchPageSnapshot} */ (out);
-}
 
 /**
  * content からの NLS_EXPORT_PANEL_METRICS をカードに即反映する。
@@ -16423,14 +16326,8 @@ async function refresh() {
    *   幕だけ t+1238ms まで残る=約1.2秒「中身が見えない」。冪等なので後続は no-op。
    */
   if (shouldRevealCloakAfterFirstPaint({ snapshotCacheHit, freshRefresh: isFreshRefresh() }).revealNow) {
-    /*
-     * ★v0.1.2226 CACHE_HIT_SINGLE_PAINT: ここでは描かない(幕も下の本描画の直後に外す)。
-     *   キャッシュヒットのときは、ここから下の本描画(「thumbCountEl … → paintWatchPopupUi()」)まで await が1つも無く、
-     *   同じ仕事の中で続けて走る。以前はここでも描いていたので、画面に出る前に上書きされる全く同じ描き直しを
-     *   毎回2回していた(箱の実測: 横の欄の描き直しの約4割がこれ。遅い PC では長いタスクの元)。
-     *   幕が外れる時刻は変わらない(同じ仕事の中)。下までに await を足すときは、ここで描く形に戻すこと
-     *   (popupCacheHitSinglePaint.wiring.test.js が見張る)。
-     */
+    // ★v0.1.2227 CACHE_HIT_SINGLE_PAINT: ここでは描かない。下の本描画まで await が無く同じ仕事で続く=以前は同じ描き直しを2回していた。
+    //   await を足すならここで描く形に戻す(popupCacheHitSinglePaint.wiring.test.js)。
   }
 
   if (!snapshotCacheHit) {
@@ -17897,10 +17794,7 @@ const coalescedRefreshScheduler = createCoalescedRefreshScheduler({
   //   1.5秒ごとに描き直すと画面が描き直しだけで埋まる。軽い配信(1回 150ms 未満)は 450ms のまま。
   // ★v0.1.1985: 上限を 20秒→60秒に(定期の見回りの門と同じ上限)。間隔は「描き直し1回まるごとの時間」の3倍でも決まるようになった。
   maxAdaptiveMs: 60_000,
-  // ★v0.1.2226: コメントで動く描き直しの間隔は、会場・応援レーンと同じ共通の決まり(renderCadence.js)にも従う。
-  //   この文書の心拍が詰まり気味(60ms 以上)なら 400ms、固まりかけ(200ms 以上)なら 800ms に1回まで。余裕のある PC は 450ms のまま。
-  //   遅い PC の実測(CPU 4倍遅く・8コメ/秒)で、横の欄の描き直しが終わった直後に次が始まり、長いタスクの大半がこれだった。
-  //   コメントは捨てない(描き直しは毎回 storage から全部読み直す)。新しいタイマー・見張りは無い(心拍は既存の計器)。
+  // ★v0.1.2227: 会場・応援レーンと同じ決まり(renderCadence.js)にも従う=心拍が固まりかけ(200ms 以上)なら 800ms に1回まで。コメントは捨てない。
   minIntervalMs: () => resolveListRenderGapMs({ baseMs: 0, recentLagMs: readExtDocRecentLagMs() })
 });
 /**

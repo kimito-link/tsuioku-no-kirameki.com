@@ -35,7 +35,7 @@ describe('応援マス: 変わっていないマスは書き直さない', () =>
   });
   it('書く中身を決める値が全部同じなら何も書かない(顔の読み込み結果・いまの src も値に入れる)', () => {
     const apply = bodyOf('function applyStoryGrowthIconAttributes(');
-    expect(apply).toMatch(/if \(accent && sameStoryGrowthCellMemo\(img, memoVals\)\) return;/);
+    expect(apply).toMatch(/if \(accent && STORY_GROWTH_CELL_MEMO\.same\(img, memoVals\)\) return;/);
     expect(apply).toContain('STORY_GROWTH_CELL_MEMO.set(img, memoVals)');
     const vals = bodyOf('function storyGrowthCellMemoValues(');
     for (const k of ['requestedTile', 'displayTile', 'selected', 'accent.total', 'accent.ordinal', "img.getAttribute('src')", 'storyHoverPreviewEnabled()', 'storyGrowthDisplayLabel(']) {
