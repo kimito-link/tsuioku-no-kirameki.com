@@ -244,14 +244,20 @@ export function sectionPlatformDedicatedHtml(comments, view, pageCount, pageFact
   const spends = Array.isArray(extra?.estimatedSpends) ? extra.estimatedSpends : [];
   /** @type {string[]} */
   const spendNotes = [];
-  if (spends.length) {
-    for (const sp of spends) {
+  const viewerSpends = spends.filter((sp) => sp.key !== 'estimatedStreamerTakeHome');
+  if (viewerSpends.length) {
+    for (const sp of viewerSpends) {
       cards.push([sp.label, sp.text]);
       spendNotes.push(`${sp.note}（出典: ${sp.sourceUrl}）`);
     }
   } else if (ESTIMATED_VIEWER_SPEND_PLATFORMS.includes(view.id)) {
     cards.push([ESTIMATED_VIEWER_SPEND_LABEL, '—']);
     spendNotes.push(ESTIMATED_VIEWER_SPEND_EMPTY_NOTE);
+  }
+  // 配信者の受取（推定）は視聴者の推定のすぐ後ろ。公式の率が無いサービスは理由つきの「—」(v0.1.2225)
+  for (const sp of spends.filter((x) => x.key === 'estimatedStreamerTakeHome')) {
+    cards.push([sp.label, sp.text]);
+    spendNotes.push(sp.sourceUrl ? `${sp.note}（${sp.sourceUrl}）` : sp.note);
   }
   if (view.pageCountLabel && pageCount > 0) cards.push([view.pageCountLabel, `${pageCount.toLocaleString('ja-JP')}`]);
   for (const [cur, sum] of byCur) {
@@ -293,7 +299,7 @@ export function sectionPlatformDedicatedHtml(comments, view, pageCount, pageFact
     for (const chip of panelExtraChips(view.id, pageFacts)) {
       if (chip.placeholder) continue;
       if (chip.key === 'totalViews' && pageCount > 0) continue;
-      if (chip.key === 'estimatedViewerSpend' || chip.key === 'estimatedViewerConsumption') continue;
+      if (chip.key === 'estimatedViewerSpend' || chip.key === 'estimatedViewerConsumption' || chip.key === 'estimatedStreamerTakeHome') continue;
       cards.push([`ページの${chip.label}`, chip.text]);
     }
   }

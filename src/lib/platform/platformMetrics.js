@@ -26,7 +26,9 @@ import {
   ESTIMATED_VIEWER_SPEND_LABEL,
   ESTIMATED_VIEWER_SPEND_EMPTY_TITLE,
   ESTIMATED_VIEWER_SPEND_PLATFORMS,
-  isSupportEventRow
+  isSupportEventRow,
+  estimateStreamerTakeHomeJpy,
+  formatStreamerTakeHomeDisplay
 } from '../estimatedViewerSpend.js';
 
 /** 能力表を持つサービス。ABEMA は記録の実装が別の変更にあるので、数字の枠だけを先に置く。 */
@@ -894,7 +896,26 @@ function estimateChips(id, est, extraTitle = '') {
  * @param {any} support
  * @returns {Array<{ key: string, label: string, text: string, unit: string, placeholder: boolean, title: string }>}
  */
+/** 受取（推定）のチップ。推定（視聴者の購入額）のすぐ後ろに置く(v0.1.2225) @param {string} id @param {any} support */
+function takeHomeChip(id, support) {
+  const d = formatStreamerTakeHomeDisplay(id, estimateStreamerTakeHomeJpy(id, support));
+  return { key: d.key, label: d.label, text: d.text, unit: '', placeholder: d.placeholder, title: d.title };
+}
+
 function supportChips(id, support) {
+  const base = supportChipsBase(id, support);
+  if (!base.length || !TAKE_HOME_CHIP_PLATFORMS.has(id)) return base;
+  // 推定（視聴者の購入額・消費）の直後に受取（推定）を置く。率の無いサービスは理由つきの「—」(v0.1.2225)
+  let at = 0;
+  while (at < base.length && /^estimat/.test(base[at].key)) at += 1;
+  return [...base.slice(0, at), takeHomeChip(id, support), ...base.slice(at)];
+}
+
+/** 受取（推定）のチップを出すサービス(応援を記録するサービス全部。式があるのは YouTube・Kick・Twitch だけ) */
+const TAKE_HOME_CHIP_PLATFORMS = new Set(['youtube', 'twitch', 'kick', 'twitcasting', 'mixch', 'tiktok', 'showroom', 'whowatch']);
+
+/** @param {string} id @param {any} support */
+function supportChipsBase(id, support) {
   if (!support || support.ready !== true) return [];
   const amounts = support.amounts && typeof support.amounts === 'object' ? support.amounts : {};
   const native = support.nativeTotals && typeof support.nativeTotals === 'object' ? support.nativeTotals : {};

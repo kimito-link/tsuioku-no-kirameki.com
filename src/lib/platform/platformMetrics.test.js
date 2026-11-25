@@ -128,18 +128,18 @@ describe('venueItemsForPlatform', () => {
     const items = venueItemsForPlatform('youtube', bag({ support: ytSupport() }));
     const paid = items.find((i) => i.key === 'superchat');
     expect(paid.label).toBe('スパチャ');
-    expect(paid.text).toBe('¥1,200');
+    expect(paid.text).toBe('¥1,200 · 3件'); // v0.1.2225: 件数を添える(ほかの通貨のスパチャでも数字が動く)
     expect(paid.title).toContain('USD 5');
     expect(paid.title).toContain('このPCの記録');
     // v0.1.2207: 推定が先頭、メンバー加入・メンバーギフトは 1 以上のとき出す
-    expect(items.map((i) => i.key).slice(3)).toEqual(['estimatedViewerSpend', 'superchat', 'members', 'memberGifts']);
+    expect(items.map((i) => i.key).slice(3)).toEqual(['estimatedViewerSpend', 'estimatedStreamerTakeHome', 'superchat', 'members', 'memberGifts']);
     expect(items.find((i) => i.key === 'members').text).toBe('1人');
     expect(items.find((i) => i.key === 'memberGifts').text).toBe('4件');
   });
 
   it('スパチャが無い YouTube は、0円の枠を出さず「推定 —」だけ出す(v0.1.2207)', () => {
     const items = venueItemsForPlatform('youtube', bag({ support: tallySupportItems([]) }));
-    expect(items.map((i) => i.label)).toEqual(['記録', '同時視聴者数', '経過', '推定（視聴者の購入額）']);
+    expect(items.map((i) => i.label)).toEqual(['記録', '同時視聴者数', '経過', '推定（視聴者の購入額）', '推定（配信者の受取）']);
     const est = items.find((i) => i.key === 'estimatedViewerSpend');
     expect(est.text).toBe('—');
     expect(est.isPlaceholder).toBe(true);
@@ -155,7 +155,7 @@ describe('venueItemsForPlatform', () => {
       { kind: 'tw_raid', amount: 40 },
     ]);
     const items = venueItemsForPlatform('twitch', bag({ viewers: 10, support }));
-    expect(items.map((i) => i.label)).toEqual(['記録', '視聴者数', '経過', '推定（視聴者の購入額）', 'Bits', 'サブスク', 'ギフトサブ', 'レイド']);
+    expect(items.map((i) => i.label)).toEqual(['記録', '視聴者数', '経過', '推定（視聴者の購入額）', '推定（配信者の受取）', 'Bits', 'サブスク', 'ギフトサブ', 'レイド']);
     expect(items.find((i) => i.key === 'estimatedViewerSpend').title).toContain('Bits は円にしていません');
     expect(items.find((i) => i.key === 'bits').text).toBe('300');
     expect(items.find((i) => i.key === 'raids').text).toBe('1');
@@ -190,7 +190,7 @@ describe('venueItemsForPlatform', () => {
       { kind: 'membership_gift', giftCount: 1 },
     ]);
     const labels = venueItemsForPlatform('kick', bag({ support })).map((i) => i.label);
-    expect(labels).toEqual(['記録', '視聴者数', '経過', '推定（視聴者の購入額）', 'Kicks', 'サブスク', 'ギフトサブ', 'ホスト']);
+    expect(labels).toEqual(['記録', '視聴者数', '経過', '推定（視聴者の購入額）', '推定（配信者の受取）', 'Kicks', 'サブスク', 'ギフトサブ', 'ホスト']);
   });
 
   it('Kick のホストは回数と人数を数える(v0.1.2207)', () => {

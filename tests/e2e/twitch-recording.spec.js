@@ -15,6 +15,7 @@ import https from 'node:https';
 import { execFileSync } from 'node:child_process';
 import { fileURLToPath } from 'node:url';
 import { WebSocketServer } from 'ws';
+import { captureSupportEvidence } from './supportEvidence.js';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const extensionPath = path.resolve(__dirname, '../../extension');
@@ -365,4 +366,5 @@ test('Twitch のチャットを記録し、送信も届く', async ({ context, i
       return e ? `${e.textContent}|${e.classList.contains('is-ready')}|${/emoticons\/v2\/25\//.test(/** @type {HTMLElement} */ (e).style.backgroundImage)}|${row}` : '';
     }), { timeout: 20_000 })
     .toBe('|true|true|わこつ');
+  await captureSupportEvidence(ext, 'twitch');
 });

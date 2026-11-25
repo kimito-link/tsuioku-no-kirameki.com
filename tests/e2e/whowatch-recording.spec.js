@@ -8,6 +8,7 @@ import { test as base, chromium, expect } from '@playwright/test';
 import { readStreamSummary } from './readStreamSummary.js';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
+import { captureSupportEvidence } from './supportEvidence.js';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const extensionPath = path.resolve(__dirname, '../../extension');
@@ -217,6 +218,7 @@ test('ふわっちの配信とコメントを記録し、送信も届く', async
   const n = asked.length;
   await page.waitForTimeout(4000);
   expect(asked.length).toBe(n);
+  await captureSupportEvidence(ext, 'whowatch');
 });
 
 test('ページから API を読めない(CORS・拒否)ときは、バックグラウンドが代わりに読む', async ({ context }) => {

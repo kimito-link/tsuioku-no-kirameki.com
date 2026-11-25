@@ -14,6 +14,7 @@ import https from 'node:https';
 import { execFileSync } from 'node:child_process';
 import { fileURLToPath } from 'node:url';
 import { WebSocketServer } from 'ws';
+import { captureSupportEvidence } from './supportEvidence.js';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const extensionPath = path.resolve(__dirname, '../../extension');
@@ -303,4 +304,5 @@ test('ツイキャスのコメント・ギフト(🍡)・ページの数を記�
   await expect
     .poll(async () => Number((await readStreamSummary(sw, KEY))?.endedAt || 0), { timeout: 70_000 })
     .toBeGreaterThan(0);
+  await captureSupportEvidence(ext, 'twitcasting');
 });

@@ -26,8 +26,13 @@ import {
   estimateNiconicoGiftSpendJpy,
   estimateViewerSpendFromComments,
   formatEstimatedViewerSpendDisplays,
-  formatEstimatedViewerSpendDisplay
+  formatEstimatedViewerSpendDisplay,
+  estimateStreamerTakeHomeFromComments,
+  formatStreamerTakeHomeDisplay
 } from './estimatedViewerSpend.js';
+
+/** 振り返りで受取（推定）を出すサービス(応援を記録するサービス。金額は公式の率がある YouTube・Kick・Twitch だけ) */
+const MARKETING_TAKE_HOME_PLATFORMS = new Set(['youtube', 'twitch', 'kick', 'twitcasting', 'mixch', 'tiktok', 'showroom', 'whowatch']);
 import { buildCommenterFollowAnalytics } from './commenterFollowAnalytics.js';
 import { buildUserProfileLinkedLabelHtml } from './userProfileLinkHtml.js';
 import {
@@ -3534,7 +3539,11 @@ export function buildMarketingDashboardHtml(r, opts = {}) {
         positiveMarketingNumber(giftMomentum?.totals?.totalPoints);
       return formatEstimatedViewerSpendDisplays(estimateNiconicoGiftSpendJpy(nicoGiftPts));
     }
-    return formatEstimatedViewerSpendDisplays(estimateViewerSpendFromComments(view.id, commentsRaw));
+    const viewer = formatEstimatedViewerSpendDisplays(estimateViewerSpendFromComments(view.id, commentsRaw));
+    // 配信者の受取（推定）。公式の率・単価があるサービス(YouTube・Kick・Twitch)だけ金額、ほかは理由つきの「—」(v0.1.2225)
+    if (!MARKETING_TAKE_HOME_PLATFORMS.has(view.id)) return viewer;
+    const th = formatStreamerTakeHomeDisplay(view.id, estimateStreamerTakeHomeFromComments(view.id, commentsRaw));
+    return [...viewer, { key: th.key, label: th.label, text: th.text, title: th.title, note: th.note, sourceUrl: th.sourceUrl, asOf: th.asOf }];
   })();
   // v0.1.2207: 前回までの配信との応援の比較(同じサービスの直近 4 配信まで・同じ式)。重い書き出しでは計算しない。
   const supportCompare = view && opts.slimForHeavyExport !== true
@@ -4045,7 +4054,7 @@ function sectionKpi(r, gap, followerSeries, estimatedSpends) {
     cards.push({
       label: sp.label,
       value: sp.text,
-      icon: sp.key === 'estimatedViewerConsumption' ? '🎫' : '💴'
+      icon: sp.key === 'estimatedViewerConsumption' ? '🎫' : sp.key === 'estimatedStreamerTakeHome' ? '🤝' : '💴'
     });
   }
   if (participation && participation.totalVisitors > 0) {

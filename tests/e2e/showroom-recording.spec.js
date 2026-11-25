@@ -14,6 +14,7 @@ import https from 'node:https';
 import { execFileSync } from 'node:child_process';
 import { fileURLToPath } from 'node:url';
 import { WebSocketServer } from 'ws';
+import { captureSupportEvidence } from './supportEvidence.js';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const extensionPath = path.resolve(__dirname, '../../extension');
@@ -283,4 +284,5 @@ test('SHOWROOM のコメント・ギフト・公式の順位を記録し、送�
   await expect
     .poll(async () => Number((await readStreamSummary(sw, KEY))?.endedAt || 0), { timeout: 45_000 })
     .toBeGreaterThan(0);
+  await captureSupportEvidence(ext, 'showroom');
 });
