@@ -18,6 +18,16 @@
 /** @type {readonly ChangelogEntry[]} */
 export const EXTENSION_CHANGELOG = Object.freeze([
   Object.freeze({
+    version: '0.1.2229',
+    date: '2026-11-25',
+    summary: 'この版で変わったことを短く・版番号から説明へ',
+    items: Object.freeze([
+      '更新したあとに出る「この版で変わったこと」を、版番号と一言だけの短い表示にしました。版番号か「詳しく」を押すと、紹介ページのその版の説明が新しいタブで開きます。',
+      'ポップアップの更新履歴も、版ごとに一言だけにしました。版番号を押すと、紹介ページでその版の詳しい説明が開きます。「詳しい状況」の欄にある版番号も同じように開けます。',
+      '紹介ページに、すべての版の更新履歴（tsuioku-no-kirameki.com/changelog.html）を置きました。版ごとに決まった場所があるので、拡張から開いたリンクがあとで切れることはありません。',
+    ])
+  }),
+  Object.freeze({
     version: '0.1.2226',
     date: '2026-11-25',
     summary: '紹介ページの最初を、配信する人向けの説明にしました',

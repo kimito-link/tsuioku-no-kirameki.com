@@ -15,6 +15,7 @@
  *   6. 紹介LP の掲載【版数】が package と一致（版数表記は常に追従）
  *   7. ★紹介LP の掲載【内容】が何版ぶん止まっているか（警告のみ・載せることは強制しない）
  *   8. 紹介LP の「この版で変わったこと」が今の版のユーザー向け説明と一致（無い・古いと失敗）
+ *   9. 紹介ページの全版一覧 changelog.html に今の版の id="v<版>" があり、changelog と一致（無い・古いと失敗）
  *
  * 失敗したら exit 1。CI でも手元でも回せる。
  */
@@ -294,9 +295,26 @@ console.log(`\n[8] 紹介LP の「この版で変わったこと」が今の版�
   }
 }
 
+// [9] 紹介ページの全版一覧（changelog.html）に今の版の場所があり、changelog と一致するか
+//    拡張の版番号・「詳しく」は https://tsuioku-no-kirameki.com/changelog.html#v<版> を開く。
+//    無いとリンクが一覧の先頭に落ちるので赤にする（npm run build で自動で書き直される）。
+console.log(`\n[9] 紹介ページの全版一覧（changelog.html）に v${pkg.version} がある`);
+{
+  const { LP_CHANGELOG_PAGE_PATH, buildLpChangelogPageHtml } = await import('./lp-changelog-page.mjs');
+  const id = `id="v${pkg.version}"`;
+  const html = fs.existsSync(LP_CHANGELOG_PAGE_PATH) ? fs.readFileSync(LP_CHANGELOG_PAGE_PATH, 'utf8') : '';
+  if (!html.includes(id)) {
+    fail(`tsuioku-no-kirameki/changelog.html に ${id} が無い。npm run build（または node scripts/lp-changelog-page.mjs）で書き直してください`);
+  } else if (html !== buildLpChangelogPageHtml()) {
+    fail('tsuioku-no-kirameki/changelog.html が changelog と違う。npm run build で書き直してください');
+  } else {
+    log.ok(`changelog.html#v${pkg.version} あり・changelog と一致`);
+  }
+}
+
 console.log();
 if (failed > 0) {
   console.log(`\x1b[31m✗ ${failed} 件失敗。ship 前に解消してください。\x1b[0m`);
   process.exit(1);
 }
-console.log('\x1b[32m✓ 全 8 ステップ OK。Chrome をリロードすれば反映されるはず。\x1b[0m');
+console.log('\x1b[32m✓ 全 9 ステップ OK。Chrome をリロードすれば反映されるはず。\x1b[0m');

@@ -13,6 +13,7 @@ import {
 } from '../src/lib/distFingerprint.js';
 import { ytBuildTargets, writeYtMergedHtml } from './youtube-build.mjs';
 import { stampSwScript } from '../src/lib/swScriptStamp.js';
+import { writeLpChangelogPage } from './lp-changelog-page.mjs';
 
 // .env を読み込む(status の共有キー NL_STATUS_INGEST_KEY / NL_STATUS_VIEW_TOKEN は .env から注入)。
 //   ★これが無いと `npm run build` が空キービルドになり、status の「WEBサイトURLで共有」ボタンが
@@ -271,6 +272,9 @@ const targets = [
 // 2026-11-05 りんく「メインに統合したい(ダウンロード数を分けたくない)」: YouTube 版を本体に同梱する。
 //   束は extension/dist/yt-*.js、画面は extension/yt-*.html(ニコ生版の画面の完全コピー)。書き換えと入口は scripts/youtube-build.mjs。
 writeYtMergedHtml();
+// 0.1.2229: 紹介ページの全版一覧(tsuioku-no-kirameki/changelog.html)を changelog から書き直す。
+//   拡張の版番号・「詳しく」はここの #v<版> へ飛ぶ。版を上げて build すれば自動でそろう。
+writeLpChangelogPage();
 targets.push(...ytBuildTargets({ merged: true, define: popupDefine }));
 
 const results = await Promise.all(targets.map((t) => esbuild.build({ ...common, ...t, metafile: true })));

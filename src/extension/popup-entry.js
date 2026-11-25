@@ -467,7 +467,7 @@ import {
   normalizeRecentCheerKeys
 } from '../lib/cheerPalette.js';
 import { EXTENSION_CHANGELOG } from '../lib/changelog.js';
-import { wireWhatsNewNotice } from './whatsNewNoticeUi.js';
+import { wireWhatsNewNotice, applyLpChangelogLink } from './whatsNewNoticeUi.js';
 import { detectCommentKindnessNudge } from '../lib/commentKindnessNudge.js';
 import { resolveCommentKindnessDisplayModel } from '../lib/commentKindnessDisplayModel.js';
 import {
@@ -18525,6 +18525,8 @@ function paintVersionBadge() {
     const buildId =
       typeof NL_BUILD_ID !== 'undefined' && NL_BUILD_ID ? String(NL_BUILD_ID) : 'dev';
     valueEl.textContent = `v${version}・b${buildId}`;
+    // 0.1.2229: 版番号を押すと紹介ページのその版の説明を開く。
+    applyLpChangelogLink($('nlVersionBadge'), version);
   } catch {
     valueEl.textContent = '—';
   }
@@ -21395,9 +21397,11 @@ async function initPopup() {
       li.className = 'nl-changelog-entry';
       const head = document.createElement('div');
       head.className = 'nl-changelog-entry__head';
-      const ver = document.createElement('span');
+      // 0.1.2229: 版番号は紹介ページのその版（詳しい説明）を新しいタブで開くリンク。
+      const ver = document.createElement('a');
       ver.className = 'nl-changelog-entry__version';
       ver.textContent = `v${entry.version}`;
+      applyLpChangelogLink(ver, entry.version);
       const date = document.createElement('span');
       date.className = 'nl-changelog-entry__date';
       date.textContent = entry.date;
@@ -21407,15 +21411,8 @@ async function initPopup() {
       head.appendChild(ver);
       head.appendChild(date);
       head.appendChild(summary);
-      const ul = document.createElement('ul');
-      ul.className = 'nl-changelog-entry__items';
-      for (const item of entry.items) {
-        const itemLi = document.createElement('li');
-        itemLi.textContent = item;
-        ul.appendChild(itemLi);
-      }
+      // 0.1.2229: 項目の全文は紹介ページで読む（ここに並べると長くて使いづらい）。
       li.appendChild(head);
-      li.appendChild(ul);
       changelogListEl.appendChild(li);
     }
   }
