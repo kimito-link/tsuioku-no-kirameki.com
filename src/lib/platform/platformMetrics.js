@@ -888,6 +888,12 @@ function estimateChips(id, est, extraTitle = '') {
   }];
 }
 
+/** 受取（推定）のチップ。推定（視聴者の購入額）のすぐ後ろに置く(v0.1.2225) @param {string} id @param {any} support */
+function takeHomeChip(id, support) {
+  const d = formatStreamerTakeHomeDisplay(id, estimateStreamerTakeHomeJpy(id, support));
+  return { key: d.key, label: d.label, text: d.text, unit: '', placeholder: d.placeholder, title: d.title };
+}
+
 /**
  * 数えた合計のチップ。まだ数えていなければ出さない(0 と「まだ数えていない」を混ぜない)。
  *   並び(v0.1.2207・全サービス共通): 推定 → そのサービスの単位の合計 → 件数 → 反応 → (公式の数) → 数え始め。
@@ -896,12 +902,6 @@ function estimateChips(id, est, extraTitle = '') {
  * @param {any} support
  * @returns {Array<{ key: string, label: string, text: string, unit: string, placeholder: boolean, title: string }>}
  */
-/** 受取（推定）のチップ。推定（視聴者の購入額）のすぐ後ろに置く(v0.1.2225) @param {string} id @param {any} support */
-function takeHomeChip(id, support) {
-  const d = formatStreamerTakeHomeDisplay(id, estimateStreamerTakeHomeJpy(id, support));
-  return { key: d.key, label: d.label, text: d.text, unit: '', placeholder: d.placeholder, title: d.title };
-}
-
 function supportChips(id, support) {
   const base = supportChipsBase(id, support);
   if (!base.length || !TAKE_HOME_CHIP_PLATFORMS.has(id)) return base;

@@ -24,6 +24,15 @@
 /** @type {ChangelogEntry[]} */
 const ARCHIVE_ENTRIES = [
   Object.freeze({
+    version: '0.1.2198',
+    date: '2026-11-23',
+    summary: 'ニコ生の常駐タイマーを共通スケジューラへ集約し裏タブを間引き',
+    items: Object.freeze([
+      'ニコ生視聴ページ（content-entry.js）の常駐タイマー 6 本（360ms 枠更新・550ms パネルスキャン・4s 配信ID監視・5s 公式DOM・45s 統計・120s deep harvest）を共通ページ監視スケジューラへ集約しました。',
+      '表タブの間隔とスクロール中見送り保護はそのまま維持し、裏タブでは間引きまたは停止、bfcache 復帰時は pageshow で再開します。',
+    ])
+  }),
+  Object.freeze({
     version: '0.1.2197',
     date: '2026-11-23',
     summary: 'YouTube チャットの監視を共通 Observer ハブへ統合',
