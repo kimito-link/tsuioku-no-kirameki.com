@@ -38,7 +38,7 @@ describe('応援マス: 変わっていないマスは書き直さない', () =>
     expect(apply).toMatch(/if \(accent && STORY_GROWTH_CELL_MEMO\.same\(img, memoVals\)\) return;/);
     expect(apply).toContain('STORY_GROWTH_CELL_MEMO.set(img, memoVals)');
     const vals = bodyOf('function storyGrowthCellMemoValues(');
-    for (const k of ['requestedTile', 'displayTile', 'selected', 'accent.total', 'accent.ordinal', "img.getAttribute('src')", 'storyHoverPreviewEnabled()', 'storyGrowthDisplayLabel(']) {
+    for (const k of ['requestedTile', 'displayTile', 'selected', 'accent.total', 'accent.ordinal', 'img.className', "img.getAttribute('src')", 'storyHoverPreviewEnabled()', 'storyGrowthDisplayLabel(']) {
       expect(vals).toContain(k);
     }
   });

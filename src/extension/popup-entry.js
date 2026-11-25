@@ -8697,16 +8697,16 @@ function applyStoryGrowthIconAttributes(img, index, isNew, accent) {
       : `${index + 1}件目`
   );
   setAttrIfChanged(img, 'alt', '');
-  memoVals[memoVals.length - 1] = img.getAttribute('src') || ''; // 書き終えた後の src で控える
+  memoVals[memoVals.length - 2] = img.className; memoVals[memoVals.length - 1] = img.getAttribute('src') || ''; // 書き終えた後の class/src で控える(外から足された class も従来どおり書き直す)
   STORY_GROWTH_CELL_MEMO.set(img, memoVals);
 }
 
 const STORY_GROWTH_CELL_MEMO = createElementValuesMemo();
-/** マスに書く中身を決める値。最後の要素は「いまの src」。 @returns {unknown[]} */
+/** マスに書く中身を決める値。最後の2つは「いまの class・src」。 @returns {unknown[]} */
 function storyGrowthCellMemoValues(img, entry, index, isNew, accent, stable, selected, requestedTile, displayTile) {
   return [entry ? 1 : 0, index, isNew, stable, selected, requestedTile, displayTile, accent ? accent.ordinal : -1, accent ? accent.total : -1,
     (STORY_GROWTH_STATE.sourceOffset || 0) > 0, storyHoverPreviewEnabled(), STORY_SOURCE_STATE.liveId, entry?.commentNo, entry?.userId, entry?.text,
-    storyGrowthDisplayLabel(entry, STORY_SOURCE_STATE.liveId), img.getAttribute('src') || ''];
+    storyGrowthDisplayLabel(entry, STORY_SOURCE_STATE.liveId), img.className, img.getAttribute('src') || ''];
 }
 
 /**
