@@ -18,6 +18,14 @@
 /** @type {readonly ChangelogEntry[]} */
 export const EXTENSION_CHANGELOG = Object.freeze([
   Object.freeze({
+    version: '0.1.2223',
+    date: '2026-11-25',
+    summary: '紹介ページの最初を、配信する人向けの説明にしました',
+    items: Object.freeze([
+      '紹介ページ（tsuioku-no-kirameki.com）のいちばん上に、配信する人向けのまとめを置きました。名前を呼んでお礼を言える・声でだれか分かる・会場になる・配信のあとに振り返れる、の4つを「いままで」と「これから」で並べ、始め方3つ・記録の行き先・よくある質問・Chrome ウェブストアへのボタンをまとめています。拡張の動きは変わりません。',
+    ])
+  }),
+  Object.freeze({
     version: '0.1.2222',
     date: '2026-11-25',
     summary: '別窓の幅が広がったままにならないようにした',
@@ -187,16 +195,6 @@ export const EXTENSION_CHANGELOG = Object.freeze([
     items: Object.freeze([
       '診断 JSON ダンプ（status-latest.json・既定 OFF）と status.html の JSON ダウンロードに、YouTube・Twitch・Kick・ふわっち・SHOWROOM・ミクチャ・ツイキャス・TikTok・ABEMA の計器スナップショットと開いている視聴タブ一覧（最大 30 件）を追加しました。',
       '固定ホワイトリストの計器キーと既存ホスト権限のみを使い、全 storage のダンプや権限追加は行いません。',
-    ])
-  }),
-  Object.freeze({
-    version: '0.1.2199',
-    date: '2026-11-23',
-    summary: '全サービスへ孤児タブ自動復帰・診断間引き・会場負荷抑制を横展開',
-    items: Object.freeze([
-      'Twitch・Kick・ミクチャ・SHOWROOM・ふわっち・ツイキャス・TikTok・ABEMA・YouTube チャットに拡張更新後の自動復帰（orphanTabAutoReload）を配線しました。',
-      'Kick・ミクチャ・SHOWROOM のランキング定期タイマーを共通スケジューラ（裏タブ停止）へ移行し、Twitch・Kick の診断書き込みを差分・間隔抑制つき書き手へ統一しました。',
-      '会場モードで閉鎖中・しまい中・裏タブの吹き出し位置再計算と読み上げ OFF 時の裏タブ発言ポーリングを抑止しました。',
     ])
   })
 ]);
