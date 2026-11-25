@@ -26,8 +26,8 @@
 //   突合し、ズレていれば画面上部にバナーを出す。詳細は src/lib/versionMismatch.js の背景コメント参照。
 // v0.1.1580: 拡張プロセスの忙しさ台帳(文書別・ページを開かなくても犯人を名指しする)。import するだけで起動。
 import '../lib/extDocBusyCensusBoot.js';
-import { lpChangelogUrl } from '../lib/lpChangelogLink.js';
 import { detectVersionMismatch } from '../lib/versionMismatch.js';
+import { lpChangelogUrl } from '../lib/lpChangelogLink.js';
 import { stallOverviewLine } from '../lib/stallTrace.js';
 // 拡張リロード後も残る status.html からの storage 操作を安全な helper に集約する。
 import {
@@ -602,17 +602,14 @@ async function bootstrap() {
   } catch {
     /* no-op */
   }
-  // バージョン + ビルド ID 表示(popup と同じ `v<version>・build<id>`)。
-  //   v0.1.642: ビルド番号だけだと「今どのバージョンか」が分からず紛らわしいので
-  //   manifest の version も併記する(watch パネルの「ビルド v0.1.642・b...」と揃える)。
+  // バージョン + ビルド ID 表示。v0.1.642: manifest の version も併記(watch パネルの「ビルド v…・b…」と揃える)。
   const buildIdEl = document.getElementById('metaBuildId');
   if (buildIdEl) {
     try {
       const ver = String(chrome.runtime.getManifest()?.version || '').trim();
       const bid = typeof NL_BUILD_ID !== 'undefined' ? NL_BUILD_ID : '?';
       buildIdEl.textContent = (ver ? `v${ver} · ` : '') + 'build ' + bid;
-      // 0.1.2229: 版番号を押すと紹介ページのその版の説明を開く（<a target="_blank">）。
-      if (ver) buildIdEl.setAttribute('href', lpChangelogUrl(ver));
+      if (ver) buildIdEl.setAttribute('href', lpChangelogUrl(ver)); // 0.1.2229: 押すと紹介ページのその版の説明(<a target="_blank">)
     } catch {
       buildIdEl.textContent = 'build ' + (typeof NL_BUILD_ID !== 'undefined' ? NL_BUILD_ID : '?');
     }
