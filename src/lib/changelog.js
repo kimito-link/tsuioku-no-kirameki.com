@@ -18,6 +18,15 @@
 /** @type {readonly ChangelogEntry[]} */
 export const EXTENSION_CHANGELOG = Object.freeze([
   Object.freeze({
+    version: '0.1.2221',
+    date: '2026-11-25',
+    summary: 'コメントが届くたびの画面の描き直しを小さく',
+    items: Object.freeze([
+      'コメントが届くたびに、横の欄やページ内パネルの広い範囲を描き直していました。数字が変わる「記録した件数・同接・応援」のカードだけを描き直すようにして、PC の負担を減らしました。見た目は変わりません。設定はいりません。',
+      '画面の描画を CPU だけで行う条件で、1秒に8件のコメントが届く配信を試しました。画面を描く処理は約4割減り、拡張の CPU 使用は約1割減りました。CPU を4分の1の速さにした PC を想定した試験では、減り方は小さめ（約3%）です。',
+    ])
+  }),
+  Object.freeze({
     version: '0.1.2219',
     date: '2026-11-25',
     summary: '更新したら「この版で変わったこと」が出ます',
@@ -189,16 +198,6 @@ export const EXTENSION_CHANGELOG = Object.freeze([
     items: Object.freeze([
       'ニコ生視聴ページ（content-entry.js）の常駐タイマー 6 本（360ms 枠更新・550ms パネルスキャン・4s 配信ID監視・5s 公式DOM・45s 統計・120s deep harvest）を共通ページ監視スケジューラへ集約しました。',
       '表タブの間隔とスクロール中見送り保護はそのまま維持し、裏タブでは間引きまたは停止、bfcache 復帰時は pageshow で再開します。',
-    ])
-  }),
-  Object.freeze({
-    version: '0.1.2197',
-    date: '2026-11-23',
-    summary: 'YouTube チャットの監視を共通 Observer ハブへ統合',
-    items: Object.freeze([
-      'YouTube ライブチャットの 4 つの DOM 監視（新着・遅延アイコン・スパチャ送信後・購入窓検出）を共通の MutationObserver ハブへ統合しました。',
-      '混雑チャットでのバッチ集約・件数上限・スクロール中見送り（domHarvestScrollDefer 再利用）と overflow 時の全体回収を入れ、定期スキャンも共通スケジューラ（裏タブ 10 秒間引き）へ移行しました。',
-      'ABEMA のチャット受信で同一配信キー内の chatId 表記揺れによる重複取り込み（seen 誤リセット）を防止しました。',
     ])
   })
 ]);

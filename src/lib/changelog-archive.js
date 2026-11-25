@@ -24,6 +24,16 @@
 /** @type {ChangelogEntry[]} */
 const ARCHIVE_ENTRIES = [
   Object.freeze({
+    version: '0.1.2197',
+    date: '2026-11-23',
+    summary: 'YouTube チャットの監視を共通 Observer ハブへ統合',
+    items: Object.freeze([
+      'YouTube ライブチャットの 4 つの DOM 監視（新着・遅延アイコン・スパチャ送信後・購入窓検出）を共通の MutationObserver ハブへ統合しました。',
+      '混雑チャットでのバッチ集約・件数上限・スクロール中見送り（domHarvestScrollDefer 再利用）と overflow 時の全体回収を入れ、定期スキャンも共通スケジューラ（裏タブ 10 秒間引き）へ移行しました。',
+      'ABEMA のチャット受信で同一配信キー内の chatId 表記揺れによる重複取り込み（seen 誤リセット）を防止しました。',
+    ])
+  }),
+  Object.freeze({
     version: '0.1.2196',
     date: '2026-11-23',
     summary: 'ふわっち・ツイキャス・TikTok・ABEMA の復帰再接続を修正',
