@@ -7,6 +7,8 @@ import { describe, it, expect } from 'vitest';
 import { tallySupportItems, panelExtraChips } from './platformMetrics.js';
 import { isSupportEventRow } from '../estimatedViewerSpend.js';
 import { isMarketingSupportRow } from '../marketingAggregate.js';
+import { aggregateMarketingReport } from '../marketingAggregate.js';
+import { buildMarketingDashboardHtml } from '../marketingChartsHtml.js';
 import { buildYtGiftBags } from '../../../extension-youtube/src/ytGiftToNico.js';
 
 const PLATFORM_OF_PREFIX = { 'tw:': 'twitch', 'kk:': 'kick', 'sr:': 'showroom', 'mx:': 'mixch', 'tt:': 'tiktok', 'ww:': 'whowatch', 'tc:': 'twitcasting' };
@@ -108,5 +110,21 @@ describe('演出と数字が同じ応援を数える(全サービス)', () => {
     const chips = panelExtraChips('youtube', { support: tallySupportItems([g]) });
     expect(chips.find((c) => c.key === 'ytGifts')?.text).toBe('1件');
     expect(tallySupportItems([g]).amounts).toEqual({});
+  });
+
+  it('YouTube: 振り返りのスパチャ件数・ギフト件数が横の欄と同じ', () => {
+    const rows = STREAMS.youtube.map((r, i) => ({ text: '', name: `n${i}`, ...r, id: `y-${i}`, recordedAt: 1000 + i }));
+    const chips = panelExtraChips('youtube', { support: tallySupportItems(rows) });
+    const scCount = String(chips.find((c) => c.key === 'superchat')?.text).split(' · ')[1];
+    const giftCount = chips.find((c) => c.key === 'ytGifts')?.text;
+    const comments = rows.map((r, i) => ({ ...toEntry(r), liveId: 'lv900000000001', commentNo: String(i + 1), avatarUrl: '', ytChannelId: r.channelId, ytPlatform: 'youtube' }));
+    const html = buildMarketingDashboardHtml(aggregateMarketingReport(comments, 'lv900000000001'), { platform: 'youtube', commentsForAnalytics: comments });
+    const card = (/** @type {string} */ label) => {
+      const m = html.match(new RegExp(`mkt-kpi__val">([^<]+)</span><span class="mkt-kpi__label">${label}<`));
+      return m ? m[1] : null;
+    };
+    expect(scCount).toBe('3件');
+    expect(card('スーパーチャット・ステッカーの件数（記録）')).toBe(scCount);
+    expect(card('ギフトの件数（記録）')).toBe(giftCount);
   });
 });

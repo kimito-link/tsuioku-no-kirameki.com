@@ -175,6 +175,8 @@ export function sectionPlatformDedicatedHtml(comments, view, pageCount, pageFact
   let milestoneMax = 0;
   /** ギフト・アイテムの名前がある応援の行数(件数のカード・v0.1.2207) */
   let giftRows = 0;
+  /** YouTube のスーパーチャット・ステッカーの件数(横の欄の「スパチャ N件」と同じ数・v0.1.2225) */
+  let paidChatRows = 0;
   /** @type {number[]} */
   const months = [];
   for (const c of rows) {
@@ -205,6 +207,7 @@ export function sectionPlatformDedicatedHtml(comments, view, pageCount, pageFact
       if (!prev.unit) prev.unit = unit;
       giftNames.set(giftName, prev);
     }
+    if (kind === 'superchat' || kind === 'sticker') paidChatRows += 1;
     if (EXTRA_KIND_LABEL[kind]) extraKinds.set(kind, (extraKinds.get(kind) || 0) + 1);
     if (kind === 'tw_milestone' && Number.isFinite(amt) && amt > 0) milestoneMax = Math.max(milestoneMax, Math.floor(amt));
     if (kind === 'tw_raid') {
@@ -263,7 +266,11 @@ export function sectionPlatformDedicatedHtml(comments, view, pageCount, pageFact
   for (const [cur, sum] of byCur) {
     cards.push([CURRENCY_LABEL[cur] || `${cur} の合計（記録）`, String(sum)]);
   }
-  if (giftRows > 0) cards.push([`${view.giftWord || 'ギフト'}の件数（記録）`, `${giftRows.toLocaleString('ja-JP')}件`]);
+  if (view.id === 'youtube') {
+    // YouTube で名前のある応援はジュエルのギフトだけ。スパチャの件数とは分けて、横の欄と同じ言葉で出す(v0.1.2225)
+    if (paidChatRows > 0) cards.push(['スーパーチャット・ステッカーの件数（記録）', `${paidChatRows.toLocaleString('ja-JP')}件`]);
+    if (giftRows > 0) cards.push(['ギフトの件数（記録）', `${giftRows.toLocaleString('ja-JP')}件`]);
+  } else if (giftRows > 0) cards.push([`${view.giftWord || 'ギフト'}の件数（記録）`, `${giftRows.toLocaleString('ja-JP')}件`]);
   if (subs > 0) cards.push(['新しいサブスク', `${subs}件`]);
   if (resubs > 0) cards.push(['継続のサブスク', `${resubs}件`]);
   if (giftSubs > 0) cards.push(['ギフトサブ', `${giftSubs}件`]);
