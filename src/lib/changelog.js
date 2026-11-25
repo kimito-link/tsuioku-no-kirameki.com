@@ -18,6 +18,15 @@
 /** @type {readonly ChangelogEntry[]} */
 export const EXTENSION_CHANGELOG = Object.freeze([
   Object.freeze({
+    version: '0.1.2223',
+    date: '2026-11-25',
+    summary: '遅いPCでも横の欄がコメントで詰まりにくく',
+    items: Object.freeze([
+      'コメントが届くたびに、横の欄の処理が画面の配置をその場で何度も計算し直していました（応援マスの「新しく来た」光り方、キャラの弾み、顔のぴょん）。計算し直しを待たずに動かす形に変えて、遅い PC でも詰まりにくくしました。コメントが速いときは、動いている最中の弾みを最初からやり直さず、そのまま最後まで動かします。設定はいりません。',
+      'コメントが届くたびに応援マスを全部書き直していたのをやめ、中身が変わったマスだけを書き直すようにしました。読み込み途中のアイコンも、途中でやり直さずに最後まで読み込めます。',
+    ])
+  }),
+  Object.freeze({
     version: '0.1.2221',
     date: '2026-11-25',
     summary: 'コメントが届くたびの画面の描き直しを小さく',
@@ -189,15 +198,6 @@ export const EXTENSION_CHANGELOG = Object.freeze([
       'Twitch・Kick・ミクチャ・SHOWROOM・ふわっち・ツイキャス・TikTok・ABEMA・YouTube チャットに拡張更新後の自動復帰（orphanTabAutoReload）を配線しました。',
       'Kick・ミクチャ・SHOWROOM のランキング定期タイマーを共通スケジューラ（裏タブ停止）へ移行し、Twitch・Kick の診断書き込みを差分・間隔抑制つき書き手へ統一しました。',
       '会場モードで閉鎖中・しまい中・裏タブの吹き出し位置再計算と読み上げ OFF 時の裏タブ発言ポーリングを抑止しました。',
-    ])
-  }),
-  Object.freeze({
-    version: '0.1.2198',
-    date: '2026-11-23',
-    summary: 'ニコ生の常駐タイマーを共通スケジューラへ集約し裏タブを間引き',
-    items: Object.freeze([
-      'ニコ生視聴ページ（content-entry.js）の常駐タイマー 6 本（360ms 枠更新・550ms パネルスキャン・4s 配信ID監視・5s 公式DOM・45s 統計・120s deep harvest）を共通ページ監視スケジューラへ集約しました。',
-      '表タブの間隔とスクロール中見送り保護はそのまま維持し、裏タブでは間引きまたは停止、bfcache 復帰時は pageshow で再開します。',
     ])
   })
 ]);

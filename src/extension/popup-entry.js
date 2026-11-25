@@ -6094,9 +6094,12 @@ function getStoryEntryByStableId(stableId) {
   return null;
 }
 
+/** v0.1.2223: 問い合わせ(MediaQueryList)は1つを使い回す。matches は生きた値なので、マウスの抜き差しにも追従する。 */
+let _storyHoverMql = /** @type {MediaQueryList|null} */ (null);
 function storyHoverPreviewEnabled() {
   if (typeof window.matchMedia !== 'function') return false;
-  return window.matchMedia('(hover: hover) and (pointer: fine)').matches;
+  if (!_storyHoverMql) _storyHoverMql = window.matchMedia('(hover: hover) and (pointer: fine)');
+  return _storyHoverMql.matches;
 }
 
 function cancelStoryHoverClearTimer() {
@@ -8611,6 +8614,12 @@ function applyStoryGrowthIconAttributes(img, index, isNew, accent) {
   // v0.1.1691: 匿名の仮の顔(SVG)が要求されたとき、メモリに合成済みの顔(PNG)があれば最初からそれを出す(作り直したマスでも仮顔→本顔の差し替えが出ない。レーンと同じ型)。
   const cachedFace = requestedTile.startsWith('data:image/svg+xml') ? cachedAnonymousFace(entry?.userId) : '';
   const displayTile = cachedFace || storyAvatarLoadGuard.pickDisplaySrc(requestedTile);
+  // v0.1.2223 STORY_GROWTH_CELL_MEMO: 書く中身を決める値が前回と全部同じマスは、何も書かない。
+  //   以前はコメント1件ごとに全マス(最大で数百)を書き直し、読み込み途中の顔の読み込みもやり直していた。
+  //   顔の読み込み結果・合成済みの顔・いまの src も値に含める=どれかが変われば従来どおり書き直す。
+  const memoVals = storyGrowthCellMemoValues(img, entry, index, isNew, accent, stable, selected, requestedTile, displayTile);
+  // accent が無い呼び出し(従来の per-cell 計算)は窓全体に依存するので、比べずに毎回書く。
+  if (accent && sameStoryGrowthCellMemo(img, memoVals)) return;
   // v0.1.1683: 同じ人の合成済みの顔(PNG)が出ているマスは、SVG の仮の顔へ戻して差し替え直さない(無駄な代入とちらつきを止める)。
   if (!isAnonymousFaceShown(img, entry?.userId, displayTile)) {
     storyGrowthImgAssignSrc(img, displayTile);
@@ -8685,6 +8694,46 @@ function applyStoryGrowthIconAttributes(img, index, isNew, accent) {
       : `${index + 1}件目`
   );
   setAttrIfChanged(img, 'alt', '');
+  // 書き終えた後の src(代入や読み込みの判断で変わる)で控える。
+  memoVals[memoVals.length - 1] = img.getAttribute('src') || '';
+  STORY_GROWTH_CELL_MEMO.set(img, memoVals);
+}
+
+/** @type {WeakMap<HTMLImageElement, unknown[]>} */
+const STORY_GROWTH_CELL_MEMO = new WeakMap();
+
+/**
+ * マスに書く中身を決める値(安い順に並べる)。最後の要素は「いまの src」。
+ * @returns {unknown[]}
+ */
+function storyGrowthCellMemoValues(img, entry, index, isNew, accent, stable, selected, requestedTile, displayTile) {
+  return [
+    entry ? 1 : 0,
+    index,
+    isNew,
+    stable,
+    selected,
+    requestedTile,
+    displayTile,
+    accent ? accent.ordinal : -1,
+    accent ? accent.total : -1,
+    (STORY_GROWTH_STATE.sourceOffset || 0) > 0,
+    storyHoverPreviewEnabled(),
+    STORY_SOURCE_STATE.liveId,
+    entry?.commentNo,
+    entry?.userId,
+    entry?.text,
+    storyGrowthDisplayLabel(entry, STORY_SOURCE_STATE.liveId),
+    img.getAttribute('src') || ''
+  ];
+}
+
+/** @param {HTMLImageElement} img @param {unknown[]} vals */
+function sameStoryGrowthCellMemo(img, vals) {
+  const prev = STORY_GROWTH_CELL_MEMO.get(img);
+  if (!prev || prev.length !== vals.length) return false;
+  for (let i = 0; i < vals.length; i += 1) if (prev[i] !== vals[i]) return false;
+  return true;
 }
 
 /**
