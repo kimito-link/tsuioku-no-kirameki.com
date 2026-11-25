@@ -632,6 +632,7 @@
 | `src/lib/aiShareFullText.js` | 1 | 状態速報ページ |
 | `src/lib/aiShareTextChanged.js` | 1 | 状態速報ページ |
 | `src/lib/appliedEntriesMemo.js` | 1 | ポップアップ(応援レーン) |
+| `src/lib/applyPopupWindowBounds.js` | 1 | ポップアップ(応援レーン) |
 | `src/lib/audienceEngagementGap.js` | 1 | ポップアップ(応援レーン) |
 | `src/lib/autoBackupState.js` | 1 | 記録エンジン(watchページ常駐) |
 | `src/lib/autoPublishDecision.js` | 1 | 状態速報ページ |

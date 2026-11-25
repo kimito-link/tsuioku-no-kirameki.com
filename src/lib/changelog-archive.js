@@ -24,6 +24,15 @@
 /** @type {ChangelogEntry[]} */
 const ARCHIVE_ENTRIES = [
   Object.freeze({
+    version: '0.1.2200',
+    date: '2026-11-23',
+    summary: '状態ダンプ（JSON）にニコ生以外のサービス計器・タブ一覧を追加',
+    items: Object.freeze([
+      '診断 JSON ダンプ（status-latest.json・既定 OFF）と status.html の JSON ダウンロードに、YouTube・Twitch・Kick・ふわっち・SHOWROOM・ミクチャ・ツイキャス・TikTok・ABEMA の計器スナップショットと開いている視聴タブ一覧（最大 30 件）を追加しました。',
+      '固定ホワイトリストの計器キーと既存ホスト権限のみを使い、全 storage のダンプや権限追加は行いません。',
+    ])
+  }),
+  Object.freeze({
     version: '0.1.2199',
     date: '2026-11-23',
     summary: '全サービスへ孤児タブ自動復帰・診断間引き・会場負荷抑制を横展開',

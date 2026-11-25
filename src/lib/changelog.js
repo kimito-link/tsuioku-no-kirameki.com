@@ -18,6 +18,14 @@
 /** @type {readonly ChangelogEntry[]} */
 export const EXTENSION_CHANGELOG = Object.freeze([
   Object.freeze({
+    version: '0.1.2226',
+    date: '2026-11-25',
+    summary: '紹介ページの最初を、配信する人向けの説明にしました',
+    items: Object.freeze([
+      '紹介ページ（tsuioku-no-kirameki.com）のいちばん上に、配信する人向けのまとめを置きました。名前を呼んでお礼を言える・声でだれか分かる・会場になる・配信のあとに振り返れる、の4つを「いままで」と「これから」で並べ、始め方3つ・記録の行き先・よくある質問・Chrome ウェブストアへのボタンをまとめています。拡張の動きは変わりません。',
+    ])
+  }),
+  Object.freeze({
     version: '0.1.2224',
     date: '2026-11-25',
     summary: '別窓の会場でも、声と吹き出しが同時に',
@@ -188,15 +196,6 @@ export const EXTENSION_CHANGELOG = Object.freeze([
     items: Object.freeze([
       'YouTube のスーパーチャット・スーパーステッカーとニコ生の有料ギフト pt のみを対象に、会場・横欄・マーケ分析レポートへ「推定（視聴者の購入額）」チップ/KPI カードを追加しました（配信者の手取りは表示しません）。',
       'ニコニコポイントの標準単価（2026-11-23 確認）と ECB 基準為替レート（2026-11-20 確定値）を日付・出典 URL つきで 1 ファイル（estimatedViewerSpend.js）に集約しました。',
-    ])
-  }),
-  Object.freeze({
-    version: '0.1.2200',
-    date: '2026-11-23',
-    summary: '状態ダンプ（JSON）にニコ生以外のサービス計器・タブ一覧を追加',
-    items: Object.freeze([
-      '診断 JSON ダンプ（status-latest.json・既定 OFF）と status.html の JSON ダウンロードに、YouTube・Twitch・Kick・ふわっち・SHOWROOM・ミクチャ・ツイキャス・TikTok・ABEMA の計器スナップショットと開いている視聴タブ一覧（最大 30 件）を追加しました。',
-      '固定ホワイトリストの計器キーと既存ホスト権限のみを使い、全 storage のダンプや権限追加は行いません。',
     ])
   })
 ]);
