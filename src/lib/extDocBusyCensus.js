@@ -343,3 +343,53 @@ export function formatExtProcessCensusLines(rec, nowMs) {
   }
   return lines;
 }
+
+/** v0.1.2214: 直近の遅れの EMA の重み(1秒の心拍ごと・約5秒で入れ替わる)。 */
+export const EXT_RECENT_LAG_ALPHA = 0.2;
+
+/**
+ * 直近の遅れ(心拍のずれ)を EMA で畳む(純関数)。負のずれ(早く来た)は 0 として畳む。
+ * @param {number} prev
+ * @param {unknown} lagMs
+ * @returns {number}
+ */
+export function foldRecentLagMs(prev, lagMs) {
+  const p = Number.isFinite(Number(prev)) && Number(prev) > 0 ? Number(prev) : 0;
+  const raw = Number(lagMs);
+  const d = Number.isFinite(raw) && raw > 0 ? Math.min(raw, 10_000) : 0;
+  return p + (d - p) * EXT_RECENT_LAG_ALPHA;
+}
+
+/**
+ * この文書の直近の遅れ[ms]を読む(extDocBusyCensusBoot が起動していなければ 0)。読むだけ・副作用なし。
+ * @returns {number}
+ */
+export function readExtDocRecentLagMs() {
+  try {
+    const c = /** @type {any} */ (globalThis).__nlsExtDocBusyCensus;
+    const v = c && typeof c.recentLagMs === 'function' ? Number(c.recentLagMs()) : 0;
+    return Number.isFinite(v) && v > 0 ? v : 0;
+  } catch {
+    return 0;
+  }
+}
+
+/**
+ * v0.1.2215: storage.onChanged を数えない文書。
+ * ■ なぜ: onChanged は「聞いている文書」ごとに、書かれた値(コメントのテール 最大2,000行など)を丸ごと受け取って作り直す。
+ *   次の文書は自分では onChanged を聞いておらず、この計器だけが聞いていた=計器のためだけに、記録が書かれるたびに
+ *   全文を受け取っていた。とくに offscreen は IndexedDB の書き手で、記録の通り道そのもの。
+ *   - offscreen(IndexedDB の書き手) / sidepanel(横の欄の外枠。中身の popup は別文書で自分で聞く)
+ *   - voice-native-guide / marketing-export(開いている間だけの画面)
+ * ■ この文書で onChanged を使い始めたら、ここから外すこと(extDocBusyCensusOnChangedSkip.test.js が dist で見張る)。
+ */
+export const EXT_CENSUS_ONCHANGED_SKIP_SURFACES = Object.freeze(['offscreen', 'sidepanel', 'voice-native-guide', 'marketing-export']);
+
+/**
+ * この文書で storage.onChanged を数えるか。
+ * @param {string} surface detectExtSurface の結果
+ * @returns {boolean}
+ */
+export function shouldCensusCountOnChanged(surface) {
+  return !EXT_CENSUS_ONCHANGED_SKIP_SURFACES.includes(String(surface || ''));
+}

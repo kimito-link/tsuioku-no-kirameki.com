@@ -105,7 +105,9 @@ describe('VoicePlayer: VOICEVOX が混雑中は軽い声で読む', () => {
     });
   }
 
-  it('混雑中は軽い声を読みながら、実コメントの指定声を作り続ける', async () => {
+  // v0.1.2213(りんく決定「ぜんぶやって」): 混雑中は実コメントを VOICEVOX に頼まず、確かめの「てすと」だけ頼む
+  //   (2026-11-16〜0.1.2212 は実コメントを作り続けていた=VOICEVOX の CPU が空かず混雑が解けなかった)。
+  it('混雑中は軽い声で読み、VOICEVOX には確かめの短い文だけ頼む(実コメントは頼まない)', async () => {
     const synth = fakeSynth();
     const fetchSynthesizeVoice = vi.fn(() => new Promise(() => {}));
     const p = makePlayer(createLightSpeaker({ synth, Utterance: FakeUtterance }), fetchSynthesizeVoice);
@@ -118,7 +120,9 @@ describe('VoicePlayer: VOICEVOX が混雑中は軽い声で読む', () => {
     expect(synth.spoken.map((u) => u.text).join('|')).toContain('やっほー');
     expect(synth.spoken.length).toBe(2);
     expect(onAudioStart).toHaveBeenCalled();
-    expect(fetchSynthesizeVoice).toHaveBeenCalledTimes(1); // 実コメントの合成1回。中断して次を重ねない
+    expect(fetchSynthesizeVoice).toHaveBeenCalledTimes(1); // 確かめ1回。終わるまで次を重ねない
+    expect(String(fetchSynthesizeVoice.mock.calls[0][0])).toBe('てすと');
+    expect(p.diag.lightProbeTotal).toBe(1);
     expect(p.diag.lightSpokenTotal).toBe(2);
     expect(p.diag.lightVoiceActive).toBe(true);
   });
@@ -133,7 +137,8 @@ describe('VoicePlayer: VOICEVOX が混雑中は軽い声で読む', () => {
     p.enqueue([{ kind: 'comment', userId: 'u1', nickname: 'A', text: 'やっほー' }]);
     await new Promise((r) => setTimeout(r, 30));
     expect(p.diag.lightSpokenTotal).toBe(1); // 1分ならまだ軽い声
-    expect(p.diag.lightProbeTotal).toBe(0); // 試験文ではなく実コメントを合成
+    expect(p.diag.lightProbeTotal).toBe(1); // v0.1.2213: 実コメントではなく確かめの文を頼む
+    expect(fetchSynthesizeVoice.mock.calls.every((c) => String(c[0]) === 'てすと')).toBe(true);
     expect(p.diag.voiceOverloadRetryTotal).toBe(0);
     p._overload.overloadedAt = Date.now() - 121_000;
     expect(p._useLightVoice()).toBe(false); // 2分を超えたら VOICEVOX を試す

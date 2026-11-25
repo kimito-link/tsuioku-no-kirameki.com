@@ -313,10 +313,11 @@ import { coveredBubbleIndexes } from '../lib/bubblePlacement.js';
 import { drawCrowdOnCanvas } from '../lib/crowdRasterizer.js';
 import {
   resolveVenueHeatLevel,
-  heatLevelToWarmColor,
-  heatLevelToGlowOpacity,
-  heatLevelToLabel
+  buildVenueHeatPaint
 } from '../lib/venueHeat.js';
+import { shouldSkipVenueSpeechPollRead, VENUE_SPEECH_POLL_INTERVAL_MS } from '../lib/venueSpeechPollGate.js';
+import { resolveVenueCrowdFrameMs } from '../lib/venueCrowdFramePolicy.js';
+import { readExtDocRecentLagMs } from '../lib/extDocBusyCensus.js';
 import { VoicePlayer } from '../lib/voicePlayer.js';
 import { KEY_VOICE_DIAG } from '../lib/voiceDiagKey.js';
 import { buildVoiceDiagSnapshot } from '../lib/voiceDiag.js';
@@ -405,7 +406,7 @@ const OPEN_STORAGE_KEY = 'nls_venue_open';
 const AGGREGATE_INTERVAL_MS = 30_000;
 // 北極星「コメントがリアルタイムでちゃんと出る」: poll を 1.5→0.8秒に上げて取りこぼし/遅延を減らす
 //   (storage.onChanged のイベント駆動と並走するハートビート)。会議(無料LLM)一致。
-const SPEECH_INTERVAL_MS = 800;
+const SPEECH_INTERVAL_MS = VENUE_SPEECH_POLL_INTERVAL_MS; // 800ms(venueSpeechPollGate.js と同じ値を共有)
 const BUBBLE_LIFETIME_MS = 4_000;
 const BUBBLE_FADE_MS = 600;
 // v0.1.755 リアルタイム完璧化: 同時表示数を 6→12 に拡大。洪水時に「出してすぐ最古を消す」で
@@ -3438,6 +3439,7 @@ export function mountVenueBarButton(options = {}) {
   let aggregateInFlightDone = null;
   let speechTimer = 0;
   let speechInFlight = false;
+  let _speechTailPushAt = 0; // v0.1.2212: テールが onChanged で直接届いた時刻(0=まだ・venueSpeechPollGate.js)
   let speechGeneration = 0;
   let speechLiveId = '';
   /** @type {{ seenKeys: Set<string>|null, primed: boolean, hiNo: number }} */
@@ -5278,7 +5280,7 @@ export function mountVenueBarButton(options = {}) {
    * @param {string} [nextLiveId]
    */
   const resetSpeechTracking = (nextLiveId = '') => {
-    speechGeneration += 1;
+    speechGeneration += 1; _speechTailPushAt = 0; // v0.1.2212: 前の配信の「テールが届いた」を持ち越さない
     speechLiveId = nextLiveId;
     speechState = { seenKeys: null, primed: false, hiNo: 0 };
     hiddenSpeechBuf.clear();
@@ -5295,20 +5297,22 @@ export function mountVenueBarButton(options = {}) {
     clearBubbles();
   };
 
+  let _venueHeatPaintSig = ''; // v0.1.2212: 見た目が変わる時だけ stage に書く(理由は venueHeat.buildVenueHeatPaint)
   /**
-   * 2026-06-14 星野アイデア会議2「熱量の色温度」: 直近コメントの速さから会場照明の色温度を更新。
-   *   過疎=涼しい青紫、怒涛=熱いオレンジ。映像中央は素通しのまま下端(客席)だけ色が変わる。
-   *   stage に CSS 変数を注入するだけ(色/不透明度の補間と速度→熱量の正規化は純関数 venueHeat)。
+   * 2026-06-14 星野アイデア会議2「熱量の色温度」: 直近コメントの速さから会場照明の色温度を更新(過疎=涼しい青紫、怒涛=熱いオレンジ)。
+   *   映像中央は素通しのまま下端(客席)だけ色が変わる。stage に CSS 変数を注入するだけ(補間・正規化は純関数 venueHeat)。
    * @param {Array<{ capturedAt?: number|null }>} commentRows 直近コメント行(capturedAt 付き)
    */
   const applyVenueHeat = (commentRows) => {
     const level = resolveVenueHeatLevel(commentRows, { now: Date.now() });
-    stage.style.setProperty('--nlsb-heat-color', heatLevelToWarmColor(level));
-    stage.style.setProperty('--nlsb-heat-opacity', String(heatLevelToGlowOpacity(level)));
-    // 任意: 盛り上がり具合を支援技術/ツールチップ向けに持たせる(視覚に依存しない情報)。
-    stage.setAttribute('data-nls-heat', heatLevelToLabel(level));
-    // 「生きている会場」: この盛り上がりで観客の揺れの速さ/大きさが決まる。
+    // 「生きている会場」: この盛り上がりで観客の揺れの速さ/大きさが決まる(群衆は従来どおり丸めない値)。
     crowdHeatLevel = level;
+    const paint = buildVenueHeatPaint(level);
+    if (paint.sig === _venueHeatPaintSig && stage.hasAttribute('data-nls-heat')) return;
+    _venueHeatPaintSig = paint.sig;
+    stage.style.setProperty('--nlsb-heat-color', paint.color);
+    stage.style.setProperty('--nlsb-heat-opacity', paint.opacity);
+    stage.setAttribute('data-nls-heat', paint.label); // 盛り上がり具合を支援技術/ツールチップ向けにも(視覚に依存しない)
   };
 
   /** 単調増加の時刻(ms)。performance.now があれば使う。 */
@@ -5317,11 +5321,8 @@ export function mountVenueBarButton(options = {}) {
       ? performance.now()
       : Date.now();
 
-  /**
-   * 群衆canvasの寸法を戻す(v0.1.1239)。stopCrowdMotion が 0 に落としてバックストアを
-   * 解放するため、描き始める前に必ず復元する。既に正しい寸法なら何もしない
-   * (寸法代入は canvas をクリアする副作用があるため、無条件代入は避ける)。
-   */
+  /** 群衆canvasの寸法を戻す(v0.1.1239)。stopCrowdMotion が 0 に落としてバックストアを解放するため、描き始める前に必ず復元する。
+   *  既に正しい寸法なら何もしない(寸法代入は canvas をクリアする副作用があるため、無条件代入は避ける)。 */
   const ensureCrowdCanvasSize = () => {
     try {
       if (crowdCanvas && crowdCanvas.width !== CROWD_CANVAS_W) {
@@ -5334,7 +5335,8 @@ export function mountVenueBarButton(options = {}) {
   const crowdMotion = createVenueCrowdMotion({
     allowed: crowdAnimAllowed,
     now: nowMs,
-    minFrameMs: 55,
+    minFrameMs: 55, // v0.1.2214: 弱い PC では間引く(既存の合図だけ・venueCrowdFramePolicy.js)
+    frameMs: () => resolveVenueCrowdFrameMs({ recentLagMs: readExtDocRecentLagMs(), voiceOverloaded: voicePlayer._overload?.overloaded === true, lightVoiceActive: /** @type {any} */ (voicePlayer.diag).lightVoiceActive === true, weakVoicePc: voicePlayer._slowEngine === true }),
     draw: (t) => {
       drawCrowdOnCanvas(crowdCanvas, crowdAnimCount, crowdAnimSeed, { timeMs: t, heatLevel: crowdHeatLevel });
     },
@@ -5349,8 +5351,7 @@ export function mountVenueBarButton(options = {}) {
 
   const stopCrowdMotion = () => {
     crowdMotion.stop();
-    // ★v0.1.1239: 群衆canvasのバックストア(1200x350x4B = 1.68MB)を解放する。
-    //   従来は rAF を止めるだけでピクセルバッファが残り続けていた。
+    // ★v0.1.1239: 群衆canvasのバックストア(1200x350x4B = 1.68MB)を解放する(rAF を止めるだけではピクセルバッファが残る)。
     //   width=0 でバックストアが破棄される(次に描くとき setupCrowd 側が寸法を戻す)。
     try {
       if (crowdCanvas && crowdCanvas.width > 0) {
@@ -7003,14 +7004,13 @@ export function mountVenueBarButton(options = {}) {
     const generation = speechGeneration;
     const tailKey = tailStorageKey(liveId);
     const summaryKey = commentDbSummaryKey(liveId);
-    // v0.1.1090: onChanged だけに頼らず、既存の定期ポーリングに相乗りして「会場を開いた時点で
-    //   既に貯まっている集計ギフトpt」も拾う(保険・tail/summaryと同じ方針)。
+    // v0.1.1090: onChanged だけに頼らず、定期ポーリングに相乗りして「会場を開いた時点で既に貯まっている集計ギフトpt」も拾う(保険)。
     const giftPointsAggregateKey = officialGiftPointsAggregateStorageKey(liveId);
-    // story-diag-realtime-sync §D-2(b): onChanged 欠落時の自己修復(15秒以上更新が無いときだけ
-    //   1 key read)。担わない責務: 通常時の更新(それは onChanged が担う=毎tick read を増やさない)。
+    // story-diag-realtime-sync §D-2(b): onChanged 欠落時の自己修復(15秒以上更新が無いときだけ1 key read)。通常時の更新は onChanged が担う。
     const STORY_DIAG_PANEL_STALE_MS = 15_000;
-    const needsPanelSummaryRefresh =
-      Date.now() - _panelSummaryLastSeenAt > STORY_DIAG_PANEL_STALE_MS;
+    const needsPanelSummaryRefresh = Date.now() - _panelSummaryLastSeenAt > STORY_DIAG_PANEL_STALE_MS;
+    // v0.1.2212: テールが直接届いている間は同じテールを読み直さない(届かなくなれば読む=保険は残る・venueSpeechPollGate.js)
+    if (shouldSkipVenueSpeechPollRead({ nowMs: Date.now(), lastPushAt: _speechTailPushAt, panelRefreshDue: needsPanelSummaryRefresh })) { voicePlayer.diag.venuePollReadSkipTotal = (Number(voicePlayer.diag.venuePollReadSkipTotal) || 0) + 1; return; }
     const panelKey = needsPanelSummaryRefresh ? panelSummaryStorageKey(liveId) : '';
     speechInFlight = true;
     try {
@@ -7062,11 +7062,10 @@ export function mountVenueBarButton(options = {}) {
     if (!liveId) return;
     const tailKey = tailStorageKey(liveId);
     const summaryKey = commentDbSummaryKey(liveId);
-    // v0.1.756 リアルタイム完璧化(ユーザー洞察: コメビュは速い→同じ経路に): コメビュ comeview は
-    //   onChanged の newValue を【その場で直接】処理して速い。会場はここで pollSpeech(非同期の
-    //   storage.local.get 再取得=1往復の遅延)していた。tail が変わったら newValue を直接
-    //   processSpeechRows へ渡し、再取得を省いて即座に吹き出し/読み上げする(コメビュと同経路)。
+    // v0.1.756 リアルタイム完璧化: tail が変わったら newValue を【その場で直接】processSpeechRows へ渡し、storage の再取得
+    //   (1往復の遅延)を省いて即座に吹き出し/読み上げする(コメビュと同経路)。v0.1.2212: 届いた時刻を覚え、0.8秒の読み直しを省く。
     if (changes[tailKey] && Array.isArray(changes[tailKey].newValue)) {
+      _speechTailPushAt = Date.now();
       processSpeechRows(/** @type {Array<Record<string, any>>} */ (changes[tailKey].newValue), 'tail');
     } else if (changes[tailKey] || changes[summaryKey]) {
       // tail が無い(summary だけ等)時は従来どおり storage から読む保険。
@@ -7230,7 +7229,7 @@ export function mountVenueBarButton(options = {}) {
 
   const startSpeechPolling = () => {
     if (speechTimer) return;
-    void pollSpeech();
+    _speechTailPushAt = 0; void pollSpeech(); // v0.1.2212: 開いた直後は必ず1回読む(開く前に貯まったギフトpt・テールを拾う)
     speechTimer = window.setInterval(() => {
       if (isPageHidden() && !voicePlayer.readingWanted) return;
       void pollSpeech();

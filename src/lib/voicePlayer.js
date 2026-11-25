@@ -27,7 +27,8 @@ import {
   LIGHT_VOICE_PROBE_TEXT,
   lightVoiceToneFor,
   shouldProbeVoicevox,
-  shouldUseLightVoice
+  shouldUseLightVoice,
+  shouldPauseVoicevoxFeed
 } from './voiceLightFallback.js';
 import { createLightSpeaker } from './voiceLightSpeaker.js';
 import { createVoiceClipCache, voiceClipKey } from './voiceClipCache.js';
@@ -333,7 +334,7 @@ export class VoicePlayer {
       upstreamEmaMs: -1, lastUpstreamMs: -1, queueWaitEmaMs: -1, engineWaitEmaMs: -1,
       audioQueryEmaMs: -1, synthesisEmaMs: -1, warmSynthEmaMs: -1,
       coldSynthTotal: 0, coldSynthMaxMs: 0, lastColdSynthMs: -1,
-      speakerInitTotal: 0, speakerInitMaxMs: 0, voiceBorrowTotal: 0, e2eSampleTotal: 0, e2eSumMsTotal: 0, e2eMaxMs: 0, bgInitTotal: 0, bgInitMaxMs: 0, bgInitYieldTotal: 0, readerYieldTotal: 0,
+      speakerInitTotal: 0, speakerInitMaxMs: 0, voiceBorrowTotal: 0, e2eSampleTotal: 0, e2eSumMsTotal: 0, e2eMaxMs: 0, bgInitTotal: 0, bgInitMaxMs: 0, bgInitYieldTotal: 0, readerYieldTotal: 0, venuePollReadSkipTotal: 0, voicevoxFeedPausedTotal: 0,
       streamTotal: 0, streamFirstAudioEmaMs: -1, warmSynthSamples: 0, contendedSynthTotal: 0,
       warmSynthRtfPermille: -1, warmRtfSamples: 0,
       playCheckedTotal: 0, playCutShortTotal: 0, playStallTotal: 0, streamUnderrunTotal: 0, streamUnderrunMaxMs: 0,
@@ -1376,7 +1377,14 @@ export class VoicePlayer {
     for (const item of this.queue) {
       if (item && this._attachCachedClip(item, generation)) cachedReady.add(item);
     }
-    // 完成した声は待機中でも利用し、PC音声の間も実コメントを先読みする。
+    // v0.1.2213: VOICEVOX が混雑中で PC の声が代わりに読める間は実コメントを VOICEVOX に頼まない(理由と戻り道は
+    //   voiceLightFallback.shouldPauseVoicevoxFeed)。短い「てすと」で速さだけ確かめる。頼み済みの件・覚えた声はそのまま使う。
+    if (shouldPauseVoicevoxFeed({ overloaded: this._overload.overloaded, lightActive: this._useLightVoice() })) {
+      this.diag.voicevoxFeedPausedTotal = (Number(this.diag.voicevoxFeedPausedTotal) || 0) + 1;
+      this._maybeProbeVoicevox();
+      return;
+    }
+    // 完成した声は待機中でも利用し、PC音声の間も実コメントを先読みする(混雑していないとき)。
     this.diag.lastDepth = this._pipeline.limit;
     this.diag.pipelineLimit = this._pipeline.limit;
     this._refreshEngineBlock();

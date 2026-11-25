@@ -92,6 +92,7 @@ export const VOICE_DIAG_FRESH_MS = 60_000;
  *   bgInitMaxMs: number,         // 同上の最長ms
  *   bgInitYieldTotal: number,    // もう片方のページが使用中で裏の読み込みを見送った回数(v0.1.1781)
  *   readerYieldTotal: number,    // 同じ配信をもう片方のページが読んでいるので読まなかったコメント数(v0.1.1794)
+ *   venuePollReadSkipTotal: number, // v0.1.2212: テールが直接届いていたので会場の0.8秒読みを省いた回数(低スペック対策の効き目)
  *   ngMutedTotal: number,        // v0.1.1812: コメビュで NG にした人なので読まなかったコメント数(会場)
  *   busySkipTotal: number,       // v0.1.1861: 混雑(待ち2件以上)で大事でないので読まなかったコメント数(吹き出しだけ)
  *   busyImportantTotal: number,  // v0.1.1861: 混雑中でも大事なもの(ギフト・広告・配信者・初コメ)として読む列に入れた数
@@ -112,6 +113,7 @@ export const VOICE_DIAG_FRESH_MS = 60_000;
  *   lightProbeLastMs: number,    // 同上: 直近の確かめの ms(失敗 -1)
  *   lightProbeBusySkipTotal: number, // 同上: ほかの合成が終わらず確かめられなかった回数
  *   voiceOverloadRetryTotal: number, // 0.1.2115: 混雑のまま2分経って VOICEVOX を一度試した回数
+ *   voicevoxFeedPausedTotal: number, // v0.1.2213: 混雑中で PC の声が読める間、実コメントを VOICEVOX に頼まなかった回数
  *   refreshVoicedTotal: number,  // v0.1.1804計器: コメビュの整合リフレッシュで初めて出たので読みに回したコメント数
  *   backlogSkipTotal: number,    // v0.1.1805計器: コメビュで開く前の古いコメント(後からまとめて届いた分)を読まずに外した数
  *   bigBatchTotal: number,       // v0.1.1804計器: コメビュで一度に10件以上が読む列へ来た回数
@@ -230,6 +232,7 @@ export function makeInitialVoiceDiag() {
     bgInitMaxMs: 0,
     bgInitYieldTotal: 0,
     readerYieldTotal: 0,
+    venuePollReadSkipTotal: 0,
     ngMutedTotal: 0,
     busySkipTotal: 0,
     busyImportantTotal: 0,
@@ -250,6 +253,7 @@ export function makeInitialVoiceDiag() {
     lightProbeLastMs: -1,
     lightProbeBusySkipTotal: 0,
     voiceOverloadRetryTotal: 0,
+    voicevoxFeedPausedTotal: 0,
     refreshVoicedTotal: 0,
     backlogSkipTotal: 0,
     bigBatchTotal: 0,
@@ -413,6 +417,7 @@ export function buildVoiceDiagSnapshot(diag, nowMs, liveId) {
     bgInitMaxMs: num(d.bgInitMaxMs, base.bgInitMaxMs),
     bgInitYieldTotal: num(d.bgInitYieldTotal, base.bgInitYieldTotal),
     readerYieldTotal: num(d.readerYieldTotal, base.readerYieldTotal),
+    venuePollReadSkipTotal: num(d.venuePollReadSkipTotal, base.venuePollReadSkipTotal),
     ngMutedTotal: num(d.ngMutedTotal, base.ngMutedTotal),
     busySkipTotal: num(d.busySkipTotal, base.busySkipTotal),
     busyImportantTotal: num(d.busyImportantTotal, base.busyImportantTotal),
@@ -433,6 +438,7 @@ export function buildVoiceDiagSnapshot(diag, nowMs, liveId) {
     lightProbeLastMs: num(d.lightProbeLastMs, base.lightProbeLastMs),
     lightProbeBusySkipTotal: num(d.lightProbeBusySkipTotal, base.lightProbeBusySkipTotal),
     voiceOverloadRetryTotal: num(d.voiceOverloadRetryTotal, base.voiceOverloadRetryTotal),
+    voicevoxFeedPausedTotal: num(d.voicevoxFeedPausedTotal, base.voicevoxFeedPausedTotal),
     refreshVoicedTotal: num(d.refreshVoicedTotal, base.refreshVoicedTotal),
     backlogSkipTotal: num(d.backlogSkipTotal, base.backlogSkipTotal),
     bigBatchTotal: num(d.bigBatchTotal, base.bigBatchTotal),
