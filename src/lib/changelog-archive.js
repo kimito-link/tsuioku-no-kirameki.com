@@ -24,6 +24,16 @@
 /** @type {ChangelogEntry[]} */
 const ARCHIVE_ENTRIES = [
   Object.freeze({
+    version: '0.1.2199',
+    date: '2026-11-23',
+    summary: '全サービスへ孤児タブ自動復帰・診断間引き・会場負荷抑制を横展開',
+    items: Object.freeze([
+      'Twitch・Kick・ミクチャ・SHOWROOM・ふわっち・ツイキャス・TikTok・ABEMA・YouTube チャットに拡張更新後の自動復帰（orphanTabAutoReload）を配線しました。',
+      'Kick・ミクチャ・SHOWROOM のランキング定期タイマーを共通スケジューラ（裏タブ停止）へ移行し、Twitch・Kick の診断書き込みを差分・間隔抑制つき書き手へ統一しました。',
+      '会場モードで閉鎖中・しまい中・裏タブの吹き出し位置再計算と読み上げ OFF 時の裏タブ発言ポーリングを抑止しました。',
+    ])
+  }),
+  Object.freeze({
     version: '0.1.2198',
     date: '2026-11-23',
     summary: 'ニコ生の常駐タイマーを共通スケジューラへ集約し裏タブを間引き',
