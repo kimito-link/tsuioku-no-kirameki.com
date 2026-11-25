@@ -567,6 +567,7 @@ import {
   decorateTickerLine,
   makeTickerPickDiag,
   pickTickerHighlightEntry,
+  createTickerLastUserTracker,
   recordTickerPick,
   tickerArgsFromMirrorRow,
   tickerHighlightKey
@@ -3090,7 +3091,8 @@ function commentTickerDisplayLabel(entry, liveId, entries) {
 
 /** v0.1.1226: ティッカー選定の計器と、直前に選ばれた userId(1人占拠の防止・匿名には効かせない)。 */
 const _tickerPickDiag = makeTickerPickDiag();
-let _tickerLastUserId = '';
+// v0.1.2226: 「直前の人」はバケット単位で決める(同じバケットの中で A↔B を交互に書き直さない・pickTickerHighlight.js)。
+const _tickerLastUser = createTickerLastUserTracker();
 
 /** @param {PopupCommentEntry[]} comments */
 function renderCommentTicker(comments) {
@@ -3106,7 +3108,8 @@ function renderCommentTickerImpl(comments) {
 
   const list = Array.isArray(comments) ? comments : [];
   // v0.1.1226: 「最新1件を流す」→「7秒バケットで選んだ1件を留める」(埋もれ対策・候補ゼロなら現状維持)。
-  const _picked = pickTickerHighlightEntry(list, Date.now(), { lastUserId: _tickerLastUserId });
+  const _tickerNow = Date.now();
+  const _picked = pickTickerHighlightEntry(list, _tickerNow, { lastUserId: _tickerLastUser.lastUserIdFor(_tickerNow) });
   recordTickerPick(_tickerPickDiag, _picked);
   const latest = /** @type {PopupCommentEntry|null} */ (_picked.entry);
   const placeholder =
@@ -3136,7 +3139,7 @@ function renderCommentTickerImpl(comments) {
   const _tickerKey = tickerHighlightKey(_picked);
   if (segA.dataset.nlTickerKey === _tickerKey) return;
   segA.dataset.nlTickerKey = _tickerKey;
-  _tickerLastUserId = String(latest.userId || '');
+  _tickerLastUser.noteShown(latest.userId);
   _tickerPickDiag.domWriteTotal += 1;
   segA.innerHTML = buildCommentTickerLatestHtml({
     label,
@@ -17888,7 +17891,12 @@ const coalescedRefreshScheduler = createCoalescedRefreshScheduler({
   // ★v0.1.1981: 描き直しが重いときの間隔の上限を 1.5秒→20秒に(間隔は描き直しの時間の3倍)。1回が数秒かかる配信(8万行・遅い PC)で
   //   1.5秒ごとに描き直すと画面が描き直しだけで埋まる。軽い配信(1回 150ms 未満)は 450ms のまま。
   // ★v0.1.1985: 上限を 20秒→60秒に(定期の見回りの門と同じ上限)。間隔は「描き直し1回まるごとの時間」の3倍でも決まるようになった。
-  maxAdaptiveMs: 60_000
+  maxAdaptiveMs: 60_000,
+  // ★v0.1.2226: コメントで動く描き直しの間隔は、会場・応援レーンと同じ共通の決まり(renderCadence.js)にも従う。
+  //   この文書の心拍が詰まり気味(60ms 以上)なら 400ms、固まりかけ(200ms 以上)なら 800ms に1回まで。余裕のある PC は 450ms のまま。
+  //   遅い PC の実測(CPU 4倍遅く・8コメ/秒)で、横の欄の描き直しが終わった直後に次が始まり、長いタスクの大半がこれだった。
+  //   コメントは捨てない(描き直しは毎回 storage から全部読み直す)。新しいタイマー・見張りは無い(心拍は既存の計器)。
+  minIntervalMs: () => resolveListRenderGapMs({ baseMs: 0, recentLagMs: readExtDocRecentLagMs() })
 });
 /**
  * ★v0.1.1450: 北極星 tick(独立レーン描画)専用のスロットル。

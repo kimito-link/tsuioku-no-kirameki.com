@@ -265,6 +265,41 @@ export function pickTickerHighlightEntry(list, nowMs, opts = {}) {
 }
 
 /**
+ * v0.1.2226: 「直前に出した人」(1人占拠の防止に使う lastUserId)を【バケット単位】で決める係。
+ *
+ * ■ 何が起きていたか(2026-11-25 箱の実測・8コメ/秒)
+ *   描き直し1回の中でティッカーは2回描かれる(応援レーンの経路と本体)。以前は「書いた瞬間に lastUserId を
+ *   書いた人へ更新」していたので、1回目で A を出す → 2回目は A を除外して B を出す → 次の描き直しの1回目は
+ *   B を除外して A を出す…と、同じバケットの中で A↔B を交互に書き直していた(約25秒で書き込み約250回のうち
+ *   約9割が A→B→A の往復)。毎回 innerHTML と顔の画像を作り直すので、重さとちらつきの元になる。
+ * ■ 決まり
+ *   lastUserId は「1つ前のバケットの終わりに出ていた人」。同じバケットの中では何度呼んでも同じ値
+ *   (= pickTickerHighlightEntry の「同一バケット内は同じ答え」がそのまま成り立つ)。
+ *   バケットが変わったときだけ、そのとき出ていた人を「直前の人」に繰り上げる。タイマーは使わない。
+ */
+export function createTickerLastUserTracker() {
+  let bucketAt = -1;
+  let shownUserId = '';
+  let prevBucketUserId = '';
+  return {
+    /** @param {number} nowMs @returns {string} この時刻のバケットで除外する人 */
+    lastUserIdFor(nowMs) {
+      const now = Number(nowMs);
+      const b = Number.isFinite(now) && now > 0 ? now - (now % TICKER_BUCKET_MS) : 0;
+      if (b !== bucketAt) {
+        prevBucketUserId = shownUserId;
+        bucketAt = b;
+      }
+      return prevBucketUserId;
+    },
+    /** 書いた(=いま出ている)人を控える。 @param {unknown} userId */
+    noteShown(userId) {
+      shownUserId = String(userId ?? '').trim();
+    }
+  };
+}
+
+/**
  * diff-skip 用のキーを作る。同じキーなら innerHTML 代入をスキップする
  * (paint のたびに DOM を書き換えるのを防ぐ＝ちらつきと重さの両方に効く)。
  *
