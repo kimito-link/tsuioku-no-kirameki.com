@@ -2,7 +2,7 @@ import { describe, it, expect } from 'vitest';
 import {
   createVenueBubbleVoiceSyncState, noteBubbleVoiceSample, summarizeBubbleVoiceSync, shouldSkipVoiceAsLate,
   shouldHoldBubbleForVoiceSync, decideHeldBubbleAfterHold, VENUE_BUBBLE_VOICE_LATE_MS, VENUE_BUBBLE_VOICE_HOLD_MAX_MS,
-  VENUE_BUBBLE_VOICE_FAIL_STREAK_MAX
+  VENUE_BUBBLE_VOICE_FAIL_STREAK_MAX, resolveBubbleVoiceHoldMaxMs, startVenueSpeechBubbleVoice
 } from './venueBubbleVoiceSync.js';
 import { estimateVoiceStartDelayMs, VOICE_SYNTH_FIXED_MS, VOICE_ITEM_MIN_MS } from './voiceLagBudget.js';
 import { VoicePlayer } from './voicePlayer.js';
@@ -233,5 +233,124 @@ describe('startVenueSpeechBubbleVoice: 開いた瞬間の3件と声が鳴らな�
     expect(shown).toBe(1); // 試す1件は声まで待つ
     expect(vp.enq.length).toBe(1);
     expect(st.lastProbeAt).toBe(t);
+  });
+});
+
+// 2026-11-25(りんく「読み上げもリアルタイムでてんぽよくふきだしとともに」): コメントが速い間は、
+//   声の作り置きの寿命(20秒)まで吹き出しを待たせない。箱の実測 8件/秒で、声つきの吹き出しが届いて15〜21秒後に出ていた。
+describe('resolveBubbleVoiceHoldMaxMs / 速い配信で声を待たせる上限', () => {
+  it('速い間は6秒(読み上げの鮮度8秒より短い)・静かな間は作り置きの寿命まで(上限20秒)', () => {
+    expect(resolveBubbleVoiceHoldMaxMs({ budgetMs: 20000, busyChat: true })).toBe(VENUE_BUBBLE_VOICE_HOLD_MAX_MS);
+    expect(resolveBubbleVoiceHoldMaxMs({ budgetMs: 20000, busyChat: false })).toBe(20000);
+    expect(resolveBubbleVoiceHoldMaxMs({ budgetMs: 90000 })).toBe(20000);
+    expect(resolveBubbleVoiceHoldMaxMs({ budgetMs: 1000 })).toBe(VENUE_BUBBLE_VOICE_HOLD_MAX_MS);
+    expect(resolveBubbleVoiceHoldMaxMs({})).toBe(VENUE_BUBBLE_VOICE_HOLD_MAX_MS);
+  });
+
+  /** 声づくりの途中のまま鳴らない VoicePlayer(待ちから外せない=inflight)。 */
+  function stuckPlayer() {
+    /** @type {any[]} */
+    const queue = [];
+    return {
+      enabled: true,
+      queue,
+      dropped: 0,
+      voiceHoldBudgetMs: () => 20000,
+      previewImportant: () => false,
+      enqueue(/** @type {any[]} */ items) { queue.push(...items); },
+      estimateStartDelayMs: () => ({ ms: 500, important: false, ahead: 0 }),
+      dropQueuedUnstarted: () => 'inflight',
+      dropQueuedAny(/** @type {Function} */ onDropped) { this.dropped += 1; const i = queue.findIndex((q) => q.onDropped === onDropped); if (i >= 0) queue.splice(i, 1); onDropped(); return 'dropped'; }
+    };
+  }
+  function run(/** @type {boolean} */ busyChat) {
+    let t = 0;
+    /** @type {Array<{ at: number, fn: () => void }>} */
+    let timers = [];
+    const vp = stuckPlayer();
+    /** @type {number[]} */
+    const shownAt = [];
+    const st = createVenueBubbleVoiceSyncState();
+    startVenueSpeechBubbleVoice(st, { key: 'k1', userId: 'u1', name: 'A', text: 'こんにちは' }, {
+      voicePlayer: vp, primeBurst: false, arrivedAt: 0, now: () => t, busyChat,
+      setTimer: (fn, ms) => { const h = { at: t + ms, fn }; timers.push(h); return h; },
+      clearTimer: (h) => { timers = timers.filter((x) => x !== h); },
+      isOpen: () => true,
+      showBubble: () => { shownAt.push(t); return { id: 1 }; },
+      onSpeaking: () => {}, onDone: () => {}, onResolved: () => {}
+    });
+    const advanceTo = (/** @type {number} */ ms) => {
+      for (;;) {
+        timers.sort((a, b) => a.at - b.at);
+        const next = timers[0];
+        if (!next || next.at > ms) break;
+        timers.shift();
+        t = next.at;
+        next.fn();
+      }
+      t = ms;
+    };
+    return { vp, shownAt, advanceTo };
+  }
+  it('速い間: 6秒で声を待つのをやめ、読まずに吹き出しを出す(後から声だけ鳴らない)', () => {
+    const r = run(true);
+    r.advanceTo(VENUE_BUBBLE_VOICE_HOLD_MAX_MS - 1);
+    expect(r.shownAt).toEqual([]);
+    r.advanceTo(VENUE_BUBBLE_VOICE_HOLD_MAX_MS);
+    expect(r.shownAt).toEqual([VENUE_BUBBLE_VOICE_HOLD_MAX_MS]);
+    expect(r.vp.dropped).toBe(1);
+    expect(r.vp.queue).toHaveLength(0);
+  });
+  it('静かな間: 今までどおり作り置きの寿命(20秒)まで声を待つ', () => {
+    const r = run(false);
+    r.advanceTo(10000);
+    expect(r.shownAt).toEqual([]);
+    r.advanceTo(20000);
+    expect(r.shownAt).toEqual([20000]);
+  });
+});
+
+// 2026-11-25: 吹き出しは play() を呼んだ瞬間でなく、音が実際に出始めた瞬間(audio の playing = onAudible)に出す。
+//   CPU を4分の1にした箱の実測で、play() の直後に出すと音より中央0.4秒・最大1.2秒先に出ていた。
+describe('吹き出しは音が出始めた瞬間に出す', () => {
+  function setup() {
+    let t = 0;
+    /** @type {any[]} */
+    const items = [];
+    /** @type {number[]} */
+    const shownAt = [];
+    /** @type {string[]} */
+    const log = [];
+    const vp = {
+      enabled: true, voiceHoldBudgetMs: () => 20000, previewImportant: () => false,
+      enqueue: (/** @type {any[]} */ xs) => { items.push(...xs); },
+      estimateStartDelayMs: () => ({ ms: 300, important: false, ahead: 0 }),
+      dropQueuedUnstarted: () => 'inflight', dropQueuedAny: () => 'not-queued'
+    };
+    startVenueSpeechBubbleVoice(createVenueBubbleVoiceSyncState(), { key: 'k', userId: 'u', name: 'A', text: 'やっほー' }, {
+      voicePlayer: vp, primeBurst: false, arrivedAt: 0, now: () => t,
+      setTimer: () => 1, clearTimer: () => {},
+      isOpen: () => true,
+      showBubble: () => { shownAt.push(t); return { id: 1 }; },
+      onSpeaking: () => log.push(`speaking@${t}`), onDone: () => log.push(`done@${t}`), onResolved: () => {},
+      onAudible: () => log.push(`pickup@${t}`)
+    });
+    return { items, shownAt, log, at: (/** @type {number} */ ms) => { t = ms; } };
+  }
+  it('play() の直後(onAudioStart)では出さず、音が出た瞬間(onAudible)に出す', () => {
+    const r = setup();
+    expect(r.items).toHaveLength(1);
+    r.at(1000); r.items[0].onAudioStart();
+    expect(r.shownAt).toEqual([]);
+    r.at(1400); r.items[0].onAudible();
+    expect(r.shownAt).toEqual([1400]);
+    expect(r.log).toEqual(['pickup@1400', 'speaking@1400']);
+  });
+  it('音が出ないまま終わっても(再生の失敗など)吹き出しは必ず出す', () => {
+    const r = setup();
+    r.at(1000); r.items[0].onAudioStart();
+    r.at(1500); r.items[0].onAudioEnd();
+    expect(r.shownAt).toEqual([1500]);
+    expect(r.log).toEqual(['done@1500']);
   });
 });

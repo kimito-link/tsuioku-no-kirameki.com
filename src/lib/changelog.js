@@ -18,6 +18,16 @@
 /** @type {readonly ChangelogEntry[]} */
 export const EXTENSION_CHANGELOG = Object.freeze([
   Object.freeze({
+    version: '0.1.2224',
+    date: '2026-11-25',
+    summary: '別窓の会場でも、声と吹き出しが同時に',
+    items: Object.freeze([
+      '会場を別の窓で開いていると、声は視聴ページの側で読まれ、会場の吹き出しは声より数秒早く出ていました。いま見えている会場が読み上げを受け持つようにしたので、吹き出しは声が鳴り始めるのと同時に出ます。',
+      '吹き出しを出す瞬間を、再生を頼んだときから「音が実際に出始めたとき」に変えました。動きの遅い PC でも、吹き出しが声より先に出にくくなります。',
+      'コメントが速い間（1分に27件くらいから）は、声を待たせるのを6秒までにしました。ずっと前のコメントが今ごろ声つきで出ることがなくなり、今のコメントを読みます。読まなかったコメントも吹き出しと記録にはそのまま残ります。',
+    ])
+  }),
+  Object.freeze({
     version: '0.1.2222',
     date: '2026-11-25',
     summary: '別窓の幅が広がったままにならないようにした',
@@ -187,16 +197,6 @@ export const EXTENSION_CHANGELOG = Object.freeze([
     items: Object.freeze([
       '診断 JSON ダンプ（status-latest.json・既定 OFF）と status.html の JSON ダウンロードに、YouTube・Twitch・Kick・ふわっち・SHOWROOM・ミクチャ・ツイキャス・TikTok・ABEMA の計器スナップショットと開いている視聴タブ一覧（最大 30 件）を追加しました。',
       '固定ホワイトリストの計器キーと既存ホスト権限のみを使い、全 storage のダンプや権限追加は行いません。',
-    ])
-  }),
-  Object.freeze({
-    version: '0.1.2199',
-    date: '2026-11-23',
-    summary: '全サービスへ孤児タブ自動復帰・診断間引き・会場負荷抑制を横展開',
-    items: Object.freeze([
-      'Twitch・Kick・ミクチャ・SHOWROOM・ふわっち・ツイキャス・TikTok・ABEMA・YouTube チャットに拡張更新後の自動復帰（orphanTabAutoReload）を配線しました。',
-      'Kick・ミクチャ・SHOWROOM のランキング定期タイマーを共通スケジューラ（裏タブ停止）へ移行し、Twitch・Kick の診断書き込みを差分・間隔抑制つき書き手へ統一しました。',
-      '会場モードで閉鎖中・しまい中・裏タブの吹き出し位置再計算と読み上げ OFF 時の裏タブ発言ポーリングを抑止しました。',
     ])
   })
 ]);

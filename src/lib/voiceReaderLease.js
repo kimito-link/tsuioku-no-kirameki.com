@@ -11,6 +11,14 @@ export const VOICE_READER_LEASE_BEAT_MS = 2000;
 /** 返事を待つ上限(ms)。 */
 export const VOICE_READER_LEASE_QUERY_TIMEOUT_MS = 500;
 export const VOICE_READER_CLAIM = 'NLS_VOICE_READER_CLAIM';
+/**
+ * 読み手の優先度(2026-11-25 りんく「読み上げもリアルタイムでてんぽよくふきだしとともに」)。
+ *   箱の実測: 別窓の会場を開いていても、先に名乗った視聴ページ内の「閉じた会場」(声だけ)が読み続け、
+ *   別窓の吹き出しは届いた瞬間に出て、声は中央4.4秒・最大19.6秒あとに鳴っていた(声と吹き出しが別の文書)。
+ *   見えている会場・コメビュ(1)は、閉じた会場(0)から読み手を引き継ぐ。同じ優先度どうしは今までどおり先着。
+ */
+export const VOICE_READER_PRIO_HEADLESS = 0;
+export const VOICE_READER_PRIO_VISIBLE = 1;
 export const VOICE_READER_RELEASE = 'NLS_VOICE_READER_RELEASE';
 
 /**
@@ -19,22 +27,24 @@ export const VOICE_READER_RELEASE = 'NLS_VOICE_READER_RELEASE';
  */
 export function createVoiceReaderLeaseTable(opts = {}) {
   const ttl = Number(opts.ttlMs) > 0 ? Number(opts.ttlMs) : VOICE_READER_LEASE_TTL_MS;
-  /** @type {Map<string, { holder: string, at: number }>} */
+  /** @type {Map<string, { holder: string, at: number, prio: number }>} */
   const byLive = new Map();
   return {
     /**
      * @param {unknown} liveId
      * @param {unknown} holder
      * @param {number} now
+     * @param {unknown} [prio] 読み手の優先度(VOICE_READER_PRIO_*・無ければ 0)
      * @returns {{ granted: boolean }}
      */
-    claim(liveId, holder, now) {
+    claim(liveId, holder, now, prio) {
       const lv = String(liveId || '').trim().toLowerCase();
       const h = String(holder || '');
       if (!lv || !h) return { granted: true };
+      const p = Number(prio) > 0 ? 1 : 0;
       const cur = byLive.get(lv);
-      if (!cur || cur.holder === h || now - cur.at > ttl) {
-        byLive.set(lv, { holder: h, at: now });
+      if (!cur || cur.holder === h || now - cur.at > ttl || p > cur.prio) {
+        byLive.set(lv, { holder: h, at: now, prio: p });
         return { granted: true };
       }
       return { granted: false };
@@ -53,7 +63,9 @@ export function createVoiceReaderLeaseTable(opts = {}) {
  *   (v0.1.1794 の初版は答えが無い時に「読む」としていて、コメビュを開いた直後・会場を開き直した直後の
  *   最初の数件が二重に読まれた=PC 試験)。返事が来ない・壊れている時は「読む」。
  * @param {(msg: Record<string, unknown>) => (Promise<unknown> | unknown)} sendMessage
- * @param {{ now?: () => number, holder?: string }} [opts]
+ * @param {{ now?: () => number, holder?: string, priority?: () => number, onLost?: () => void }} [opts]
+ *   priority: 名乗るときの優先度(VOICE_READER_PRIO_*)。onLost: 読んでいたのに、もう片方に引き継がれた時に1回呼ぶ
+ *   (待っている声を捨てて二重に鳴らさないため・呼び出し側が VoicePlayer.flushPendingQueue を渡す)。
  */
 export function createVoiceReaderLeaseLink(sendMessage, opts = {}) {
   const now = opts.now || (() => Date.now());
@@ -64,6 +76,9 @@ export function createVoiceReaderLeaseLink(sendMessage, opts = {}) {
   let lastSentAt = -Infinity;
   /** @type {Promise<void> | null} */
   let inflight = null;
+  const readPrio = () => {
+    try { return typeof opts.priority === 'function' && Number(opts.priority()) > 0 ? VOICE_READER_PRIO_VISIBLE : VOICE_READER_PRIO_HEADLESS; } catch { return VOICE_READER_PRIO_HEADLESS; }
+  };
   /** @param {string} lv */
   const claim = (lv) => {
     if (!inflight) inflight = claimOnce(lv).finally(() => { inflight = null; });
@@ -76,14 +91,18 @@ export function createVoiceReaderLeaseLink(sendMessage, opts = {}) {
     let timer = null;
     try {
       const res = await Promise.race([
-        Promise.resolve(sendMessage({ type: VOICE_READER_CLAIM, liveId: lv, holder })),
+        Promise.resolve(sendMessage({ type: VOICE_READER_CLAIM, liveId: lv, holder, prio: readPrio() })),
         new Promise((r) => { timer = setTimeout(() => r(null), VOICE_READER_LEASE_QUERY_TIMEOUT_MS); })
       ]);
       const granted = res && typeof res === 'object' ? /** @type {any} */ (res).granted : undefined;
       if (lv !== lastLive) return;
       // 形が違う・返事が無い時は「読んでよい」(止めっぱなしにしない)。
+      const wasMine = lastGranted && lastAnswerAt > -Infinity;
       lastGranted = granted !== false;
       lastAnswerAt = now();
+      if (wasMine && !lastGranted && typeof opts.onLost === 'function') {
+        try { opts.onLost(); } catch { /* 引き継ぎの片付けに失敗しても読み手の判定は止めない */ }
+      }
     } catch {
       if (lv === lastLive) { lastGranted = true; lastAnswerAt = now(); }
     } finally {
@@ -145,24 +164,26 @@ export function createVoiceReaderLeaseLink(sendMessage, opts = {}) {
 
 /**
  * 拡張の中(会場の content script・コメビュ)で使う口。chrome が無ければ null(=いつも読む)。
+ * @param {{ priority?: () => number, onLost?: () => void }} [opts]
  * @returns {ReturnType<typeof createVoiceReaderLeaseLink> | null}
  */
-export function chromeVoiceReaderLeaseLink() {
+export function chromeVoiceReaderLeaseLink(opts = {}) {
   const rt = typeof chrome !== 'undefined' ? chrome.runtime : undefined;
   if (!rt || typeof rt.sendMessage !== 'function') return null;
-  return createVoiceReaderLeaseLink((msg) => rt.sendMessage(msg));
+  return createVoiceReaderLeaseLink((msg) => rt.sendMessage(msg), { priority: opts.priority, onLost: opts.onLost });
 }
 
 /**
  * 合図を定期的に送り、読まなくなったら手放す(会場・コメビュの配線を1行にするため)。chrome が無ければ null。
  * @param {() => boolean} isActive 読み上げ中か(会場なら「開いていて ON」)
  * @param {() => unknown} liveId
- * @param {{ link?: ReturnType<typeof createVoiceReaderLeaseLink> | null, onPageHide?: (fn: () => void) => void }} [opts]
+ * @param {{ link?: ReturnType<typeof createVoiceReaderLeaseLink> | null, onPageHide?: (fn: () => void) => void, priority?: () => number, onLost?: () => void }} [opts]
  *   onPageHide: ページを閉じる時に呼ぶ口(呼び出し側が window の pagehide を渡す・lib は I/O を持たない)
+ *   priority / onLost: createVoiceReaderLeaseLink と同じ(見えている会場が閉じた会場から読み手を引き継ぐ)
  * @returns {ReturnType<typeof createVoiceReaderLeaseLink> | null}
  */
 export function startVoiceReaderLease(isActive, liveId, opts = {}) {
-  const link = opts.link !== undefined ? opts.link : chromeVoiceReaderLeaseLink();
+  const link = opts.link !== undefined ? opts.link : chromeVoiceReaderLeaseLink({ priority: opts.priority, onLost: opts.onLost });
   if (!link) return null;
   let beating = false;
   setInterval(() => {

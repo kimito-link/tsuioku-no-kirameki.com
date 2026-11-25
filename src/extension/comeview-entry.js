@@ -105,7 +105,7 @@ import {
   createVoicePaceState, noteVoicePaceArrival, noteVoicePacePlayed, computeVoicePaceFloor, foldVoiceArrivalWindow, resetVoicePaceArrival
 } from '../lib/voiceLagBudget.js';
 import { createBrowserStreamedAudio } from './voiceStreamAudio.js';
-import { startVoiceReaderLease } from '../lib/voiceReaderLease.js';
+import { startVoiceReaderLease, VOICE_READER_PRIO_VISIBLE } from '../lib/voiceReaderLease.js';
 import { publishVoiceNowPlaying } from './venuePickupVoice.js';
 import { chromeVoiceEngineLink, createVoicevoxWarmup, startVoiceWarmup, wireVoiceWarmupHooks, withVoiceWarmup } from '../lib/voiceWarmup.js';
 // ★v0.1.1329: 会場と同じ「再試行バックオフ」「無音WAV」をコメビュでも使う(二重定義しない)。
@@ -302,7 +302,9 @@ let _voiceSynthInFlight = 0;
 // v0.1.1794: 同じ配信を会場でも読んでいる時は、先に読み始めた方だけが読む(声の二重・VOICEVOX の取り合いを防ぐ)。
 //   試験(voiceTestRun)は enqueueVoiceTimelineItems を直接呼ぶのでこの関門を通らない。
 const _voiceReaderLease = startVoiceReaderLease(() => _voiceReadingEnabled && !isObsMode() && !!_liveId, () => _liveId, {
-  onPageHide: (fn) => window.addEventListener('pagehide', fn)
+  onPageHide: (fn) => window.addEventListener('pagehide', fn),
+  // 2026-11-25: コメビュは見えている読み手(閉じた会場=声だけから引き継ぐ・見えている会場とは先着のまま)。
+  priority: () => VOICE_READER_PRIO_VISIBLE
 });
 let _voiceToggleBusy = false;
 /** v0.1.699: 名前読み(既定OFF=本文だけ)。 */
