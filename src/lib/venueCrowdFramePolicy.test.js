@@ -100,7 +100,8 @@ describe('会場の配線', () => {
     const s = src.indexOf('const crowdMotion = createVenueCrowdMotion({');
     const body = src.slice(s, src.indexOf('});', s));
     expect(body).toContain('minFrameMs: 55');
-    expect(body).toContain('frameMs: () => resolveVenueCrowdFrameMs({ recentLagMs: readExtDocRecentLagMs()');
+    expect(body).toContain('frameMs: () => resolveDecorFrameMs({ recentLagMs: readExtDocRecentLagMs()'); // v0.1.2218: 共通の決まり経由
+    expect(body).toContain('busyChat: isVenueBusyForCalm(crowdHeatLevel)');
     expect(body).toContain('voiceOverloaded: voicePlayer._overload?.overloaded === true');
     expect(body).toContain('lightVoiceActive: /** @type {any} */ (voicePlayer.diag).lightVoiceActive === true');
     expect(body).toContain('weakVoicePc: voicePlayer._slowEngine === true');

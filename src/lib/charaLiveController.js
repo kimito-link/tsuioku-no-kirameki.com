@@ -79,7 +79,8 @@ export const CHEER_DURATION_MS = 2400;
  *   getHeatLevel?: () => number,
  *   reducedMotion?: boolean,
  *   backchannels?: readonly string[],
- *   talk?: boolean
+ *   talk?: boolean,
+ *   frameGapMs?: () => number
  * }} deps
  * @returns {{
  *   root: HTMLElement,
@@ -121,6 +122,19 @@ export function startCharaLive(deps) {
         ? view.cancelAnimationFrame.bind(view)
         : (/** @type {number} */ id) => clearTimeout(id);
   const getHeat = typeof deps.getHeatLevel === 'function' ? deps.getHeatLevel : () => 0;
+  /*
+   * v0.1.2218: 描く間隔を呼び出し側が決められる(会場は観客のそよぎと同じ決まり=renderCadence.resolveDecorFrameMs)。
+   *   PC が詰まっている・コメントが速い間は浮遊のコマを減らす。渡されなければ従来どおり約18fps。
+   */
+  const frameGap = () => {
+    if (typeof deps.frameGapMs !== 'function') return FRAME_MIN_GAP_MS;
+    try {
+      const v = Number(deps.frameGapMs());
+      return Number.isFinite(v) && v > 0 ? Math.max(FRAME_MIN_GAP_MS, Math.min(1000, v)) : FRAME_MIN_GAP_MS;
+    } catch {
+      return FRAME_MIN_GAP_MS;
+    }
+  };
   /*
    * ★しゃべるか(2026-10-12 ユーザー要望「とりあえず浮かんでるだけでいい」)。
    *   false なら、相槌(読み上げ)・配信者への返事・AI の考え中(…)の入口をすべて何もしない。
@@ -184,7 +198,7 @@ export function startCharaLive(deps) {
     // ★rAF は毎秒60回来る。会場を重くしないため描画は約18fpsに間引く
     //   (群衆canvasと同じ方針)。間引いても浮遊は滑らかに見える。
     //   ただし相槌/返事/思考が入った直後だけは即座に描く(反応が鈍く見えないように)。
-    if (!needsImmediateDraw && t - lastDrawMs < FRAME_MIN_GAP_MS) {
+    if (!needsImmediateDraw && t - lastDrawMs < frameGap()) {
       frameId = raf(tick);
       return;
     }

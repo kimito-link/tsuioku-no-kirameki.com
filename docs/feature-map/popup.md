@@ -26,9 +26,11 @@ graph LR
   n_popup --> n_src_domain_user_identity_js["domain/user/identity.js"]:::shared
   n_popup --> n_src_domain_user_nickname_js["domain/user/nickname.js"]:::shared
   n_popup --> n_src_extension_popup_attachAiDiagButtonHandler_js["extension/popup/attachAiDiagButtonHandler.js"]
+  n_popup --> n_src_extension_popup_broadcasterCasterThumb_js["extension/popup/broadcasterCasterThumb.js"]
   n_popup --> n_src_extension_popup_eventLiveBoardPopup_js["extension/popup/eventLiveBoardPopup.js"]
   n_popup --> n_src_extension_popup_init_devMonitorExport_js["extension/popup/init/devMonitorExport.js"]
   n_popup --> n_src_extension_popup_init_frameTheme_js["extension/popup/init/frameTheme.js"]
+  n_popup --> n_src_extension_popup_nicoEstimatedSpendChip_js["extension/popup/nicoEstimatedSpendChip.js"]
   n_popup --> n_src_extension_popup_renderAcquisitionDashboard_js["extension/popup/renderAcquisitionDashboard.js"]
   n_popup --> n_src_extension_popup_report_htmlReportDocument_js["extension/popup/report/htmlReportDocument.js"]
   n_popup --> n_src_extension_popup_wireLaneUserDetailOpen_js["extension/popup/wireLaneUserDetailOpen.js"]
@@ -51,9 +53,7 @@ graph LR
   n_popup --> n_src_lib_aiShareFastDiagKey_js["lib/aiShareFastDiagKey.js"]
   n_popup --> n_src_lib_aiSharePopupDiagKey_js["lib/aiSharePopupDiagKey.js"]:::shared
   n_popup --> n_src_lib_anomalyVerdict_js["lib/anomalyVerdict.js"]:::shared
-  n_popup --> n_src_lib_anonymousIdenticon_js["lib/anonymousIdenticon.js"]:::shared
-  n_popup --> n_src_lib_appliedEntriesMemo_js["lib/appliedEntriesMemo.js"]
   classDef shared fill:#eee,stroke:#999,color:#666;
 ```
 
-> ほか 516 ファイル省略（全件は storage-bus.md / metafile 参照）。
+> ほか 522 ファイル省略（全件は storage-bus.md / metafile 参照）。

@@ -315,8 +315,7 @@ import {
   resolveVenueHeatLevel,
   buildVenueHeatPaint
 } from '../lib/venueHeat.js';
-import { shouldSkipVenueSpeechPollRead, VENUE_SPEECH_POLL_INTERVAL_MS } from '../lib/venueSpeechPollGate.js';
-import { resolveVenueCrowdFrameMs } from '../lib/venueCrowdFramePolicy.js';
+import { shouldSkipVenueSpeechPollRead, VENUE_SPEECH_POLL_INTERVAL_MS } from '../lib/venueSpeechPollGate.js'; import { applyVenueBusyCalm, isVenueBusyForCalm, VENUE_BUSY_CALM_CSS } from '../lib/venueBusyCalm.js'; import { resolveListRenderGapMs, resolveDecorFrameMs } from '../lib/renderCadence.js';
 import { readExtDocRecentLagMs } from '../lib/extDocBusyCensus.js';
 import { VoicePlayer } from '../lib/voicePlayer.js';
 import { KEY_VOICE_DIAG } from '../lib/voiceDiagKey.js';
@@ -2423,7 +2422,7 @@ function ensureVenueStyle() {
   if (document.getElementById(STYLE_ID)) return;
   const style = document.createElement('style');
   style.id = STYLE_ID;
-  style.textContent = VENUE_CSS + VENUE_STAT_STRIP_CSS;
+  style.textContent = VENUE_CSS + VENUE_STAT_STRIP_CSS + VENUE_BUSY_CALM_CSS;
   (document.head || document.documentElement).appendChild(style);
 }
 
@@ -3316,7 +3315,7 @@ export function mountVenueBarButton(options = {}) {
   let tucked = false;
   const isPageHidden = () => isVenuePageHidden(typeof document !== 'undefined' ? document : null);
   const venuePaint = createVenuePaintSchedule({
-    isHidden: isPageHidden, isPaused: () => tucked === true || open !== true, minIntervalMs: 80,
+    isHidden: isPageHidden, isPaused: () => tucked === true || open !== true, minIntervalMs: () => resolveListRenderGapMs({ baseMs: 80, recentLagMs: readExtDocRecentLagMs(), busyChat: isVenueBusyForCalm(crowdHeatLevel) }), // v0.1.2218: 共通の決まり(renderCadence.js)
   });
   const crowdAnimAllowed = () => shouldAnimateVenueCrowd({
     open, tucked, hidden: isPageHidden(), reducedMotion: crowdReducedMotion, count: crowdAnimCount,
@@ -3486,7 +3485,7 @@ export function mountVenueBarButton(options = {}) {
     mount: stage,
     resolveUrl: resolveVenueAssetUrl,
     getHeatLevel: () => crowdHeatLevel,
-    reducedMotion: crowdReducedMotion,
+    reducedMotion: crowdReducedMotion, frameGapMs: () => resolveDecorFrameMs({ recentLagMs: readExtDocRecentLagMs(), voiceOverloaded: voicePlayer._overload?.overloaded === true, lightVoiceActive: /** @type {any} */ (voicePlayer.diag).lightVoiceActive === true, weakVoicePc: voicePlayer._slowEngine === true, busyChat: isVenueBusyForCalm(crowdHeatLevel) }), // v0.1.2218: 群衆と同じ決まり(renderCadence.js)
     // ★2026-10-12 ユーザー要望「とりあえず浮かんでるだけでいい」: しゃべらない(相槌・返事・考え中の「…」を出さない)。
     //   吹き出しが会場の内容(広告ランキング等)に被っていた。浮遊・まばたき・表情だけ続ける。
     //   しゃべらせたくなったら true(または削除=既定 true)に戻すだけ。
@@ -5308,6 +5307,7 @@ export function mountVenueBarButton(options = {}) {
     // 「生きている会場」: この盛り上がりで観客の揺れの速さ/大きさが決まる(群衆は従来どおり丸めない値)。
     crowdHeatLevel = level;
     const paint = buildVenueHeatPaint(level);
+    applyVenueBusyCalm(stage, level); // v0.1.2217: コメントが速い間だけ飾りの動きを止める(理由は venueBusyCalm.js・同じ値なら DOM は触らない)
     if (paint.sig === _venueHeatPaintSig && stage.hasAttribute('data-nls-heat')) return;
     _venueHeatPaintSig = paint.sig;
     stage.style.setProperty('--nlsb-heat-color', paint.color);
@@ -5336,7 +5336,7 @@ export function mountVenueBarButton(options = {}) {
     allowed: crowdAnimAllowed,
     now: nowMs,
     minFrameMs: 55, // v0.1.2214: 弱い PC では間引く(既存の合図だけ・venueCrowdFramePolicy.js)
-    frameMs: () => resolveVenueCrowdFrameMs({ recentLagMs: readExtDocRecentLagMs(), voiceOverloaded: voicePlayer._overload?.overloaded === true, lightVoiceActive: /** @type {any} */ (voicePlayer.diag).lightVoiceActive === true, weakVoicePc: voicePlayer._slowEngine === true }),
+    frameMs: () => resolveDecorFrameMs({ recentLagMs: readExtDocRecentLagMs(), voiceOverloaded: voicePlayer._overload?.overloaded === true, lightVoiceActive: /** @type {any} */ (voicePlayer.diag).lightVoiceActive === true, weakVoicePc: voicePlayer._slowEngine === true, busyChat: isVenueBusyForCalm(crowdHeatLevel) }), // v0.1.2218 renderCadence
     draw: (t) => {
       drawCrowdOnCanvas(crowdCanvas, crowdAnimCount, crowdAnimSeed, { timeMs: t, heatLevel: crowdHeatLevel });
     },
@@ -5874,7 +5874,7 @@ export function mountVenueBarButton(options = {}) {
             if (!node) return tileEl;
             // 席の持ち主ではない段(同じ人が別の段にも居る)は席に包まない=席の要素を奪わない。
             if (seatOwnerItem.has(seatIndexRaw) && seatOwnerItem.get(seatIndexRaw) !== item) return tileEl;
-            node.seat.replaceChildren(tileEl);
+            if (!(node.seat.firstChild === tileEl && node.seat.childNodes.length === 1)) node.seat.replaceChildren(tileEl); // v0.1.2217: 使い回したタイルが既に唯一の中身なら付け直さない(アニメの鳴り直し・描き直しを防ぐ)
             node.tile = tileEl;
             return node.seat;
           }

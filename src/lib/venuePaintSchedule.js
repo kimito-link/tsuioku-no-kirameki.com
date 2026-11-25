@@ -107,6 +107,11 @@ export function shouldSyncVenueSeatCommit(s = {}) {
   return false;
 }
 
+/** @param {() => unknown} fn */
+function safeNum(fn) {
+  try { return Number(fn()); } catch { return NaN; }
+}
+
 /**
  * 席の再描画を 1 本にまとめる。同じフレームに何度来ても 1 回だけ。短すぎる間隔は間引く。
  * しまったとき・裏タブでは保留し、kick() で再開する。
@@ -116,7 +121,7 @@ export function shouldSyncVenueSeatCommit(s = {}) {
  *   now?: () => number,
  *   isHidden?: () => boolean,
  *   isPaused?: () => boolean,
- *   minIntervalMs?: number
+ *   minIntervalMs?: number | (() => number)
  * }} [opts]
  */
 export function createVenuePaintSchedule(opts = {}) {
@@ -131,7 +136,11 @@ export function createVenuePaintSchedule(opts = {}) {
   const now = opts.now || (() => Date.now());
   const isHidden = opts.isHidden || (() => false);
   const isPaused = opts.isPaused || (() => false);
-  const minIntervalMs = Math.max(0, Number(opts.minIntervalMs) || 80);
+  // v0.1.2218: 関数も受ける(毎回読む・renderCadence の共通の決まり)。数値なら従来どおり固定。
+  const minIntervalOf = () => {
+    const raw = typeof opts.minIntervalMs === 'function' ? safeNum(opts.minIntervalMs) : opts.minIntervalMs;
+    return Math.max(0, Number(raw) || 80);
+  };
   let pending = /** @type {null | (() => void)} */ (null);
   let id = 0;
   let lastRun = 0;
@@ -146,7 +155,7 @@ export function createVenuePaintSchedule(opts = {}) {
     id = 0;
     if (!pending) return;
     if (isPaused() || isHidden()) return;
-    const wait = lastRun + minIntervalMs - now();
+    const wait = lastRun + minIntervalOf() - now();
     if (wait > 0) {
       id = raf(flush);
       return;

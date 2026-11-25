@@ -113,6 +113,38 @@ describe('常駐アニメーション', () => {
   });
 });
 
+describe('v0.1.2218 描く間隔を呼び出し側が決める(renderCadence)', () => {
+  const tf = (h) => h.live.root.querySelector('.nlcl-chara').style.transform;
+  it('渡さなければ従来どおり約18fps(100ms 後には動く)', () => {
+    const h = makeHarness();
+    h.advance(0);
+    const a = tf(h);
+    h.advance(100);
+    expect(tf(h)).not.toBe(a);
+    h.live.destroy();
+  });
+  it('500ms と言われたら、その間は描かない(コマを減らす)', () => {
+    const h = makeHarness({ frameGapMs: () => 500 });
+    h.advance(0);
+    const a = tf(h);
+    h.advance(100);
+    h.advance(100);
+    h.advance(100);
+    expect(tf(h)).toBe(a);
+    h.advance(250);
+    expect(tf(h)).not.toBe(a);
+    h.live.destroy();
+  });
+  it('おかしな値・例外は従来の間隔に戻す', () => {
+    const h = makeHarness({ frameGapMs: () => { throw new Error('x'); } });
+    h.advance(0);
+    const a = tf(h);
+    h.advance(100);
+    expect(tf(h)).not.toBe(a);
+    h.live.destroy();
+  });
+});
+
 describe('コメント読み上げへの相槌', () => {
   it('読み上げが鳴った瞬間に 1 体が相槌を入れる', () => {
     const h = makeHarness();

@@ -104,6 +104,34 @@ describe('createVenuePaintSchedule', () => {
   });
 });
 
+describe('createVenuePaintSchedule: 間隔を関数で受ける(v0.1.2218 renderCadence)', () => {
+  it('毎回読み直し、広がれば次の描画を待たせる', () => {
+    const queue = [];
+    let now = 1000;
+    let gap = 80;
+    const sched = createVenuePaintSchedule({
+      raf: (cb) => { queue.push(cb); return queue.length; },
+      caf: () => { queue.length = 0; },
+      now: () => now,
+      isHidden: () => false,
+      isPaused: () => false,
+      minIntervalMs: () => gap,
+    });
+    let ran = 0;
+    sched.schedule(() => { ran += 1; });
+    queue.shift()();
+    expect(ran).toBe(1);
+    gap = 250;
+    sched.schedule(() => { ran += 1; });
+    now += 100;
+    queue.shift()();
+    expect(ran).toBe(1);
+    now += 160;
+    while (queue.length) queue.shift()();
+    expect(ran).toBe(2);
+  });
+});
+
 describe('growVenueSeatNodes', () => {
   it('足りない席だけ足し、上限は超えない', () => {
     const nodes = ['a', 'b'];

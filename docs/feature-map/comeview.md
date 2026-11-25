@@ -40,6 +40,7 @@ graph LR
   n_comeview --> n_src_lib_commentRecord_js["lib/commentRecord.js"]:::shared
   n_comeview --> n_src_lib_commentTailBuffer_js["lib/commentTailBuffer.js"]:::shared
   n_comeview --> n_src_lib_deriveAvatarUrlFromUid_js["lib/deriveAvatarUrlFromUid.js"]:::shared
+  n_comeview --> n_src_lib_devMarketingUnlock_js["lib/devMarketingUnlock.js"]
   n_comeview --> n_src_lib_extDocBusyCensus_js["lib/extDocBusyCensus.js"]:::shared
   n_comeview --> n_src_lib_extDocBusyCensusBoot_js["lib/extDocBusyCensusBoot.js"]:::shared
   n_comeview --> n_src_lib_extProcessCensusKey_js["lib/extProcessCensusKey.js"]:::shared
@@ -52,8 +53,7 @@ graph LR
   n_comeview --> n_src_lib_parseGiftComment_js["lib/parseGiftComment.js"]:::shared
   n_comeview --> n_src_lib_storageKeys_js["lib/storageKeys.js"]:::shared
   n_comeview --> n_src_lib_storageOpTimeout_js["lib/storageOpTimeout.js"]:::shared
-  n_comeview --> n_src_lib_storageRefreshTriggerKey_js["lib/storageRefreshTriggerKey.js"]:::shared
   classDef shared fill:#eee,stroke:#999,color:#666;
 ```
 
-> ほか 49 ファイル省略（全件は storage-bus.md / metafile 参照）。
+> ほか 50 ファイル省略（全件は storage-bus.md / metafile 参照）。

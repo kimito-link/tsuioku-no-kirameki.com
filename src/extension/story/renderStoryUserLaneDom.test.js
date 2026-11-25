@@ -785,6 +785,8 @@ describe('fillLaneTier — 1人変わっても、同じ見た目の人のタイ�
   const C = cell('a:CCC', 'ident-c.svg', '匿名C');
   const D = cell('a:DDD', 'ident-d.svg', '匿名D');
   const tanu = (els) => Array.from(els.laneTanu.children);
+  /** 会場の包み(席)の中のタイルも含めて、段のタイル本体を並び順で */
+  const tilesIn = (els) => Array.from(els.laneTanu.children).map((w) => (w.firstElementChild && !w.matches('a,span.nl-story-userlane-cell,.nl-story-userlane-cell') ? w.firstElementChild : w));
   const buckets = (tanuItems) => ({ link: [], gift: [], ad: [], konta: [], tanu: tanuItems });
 
   it('★1人増えても、すでにいる人のタイル(=img)は同じ要素のまま・増えた人だけ新しい', () => {
@@ -844,15 +846,42 @@ describe('fillLaneTier — 1人変わっても、同じ見た目の人のタイ�
     expect(after[0].getAttribute('data-user-key')).toBeTruthy();
   });
 
-  it('★会場(wrapTileEl あり)は席ごとの包みがあるので、従来どおり毎回作り直す(使い回さない)', () => {
+  it('★v0.1.2217 会場(wrapTileEl あり)も、見た目が同じ人のタイルは使い回す(席の包みは毎回通す)', () => {
+    const els = makeEls();
+    /** @type {Map<string, HTMLElement>} */
+    const seats = new Map();
+    let wrapCalls = 0;
+    const wrap = (tileEl, item) => {
+      wrapCalls += 1;
+      const k = String(item?.entry?.userId || '');
+      let w = seats.get(k);
+      if (!w) { w = document.createElement('div'); w.className = 'nlsb-seat'; seats.set(k, w); }
+      if (!(w.firstChild === tileEl && w.childNodes.length === 1)) w.replaceChildren(tileEl);
+      return w;
+    };
+    paintStoryUserLaneDomFilled(els, FACES, buckets([A, B]), 2, IO, { wrapTileEl: wrap });
+    const before = tilesIn(els);
+    wrapCalls = 0;
+    paintStoryUserLaneDomFilled(els, FACES, buckets([A, B, C]), 3, IO, { wrapTileEl: wrap });
+    const after = tilesIn(els);
+    expect(after.length).toBe(3);
+    expect(after[0]).toBe(before[0]);
+    expect(after[1]).toBe(before[1]);
+    expect(wrapCalls).toBe(3);
+    expect(after[0].parentElement?.className).toBe('nlsb-seat');
+    expect(Array.from(els.laneTanu.children).every((w) => w.className === 'nlsb-seat')).toBe(true);
+  });
+
+  it('★v0.1.2217 会場で席から外れたタイルは使い回さない(新しく作る)', () => {
     const els = makeEls();
     const wrap = (tileEl) => { const w = document.createElement('div'); w.appendChild(tileEl); return w; };
     paintStoryUserLaneDomFilled(els, FACES, buckets([A, B]), 2, IO, { wrapTileEl: wrap });
-    const before = tanu(els);
+    const before = tilesIn(els);
+    before[0].remove(); // 席の片付けで外れた
     paintStoryUserLaneDomFilled(els, FACES, buckets([A, B, C]), 3, IO, { wrapTileEl: wrap });
-    const after = tanu(els);
-    expect(after.length).toBe(3);
+    const after = tilesIn(els);
     expect(after[0]).not.toBe(before[0]);
+    expect(after[1]).toBe(before[1]);
   });
 
   it('★作り直しを求められた段(invalidate)は、同じ人でも新しいタイルにする', async () => {

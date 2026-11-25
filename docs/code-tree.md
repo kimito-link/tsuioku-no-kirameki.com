@@ -27,7 +27,7 @@
 
 > 値が次の段へ届かない「断線」(broadcaster バグ型)は `npm run feature-map -- --check` が機械検知。
 
-## ⚠️ 役割コメントが無いソース 15 / 1360 件
+## ⚠️ 役割コメントが無いソース 15 / 1361 件
 - `docs/handoff/bench/bench-interval.mjs`
 - `docs/handoff/bench/bench-lane.mjs`
 - `extension-youtube/cloak-failsafe.js`
@@ -1202,7 +1202,7 @@
   - `gift-coin-hq.wav`
   - `gift-register-hq.wav`
   - `gift-register.mp3`
-- 📁 **src/** (2643)
+- 📁 **src/** (2646)
   - 📁 **data/** (7)
     - 📁 **acquirers/** (2)
       - `laneFromStorage.js` — 応援レーン acquirer: chrome.storage.local(nls_comments) → laneStore の橋渡し。
@@ -1548,7 +1548,7 @@
         - `logo_funlink_white_RGB_link_black.png`
         - `logo_funlink_white_RGB_maru_black.png`
     - `hero-connect-hub.svg`
-  - 📁 **lib/** (2322)
+  - 📁 **lib/** (2325)
     - 📁 **__snapshots__/** (4)
       - `marketing-abema-baseline.html`
       - `marketing-niconico.html`
@@ -2319,6 +2319,7 @@
     - `extDocBusyCensus.test.js`
     - `extDocBusyCensusBoot.js` — 【層】L2 配線層(副作用あり・各拡張文書から1行 import で起動する)
     - `extDocBusyCensusBoot.test.js`
+    - `extDocBusyCensusOnChangedSkip.test.js`
     - `extProcessCensusKey.js` — 拡張プロセスの忙しさ台帳の storage キーとメッセージ型(書き手と読み手が同じ名前を使うための1か所)。
     - `extensionCspInlineScript.test.js`
     - `externalFetchCells.js` — 外部API(貢献度/ニコニ広告)の取得をセルにする(純関数)。
@@ -3581,6 +3582,8 @@
     - `venueBubbleVoiceSync.js` — 会場の吹き出しと読み上げの声を「ぴったり・テンポよく」合わせる(2026-11-12 りんく「全部のプラットフォーム
     - `venueBubbleVoiceSync.sim.test.js`
     - `venueBubbleVoiceSync.test.js`
+    - `venueBusyCalm.js` — コメントが速い間だけ、会場の「飾りの動き」を止めて軽くする(見た目の情報は残す)。
+    - `venueBusyCalm.test.js`
     - `venueButtonVisible.wiring.test.js`
     - `venueCharacterFrame.js` — 会場モードの「額縁(フレーム)」: ゆっくり3キャラ(りんく/こん太/たぬ姉)の全表情サムネを、
     - `venueCharacterFrame.test.js`
