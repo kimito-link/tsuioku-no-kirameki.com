@@ -113,6 +113,7 @@ export const VOICE_DIAG_FRESH_MS = 60_000;
  *   lightProbeLastMs: number,    // 同上: 直近の確かめの ms(失敗 -1)
  *   lightProbeBusySkipTotal: number, // 同上: ほかの合成が終わらず確かめられなかった回数
  *   voiceOverloadRetryTotal: number, // 0.1.2115: 混雑のまま2分経って VOICEVOX を一度試した回数
+ *   voicevoxFeedPausedTotal: number, // v0.1.2213: 混雑中で PC の声が読める間、実コメントを VOICEVOX に頼まなかった回数
  *   refreshVoicedTotal: number,  // v0.1.1804計器: コメビュの整合リフレッシュで初めて出たので読みに回したコメント数
  *   backlogSkipTotal: number,    // v0.1.1805計器: コメビュで開く前の古いコメント(後からまとめて届いた分)を読まずに外した数
  *   bigBatchTotal: number,       // v0.1.1804計器: コメビュで一度に10件以上が読む列へ来た回数
@@ -252,6 +253,7 @@ export function makeInitialVoiceDiag() {
     lightProbeLastMs: -1,
     lightProbeBusySkipTotal: 0,
     voiceOverloadRetryTotal: 0,
+    voicevoxFeedPausedTotal: 0,
     refreshVoicedTotal: 0,
     backlogSkipTotal: 0,
     bigBatchTotal: 0,
@@ -436,6 +438,7 @@ export function buildVoiceDiagSnapshot(diag, nowMs, liveId) {
     lightProbeLastMs: num(d.lightProbeLastMs, base.lightProbeLastMs),
     lightProbeBusySkipTotal: num(d.lightProbeBusySkipTotal, base.lightProbeBusySkipTotal),
     voiceOverloadRetryTotal: num(d.voiceOverloadRetryTotal, base.voiceOverloadRetryTotal),
+    voicevoxFeedPausedTotal: num(d.voicevoxFeedPausedTotal, base.voicevoxFeedPausedTotal),
     refreshVoicedTotal: num(d.refreshVoicedTotal, base.refreshVoicedTotal),
     backlogSkipTotal: num(d.backlogSkipTotal, base.backlogSkipTotal),
     bigBatchTotal: num(d.bigBatchTotal, base.bigBatchTotal),

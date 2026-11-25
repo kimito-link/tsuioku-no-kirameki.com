@@ -81,3 +81,21 @@ export function shouldProbeVoicevox(s) {
   if (!s || s.inFlight > 0) return false;
   return !(s.lastProbeAt > 0) || s.nowMs - s.lastProbeAt >= LIGHT_VOICE_PROBE_INTERVAL_MS;
 }
+
+/**
+ * v0.1.2213: VOICEVOX へ実コメントの合成を頼むのを止めておくか(止めている間は短い「てすと」で速さだけ確かめる)。
+ *
+ * ■ なぜ要るか: 混雑中(時間切れが続いた)も実コメントを頼み続けていた(2026-11-16 から)。拡張が諦めた依頼も
+ *   VOICEVOX は最後まで計算するので CPU が空かず、Chrome(会場・パネル)も VOICEVOX も重いまま混雑が解けない
+ *   (2026-11-03 の実測: CPU 100%・時間切れ1,940件)。PC の声が代わりに読めるときだけ止める。
+ * ■ 戻り道(新しいタイマーは足さない・どちらも既存):
+ *   - shouldProbeVoicevox: 6秒ごと・ほかの合成が無いときに短い文を頼み、3秒未満が5回続けば混雑が解ける。
+ *   - retryVoiceEngineAfterLongOverload: 混雑のまま2分経ったら一度 VOICEVOX に戻して試す。
+ * ■ ふつうのノート PC: 混雑の判定は「時間切れ(15〜20秒)が2回続いた」ときだけなので、ふだんは止まらない。
+ * ■ PC の声を切っている(設定 off)・使えない(声が無い・3回失敗)ときは止めない=今までどおり VOICEVOX だけで読む。
+ * @param {{ overloaded: boolean, lightActive: boolean }} s lightActive = shouldUseLightVoice の結果
+ * @returns {boolean}
+ */
+export function shouldPauseVoicevoxFeed(s) {
+  return !!s && s.overloaded === true && s.lightActive === true;
+}

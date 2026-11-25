@@ -24,6 +24,15 @@
 /** @type {ChangelogEntry[]} */
 const ARCHIVE_ENTRIES = [
   Object.freeze({
+    version: '0.1.2190',
+    date: '2026-11-23',
+    summary: '裏タブや視聴ページの定期監視を共通スケジューラへ集約',
+    items: Object.freeze([
+      'YouTube 会場・重ね表示・Twitch・Kick の視聴ページで個別に動いていた定期タイマーを、共通のページ監視スケジューラへまとめました。',
+      '裏タブでは定期チェックを停止または間引き、重ね表示ではボタン書き換え後の不要な DOM 走査を止めることで、低スペック PC での負荷を抑えます。',
+    ])
+  }),
+  Object.freeze({
     version: '0.1.2189',
     date: '2026-11-23',
     summary: 'ミクチャの欄を探す部品の型を直す',

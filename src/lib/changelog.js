@@ -18,6 +18,14 @@
 /** @type {readonly ChangelogEntry[]} */
 export const EXTENSION_CHANGELOG = Object.freeze([
   Object.freeze({
+    version: '0.1.2213',
+    date: '2026-11-25',
+    summary: '混雑中は VOICEVOX を休ませて早く戻す',
+    items: Object.freeze([
+      'VOICEVOX が混雑して PC の声で読んでいる間は、コメントの合成を VOICEVOX に頼むのをやめ、6秒ごとに短い「てすと」だけを頼んで速さを確かめるようにしました。VOICEVOX の CPU が空くので、混雑から早く戻れ、そのあいだ Chrome（会場・パネル）も重くなりにくくなります。速さが戻ったら（短い文が速く5回続いたら）自動で VOICEVOX の声に戻ります。2分たっても戻らないときは一度 VOICEVOX を試します。PC の声を切っている・使えないときは今までどおり VOICEVOX だけで読みます。',
+    ])
+  }),
+  Object.freeze({
     version: '0.1.2212',
     date: '2026-11-25',
     summary: '会場が開いている間の負荷を減らし低スペックPCでも軽く',
@@ -192,15 +200,6 @@ export const EXTENSION_CHANGELOG = Object.freeze([
     summary: '戻る・進むで復帰した視聴ページでも監視を再開するように修正',
     items: Object.freeze([
       'YouTube 会場・重ね表示・Twitch・Kick の視聴ページで、ブラウザの「戻る・進む」（bfcache 復元）から戻ったあとも定期監視が止まったままにならないよう pageshow で再開するようにしました。',
-    ])
-  }),
-  Object.freeze({
-    version: '0.1.2190',
-    date: '2026-11-23',
-    summary: '裏タブや視聴ページの定期監視を共通スケジューラへ集約',
-    items: Object.freeze([
-      'YouTube 会場・重ね表示・Twitch・Kick の視聴ページで個別に動いていた定期タイマーを、共通のページ監視スケジューラへまとめました。',
-      '裏タブでは定期チェックを停止または間引き、重ね表示ではボタン書き換え後の不要な DOM 走査を止めることで、低スペック PC での負荷を抑えます。',
     ])
   })
 ]);
