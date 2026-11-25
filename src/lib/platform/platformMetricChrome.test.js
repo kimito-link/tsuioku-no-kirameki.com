@@ -77,11 +77,11 @@ describe('applyPlatformMetricChrome', () => {
     expect(root.querySelector('#officialStatNicoComments').parentElement.hidden).toBe(true);
     expect(root.querySelector('#officialStatNicoGiftPts').parentElement.hidden).toBe(true);
     expect(root.querySelector('#officialStatNicoStreamAge').parentElement.hidden).toBe(false);
-    expect(root.querySelector('[data-nl-metric="superchat"] .nl-official-nico-stats__val').textContent).toBe('¥500');
+    expect(root.querySelector('[data-nl-metric="superchat"] .nl-official-nico-stats__val').textContent).toBe('¥500 · 1件');
     // v0.1.2207: メンバー加入は 1 以上なら出す(以前は出さなかった)。推定がスパチャより前
     expect(root.querySelector('[data-nl-metric="members"] .nl-official-nico-stats__val').textContent).toBe('1人');
     const keys = [...root.querySelectorAll('[data-nl-metric]')].map((el) => el.getAttribute('data-nl-metric'));
-    expect(keys).toEqual(['estimatedViewerSpend', 'superchat', 'members']);
+    expect(keys).toEqual(['estimatedViewerSpend', 'estimatedStreamerTakeHome', 'superchat', 'members']);
     expect(root.documentElement.classList.contains('nl-cap-youtube')).toBe(true);
     expect(root.querySelector('[data-lane="adRanking"]').hidden).toBe(true);
     expect(root.querySelector('#giftRankingFetchPrompt').hidden).toBe(true);
@@ -105,7 +105,7 @@ describe('applyPlatformMetricChrome', () => {
       facts: { official: { level: 3 }, support: tallySupportItems([{ kind: 'superchat', amount: 400, currency: 'MXCOIN', channelId: 'mx:1', giftName: 'バラ' }]) },
     });
     const after = [...root.querySelectorAll('[data-nl-metric]')].map((el) => el.getAttribute('data-nl-metric'));
-    expect(after).toEqual(['estimatedViewerSpend', 'nativeTotal', 'paidGifts', 'level']);
+    expect(after).toEqual(['estimatedViewerSpend', 'estimatedStreamerTakeHome', 'nativeTotal', 'paidGifts', 'level']);
     expect(root.querySelector('[data-nl-metric="estimatedViewerSpend"] .nl-official-nico-stats__val').textContent).toBe('約¥480');
   });
 

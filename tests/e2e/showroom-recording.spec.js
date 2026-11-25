@@ -14,6 +14,7 @@ import https from 'node:https';
 import { execFileSync } from 'node:child_process';
 import { fileURLToPath } from 'node:url';
 import { WebSocketServer } from 'ws';
+import { captureSupportEvidence } from './supportEvidence.js';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const extensionPath = path.resolve(__dirname, '../../extension');
@@ -271,10 +272,14 @@ test('SHOWROOM のコメント・ギフト・公式の順位を記録し、送�
   expect(await chipText('eventRank')).toContain('イベント順位');
   expect(await chipText('eventPoint')).toContain('123,456pt');
   expect(await chipText('quest')).toContain('Lv3');
-  expect(await bodyText()).not.toMatch(/推定/);
-  // v0.1.2207: 記録したギフトの pt(円にしない)が公式の数より前に出る
+  // v0.1.2227(2026-11-25 りんくさん決定): 受取（推定）の欄はどのサービスも同じ場所に出す。SHOWROOM はシェア率が非公開なので
+  //   「—（公式の率が非公開）」だけ。金額(約¥)や視聴者の購入額の推定は作らない
+  await expect.poll(() => chipText('estimatedStreamerTakeHome'), { timeout: 30_000 }).toBe('推定（配信者の受取）—（公式の率が非公開）');
+  const bodyWithoutSlot = (await bodyText()).replaceAll('推定（配信者の受取）', '');
+  expect(bodyWithoutSlot).not.toMatch(/推定|約¥/);
+  // v0.1.2207: 記録したギフトの pt(円にしない)が公式の数より前に出る(受取の欄はその前・どのサービスも先頭側)
   await expect.poll(() => chipText('nativeTotal'), { timeout: 30_000 }).toMatch(/ギフト（記録）[\d,]+pt/);
-  expect(await ext.evaluate(() => document.querySelector('[data-nl-metric]')?.getAttribute('data-nl-metric') || '')).toBe('nativeTotal');
+  expect(await ext.evaluate(() => [...document.querySelectorAll('[data-nl-metric]')].slice(0, 2).map((el) => el.getAttribute('data-nl-metric')).join(','))).toBe('estimatedStreamerTakeHome,nativeTotal');
   await lane.first().screenshot({ path: 'test-results/showroom-event-board.png' });
   await ext.locator('[data-nl-metric="eventRank"]').locator('xpath=..').screenshot({ path: 'test-results/showroom-event-chips.png' });
 
@@ -283,4 +288,5 @@ test('SHOWROOM のコメント・ギフト・公式の順位を記録し、送�
   await expect
     .poll(async () => Number((await readStreamSummary(sw, KEY))?.endedAt || 0), { timeout: 45_000 })
     .toBeGreaterThan(0);
+  await captureSupportEvidence(ext, 'showroom');
 });

@@ -957,3 +957,57 @@ describe('大きな段を分けて足す(v0.1.2008)', () => {
     expect(els.laneLink.children.length).toBe(500);
   });
 });
+
+/**
+ * v0.1.2226 LANE_TILE_WRITE_MEMO: 描かない経路(sig-same)は描き直しのたびに全タイルへ来る。
+ *   元の値(stats 3つ・pulse 4つ)が前回書いたときと同じタイルは、属性を読むことも整形もしない。戻すと失敗する。
+ */
+describe('タイル stats/pulse — 同じ値のタイルは読みも書きもしない(v0.1.2226)', () => {
+  const withSP = (c, stats, pulse) => ({ ...c, stats, pulse });
+  const S = { commentCount: 12, giftPt: 1200, adPt: null };
+  const P = { heat: 3, heatTier: 'warm' };
+  const metaOf = (laneEl, i = 0) => laneEl.children[i].querySelector('.nl-story-userlane-meta');
+
+  it('同じ値で sync を繰り返しても、タイルにも meta にも触らない', () => {
+    const els = makeEls();
+    paint(els, { link: [withSP(LINK[0], S, P)], gift: [], ad: [], konta: [], tanu: [] });
+    const tile = els.laneLink.firstElementChild;
+    const meta = metaOf(els.laneLink);
+    expect(meta.getAttribute('data-stats')).toBe('🎁1,200 💬12');
+    expect(tile.getAttribute('data-pulse')).toBe('+3件');
+    const reads = [vi.spyOn(meta, 'getAttribute'), vi.spyOn(tile, 'getAttribute'), vi.spyOn(meta, 'setAttribute'), vi.spyOn(tile, 'setAttribute')];
+    for (let i = 0; i < 5; i += 1) {
+      syncStoryUserLaneStatsInPlace(els, { link: [withSP(LINK[0], { ...S }, { ...P })], gift: [], ad: [], konta: [], tanu: [] });
+    }
+    // 残るのは「同じ人か」(data-user-key)と meta かどうか(class)の確認だけ
+    for (const spy of reads) expect(spy.mock.calls.filter((c) => c[0] !== 'class' && c[0] !== 'data-user-key')).toEqual([]);
+  });
+
+  it('値が変われば従来どおり書く(数字・増分・消える)', () => {
+    const els = makeEls();
+    paint(els, { link: [withSP(LINK[0], S, P)], gift: [], ad: [], konta: [], tanu: [] });
+    const tile = els.laneLink.firstElementChild;
+    syncStoryUserLaneStatsInPlace(els, { link: [withSP(LINK[0], { ...S, commentCount: 13 }, { heat: 4, heatTier: 'warm' })], gift: [], ad: [], konta: [], tanu: [] });
+    expect(metaOf(els.laneLink).getAttribute('data-stats')).toBe('🎁1,200 💬13');
+    expect(tile.getAttribute('data-pulse')).toBe('+4件');
+    expect(tile.classList.contains('is-hot')).toBe(true);
+    syncStoryUserLaneStatsInPlace(els, { link: [withSP(LINK[0], { ...S, commentCount: 13 }, { giftDelta: 500, giftTier: 'mega' })], gift: [], ad: [], konta: [], tanu: [] });
+    expect(tile.getAttribute('data-pulse')).toBe('+500pt');
+    expect(tile.getAttribute('data-pulse-tier')).toBe('mega');
+    expect(tile.classList.contains('is-gifted')).toBe(true);
+    expect(tile.classList.contains('is-hot')).toBe(false);
+    syncStoryUserLaneStatsInPlace(els, { link: [LINK[0]], gift: [], ad: [], konta: [], tanu: [] });
+    expect(metaOf(els.laneLink).hasAttribute('data-stats')).toBe(false);
+    expect(tile.hasAttribute('data-pulse')).toBe(false);
+    expect(tile.classList.contains('is-gifted')).toBe(false);
+  });
+
+  it('作り直したタイルには必ず書く(控えは要素ごと)', () => {
+    const els = makeEls();
+    paint(els, { link: [withSP(LINK[0], S, P)], gift: [], ad: [], konta: [], tanu: [] });
+    resetStoryUserLaneDom(els);
+    paint(els, { link: [withSP(LINK[0], S, P)], gift: [], ad: [], konta: [], tanu: [] });
+    expect(metaOf(els.laneLink).getAttribute('data-stats')).toBe('🎁1,200 💬12');
+    expect(els.laneLink.firstElementChild.getAttribute('data-pulse')).toBe('+3件');
+  });
+});

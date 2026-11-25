@@ -35,7 +35,9 @@
  *       買った G とおまけ G の区別も取得側に無いため、円換算しない（2026-11-24 調査）。
  *
  * - ytGiftToNico.js の固定為替は使わない。
- * - 配信者の手取り・分配率・控除額は一切算出・表示しない。
+ * - 配信者の受取（推定）は、公式が率・単価を公開しているものだけ（STREAMER_TAKE_HOME_RATES・v0.1.2227・りんくさん承認 2026-11-25）。
+ *   YouTube のスパチャ・ステッカー 70%／Kick のサブスク・ギフトサブ $4.75／Twitch の Bits 1 Bit=1セント。ほかは出さない（「推定 —」）。
+ *   税・手数料・事務所の取り分は人によって違うので引かない（「手数料・税差引前の目安」と書く）。
  *
  * @module estimatedViewerSpend
  */
@@ -1031,4 +1033,164 @@ export function formatEstimatedViewerSpendDisplays(est) {
 export function formatEstimatedViewerSpendDisplay(est) {
   const list = formatEstimatedViewerSpendDisplays(est);
   return list.length > 0 ? list[0] : null;
+}
+
+/**
+ * 【正本】応援1件の見分け(v0.1.2227)。会場の演出(投げ・効果音)と、数字(横の欄・会場の帯のチップ・振り返り)が
+ *   同じ物を数えるための、ただ1つの決まり。ここで「応援」と答えた行は、必ずどれかの数字を動かす。
+ *   (2026-11-25 りんくさん: YouTube で投げと効果音は出るのにスパチャの数字が動かない。ジュエルのギフトはどの数字にも入らず、
+ *    主の通貨以外のスパチャは主の通貨の合計を動かさなかった)
+ *   値段はここでは決めない(推定の値段は上の表だけ。値段が分からない応援は件数だけ数える)。
+ */
+export const SUPPORT_EVENT_KINDS = Object.freeze(['superchat', 'sticker', 'membership', 'membership_gift', 'yt_gift']);
+
+/** ギフトの名前だけ分かって値段が分からない行(kind=text)も応援として数えるサービス(記録の配信キーの頭・ytPlatform) */
+const NAMED_GIFT_PLATFORM_PREFIX = Object.freeze({ showroom: 'sr:', mixch: 'mx:', tiktok: 'tt:', whowatch: 'ww:', twitcasting: 'tc:' });
+
+/**
+ * 記録の行(kind/giftName/channelId)と、会場に渡す形の行(ytKind/ytGiftName/ytPlatform)のどちらでも答える。
+ * @param {unknown} row
+ * @returns {boolean}
+ */
+export function isSupportEventRow(row) {
+  if (!row || typeof row !== 'object') return false;
+  const r = /** @type {Record<string, unknown>} */ (row);
+  const kind = String(r.ytKind ?? r.kind ?? '').trim().toLowerCase();
+  if (SUPPORT_EVENT_KINDS.includes(kind)) return true;
+  if (kind && kind !== 'text') return false;
+  // 一覧に無いギフト(SHOWROOM)・コイン数の分からないギフト(ミクチャ/TikTok)は kind=text で記録される。名前があれば投げられた応援
+  if (!String(r.ytGiftName ?? r.giftName ?? '').trim()) return false;
+  const plat = String(r.ytPlatform ?? r.platform ?? '').trim().toLowerCase();
+  if (plat) return Object.prototype.hasOwnProperty.call(NAMED_GIFT_PLATFORM_PREFIX, plat);
+  const ch = String(r.channelId ?? r.userId ?? '').trim().toLowerCase();
+  return Object.values(NAMED_GIFT_PLATFORM_PREFIX).some((p) => ch.startsWith(p));
+}
+
+/** 配信者の受取（推定）の見出し（横の欄・会場の帯・振り返り） */
+export const ESTIMATED_STREAMER_TAKE_HOME_LABEL = '推定（配信者の受取）';
+/** 受取を出すときに必ず添える言葉 */
+export const STREAMER_TAKE_HOME_CAVEAT = '手数料・税差引前の目安です。事務所・MCN との契約、iOS の手数料、地方消費税、源泉徴収などで実際の額は変わります。';
+
+/**
+ * 【正本】配信者の受取の率・単価（公式に公開されているものだけ）。確認日 2026-11-25（/workspace/tsk-notes/streamer-income/rates.md）。
+ *   ここに無いサービス・応援は受取を出さない（SHOWROOM のシェア率は非公開と公式が明記・ふわっちのポイント付与は非公開・
+ *   ミクチャ/TikTok/ツイキャス/ニコ生は公式の率が見当たらない・Twitch のサブスクは契約で変わる・Kick の KICKs は1 KICK の値段が公式に無い）。
+ */
+export const STREAMER_TAKE_HOME_RATES = Object.freeze({
+  youtubePaidChat: Object.freeze({
+    share: 0.7,
+    asOf: '2026-11-25',
+    sourceName: 'YouTube ヘルプ（Super Chat の収益・課金型製品モジュール）',
+    sourceUrl: 'https://support.google.com/youtube/answer/7288782?hl=ja',
+    sourceUrl2: 'https://support.google.com/youtube/answer/72902?hl=ja',
+    note: 'スーパーチャット・スーパーステッカーの 70%（公式は地方消費税・iOS の手数料を引いた後の 70%）。',
+  }),
+  kickSub: Object.freeze({
+    usdPerSub: 4.75,
+    asOf: '2026-11-25',
+    sourceName: 'Kick Help Center（Understanding KICK\'s revenue split・更新 2026-10-26）',
+    sourceUrl: 'https://help.kick.com/en/articles/15159722-understanding-kick-s-revenue-split',
+    note: 'サブスク・ギフトサブ1件 $5 のうち配信者 $4.75（95%）。KICKs は1 KICK の値段が公式に無いので入れていません。',
+  }),
+  twitchBits: Object.freeze({
+    usdPerBit: 0.01,
+    asOf: '2026-11-25',
+    sourceName: 'Twitch Partners（1 Bit あたり 1セント）',
+    sourceUrl: 'https://www.twitch.tv/p/en/partners',
+    note: 'Cheer の Bits 1つにつき 1セント（参加パートナー）。サブスクの取り分は契約で変わるので入れていません。',
+  }),
+});
+
+/** 受取の式があるサービス（それ以外は「推定 —」・件数と pt だけ） */
+export const STREAMER_TAKE_HOME_PLATFORMS = Object.freeze(['youtube', 'kick', 'twitch']);
+
+/**
+ * 配信者の受取（推定）。応援の集計（platformMetrics.tallySupportItems の amounts・件数）から、公式の率・単価だけで出す。
+ * @param {string} platformId
+ * @param {{ amounts?: Record<string, unknown>, membershipCount?: unknown, membershipGiftCount?: unknown }|null|undefined} support
+ * @returns {{ platform: string, jpy: number, usd?: number, asOf: string, fxAsOf: string, sourceName: string, sourceUrl: string, note: string }|null}
+ */
+export function estimateStreamerTakeHomeJpy(platformId, support) {
+  if (!support || typeof support !== 'object') return null;
+  const fx = ESTIMATED_VIEWER_SPEND_RATES.fx;
+  const amounts = support.amounts && typeof support.amounts === 'object' ? support.amounts : {};
+  if (platformId === 'youtube') {
+    const viewer = estimateYoutubeSupportSpendJpy(amounts);
+    if (!viewer) return null;
+    const cfg = STREAMER_TAKE_HOME_RATES.youtubePaidChat;
+    const jpy = Math.round(viewer.jpy * cfg.share);
+    return jpy > 0 ? { platform: 'youtube', jpy, asOf: cfg.asOf, fxAsOf: fx.asOf, sourceName: cfg.sourceName, sourceUrl: cfg.sourceUrl, note: cfg.note } : null;
+  }
+  const usdRate = jpyPerCurrencyUnit('USD');
+  if (usdRate == null) return null;
+  if (platformId === 'kick') {
+    const subs = Math.max(0, Math.floor(Number(support.membershipCount) || 0)) + Math.max(0, Math.floor(Number(support.membershipGiftCount) || 0));
+    if (!(subs > 0)) return null;
+    const cfg = STREAMER_TAKE_HOME_RATES.kickSub;
+    const usd = Math.round(subs * cfg.usdPerSub * 100) / 100;
+    const jpy = Math.round(usd * usdRate);
+    return jpy > 0 ? { platform: 'kick', jpy, usd, asOf: cfg.asOf, fxAsOf: fx.asOf, sourceName: cfg.sourceName, sourceUrl: cfg.sourceUrl, note: cfg.note } : null;
+  }
+  if (platformId === 'twitch') {
+    const bits = Math.max(0, Math.floor(Number(amounts.BITS) || 0));
+    if (!(bits > 0)) return null;
+    const cfg = STREAMER_TAKE_HOME_RATES.twitchBits;
+    const usd = Math.round(bits * cfg.usdPerBit * 100) / 100;
+    const jpy = Math.round(usd * usdRate);
+    return jpy > 0 ? { platform: 'twitch', jpy, usd, asOf: cfg.asOf, fxAsOf: fx.asOf, sourceName: cfg.sourceName, sourceUrl: cfg.sourceUrl, note: cfg.note } : null;
+  }
+  return null;
+}
+
+/**
+ * 記録の行（ytKind / ytAmount / ytCurrency・振り返り用）から、配信者の受取（推定）の材料を数える。
+ * @param {string} platformId
+ * @param {readonly unknown[]} comments
+ */
+export function estimateStreamerTakeHomeFromComments(platformId, comments) {
+  if (!Array.isArray(comments) || !comments.length || !STREAMER_TAKE_HOME_PLATFORMS.includes(platformId)) return null;
+  /** @type {Record<string, number>} */
+  const amounts = {};
+  let membershipCount = 0;
+  let membershipGiftCount = 0;
+  for (const row of comments) {
+    if (!row || typeof row !== 'object') continue;
+    const c = /** @type {Record<string, unknown>} */ (row);
+    const plat = String(c.ytPlatform || '').trim().toLowerCase();
+    if (plat && plat !== platformId) continue;
+    const kind = String(c.ytKind ?? c.kind ?? '').trim().toLowerCase();
+    const amount = Number(c.ytAmount ?? c.amount);
+    const cur = String(c.ytCurrency ?? c.currency ?? '').trim().toUpperCase();
+    if ((kind === 'superchat' || kind === 'sticker') && cur && Number.isFinite(amount) && amount > 0) amounts[cur] = (amounts[cur] || 0) + amount;
+    else if (kind === 'membership') membershipCount += 1;
+    else if (kind === 'membership_gift' && !c.giftPartOf) {
+      const rawGc = c.ytGiftCount ?? c.giftCount;
+      const gc = rawGc !== undefined && rawGc !== null ? Number(rawGc) : 1;
+      if (Number.isFinite(gc) && gc > 0) membershipGiftCount += Math.floor(gc);
+    }
+  }
+  return estimateStreamerTakeHomeJpy(platformId, { amounts, membershipCount, membershipGiftCount });
+}
+
+/** 公式が配信者の取り分を公開していないサービスの受取の欄(全サービス同じ場所に置く・2026-11-25 りんくさん決定) */
+export const STREAMER_TAKE_HOME_UNDISCLOSED_TEXT = '—（公式の率が非公開）';
+
+/**
+ * 受取（推定）の表示。式があるのに材料が無ければ「—」（placeholder）。式の無いサービスは理由つきの「—」。
+ * @param {string} platformId
+ * @param {ReturnType<typeof estimateStreamerTakeHomeJpy>} est
+ * @returns {{ key: string, label: string, text: string, title: string, note: string, sourceUrl: string, asOf: string, placeholder: boolean }}
+ */
+export function formatStreamerTakeHomeDisplay(platformId, est) {
+  const base = { key: 'estimatedStreamerTakeHome', label: ESTIMATED_STREAMER_TAKE_HOME_LABEL };
+  if (est && est.jpy > 0) {
+    const fxNote = est.platform === 'youtube' || est.usd ? `為替は ECB 基準（${est.fxAsOf}）。` : '';
+    const note = `${est.note}${fxNote}${STREAMER_TAKE_HOME_CAVEAT}出典: ${est.sourceName}（${est.asOf} 確認）`;
+    return { ...base, text: `約¥${est.jpy.toLocaleString('ja-JP')}`, title: note, note, sourceUrl: est.sourceUrl, asOf: est.asOf, placeholder: false };
+  }
+  const hasRate = STREAMER_TAKE_HOME_PLATFORMS.includes(platformId);
+  const why = hasRate
+    ? '公式の率・単価で数えられる応援がこのPCの記録に来たら表示します。'
+    : 'このサービスは配信者の取り分（率・単価）を公式に公開していないので、金額は出していません。件数と pt だけ数えています。';
+  return { ...base, text: hasRate ? '—' : STREAMER_TAKE_HOME_UNDISCLOSED_TEXT, title: why, note: why, sourceUrl: '', asOf: '', placeholder: true };
 }

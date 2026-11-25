@@ -1,5 +1,6 @@
 import { toEpochMs } from './timeAuthority.js';
 import { tierForGiftDeltaPoints } from './giftDeltaFallback.js';
+import { formatNumberJa } from './htmlText.js';
 
 /** この間隔を超えた2実測は差分を出さない(15分)。 */
 export const PULSE_MAX_GAP_MS = 15 * 60_000;
@@ -107,13 +108,13 @@ export function createGiftPulseRegistry(tierFor = tierForGiftDeltaPoints) {
 /** 「+1,200pt」。0以下は空文字。 @param {unknown} d */
 export function formatPtDelta(d) {
   const n = Math.floor(Number(d) || 0);
-  return n > 0 ? `+${n.toLocaleString('ja-JP')}pt` : '';
+  return n > 0 ? `+${formatNumberJa(n)}pt` : ''; // v0.1.2226: 整形係を使い回す(htmlText.js・出る文字は同じ)
 }
 
 /** 「+12件」。0以下は空文字。コメント件数の増分用(ptとは単位が違う)。 @param {unknown} d */
 export function formatCountDelta(d) {
   const n = Math.floor(Number(d) || 0);
-  return n > 0 ? `+${n.toLocaleString('ja-JP')}件` : '';
+  return n > 0 ? `+${formatNumberJa(n)}件` : ''; // v0.1.2226: 同上
 }
 
 /** 実測間隔の文言。 @param {unknown} spanMs */

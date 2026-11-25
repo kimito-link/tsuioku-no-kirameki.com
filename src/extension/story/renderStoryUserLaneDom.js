@@ -128,6 +128,13 @@ const _laneTierTileKeys = new WeakMap();
 function applyLaneTileStatsAttr(tileEl, p) {
   const metaEl = tileEl && tileEl.lastElementChild;
   if (!metaEl || !metaEl.classList || !metaEl.classList.contains('nl-story-userlane-meta')) return;
+  // v0.1.2226 LANE_TILE_WRITE_MEMO: 書く中身を決める元の値(stats 3つ・pulse 4つ)が、このタイルに前回書いたときと同じなら何もしない。
+  //   描かない経路(sig-same)は描き直しのたびに全タイルへ来る(箱の実測: 横の欄の描き直しの約1割)。属性の読み・整形・比較を省く。
+  //   この属性(data-stats / data-pulse / data-pulse-tier / is-gifted / is-hot)を書くのはこの関数だけ。
+  //   タイルや meta を作り直したら別の要素=控えは無い=従来どおり書く。
+  const writeKey = laneTileWriteKey(p);
+  const prev = _laneTileWriteMemo.get(metaEl);
+  if (prev && prev.tileEl === tileEl && prev.key === writeKey) return;
   const text = formatLaneTileStats(p && /** @type {any} */ (p).stats);
   const cur = metaEl.getAttribute('data-stats');
   if (text) {
@@ -136,6 +143,23 @@ function applyLaneTileStatsAttr(tileEl, p) {
     metaEl.removeAttribute('data-stats');
   }
   applyLaneTilePulseAttr(tileEl, p);
+  _laneTileWriteMemo.set(metaEl, { tileEl, key: writeKey });
+}
+
+/** @type {WeakMap<Element, { tileEl: Element, key: string }>} */
+const _laneTileWriteMemo = new WeakMap();
+
+/**
+ * タイルに書く stats / pulse を決める元の値だけを並べた鍵(整形はしない=安い)。
+ * @param {unknown} p PersonTileItem
+ * @returns {string}
+ */
+function laneTileWriteKey(p) {
+  const s = /** @type {any} */ (p)?.stats;
+  const u = /** @type {any} */ (p)?.pulse;
+  return s || u
+    ? `${s?.giftPt}\u0001${s?.adPt}\u0001${s?.commentCount}\u0001${u?.giftDelta}\u0001${u?.giftTier}\u0001${u?.heat}\u0001${u?.heatTier}`
+    : '';
 }
 
 /** 属性を「値が変わったときだけ」書く/消す(同値の再書き込みは style 再計算とアニメ再発火の元)。 */

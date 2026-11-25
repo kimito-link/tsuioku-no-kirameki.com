@@ -63,3 +63,16 @@ describe('panelLiveSummary', () => {
     expect(snap?.streamAgeMin).toBe(420);
   });
 });
+
+describe('mergeWatchSnapshotWithPanelSummary(v0.1.2228 popup-entry から移設・中身は同じ)', () => {
+  it('panel の数値だけで上書きし、タイトル等は残す。同接 0 は載せない', async () => {
+    const { mergeWatchSnapshotWithPanelSummary: merge, buildPanelLiveSummary: build } = await import('./panelLiveSummary.js');
+    const summary = build({ liveId: 'lv1', recordedCount: 3, officialCount: 120, officialViewerCount: 0, updatedAt: 1 });
+    const snap = { liveId: 'lv1', title: 'T', officialCommentCount: 5, officialViewerCount: 7 };
+    const out = /** @type {Record<string, unknown>} */ (merge(snap, summary));
+    expect(out.title).toBe('T');
+    expect(out.officialCommentCount).toBe(120);
+    expect('officialViewerCount' in out).toBe(false);
+    expect(merge(snap, { nope: 1 })).toBe(snap);
+  });
+});
