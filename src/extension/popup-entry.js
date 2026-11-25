@@ -16423,9 +16423,14 @@ async function refresh() {
    *   幕だけ t+1238ms まで残る=約1.2秒「中身が見えない」。冪等なので後続は no-op。
    */
   if (shouldRevealCloakAfterFirstPaint({ snapshotCacheHit, freshRefresh: isFreshRefresh() }).revealNow) {
-    paintWatchPopupUi();
-    markPopupRefreshContentPainted();
-    revealPopupPrimaryOnce();
+    /*
+     * ★v0.1.2226 CACHE_HIT_SINGLE_PAINT: ここでは描かない(幕も下の本描画の直後に外す)。
+     *   キャッシュヒットのときは、ここから下の本描画(「thumbCountEl … → paintWatchPopupUi()」)まで await が1つも無く、
+     *   同じ仕事の中で続けて走る。以前はここでも描いていたので、画面に出る前に上書きされる全く同じ描き直しを
+     *   毎回2回していた(箱の実測: 横の欄の描き直しの約4割がこれ。遅い PC では長いタスクの元)。
+     *   幕が外れる時刻は変わらない(同じ仕事の中)。下までに await を足すときは、ここで描く形に戻すこと
+     *   (popupCacheHitSinglePaint.wiring.test.js が見張る)。
+     */
   }
 
   if (!snapshotCacheHit) {
