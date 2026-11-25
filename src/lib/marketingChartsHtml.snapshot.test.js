@@ -117,6 +117,9 @@ describe('マーケ HTML のスナップショット', () => {
     expect(html).toContain('ニコ既定アイコン');
     expect(html).toContain('好きな人が来場しました');
     expect(html).toContain('koken 公式 API');
+    // 受取の欄はニコ生も同じ場所。奨励金の計算は非公開なので金額を作らず、空の出典も付けない(v0.1.2227)
+    expect(html).toContain('—（公式の率が非公開）');
+    expect(html).not.toContain('出典: ）');
     await expect(html).toMatchFileSnapshot(join(HERE, '__snapshots__/marketing-niconico.html'));
   });
 

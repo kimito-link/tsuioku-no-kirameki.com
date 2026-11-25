@@ -8,6 +8,7 @@ import { test as base, chromium, expect } from '@playwright/test';
 import { readStreamSummary } from './readStreamSummary.js';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
+import { captureSupportEvidence } from './supportEvidence.js';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const extensionPath = path.resolve(__dirname, '../../extension');
@@ -207,7 +208,10 @@ test('ふわっちの配信とコメントを記録し、送信も届く', async
   await expect.poll(() => chip('eventRank'), { timeout: 30_000 }).toContain('2位');
   expect(await chip('eventRank')).toContain('テストイベントB 12位');
   expect(await chip('totalViews')).toContain('4,567');
-  expect(await bodyText()).not.toMatch(/推定|広告pt|来場者数/);
+  // v0.1.2227(2026-11-25 りんくさん決定): 受取（推定）の欄はどのサービスも同じ場所。ふわっちは値段も取り分も非公開なので
+  //   「—（公式の率が非公開）」だけ。金額(約¥)や視聴者の購入額の推定は作らない
+  expect(await chip('estimatedStreamerTakeHome')).toMatch(/^推定（配信者の受取）—（公式の率が非公開）\|/);
+  expect((await bodyText()).replaceAll('推定（配信者の受取）', '')).not.toMatch(/推定|約¥|広告pt|来場者数/);
 
   // 配信が終わったと分かったら、終わった時刻を送って読むのをやめる
   ended = true;
@@ -217,6 +221,7 @@ test('ふわっちの配信とコメントを記録し、送信も届く', async
   const n = asked.length;
   await page.waitForTimeout(4000);
   expect(asked.length).toBe(n);
+  await captureSupportEvidence(ext, 'whowatch');
 });
 
 test('ページから API を読めない(CORS・拒否)ときは、バックグラウンドが代わりに読む', async ({ context }) => {

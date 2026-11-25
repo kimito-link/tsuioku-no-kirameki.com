@@ -16,6 +16,7 @@ import zlib from 'node:zlib';
 import { execFileSync } from 'node:child_process';
 import { fileURLToPath } from 'node:url';
 import { WebSocketServer } from 'ws';
+import { captureSupportEvidence } from './supportEvidence.js';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const extensionPath = path.resolve(__dirname, '../../extension');
@@ -410,4 +411,5 @@ test('TikTok のコメント・ギフト・配信中の順位を記録し、送�
   await page.waitForTimeout(22_000);
   expect((await ttDiag()).stopReason).toBe('');
   await expect(page.locator('#nl-tt-login-note')).toHaveCount(0);
+  await captureSupportEvidence(ext, 'tiktok');
 });
