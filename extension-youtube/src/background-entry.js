@@ -17,6 +17,16 @@ import {
   enqueueYtVoiceItem,
 } from '../../src/lib/youtube/ytVoiceQueue.js';
 import { mergeYtStreamSummary, prepareYtCommentsForIdb } from '../../src/lib/youtube/ytStreamStorePolicy.js';
+import { classifyYtWatchContentKind, summarizeChannelRecordedLives } from '../../src/lib/youtube/ytVideoWatchMeta.js';
+import { applyLiveCommentsToChannelIndex, peopleInChannelCommenterIndex } from '../../src/lib/youtube/ytChannelCommenterIndex.js';
+import { buildYtVideoWatchCardModel } from '../../src/lib/youtube/ytVideoWatchCard.js';
+import {
+  estimateYoutubeSupportSpendJpy,
+  estimateStreamerTakeHomeJpy,
+  formatEstimatedViewerSpendDisplay,
+  formatStreamerTakeHomeDisplay,
+} from '../../src/lib/estimatedViewerSpend.js';
+import { KEY_YT_CHANNEL_COMMENTERS, KEY_YT_VIDEO_WATCH_CARD } from '../../src/lib/storageKeys.js';
 import { YT_CHAT_STORAGE_FLUSH_MS } from '../../src/lib/youtube/ytLiveRowOrder.js';
 import {
   appendYtStreamCommentsIdb,
@@ -106,6 +116,88 @@ const YT_MERGED = typeof NL_YT_MERGED !== 'undefined' && NL_YT_MERGED === true;
 
 // パネルを閉じていても同接を1分ごとに記録する(マーケの同接推移カーブ・ytViewerSampler.js)
 const ytViewerSampler = createYtViewerSampler({ merged: YT_MERGED });
+
+
+/**
+ * ライブ保存のあと、チャンネルの投稿者索引を待たずに更新する。失敗しても記録は止めない。
+ * @param {string} channelId
+ * @param {readonly any[]} rows
+ */
+function rememberChannelCommenters(channelId, rows) {
+  const ch = String(channelId || '').trim();
+  const list = Array.isArray(rows) ? rows : [];
+  if (!ch || !list.length) return;
+  void (async () => {
+    try {
+      const bag = await chrome.storage.local.get(KEY_YT_CHANNEL_COMMENTERS);
+      const next = applyLiveCommentsToChannelIndex(bag?.[KEY_YT_CHANNEL_COMMENTERS], ch, list, Date.now());
+      await chrome.storage.local.set({ [KEY_YT_CHANNEL_COMMENTERS]: next });
+    } catch {
+      /* 索引は記録の正本ではない */
+    }
+  })();
+}
+
+/**
+ * 通常動画のカードを書いて会場へ渡す。ライブのコメント保存とは別経路。
+ * @param {{ videoId: string, title?: string, viewCount?: number | null, channelId?: string, videoAuthors?: any[] }} parts
+ */
+function publishVideoWatchCard(parts) {
+  const videoId = String(parts?.videoId || '').trim();
+  if (!videoId) return;
+  void (async () => {
+    try {
+      const bag = await chrome.storage.local.get([STORAGE_KEYS.STREAM_SUMMARIES, KEY_YT_CHANNEL_COMMENTERS]);
+      const recorded = summarizeChannelRecordedLives(bag?.[STORAGE_KEYS.STREAM_SUMMARIES], parts.channelId || '');
+      const livePeople = peopleInChannelCommenterIndex(bag?.[KEY_YT_CHANNEL_COMMENTERS], parts.channelId || '');
+      const spendModel = estimateYoutubeSupportSpendJpy(
+        (parts.videoAuthors || []).reduce((/** @type {Record<string, number>} */ acc, a) => {
+          const cur = String(a?.currency || '').trim().toUpperCase();
+          const n = Number(a?.amount);
+          if (cur && Number.isFinite(n) && n > 0) acc[cur] = (acc[cur] || 0) + n;
+          return acc;
+        }, {}),
+      );
+      const amounts = spendModel
+        ? (parts.videoAuthors || []).reduce((/** @type {Record<string, number>} */ acc, a) => {
+            const cur = String(a?.currency || '').trim().toUpperCase();
+            const n = Number(a?.amount);
+            if (cur && Number.isFinite(n) && n > 0) acc[cur] = (acc[cur] || 0) + n;
+            return acc;
+          }, {})
+        : {};
+      const card = buildYtVideoWatchCardModel({
+        videoId,
+        title: parts.title || '',
+        viewCount: parts.viewCount,
+        recorded,
+        videoAuthors: parts.videoAuthors || [],
+        livePeople,
+        spend: formatEstimatedViewerSpendDisplay(spendModel),
+        takeHome: formatStreamerTakeHomeDisplay('youtube', estimateStreamerTakeHomeJpy('youtube', { amounts })),
+      });
+      await chrome.storage.local.set({ [KEY_YT_VIDEO_WATCH_CARD]: { videoId, at: Date.now(), card } });
+    } catch {
+      /* カードが書けなくても視聴は続く */
+    }
+  })();
+}
+
+/** @param {string} videoId */
+function clearVideoWatchCardIfSame(videoId) {
+  const vid = String(videoId || '').trim();
+  if (!vid) return;
+  void (async () => {
+    try {
+      const bag = await chrome.storage.local.get(KEY_YT_VIDEO_WATCH_CARD);
+      if (bag?.[KEY_YT_VIDEO_WATCH_CARD]?.videoId === vid) {
+        await chrome.storage.local.remove(KEY_YT_VIDEO_WATCH_CARD);
+      }
+    } catch {
+      /* 消えなくても配信の記録は続く */
+    }
+  })();
+}
 
 const STORAGE_KEYS = Object.freeze({
   STREAM_SUMMARIES: 'yt_stream_summaries',
@@ -1392,6 +1484,18 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
           startedAtApprox: payload.startedAtApprox === true,
           endedAt: typeof payload.endedAt === 'number' ? payload.endedAt : undefined,
           ...(payload.followerSample && typeof payload.followerSample === 'object' ? { followerSample: payload.followerSample } : {}),
+          contentKind: (payload.contentKind === 'live' || payload.contentKind === 'live_replay' || payload.contentKind === 'video' || payload.contentKind === 'unknown')
+            ? classifyYtWatchContentKind({
+                url: payload.sourceUrl ? String(payload.sourceUrl) : '',
+                concurrentViewers: typeof payload.concurrentViewers === 'number' ? payload.concurrentViewers : null,
+                isLive: payload.contentKind === 'live' ? true : payload.contentKind === 'video' ? false : null,
+                isLiveContent:
+                  payload.contentKind === 'live_replay' ? true : payload.contentKind === 'video' ? false : null,
+                hasLiveChat: payload.contentKind === 'live',
+                hasLiveChatReplay: payload.contentKind === 'live_replay',
+                existingItemCount: summaries[videoId]?.itemCount,
+              }) || payload.contentKind
+            : undefined,
         },
         Date.now(),
       );
@@ -1413,6 +1517,18 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
       // 裏の ABEMA タブは claimActive:false(#608)。要約は更新し、いま見ている配信は奪わない。
       if (payload.claimActive !== false) await claimActiveVideo(sender, videoId);
       void ytViewerSampler.maybeSample(videoId, payload.concurrentViewers, summaries[videoId]);
+      const kind = String(summaries[videoId]?.contentKind || payload.contentKind || '');
+      if (kind === 'video') {
+        publishVideoWatchCard({
+          videoId,
+          title: summaries[videoId]?.title || payload.title || '',
+          viewCount: typeof payload.slotViewCount === 'number' ? payload.slotViewCount : summaries[videoId]?.slotViewCount,
+          channelId: summaries[videoId]?.broadcasterChannelId || payload.broadcasterChannelId || '',
+          videoAuthors: Array.isArray(payload.videoAuthors) ? payload.videoAuthors : [],
+        });
+      } else if (kind === 'live' || kind === 'live_replay') {
+        clearVideoWatchCardIfSame(videoId);
+      }
       return { ok: true, videoId };
     })
       .then((res) => sendResponse(res))
@@ -1495,6 +1611,10 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
       //   (それまでは入口の確認が無く、同じコメントが2つの配信に残っていた・2026-11-07 実データ83件)。
       const res = await appendYtStreamCommentsIdb(videoId, items, { claimFromOthers: true });
       rememberYtCommentOwners(videoId, { newlyAdded: res.newlyAdded });
+      if (res.newlyAdded.length) {
+        const sum = (await ensureSummaryMem())[videoId];
+        rememberChannelCommenters(sum?.broadcasterChannelId, res.newlyAdded);
+      }
       const reclaimed = Array.isArray(res.reclaimed) ? res.reclaimed : [];
       for (const r of reclaimed) noteYtCommentOwner(r.id, videoId);
       /** @type {Record<string, number>} */
@@ -1681,6 +1801,9 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
         }
       }
       rememberYtCommentOwners(videoId, idbResult);
+      if (idbResult?.newlyAdded?.length) {
+        rememberChannelCommenters(prevSummary?.broadcasterChannelId, idbResult.newlyAdded);
+      }
       if (Date.now() - lastIngestDiagAt > 30000) {
         lastIngestDiagAt = Date.now();
         void chrome.storage.local.set({

@@ -119,7 +119,23 @@ describe('venueItemsForPlatform', () => {
     expect(items.some((i) => i.label === '来場者数' || i.label === '広告pt' || i.label === '本家コメ')).toBe(false);
   });
 
+  it('YouTube の通常動画は同時視聴者数の欄を再生回数にする（ライブの見出しは変えない）', () => {
+    const live = venueItemsForPlatform('youtube', bag({ viewers: 80 }));
+    expect(live.find((i) => i.key === 'concurrent').label).toBe('同時視聴者数');
+    expect(live.find((i) => i.key === 'concurrent').text).toBe('80');
+    const vod = venueItemsForPlatform('youtube', {
+      records: { text: '0', isPlaceholder: false },
+      concurrent: { text: '—', isPlaceholder: true },
+      streamAge: { text: '—', isPlaceholder: true },
+      facts: { contentKind: 'video', viewCount: 12345, viewers: 80 },
+    });
+    expect(vod.find((i) => i.key === 'concurrent').label).toBe('再生');
+    expect(vod.find((i) => i.key === 'concurrent').text).toBe('12,345');
+    expect(vod.find((i) => i.key === 'concurrent').unit).toBe('回');
+  });
+
   it('公式の視聴者数が無いとき、推定の ~ は出さない', () => {
+
     const items = venueItemsForPlatform('youtube', bag({ viewers: null }));
     expect(items.find((i) => i.key === 'concurrent').text).toBe('読み込み中');
   });

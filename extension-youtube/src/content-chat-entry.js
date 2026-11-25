@@ -13,6 +13,11 @@ import {
   isYtWatchLikeUrl,
   pickYtBroadcasterIconUrl,
 } from '../../src/lib/youtube/ytPageMeta.js';
+import {
+  classifyYtWatchContentKind,
+  ytVideoCommentAuthorsFromDom,
+  ytViewCountFromDom,
+} from '../../src/lib/youtube/ytVideoWatchMeta.js';
 import { ytVideoIdFromChatFrameUrl } from '../../src/lib/youtube/ytChatContinuationVideoId.js';
 import { relativeStreamStartedAtMs, startMsFromTimestampBlob } from '../../src/lib/youtube/ytStreamStart.js';
 import { followerSampleFromDom } from '../../src/lib/platform/followerCountSample.js';
@@ -653,6 +658,37 @@ function setupWatchPageMetaObserver() {
     const viewers = readConcurrentViewers();
     const ended = endedAtFields(videoId);
     const sub = followerSampleFromDom(document, 'youtube');
+    const root = document.documentElement;
+    const attrBool = (/** @type {string} */ name) => {
+      const v = root?.getAttribute(name);
+      if (v === '1') return true;
+      if (v === '0') return false;
+      return null;
+    };
+    const attrCount = root?.getAttribute('data-nl-yt-view-count') || '';
+    const viewCountFromAttr = /^\d+$/.test(attrCount) ? Number(attrCount) : null;
+    const viewCount = viewCountFromAttr != null ? viewCountFromAttr : ytViewCountFromDom(document);
+    let hasLiveChat = false;
+    let hasLiveChatReplay = false;
+    try {
+      const iframes = document.querySelectorAll('iframe[src]');
+      for (let i = 0; i < iframes.length; i += 1) {
+        const src = String(iframes[i].getAttribute('src') || '');
+        if (src.includes('live_chat_replay')) hasLiveChatReplay = true;
+        else if (src.includes('/live_chat')) hasLiveChat = true;
+      }
+    } catch {
+      /* フレームが読めなくても種別は他の印で決める */
+    }
+    const contentKind = classifyYtWatchContentKind({
+      url: String(location.href || ''),
+      concurrentViewers: viewers,
+      isLive: attrBool('data-nl-yt-is-live'),
+      isLiveContent: attrBool('data-nl-yt-is-live-content'),
+      hasLiveChat,
+      hasLiveChatReplay,
+    });
+    const videoAuthors = contentKind === 'video' ? ytVideoCommentAuthorsFromDom(document) : [];
     safeSendMessage({
       type: 'YT_STREAM_META',
       payload: {
@@ -668,6 +704,9 @@ function setupWatchPageMetaObserver() {
         ...startedAtFields(videoId, viewers !== null),
         ...ended,
         ...(sub ? { followerSample: { ...sub, at: Date.now(), ...(ended.endedAt ? { force: true } : {}) } } : {}),
+        contentKind,
+        ...(contentKind === 'video' && viewCount != null ? { slotViewCount: viewCount } : {}),
+        ...(contentKind === 'video' ? { videoAuthors } : {}),
       },
     });
     if (viewers === null) saveViewerProbe();

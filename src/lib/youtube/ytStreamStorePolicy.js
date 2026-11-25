@@ -173,6 +173,20 @@ export function mergeYtStreamSummary(existing, patch, nowMs = Date.now()) {
   // ページがすでに出しているフォロワー数。空のときは欄を足さない（要約全体の一致テストを崩さない）。
   const followerSamples = appendFollowerSample(prev.followerSamples, patch?.followerSample, nowMs);
 
+  const kindOf = (/** @type {unknown} */ v) => {
+    const k = String(v || '').trim();
+    return k === 'video' || k === 'live' || k === 'live_replay' ? k : '';
+  };
+  const patchKind = kindOf(patch?.contentKind);
+  const prevKind = kindOf(prev.contentKind);
+  // 配信・アーカイブと分かったあとに、通常動画へ落とさない（開始直後の取り違え防止）
+  const contentKind =
+    patchKind === 'live' || patchKind === 'live_replay'
+      ? patchKind
+      : prevKind === 'live' || prevKind === 'live_replay'
+        ? prevKind
+        : patchKind || prevKind;
+
   return {
     videoId,
     title,
@@ -194,6 +208,7 @@ export function mergeYtStreamSummary(existing, patch, nowMs = Date.now()) {
     ...(startedAtApprox ? { startedAtApprox: true } : {}),
     ...(endedAt ? { endedAt } : {}),
     ...(followerSamples.length ? { followerSamples } : {}),
+    ...(contentKind ? { contentKind } : {}),
     createdAt,
     updatedAt: nowMs,
   };

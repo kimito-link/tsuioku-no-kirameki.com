@@ -24,6 +24,8 @@ import { createPageWatchScheduler } from '../../src/lib/pageWatchScheduler.js';
 import { isVenuePageHidden } from '../../src/lib/venuePaintSchedule.js';
 import { installLastStreamUrlRemember } from './pfLastStreamUrl.js';
 import { venueRootVisibilityAction } from '../../src/lib/venueWatchPageVisibility.js';
+import { KEY_YT_VIDEO_WATCH_CARD } from '../../src/lib/storageKeys.js';
+import { ytVideoWatchCardInnerHtml } from '../../src/lib/youtube/ytVideoWatchCard.js';
 
 /** Twitch/Kick の視聴ページで動いているか(council/twitch-support-PLAN.md・会場は YouTube と同じくニコ生版の venueBar をそのまま使う) */
 const PAGE_PLATFORM = platformOfHostname(location.hostname);
@@ -86,14 +88,69 @@ function setRootShown(/** @type {boolean} */ shown) {
 /** 0.1.1948: このページが「最後に見た配信」を記録する(ニコ生版 rememberWatchPageUrl と同じ決まり・pfLastStreamUrl.js) */
 const lastStreamRemember =
   window.top === window ? installLastStreamUrlRemember({ getKey: (url) => streamKeyForWatchUrl(url), isAlive: () => isExtensionContextAlive() }) : null;
+const VIDEO_WATCH_CARD_ID = 'nlsb-video-watch-card';
+const VIDEO_WATCH_CARD_STYLE_ID = 'nlsb-video-watch-card-style';
+
+function ensureVideoWatchCardStyle() {
+  if (document.getElementById(VIDEO_WATCH_CARD_STYLE_ID)) return;
+  const st = document.createElement('style');
+  st.id = VIDEO_WATCH_CARD_STYLE_ID;
+  st.textContent =
+    '#' + VIDEO_WATCH_CARD_ID + '{' +
+      'position:fixed;z-index:2147483646;right:12px;bottom:72px;max-width:320px;' +
+      'font:14px/1.55 system-ui,sans-serif;color:#1b1b1b;background:rgba(255,252,245,.96);' +
+      'border:1px solid rgba(80,60,20,.28);border-radius:10px;padding:10px 12px;' +
+      'box-shadow:0 4px 16px rgba(0,0,0,.14);pointer-events:auto;' +
+    '}' +
+    '#' + VIDEO_WATCH_CARD_ID + ' .nlsb-video-watch-card__title{margin:0 0 6px;font-size:13px;font-weight:700;}' +
+    '#' + VIDEO_WATCH_CARD_ID + ' p{margin:0 0 6px;}' +
+    '#' + VIDEO_WATCH_CARD_ID + ' p:last-child{margin-bottom:0;}' +
+    '#' + VIDEO_WATCH_CARD_ID + ' .nlsb-video-watch-card__names{font-weight:600;}';
+  (document.head || document.documentElement).appendChild(st);
+}
+
+/** @param {string} vid */
+function paintVideoWatchCard(vid) {
+  try {
+    const existing = document.getElementById(VIDEO_WATCH_CARD_ID);
+    if (!vid) {
+      existing?.remove();
+      return;
+    }
+    void chrome.storage.local.get(KEY_YT_VIDEO_WATCH_CARD).then((bag) => {
+      const wrap = bag?.[KEY_YT_VIDEO_WATCH_CARD];
+      const html = wrap && wrap.videoId === vid ? ytVideoWatchCardInnerHtml(wrap.card) : '';
+      const el = document.getElementById(VIDEO_WATCH_CARD_ID);
+      if (!html) {
+        el?.remove();
+        return;
+      }
+      ensureVideoWatchCardStyle();
+      if (el) {
+        if (el.innerHTML === html) return;
+        el.innerHTML = html;
+        return;
+      }
+      const box = document.createElement('div');
+      box.id = VIDEO_WATCH_CARD_ID;
+      box.innerHTML = html;
+      (document.body || document.documentElement).appendChild(box);
+    }).catch(() => {});
+  } catch {
+    /* カードが出せなくても会場は出す */
+  }
+}
+
 function sync() {
   const vid = currentVideoId();
   if (vid) lastStreamRemember?.remember(false); // URL が変わったときだけ書く(同じ URL は書き直さない)
   if (!vid) {
     setRootShown(false);
+    paintVideoWatchCard('');
     return;
   }
   setRootShown(true);
+  paintVideoWatchCard(vid);
   if (vid === mountedVid) return;
   __ytSetVenueLiveId(pseudoLvForVideoId(vid));
   mountedVid = vid;
@@ -188,6 +245,14 @@ void ytPrefetchLocalAssets(PREFETCH).then(() => {
 });
 
 if (window.top === window) startOrphanTabAutoReloadInPage(() => isExtensionContextAlive());
+try {
+  chrome.storage.onChanged.addListener((changes, area) => {
+    if (area !== 'local' || !changes?.[KEY_YT_VIDEO_WATCH_CARD]) return;
+    paintVideoWatchCard(currentVideoId());
+  });
+} catch {
+  /* 監視できなくても sync で塗る */
+}
 
 // 計器(2026-11-04): 会場の画像の読み込み失敗を記録する。りんくの拡張のエラー一覧に「Unsafe attempt to load URL … from frame」が
 //   YouTube 版だけ出る(ニコ生版には出ない)。画面の画像は出ているので、どの画像が・いつ・どんな状態で失敗しているかを数える。

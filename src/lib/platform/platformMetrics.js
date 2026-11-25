@@ -1138,7 +1138,9 @@ export function venueItemsForPlatform(platformId, bag) {
   const facts = bag?.facts && typeof bag.facts === 'object' ? bag.facts : {};
   const cap = platformCapability(id);
   // 視聴数のサービスは、同時接続(viewers)で視聴数の欄を埋めない。
-  const pageViews = 'headlineCount' in cap && cap.headlineCount === 'views';
+  // YouTube の通常動画だけ、同じ欄を「再生」にして総再生を出す（ライブの同時視聴者数は変えない）。
+  const youtubeVideo = id === 'youtube' && facts.contentKind === 'video';
+  const pageViews = ('headlineCount' in cap && cap.headlineCount === 'views') || youtubeVideo;
   const fromFacts = pageViews ? num(facts.viewCount) : num(facts.viewers);
   const concText = String(bag?.concurrent?.text || '').trim();
   // ページに出ている数だけを出す。数でない文字(—・推定中・接続中・読み込み中 等)や推定(~)は「読み込み中」にまとめる。
@@ -1167,9 +1169,9 @@ export function venueItemsForPlatform(platformId, bag) {
     },
     {
       key: 'concurrent',
-      label: plan.concurrentLabel,
+      label: youtubeVideo ? '再生' : plan.concurrentLabel,
       text: viewer.text,
-      unit: viewer.isPlaceholder ? '' : ('countUnit' in cap ? cap.countUnit : '人'),
+      unit: viewer.isPlaceholder ? '' : (youtubeVideo ? '回' : ('countUnit' in cap ? cap.countUnit : '人')),
       isPlaceholder: viewer.isPlaceholder,
       face: 'konta',
       title: OFFICIAL,

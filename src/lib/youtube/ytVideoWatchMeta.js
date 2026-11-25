@@ -1,0 +1,544 @@
+/**
+ * 【層】L0 判定層(純粋関数・I/O禁止)
+ * 【この箱に入るもの】YouTube の通常動画・Shorts の種別判定、再生数、画面に出ているコメント投稿者、配信記録との交差
+ * 【この箱に入らないもの】fetch / storage / DOM 書き換え / chrome.* / 新しい Observer
+ * 【書けるstorageキー】なし
+ * 【正本宣言】動画ページで出す再生数・交差・スーパーサンクスの材料の読み方はこのファイル
+ *
+ * ライブの同時視聴者数は ytConcurrentViewers.js の正本のまま。こちらは総再生回数だけを扱う。
+ */
+
+const VIDEO_ID_RE = /^[A-Za-z0-9_-]{11}$/;
+const UC_RE = /^UC[A-Za-z0-9_-]{22}$/;
+const MAX_NODES = 80_000;
+
+/** @param {unknown} v */
+function isVideoId(v) {
+  return typeof v === 'string' && VIDEO_ID_RE.test(v);
+}
+
+/** @param {unknown} v */
+export function isYtChannelId(v) {
+  return typeof v === 'string' && UC_RE.test(v);
+}
+
+/**
+ * 表示文（simpleText / runs / 文字列）を1本にする。
+ * @param {any} node
+ */
+export function ytTextFromRunsOrSimple(node) {
+  if (typeof node === 'string') return node;
+  if (!node || typeof node !== 'object') return '';
+  if (typeof node.simpleText === 'string') return node.simpleText;
+  if (typeof node.content === 'string') return node.content;
+  if (Array.isArray(node.runs)) {
+    return node.runs.map((/** @type {any} */ r) => String(r?.text || r?.content || '')).join('');
+  }
+  return '';
+}
+
+/**
+ * /shorts/<動画ID> の視聴 URL か。
+ * @param {string} rawUrl
+ */
+export function isYtShortsUrl(rawUrl) {
+  try {
+    const u = new URL(String(rawUrl || ''), 'https://www.youtube.com');
+    const host = u.hostname.toLowerCase();
+    if (host !== 'youtube.com' && !host.endsWith('.youtube.com')) return false;
+    const m = u.pathname.match(/^\/shorts\/([A-Za-z0-9_-]{11})(?:\/|$)/);
+    return Boolean(m);
+  } catch {
+    return false;
+  }
+}
+
+/**
+ * 1本の動画（通常の視聴・Shorts）の URL か。ライブチャット欄は偽。
+ * 配信中かどうかはこの関数では決めない（同じ /watch?v= が配信にもなる）。
+ * @param {string} rawUrl
+ */
+export function isYtWatchOrShortsUrl(rawUrl) {
+  try {
+    const u = new URL(String(rawUrl || ''), 'https://www.youtube.com');
+    const host = u.hostname.toLowerCase();
+    if (host !== 'youtube.com' && !host.endsWith('.youtube.com')) return false;
+    if (u.pathname.startsWith('/live_chat')) return false;
+    if (u.pathname === '/watch') return true;
+    if (u.pathname.startsWith('/live/')) return true;
+    return isYtShortsUrl(rawUrl);
+  } catch {
+    return false;
+  }
+}
+
+/**
+ * 「N 回視聴」「1.2万回視聴」「1.5M views」など、総再生の表示文から数を取る。
+ * 「N 人が視聴中」「N watching」は同時視聴なので捨てる。
+ * @param {unknown} raw
+ * @returns {number | null}
+ */
+export function parseYtViewCountFromText(raw) {
+  const text = String(raw || '').replace(/\s+/g, ' ').trim();
+  if (!text) return null;
+  if (/視聴中|watching now|watching$/i.test(text) && !/回視聴|views/i.test(text)) return null;
+  if (/人が視聴|watching/i.test(text) && !/回視聴|views/i.test(text)) return null;
+
+  const jaMan = text.match(/([\d.,]+)\s*万\s*回/);
+  if (jaMan) {
+    const n = Number(String(jaMan[1]).replace(/,/g, ''));
+    if (Number.isFinite(n) && n >= 0) return Math.floor(n * 10000);
+  }
+  const jaOku = text.match(/([\d.,]+)\s*億\s*回/);
+  if (jaOku) {
+    const n = Number(String(jaOku[1]).replace(/,/g, ''));
+    if (Number.isFinite(n) && n >= 0) return Math.floor(n * 100000000);
+  }
+  const jaPlain = text.match(/([\d,]+)\s*回視聴/);
+  if (jaPlain) {
+    const n = Number(String(jaPlain[1]).replace(/,/g, ''));
+    if (Number.isFinite(n) && n >= 0 && n <= 50_000_000_000) return Math.floor(n);
+  }
+  const enMul = text.match(/([\d.,]+)\s*([KMB])\s*views/i);
+  if (enMul) {
+    const n = Number(String(enMul[1]).replace(/,/g, ''));
+    const mul = { K: 1e3, M: 1e6, B: 1e9 }[String(enMul[2]).toUpperCase()] || 1;
+    if (Number.isFinite(n) && n >= 0) return Math.floor(n * mul);
+  }
+  const enPlain = text.match(/([\d,]+)\s*views/i);
+  if (enPlain) {
+    const n = Number(String(enPlain[1]).replace(/,/g, ''));
+    if (Number.isFinite(n) && n >= 0 && n <= 50_000_000_000) return Math.floor(n);
+  }
+  return null;
+}
+
+/**
+ * videoViewCountRenderer から総再生回数を取る。ライブ配信の同時視聴文は使わない。
+ * @param {any} renderer
+ * @returns {number | null}
+ */
+export function viewCountFromVideoViewCountRenderer(renderer) {
+  if (!renderer || typeof renderer !== 'object') return null;
+  const text = ytTextFromRunsOrSimple(renderer.viewCount) || ytTextFromRunsOrSimple(renderer.extraShortViewCount);
+  const live = renderer.isLive === true || /視聴中|watching/i.test(text);
+  if (live) return null;
+  const fromText = parseYtViewCountFromText(text);
+  if (fromText != null) return fromText;
+  const raw = renderer.originalViewCount ?? renderer.viewCount;
+  const n =
+    typeof raw === 'number'
+      ? raw
+      : typeof raw === 'string' && /^\d+$/.test(raw)
+        ? Number(raw)
+        : NaN;
+  if (!Number.isFinite(n) || n < 0 || n > 50_000_000_000) return null;
+  return Math.floor(n);
+}
+
+/**
+ * @param {any} data
+ * @param {string} wantId
+ * @returns {number | null}
+ */
+export function viewCountInInnertube(data, wantId) {
+  const want = isVideoId(wantId) ? wantId : '';
+  /** @type {{ n: number }} */
+  const budget = { n: 0 };
+  return walkViewCount(data, '', want, budget, 0);
+}
+
+/**
+ * @param {any} node
+ * @param {string} videoId
+ * @param {string} want
+ * @param {{ n: number }} budget
+ * @param {number} depth
+ * @returns {number | null}
+ */
+function walkViewCount(node, videoId, want, budget, depth) {
+  if (!node || typeof node !== 'object' || depth > 40 || budget.n > MAX_NODES) return null;
+  budget.n += 1;
+  if (Array.isArray(node)) {
+    for (const item of node) {
+      const n = walkViewCount(item, videoId, want, budget, depth + 1);
+      if (n !== null) return n;
+    }
+    return null;
+  }
+  const vid = isVideoId(node.videoId) ? node.videoId : videoId;
+  const renderer = node.videoViewCountRenderer;
+  if (renderer && typeof renderer === 'object') {
+    const count = viewCountFromVideoViewCountRenderer(renderer);
+    if (count !== null && (!want || vid === want || !vid)) return count;
+  }
+  for (const key of Object.keys(node)) {
+    if (key === 'videoViewCountRenderer') continue;
+    const n = walkViewCount(node[key], vid, want, budget, depth + 1);
+    if (n !== null) return n;
+  }
+  return null;
+}
+
+/**
+ * ytInitialPlayerResponse / ytInitialData から、配信かどうかの印を読む。
+ * @param {any} data
+ * @returns {{ isLive: boolean | null, isLiveContent: boolean | null, isOwnerViewing: boolean | null }}
+ */
+export function ytLiveFlagsFromPlayerOrInitial(data) {
+  const vd = data && typeof data === 'object' ? data.videoDetails || data : null;
+  const micro = data && typeof data === 'object' ? data.microformat?.playerMicroformatRenderer : null;
+  const isLive =
+    vd && typeof vd.isLive === 'boolean'
+      ? vd.isLive
+      : micro && typeof micro.liveBroadcastDetails?.isLiveNow === 'boolean'
+        ? micro.liveBroadcastDetails.isLiveNow
+        : null;
+  const isLiveContent =
+    vd && typeof vd.isLiveContent === 'boolean'
+      ? vd.isLiveContent
+      : null;
+  return { isLive, isLiveContent, isOwnerViewing: null };
+}
+
+/**
+ * 視聴ページの中身の種別。不明のときは video にしない（配信開始直後の取り違えを防ぐ）。
+ *
+ * @param {{
+ *   url?: string,
+ *   concurrentViewers?: number | null,
+ *   isLive?: boolean | null,
+ *   isLiveContent?: boolean | null,
+ *   hasLiveChat?: boolean,
+ *   hasLiveChatReplay?: boolean,
+ *   existingItemCount?: number | null,
+ * }} signals
+ * @returns {'live' | 'live_replay' | 'video' | 'unknown'}
+ */
+export function classifyYtWatchContentKind(signals) {
+  const s = signals && typeof signals === 'object' ? signals : {};
+  if (s.hasLiveChatReplay === true) return 'live_replay';
+  if (s.hasLiveChat === true) return 'live';
+  if (s.isLive === true) return 'live';
+  if (typeof s.concurrentViewers === 'number' && Number.isFinite(s.concurrentViewers) && s.concurrentViewers >= 0) {
+    return 'live';
+  }
+  const items = Number(s.existingItemCount);
+  if (Number.isFinite(items) && items > 0) {
+    return s.isLive === false && s.isLiveContent === false ? 'video' : 'live_replay';
+  }
+  if (s.isLiveContent === true && s.isLive === false) return 'live_replay';
+  if (s.isLive === false && s.isLiveContent === false) return 'video';
+  if (s.isLiveContent === false && s.isLive !== true) return 'video';
+  try {
+    const path = new URL(String(s.url || ''), 'https://www.youtube.com').pathname;
+    if (/^\/shorts\//.test(path) && s.isLive !== true && s.hasLiveChat !== true) {
+      if (s.isLiveContent === true) return 'unknown';
+      return 'video';
+    }
+  } catch {
+    /* URL が取れなくても他の印で決める */
+  }
+  return 'unknown';
+}
+
+/**
+ * @typedef {{ channelId: string, handle: string, name: string, amount: number | null, currency: string }} YtVideoCommentAuthor
+ */
+
+/**
+ * @param {any} node
+ * @returns {string}
+ */
+function channelIdFromEndpoint(node) {
+  const browse =
+    node?.authorEndpoint?.browseEndpoint?.browseId ||
+    node?.authorExternalChannelId ||
+    node?.channelId ||
+    node?.authorName?.browseEndpoint?.browseId ||
+    '';
+  return isYtChannelId(browse) ? browse : '';
+}
+
+/**
+ * スーパーサンクス等の金額。形が違えば null（数字は作らない）。
+ * @param {any} node
+ * @returns {{ amount: number, currency: string } | null}
+ */
+export function parseYtPaidCommentAmount(node) {
+  if (!node || typeof node !== 'object') return null;
+  const rawText =
+    ytTextFromRunsOrSimple(node.superThanksAmount) ||
+    ytTextFromRunsOrSimple(node.purchaseAmount) ||
+    ytTextFromRunsOrSimple(node.paidCommentChip?.pdgCommentChipRenderer?.chipText) ||
+    (typeof node.amount === 'number' || typeof node.amount === 'string' ? String(node.amount) : '') ||
+    ytTextFromRunsOrSimple(node.amount) ||
+    '';
+  const text = String(rawText || '').replace(/\s+/g, ' ').trim();
+  if (!text) {
+    const cur = String(node.currency || node.amountCurrency || '').trim().toUpperCase();
+    const n = Number(node.amountValue ?? node.purchaseAmountValue);
+    if (cur && Number.isFinite(n) && n > 0) return { amount: n, currency: cur };
+    return null;
+  }
+  const m = text.match(/^\s*([¥￥$€£]|USD|JPY|EUR|GBP)?\s*([\d,]+(?:\.\d+)?)\s*([A-Z]{3})?\s*$/i);
+  if (!m) return null;
+  const n = Number(String(m[2]).replace(/,/g, ''));
+  if (!Number.isFinite(n) || n <= 0) return null;
+  const sym = String(m[1] || '').toUpperCase();
+  const cur =
+    String(m[3] || '').toUpperCase() ||
+    (sym === '¥' || sym === '￥' || sym === 'JPY' ? 'JPY' : '') ||
+    (sym === '$' || sym === 'USD' ? 'USD' : '') ||
+    (sym === '€' || sym === 'EUR' ? 'EUR' : '') ||
+    (sym === '£' || sym === 'GBP' ? 'GBP' : '') ||
+    String(node.currency || '').trim().toUpperCase();
+  if (!cur) return null;
+  return { amount: n, currency: cur };
+}
+
+/**
+ * innertube 木から動画コメントの投稿者を集める（本文は返さない）。
+ * @param {any} data
+ * @param {{ limit?: number }} [opts]
+ * @returns {YtVideoCommentAuthor[]}
+ */
+export function ytVideoCommentAuthorsFromInnertube(data, opts = {}) {
+  const limit = Number.isFinite(Number(opts.limit)) ? Math.max(1, Math.floor(Number(opts.limit))) : 80;
+  /** @type {YtVideoCommentAuthor[]} */
+  const out = [];
+  const seen = new Set();
+  /** @type {{ n: number }} */
+  const budget = { n: 0 };
+  walkComments(data, out, seen, budget, 0, limit);
+  return out;
+}
+
+/**
+ * @param {any} node
+ * @param {YtVideoCommentAuthor[]} out
+ * @param {Set<string>} seen
+ * @param {{ n: number }} budget
+ * @param {number} depth
+ * @param {number} limit
+ */
+function walkComments(node, out, seen, budget, depth, limit) {
+  if (!node || typeof node !== 'object' || depth > 40 || budget.n > MAX_NODES || out.length >= limit) return;
+  budget.n += 1;
+  const renderer =
+    node.commentRenderer ||
+    node.commentViewModel ||
+    (node.authorText || node.authorExternalChannelId ? node : null);
+  if (renderer && typeof renderer === 'object' && (renderer.authorText || renderer.authorExternalChannelId || renderer.authorName)) {
+    const channelId = channelIdFromEndpoint(renderer);
+    const name = ytTextFromRunsOrSimple(renderer.authorText) || ytTextFromRunsOrSimple(renderer.authorName) || '';
+    const handle = String(renderer.authorEndpoint?.browseEndpoint?.canonicalBaseUrl || '').replace(/^\//, '');
+    const paid = parseYtPaidCommentAmount(renderer) || parseYtPaidCommentAmount(node.paidCommentChip);
+    const key = channelId || (name ? `name:${name}` : '');
+    if (key && !seen.has(key)) {
+      seen.add(key);
+      out.push({
+        channelId,
+        handle: handle.startsWith('@') ? handle : '',
+        name: String(name || '').replace(/\s+/g, ' ').trim().slice(0, 80),
+        amount: paid ? paid.amount : null,
+        currency: paid ? paid.currency : '',
+      });
+    }
+  }
+  const vals = Array.isArray(node) ? node : Object.values(node);
+  for (const v of vals) {
+    if (!v || typeof v !== 'object') continue;
+    walkComments(v, out, seen, budget, depth + 1, limit);
+    if (out.length >= limit) return;
+  }
+}
+
+/**
+ * 画面に見えているコメント欄から投稿者を読む。新しい Observer は使わず、呼んだ瞬間の DOM だけ。
+ * @param {ParentNode | null | undefined} root
+ * @param {{ limit?: number }} [opts]
+ * @returns {YtVideoCommentAuthor[]}
+ */
+export function ytVideoCommentAuthorsFromDom(root, opts = {}) {
+  const limit = Number.isFinite(Number(opts.limit)) ? Math.max(1, Math.floor(Number(opts.limit))) : 80;
+  if (!root || typeof root.querySelectorAll !== 'function') return [];
+  /** @type {YtVideoCommentAuthor[]} */
+  const out = [];
+  const seen = new Set();
+  const threads = root.querySelectorAll(
+    'ytd-comment-thread-renderer, ytd-comment-view-model, ytd-comment-renderer, yt-comment-view-model',
+  );
+  for (let i = 0; i < threads.length && out.length < limit; i += 1) {
+    const el = threads[i];
+    if (!el || typeof el.querySelector !== 'function') continue;
+    let channelId = '';
+    let handle = '';
+    const links = el.querySelectorAll('a[href]');
+    for (let j = 0; j < links.length && !channelId; j += 1) {
+      const href = String(links[j].getAttribute?.('href') || '');
+      const uc = href.match(/\/channel\/(UC[A-Za-z0-9_-]{22})/);
+      if (uc) channelId = uc[1];
+      const h = href.match(/\/(@[^/?#]+)/);
+      if (h && !handle) {
+        try {
+          handle = decodeURIComponent(h[1]);
+        } catch {
+          handle = h[1];
+        }
+      }
+    }
+    const nameEl = el.querySelector('#author-text, #author-text yt-formatted-string, a#author-text, #name, yt-attributed-string#name');
+    const name = String(nameEl?.textContent || '').replace(/\s+/g, ' ').trim().slice(0, 80);
+    const paidEl = el.querySelector('[id*="super-thanks"], [class*="super-thanks"], [class*="superThanks"], #paid-comment-chip, .paid-comment-chip');
+    const paid = parseYtPaidCommentAmount({ amount: String(paidEl?.textContent || '').trim() });
+    const key = channelId || handle || (name ? `name:${name}` : '');
+    if (!key || seen.has(key)) continue;
+    seen.add(key);
+    out.push({
+      channelId,
+      handle,
+      name,
+      amount: paid ? paid.amount : null,
+      currency: paid ? paid.currency : '',
+    });
+  }
+  return out;
+}
+
+/**
+ * 画面の再生数表示から数を取る。
+ * @param {ParentNode | null | undefined} root
+ * @returns {number | null}
+ */
+export function ytViewCountFromDom(root) {
+  if (!root || typeof root.querySelector !== 'function') return null;
+  const els = root.querySelectorAll
+    ? root.querySelectorAll(
+        '#info-container yt-formatted-string, ytd-watch-info-text #tooltip, ytd-watch-info-text yt-formatted-string, span.view-count, #count .view-count, yt-formatted-string#info',
+      )
+    : [];
+  for (let i = 0; i < els.length; i += 1) {
+    const n = parseYtViewCountFromText(els[i]?.textContent);
+    if (n != null) return n;
+  }
+  if (typeof root.querySelector === 'function') {
+    const tooltip = root.querySelector('tp-yt-paper-tooltip, #tooltip');
+    const n = parseYtViewCountFromText(tooltip?.textContent);
+    if (n != null) return n;
+  }
+  return null;
+}
+
+/**
+ * @param {Record<string, any> | null | undefined} summaries
+ * @param {string} broadcasterChannelId
+ * @returns {{ streamCount: number, itemCount: number, videoIds: string[] }}
+ */
+export function summarizeChannelRecordedLives(summaries, broadcasterChannelId) {
+  const ch = String(broadcasterChannelId || '').trim();
+  const bag = summaries && typeof summaries === 'object' ? summaries : {};
+  /** @type {Array<{ id: string, at: number, items: number }>} */
+  const rows = [];
+  for (const [id, sum] of Object.entries(bag)) {
+    if (!isVideoId(id) && !String(id).startsWith('ytlive:')) {
+      // YouTube の通常の動画IDだけ（他サービスの配信キーは混ぜない）
+      if (!/^[A-Za-z0-9_-]{11}$/.test(String(id))) continue;
+    }
+    if (!isVideoId(id)) continue;
+    const s = sum && typeof sum === 'object' ? sum : {};
+    if (ch && String(s.broadcasterChannelId || '').trim() !== ch) continue;
+    const items = Number(s.itemCount);
+    if (!Number.isFinite(items) || items <= 0) continue;
+    if (s.contentKind === 'video') continue;
+    rows.push({
+      id,
+      at: Number(s.updatedAt || s.createdAt || 0) || 0,
+      items: Math.floor(items),
+    });
+  }
+  rows.sort((a, b) => b.at - a.at);
+  return {
+    streamCount: rows.length,
+    itemCount: rows.reduce((acc, r) => acc + r.items, 0),
+    videoIds: rows.map((r) => r.id),
+  };
+}
+
+/**
+ * @param {readonly any[]} commentRows
+ * @returns {Map<string, { name: string, count: number, lastAt: number }>}
+ */
+export function liveCommenterMapFromRows(commentRows) {
+  /** @type {Map<string, { name: string, count: number, lastAt: number }>} */
+  const map = new Map();
+  const list = Array.isArray(commentRows) ? commentRows : [];
+  for (const row of list) {
+    if (!row || typeof row !== 'object') continue;
+    const id = String(row.channelId || row.ytChannelId || '').trim();
+    if (!isYtChannelId(id)) continue;
+    const name = String(row.name || row.nickname || row.authorName || '').replace(/\s+/g, ' ').trim();
+    const at = Number(row.postedAtMs || row.recordedAt || row.ts || 0) || 0;
+    const prev = map.get(id);
+    if (!prev) map.set(id, { name: name.slice(0, 80), count: 1, lastAt: at });
+    else {
+      prev.count += 1;
+      if (at > prev.lastAt) prev.lastAt = at;
+      if (name && !prev.name) prev.name = name.slice(0, 80);
+    }
+  }
+  return map;
+}
+
+/**
+ * @param {readonly YtVideoCommentAuthor[]} videoAuthors
+ * @param {Map<string, { name: string, count: number, lastAt?: number }> | Record<string, { n?: string, name?: string, c?: number, count?: number }>} liveMap
+ * @returns {{ matched: Array<{ channelId: string, name: string, liveComments: number }>, videoAuthorCount: number, matchedCount: number }}
+ */
+export function matchVideoCommentersToLive(videoAuthors, liveMap) {
+  const authors = Array.isArray(videoAuthors) ? videoAuthors : [];
+  /** @param {string} id */
+  const lookup = (id) => {
+    if (!id) return null;
+    if (liveMap && typeof liveMap.get === 'function') return liveMap.get(id) || null;
+    if (liveMap && typeof liveMap === 'object') return /** @type {any} */ (liveMap)[id] || null;
+    return null;
+  };
+  const seenVideo = new Set();
+  /** @type {Array<{ channelId: string, name: string, liveComments: number }>} */
+  const matched = [];
+  let videoAuthorCount = 0;
+  for (const a of authors) {
+    const id = String(a?.channelId || '').trim();
+    if (!isYtChannelId(id) || seenVideo.has(id)) continue;
+    seenVideo.add(id);
+    videoAuthorCount += 1;
+    const hit = lookup(id);
+    if (!hit) continue;
+    const liveComments = Number(hit.count ?? hit.c) || 0;
+    const name = String(a.name || hit.name || hit.n || '').replace(/\s+/g, ' ').trim();
+    matched.push({ channelId: id, name, liveComments: liveComments > 0 ? liveComments : 1 });
+  }
+  matched.sort((a, b) => b.liveComments - a.liveComments || a.name.localeCompare(b.name, 'ja'));
+  return { matched, videoAuthorCount, matchedCount: matched.length };
+}
+
+/**
+ * 見えているスーパーサンクスの通貨別合計。
+ * @param {readonly YtVideoCommentAuthor[]} authors
+ * @returns {{ count: number, amounts: Record<string, number> }}
+ */
+export function tallyVisibleSuperThanks(authors) {
+  /** @type {Record<string, number>} */
+  const amounts = {};
+  let count = 0;
+  const list = Array.isArray(authors) ? authors : [];
+  for (const a of list) {
+    const cur = String(a?.currency || '').trim().toUpperCase();
+    const n = Number(a?.amount);
+    if (!cur || !Number.isFinite(n) || n <= 0) continue;
+    count += 1;
+    amounts[cur] = (amounts[cur] || 0) + n;
+  }
+  return { count, amounts };
+}

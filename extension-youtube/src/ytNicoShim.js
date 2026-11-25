@@ -583,6 +583,9 @@ export function ytSummaryToNicoSnapshot(sum, videoId, tabTitle, all) {
       // ABEMA は番組情報欄の「視聴数」「コメント数」(ページに出ている数そのもの・#608 がまとめに入れる)
       viewCount: typeof sum?.slotViewCount === 'number' && sum.slotViewCount >= 0 ? sum.slotViewCount : null,
       commentCount: typeof sum?.slotCommentCount === 'number' && sum.slotCommentCount >= 0 ? sum.slotCommentCount : null,
+      ...(sum?.contentKind === 'video' || sum?.contentKind === 'live' || sum?.contentKind === 'live_replay'
+        ? { contentKind: sum.contentKind }
+        : {}),
       // そのサービス特有の公式の数字(SHOWROOM のイベント順位・ミクチャのレベル等・src/lib/platform/platformStats.js)
       official: sum?.platformStats && typeof sum.platformStats === 'object' ? sum.platformStats : null,
     },

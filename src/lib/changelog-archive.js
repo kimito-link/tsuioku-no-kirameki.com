@@ -24,6 +24,15 @@
 /** @type {ChangelogEntry[]} */
 const ARCHIVE_ENTRIES = [
   Object.freeze({
+    version: '0.1.2204',
+    date: '2026-11-24',
+    summary: 'ツイキャスのチケット基準円推定とTwitch出典裏取りを追加',
+    items: Object.freeze([
+      'ツイキャスで公式アイテムチケット1枚の価格（お茶爆50=500円・お茶爆100=1,000円・お茶爆300=3,000円・お茶爆500=5,000円・極茶爆1000=10,000円）による「チケット基準の推定」を追加し、お茶爆50/100のpt表示も残しました。',
+      'Twitch のサブスク単価の出典を本文確認済みの公式URLへ更新し、まとめギフト（submysterygift）の内訳が二重計上されない保証と単体テストを追加しました。',
+    ])
+  }),
+  Object.freeze({
     version: '0.1.2203',
     date: '2026-11-24',
     summary: '推定購入額・消費をKick/Twitch/ツイキャスへ拡大',

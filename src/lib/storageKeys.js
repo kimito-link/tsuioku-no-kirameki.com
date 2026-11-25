@@ -298,6 +298,13 @@ export const KEY_PROFILE_RESOLVE_STATE = 'nls_profile_resolve_state_v1';
  */
 export const KEY_COMMENTER_FOLLOW_CACHE = 'nls_commenter_follow_v1';
 
+/** YouTube のチャンネルごとのライブコメント投稿者索引（UC… と短い名前・回数だけ。本文は持たない） */
+export const KEY_YT_CHANNEL_COMMENTERS = 'yt_channel_commenters_v1';
+
+/** いま見ている YouTube 通常動画のカード（会場・横の欄が読む。ライブのコメント正本ではない） */
+export const KEY_YT_VIDEO_WATCH_CARD = 'yt_video_watch_card_v1';
+
+
 /**
  * v0.1.541: コメンター（数値 userId）のフォロー先 userId リスト横断キャッシュ。
  * nvapi /v1/users/{uid}/following/users（非公式・ログイン Cookie 必須）。
