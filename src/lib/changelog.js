@@ -18,7 +18,7 @@
 /** @type {readonly ChangelogEntry[]} */
 export const EXTENSION_CHANGELOG = Object.freeze([
   Object.freeze({
-    version: '0.1.2222',
+    version: '0.1.2224',
     date: '2026-11-25',
     summary: '別窓の会場でも、声と吹き出しが同時に',
     items: Object.freeze([
