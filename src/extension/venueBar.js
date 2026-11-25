@@ -3418,13 +3418,7 @@ export function mountVenueBarButton(options = {}) {
   wireVoiceWarmupHooks(venueVoiceWarmup, () => !voicePlayer.playing && voicePlayer.queue.length === 0, () => voicePlayer.diag, chromeVoiceEngineLink()); // 裏の読み込みは両ページとも手が空いた時だけ
   wireVenueVoiceTestHook(voicePlayer); // 読み上げ試験の入口(開発版だけ)+鳴らない理由の計器(voiceTestHook.js)
   // v0.1.1794: 同じ配信をコメビュでも読んでいる時は、先に読み始めた方だけが読む(開いて ON の間だけ名乗る・voiceReaderLease.js)。
-  const venueReaderLease = startVoiceReaderLease(() => voicePlayer.enabled, liveIdFromPathname, {
-    onPageHide: (fn) => window.addEventListener('pagehide', fn),
-    // 2026-11-25: 見えている会場が読み手になる(吹き出しを声に合わせられるのは読んでいる会場だけ)。閉じた会場(声だけ)は譲る。
-    priority: () => (open === true && tucked !== true && !isPageHidden() ? VOICE_READER_PRIO_VISIBLE : VOICE_READER_PRIO_HEADLESS),
-    // 引き継がれたら、待っている声は捨てる(今鳴っている1本は最後まで・二重に鳴らさない)。
-    onLost: () => { try { voicePlayer.flushPendingQueue(); } catch { /* 片付けの失敗で読み上げは止めない */ } }
-  });
+  const venueReaderLease = startVoiceReaderLease(() => voicePlayer.enabled, liveIdFromPathname, { onPageHide: (fn) => window.addEventListener('pagehide', fn), priority: () => (open === true && tucked !== true && !isPageHidden() ? VOICE_READER_PRIO_VISIBLE : VOICE_READER_PRIO_HEADLESS), onLost: () => { try { voicePlayer.flushPendingQueue(); } catch { /* 片付けの失敗で読み上げは止めない */ } } }); // 2026-11-25: 見えている会場が読み手(閉じた会場は譲る)。引き継がれたら待ちの声は捨てる(今の1本は最後まで)
   voiceBtn.addEventListener('click', () => {
     if (voicePlayer.readingWanted) {
       voicePlayer.disable();
@@ -6925,8 +6919,7 @@ export function mountVenueBarButton(options = {}) {
       //   吹き出しを声が鳴り始める瞬間に出す。見込みが3秒を超える件は待たせず読まずに出す(lib の venueBubbleVoiceSync.js)。
       const shownNow = startVenueSpeechBubbleVoice(_bubbleVoiceSync, speech, {
         voicePlayer, primeBurst, arrivedAt: speechReceivedAt,
-        // 2026-11-25: コメントが速い間は、声を待たせるのを6秒まで(20秒前のコメントを今さら声と出さない・テンポ優先)。
-        busyChat: isVenueBusyForCalm(crowdHeatLevel),
+        busyChat: isVenueBusyForCalm(crowdHeatLevel), // 2026-11-25: 速い間は声を待たせるのを6秒まで(テンポ優先)
         isOpen: () => open,
         showBubble: showSpeechBubble,
         onSpeaking: markBubbleSpeaking,
