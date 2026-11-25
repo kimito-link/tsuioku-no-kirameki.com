@@ -15,7 +15,7 @@
  * 超えるため、上限は「resize が起きたか」の検知に留め、絶対上限にはしない。
  */
 
-import { test, expect, dismissExtensionUsageTermsGate } from './fixtures.js';
+import { testWithRealWindow as test, expect, dismissExtensionUsageTermsGate } from './fixtures.js';
 
 const POPUP_WIDTH = 420;
 const ACTIVE_WATCH_HEIGHT = 780;
@@ -38,15 +38,20 @@ test.describe('popup window height for empty state', () => {
     // SW から popup window を作成。activeTab に watch URL が無い状態で開くと
     // popup は empty state に倒れる。履歴 IDB がフレッシュなら no-history fallback。
     const popupUrl = `chrome-extension://${extensionId}/popup.html`;
-    await sw.evaluate(async (url) => {
-      await chrome.windows.create({
+    // 作成した窓の id を覚える（getAll().find だと別の popup を拾う余地がある）。
+    const created = await sw.evaluate(async (url) => {
+      const w = await chrome.windows.create({
         url,
         type: 'popup',
         width: 420,
         height: 780,
         focused: false
       });
+      return { id: w?.id ?? null, width: w?.width, height: w?.height };
     }, popupUrl);
+    expect(created.id, 'chrome.windows.create should return a window id').toEqual(
+      expect.any(Number)
+    );
 
     // popup ページを context から拾う
     let popupPage;
@@ -64,18 +69,27 @@ test.describe('popup window height for empty state', () => {
     await expect(
       popupPage.locator('html[data-nl-popup-content-painted="1"]')
     ).toBeAttached({ timeout: 15_000 });
-    await popupPage.waitForTimeout(800); // resize の chrome.windows.update を待つ
 
-    // popup window の現サイズを SW 経由で取得
-    const dims = await sw.evaluate(async (url) => {
-      const wins = await chrome.windows.getAll({ populate: true });
-      const popup = wins.find(
-        (w) =>
-          w.type === 'popup' &&
-          (w.tabs?.[0]?.url || '').startsWith(url.replace(/[?#].*$/, ''))
-      );
-      return { width: popup?.width, height: popup?.height, type: popup?.type };
-    }, popupUrl);
+    // 固定スリープではなく、作成した窓の幅が決めた値になるまで待つ。
+    // 一部環境では高さだけ先に直り、幅の反映が遅れる／1回では効かないことがある。
+    const readBounds = async () => {
+      const api = await sw.evaluate(async (id) => {
+        const w = await chrome.windows.get(id);
+        return { width: w?.width, height: w?.height, type: w?.type };
+      }, created.id);
+      const pageBox = await popupPage.evaluate(() => ({
+        innerWidth: window.innerWidth,
+        outerWidth: window.outerWidth,
+        innerHeight: window.innerHeight,
+        outerHeight: window.outerHeight
+      }));
+      return { ...api, ...pageBox };
+    };
+    await expect
+      .poll(async () => (await readBounds()).width, { timeout: 10_000 })
+      .toBe(POPUP_WIDTH);
+
+    const dims = await readBounds();
 
     // popup 内部の content 高さを測定（preset 調整用）
     const contentDims = await popupPage.evaluate(() => {

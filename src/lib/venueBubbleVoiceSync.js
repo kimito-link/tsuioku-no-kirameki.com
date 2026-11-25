@@ -157,6 +157,23 @@ export function decideHeldBubbleAfterHold(dropResult) {
 }
 
 /**
+ * 吹き出しを声が始まるまで待たせる上限(ms)を決める(2026-11-25)。
+ *   声の作り置きの寿命(VoicePlayer.voiceHoldBudgetMs = 20秒)まで待つのは、遅い PC で「後からでも一緒に出したい」静かな配信のため。
+ *   コメントが速い間(会場の熱量「盛り上がり」以上=約27件/分・venueBusyCalm と同じ境目)は、後ろに新しいコメントが
+ *   次々来ているので、20秒前のコメントを今さら声と一緒に出すより、読まずに吹き出しだけ出して今のコメントを読む方がテンポがよい
+ *   (箱の実測 8件/秒: 声つきの吹き出しが届いてから 15〜21秒後に出た件があった)。待ちの上限を元の6秒(読み上げの鮮度8秒より短い)に戻す。
+ * @param {{ budgetMs?: number, busyChat?: boolean }} s budgetMs = VoicePlayer.voiceHoldBudgetMs() の答え
+ * @returns {number}
+ */
+export function resolveBubbleVoiceHoldMaxMs(s = {}) {
+  if (s?.busyChat === true) return VENUE_BUBBLE_VOICE_HOLD_MAX_MS;
+  const requested = Number(s?.budgetMs);
+  return Number.isFinite(requested)
+    ? Math.min(20000, Math.max(VENUE_BUBBLE_VOICE_HOLD_MAX_MS, requested))
+    : VENUE_BUBBLE_VOICE_HOLD_MAX_MS;
+}
+
+/**
  * 発言1件の吹き出しと声を始める(会場の processSpeechRows から1件ずつ呼ぶ)。
  * @param {ReturnType<typeof createVenueBubbleVoiceSyncState>} state
  * @param {any} speech
@@ -177,8 +194,10 @@ export function decideHeldBubbleAfterHold(dropResult) {
  *   onAudible?: () => void,
  *   itemFields?: Record<string, any>,
  *   lease?: { whenMine: (liveId: string, mine: () => void, other: () => void) => void, liveId: string } | null,
- *   onReaderYield?: () => void
+ *   onReaderYield?: () => void,
+ *   busyChat?: boolean
  * }} ctx
+ *   busyChat: コメントが速い間か(会場の熱量・isVenueBusyForCalm)。速い間は声を待たせる上限を6秒に(resolveBubbleVoiceHoldMaxMs)。
  * @returns {boolean} 吹き出しを出した(または出す予定)か
  */
 export function startVenueSpeechBubbleVoice(state, speech, ctx) {
@@ -192,10 +211,7 @@ export function startVenueSpeechBubbleVoice(state, speech, ctx) {
   const clearTimer = ctx.clearTimer || ((t) => clearTimeout(t));
   const vp = ctx.voicePlayer;
   const diag = state.diag;
-  const requestedBudget = Number(vp?.voiceHoldBudgetMs?.());
-  const holdMaxMs = Number.isFinite(requestedBudget)
-    ? Math.min(20000, Math.max(VENUE_BUBBLE_VOICE_HOLD_MAX_MS, requestedBudget))
-    : VENUE_BUBBLE_VOICE_HOLD_MAX_MS;
+  const holdMaxMs = resolveBubbleVoiceHoldMaxMs({ budgetMs: vp?.voiceHoldBudgetMs?.(), busyChat: ctx.busyChat === true });
   const arrivedAt = Number(ctx.arrivedAt) || now();
   const failing = (Number(state.failStreak) || 0) >= VENUE_BUBBLE_VOICE_FAIL_STREAK_MAX;
   const probeDue = failing && now() - (Number(state.lastProbeAt) || 0) >= VENUE_BUBBLE_VOICE_PROBE_MS;
@@ -251,24 +267,44 @@ export function startVenueSpeechBubbleVoice(state, speech, ctx) {
       onDropped();
       return;
     }
+    // 2026-11-25: 吹き出しは「音が実際に出始めた瞬間」(audio の playing = onAudible)に出す。
+    //   onAudioStart は audio.play() を呼んだ直後で、音が出るのはその後(読み込み・再生の準備)。CPU を4分の1にした箱の実測で、
+    //   play() の直後に出すと吹き出しが音より中央0.4秒・最大1.2秒先に出ていた。onAudioStart では待ちの上限だけ外す。
+    let started = false;
+    let audible = false;
+    const showWithVoice = () => {
+      if (revealedAt || !started || !audible) return;
+      audioAt = now();
+      diag.shownWithVoice += 1;
+      if (audioAt - arrivedAt > VENUE_BUBBLE_VOICE_HOLD_MS) diag.heldPastHold += 1;
+      reveal();
+      if (bubble) ctx.onSpeaking(bubble);
+      sample();
+    };
     vp.enqueue([{
       ...itemBase,
-      onAudible: ctx.onAudible,
+      onAudible: () => {
+        try { ctx.onAudible?.(); } catch { /* 枠の失敗で吹き出しを止めない */ }
+        audible = true;
+        showWithVoice();
+      },
       onAudioStart: () => {
         state.lastAudioStartAt = now();
         state.failStreak = 0;
-        audioAt = now();
-        if (!revealedAt) {
-          diag.shownWithVoice += 1;
-          if (holding && audioAt - arrivedAt > VENUE_BUBBLE_VOICE_HOLD_MS) diag.heldPastHold += 1;
-        }
+        started = true;
         holding = false;
-        reveal();
-        if (bubble) ctx.onSpeaking(bubble);
+        clearHoldTimers(); // 声は始まった: 上限で外さない(音が出るまで待つ)
+        if (revealedAt) {
+          // 吹き出しを先に出していた件(待たせなかった件)は今までどおり
+          audioAt = now();
+          if (bubble) ctx.onSpeaking(bubble);
+          sample();
+        } else showWithVoice();
         ctx.onCharaSpoken?.();
-        sample();
       },
       onAudioEnd: () => {
+        // 音が出ないまま終わった(再生の失敗など)件も、吹き出しは必ず出す(v0.1.757: 吹き出しを声に頼らせない)
+        if (!revealedAt) { reveal(); sample(); }
         if (bubble) ctx.onDone(bubble);
         ctx.onCharaEnd?.();
       },

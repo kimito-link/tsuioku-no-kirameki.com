@@ -902,6 +902,10 @@ import {
   computePopupWindowTargetHeight,
   POPUP_WINDOW_WIDTH
 } from '../lib/popupWindowEmptyHeight.js';
+import {
+  applyPopupWindowBounds,
+  isPopupWindowAtBounds
+} from '../lib/applyPopupWindowBounds.js';
 import { createObjectUrlRevokeQueue } from '../lib/objectUrlRevokeQueue.js';
 import { formatDateTime } from '../lib/formatDateTime.js';
 import { shouldRunDevMonitorPaint } from '../lib/devMonitorPaintGate.js';
@@ -14799,11 +14803,9 @@ async function resizePopupWindowForState(input) {
       hasHistory,
       viewportHint
     });
-    if (typeof win.height === 'number' && win.height === height) return;
-    await chrome.windows.update(win.id, {
-      height,
-      width: POPUP_WINDOW_WIDTH
-    });
+    const bounds = { height, width: POPUP_WINDOW_WIDTH };
+    if (isPopupWindowAtBounds(win, bounds)) return;
+    await applyPopupWindowBounds(chrome.windows, win.id, bounds);
   } catch (err) {
     // 「Extension context invalidated」はリロード後の古い popup で起こる無害な失敗。
     // 騒がしくしない（chrome://extensions のエラー欄に出さない）。それ以外だけ warn。

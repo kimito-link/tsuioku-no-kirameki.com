@@ -6,7 +6,9 @@ import {
   createVoiceReaderLeaseLink,
   createVoiceReaderLeaseTable,
   startVoiceReaderLease,
-  VOICE_READER_LEASE_BEAT_MS
+  VOICE_READER_LEASE_BEAT_MS,
+  VOICE_READER_PRIO_HEADLESS,
+  VOICE_READER_PRIO_VISIBLE
 } from './voiceReaderLease.js';
 
 /** 2つのページが1つの表(Background 役)を共有する。 */
@@ -16,7 +18,7 @@ function setup() {
   const table = createVoiceReaderLeaseTable();
   /** @param {any} msg */
   const send = (msg) => {
-    if (msg.type === VOICE_READER_CLAIM) return Promise.resolve(table.claim(msg.liveId, msg.holder, t));
+    if (msg.type === VOICE_READER_CLAIM) return Promise.resolve(table.claim(msg.liveId, msg.holder, t, msg.prio));
     if (msg.type === VOICE_READER_RELEASE) { table.release(msg.holder); return Promise.resolve({ ok: true }); }
     return Promise.resolve(null);
   };
@@ -104,5 +106,53 @@ describe('voiceReaderLease (v0.1.1794)', () => {
     await venue.whenMine('lv1', () => log.push('v3'));
     expect(log.filter((x) => x.startsWith('v'))).toEqual(['v1', 'v2', 'v3']);
     expect(log.filter((x) => x.startsWith('c'))).toEqual(['c1-yield', 'c2-yield']);
+  });
+
+  // 2026-11-25: 別窓の会場を開いていても、先に名乗った視聴ページ内の閉じた会場(声だけ)が読み、
+  //   別窓の吹き出しが声より中央4.4秒先に出ていた(箱の実測)。見えている会場が読み手を引き継ぐ。
+  it('見えている会場は、閉じた会場(声だけ)から読み手を引き継ぐ。引き継がれた側は1回だけ onLost', async () => {
+    let t = 1000;
+    const table = createVoiceReaderLeaseTable();
+    /** @param {any} msg */
+    const send = (msg) => Promise.resolve(msg.type === VOICE_READER_CLAIM ? table.claim(msg.liveId, msg.holder, t, msg.prio) : (table.release(msg.holder), { ok: true }));
+    const lost = vi.fn();
+    const headless = createVoiceReaderLeaseLink(send, { now: () => t, holder: 'inpage', priority: () => VOICE_READER_PRIO_HEADLESS, onLost: lost });
+    let windowOpen = true;
+    const windowVenue = createVoiceReaderLeaseLink(send, { now: () => t, holder: 'window', priority: () => (windowOpen ? VOICE_READER_PRIO_VISIBLE : VOICE_READER_PRIO_HEADLESS) });
+    await headless.beat('lv1');
+    expect(await headless.check('lv1')).toBe(true);
+    await windowVenue.beat('lv1');
+    expect(await windowVenue.check('lv1')).toBe(true);
+    t += VOICE_READER_LEASE_BEAT_MS; // 閉じた会場の次の名乗りで「譲った」と分かる
+    await headless.beat('lv1');
+    expect(await headless.check('lv1')).toBe(false);
+    expect(lost).toHaveBeenCalledTimes(1);
+    await headless.beat('lv1');
+    expect(lost).toHaveBeenCalledTimes(1);
+    // 別窓を畳んでも(優先度0)、閉じた会場は横取りしない(同じ優先度は先着のまま・ばたつかない)
+    windowOpen = false;
+    await windowVenue.beat('lv1');
+    await headless.beat('lv1');
+    expect(await headless.check('lv1')).toBe(false);
+    // 別窓を閉じたら(手放す)閉じた会場が読み手に戻る
+    windowVenue.release();
+    await headless.beat('lv1');
+    expect(await headless.check('lv1')).toBe(true);
+  });
+  it('同じ優先度どうしは今までどおり先着(見えている会場とコメビュは取り合わない)', () => {
+    const table = createVoiceReaderLeaseTable();
+    expect(table.claim('lv1', 'venue', 1000, VOICE_READER_PRIO_VISIBLE).granted).toBe(true);
+    expect(table.claim('lv1', 'comeview', 1001, VOICE_READER_PRIO_VISIBLE).granted).toBe(false);
+    expect(table.claim('lv1', 'inpage', 1002, VOICE_READER_PRIO_HEADLESS).granted).toBe(false);
+    expect(table.claim('lv1', 'old', 1003).granted).toBe(false);
+  });
+  it('名乗りに優先度を載せる(priority が無い・壊れていれば 0)', async () => {
+    /** @type {any[]} */
+    const sent = [];
+    const send = (/** @type {any} */ msg) => { sent.push(msg); return Promise.resolve({ granted: true }); };
+    await createVoiceReaderLeaseLink(send, { holder: 'a', priority: () => VOICE_READER_PRIO_VISIBLE }).beat('lv1');
+    await createVoiceReaderLeaseLink(send, { holder: 'b' }).beat('lv1');
+    await createVoiceReaderLeaseLink(send, { holder: 'c', priority: () => { throw new Error('x'); } }).beat('lv1');
+    expect(sent.map((m) => m.prio)).toEqual([1, 0, 0]);
   });
 });
