@@ -1,7 +1,7 @@
 {
   "schema": 1,
   "mode": "default",
-  "fingerprint": "45054f51541ce5fc29b64815e2340c97c3fbca771ca6b804aa4b7f257b638419",
+  "fingerprint": "9f9d7fc6fe94f9e037fd9da8c9346c343aa792b11cc4174ccbf67cedb840c68e",
   "inputs": [
     "app/app.js",
     "app/live-view-block.js",
@@ -1113,7 +1113,7 @@
     "extension/dist/native-voice-sw.js": "720be33b83c5a139ef8fa4a9c5768c1cb73fe3a6c55d2d140269164945abec2e",
     "extension/dist/voice-native-guide.js": "b3c26a7158e520373b41d16adc7cc789688221f55217af8a1941c690f32d4db1",
     "extension/dist/self-update-sw.js": "dea5ff6a1a74ddd763e44766de0a78f9dcb68d6fbe37edde3f9bc6b931a5f74e",
-    "extension/dist/content.js": "692f7235f8446156d894ace94873ab5b1f55fae74cb59f69e28acc5b3937ec79",
+    "extension/dist/content.js": "95f9b9effbe7bb7c9e484acc805f5a3de624edd075a5e93680f5b50eda4a2ab1",
     "extension/dist/content-boot.js": "ce9c4d3f140673dbc3d872f8f7ac2f803ff10e378ebb976d796650c792cc05e8",
     "extension/dist/yt-page-boot.js": "0a575254f4c2dbdcbf37ad18d98ed3de7b8e481ae13e992ce7c75f5eb9c8fb15",
     "extension/dist/popup.js": "db4071bfc08ee18ae8ff1ed9fb9f8848c4d676526434a8eaa968a152cf532428",

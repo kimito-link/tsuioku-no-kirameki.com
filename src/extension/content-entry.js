@@ -11303,8 +11303,7 @@ async function seedTailFromMain(lid) {
     // v0.1.1011: 記録全件(main + テール)の uid/commentNo 集計を1回だけ作って running を seed する。
     //   以後の incrementalMode は accumulateSavedCommentsUidStats で added だけ加算=母数を全件に保つ
     //   (チャンクモードで totalSaved:0 と誤集計していたのを根治)。
-    // v0.1.2230: seed はメインだけ。テール行は畳み込みで added になった時に加算される
-    //   (main+テールで seed すると、そのテールの畳み込みで同じ行を二度数え、件数の床が膨らんだ)。
+    // v0.1.2230: seed はメインだけ(テール行は畳み込みで added の時に加算。含めると二度数えて件数の床が膨らんだ)。
     _savedCommentsUidStatsRunning = aggregateSavedCommentsUidStats(main);
     _lastSavedCommentsUidStats = { ..._savedCommentsUidStatsRunning };
   } else {
@@ -11946,17 +11945,12 @@ async function flushBatchViaTail(batch) {
   //   数千行のバーストを通すとクランプで古い行が黙って消え、既知キーだけが残り再取得も
   //   門前払い=38〜43%で固定(実機 crawl42,078行/保存15,094行で確定)。直行はO(追加分)。
   //   timeout時はimpl内のrequeueが再投入する(__noRequeueを渡さない)。
-  // v0.1.2230: 直行でもテール⊥メインを保つ(planMainWriteWithTailFold)。今のテールを同じ書き込みに
-  //   載せ、成功したら外し、直行した行のキーを既知集合へ足す=「記録」の二重計上の根治。
+  // v0.1.2230: 直行でもテール⊥メインを保つ(今のテールを同じ書き込みに載せ、成功したら外し、直行行のキーを既知へ足す=「記録」二重計上の根治)。
   if (batch.length >= TAIL_BULK_BYPASS_MIN_ROWS) {
     const plan = planMainWriteWithTailFold(batch, tailRowsBuffer);
     // 直行分のうちメイン∪テールに無かった行(=新着)。成功後の直近リングと軽量サマリ用。
     const bulkFresh = selectNewTailRows(lid, enrichRowsWithInterceptedUserIds(batch), tailKnownCommentNoKeys).fresh;
-    const result = await persistCommentRowsImpl(/** @type {ParsedCommentRow[]} */ (plan.rows), {
-      source: 'bulk_bypass',
-      __isCompaction: true,
-      __tailFoldCount: plan.foldLen
-    });
+    const result = await persistCommentRowsImpl(/** @type {ParsedCommentRow[]} */ (plan.rows), { source: 'bulk_bypass', __isCompaction: true, __tailFoldCount: plan.foldLen });
     if (liveId === lid && result && result.ok === true && lastImplMainCount >= 0) {
       tailMainCount = lastImplMainCount;
       const settled = settleTailAfterMainWrite(lid, { tail: tailRowsBuffer, foldLen: plan.foldLen, writtenRows: batch, knownKeys: tailKnownCommentNoKeys, mainCount: tailMainCount });
@@ -11964,31 +11958,15 @@ async function flushBatchViaTail(batch) {
       tailKnownCommentNoKeys = settled.knownKeys;
       observedRecordedCommentCount = settled.recordedCount;
       if (plan.foldLen) lastTailCompactAt = Date.now();
-      // 件数が変わったので、テール追記と同じ軽量サマリ(nls_csummary)も書く。書かないと
-      //   サマリの件数と直近コメントが直行前のまま残り、パネルが新着を読み直さない。
-      if (bulkFresh.length) {
-        recentCommentRing = recentCommentRing.concat(bulkFresh).slice(-SUMMARY_RECENT_ROWS_MAX);
-      }
+      // 件数が変わったので、テール追記と同じ軽量サマリ(nls_csummary)も書く(書かないと件数と直近コメントが直行前のまま残る)。
+      if (bulkFresh.length) recentCommentRing = recentCommentRing.concat(bulkFresh).slice(-SUMMARY_RECENT_ROWS_MAX);
       const now = Date.now();
-      const summaryPayload = buildCommentSummary({
-        liveId: lid,
-        recordedCount: recordedCountForDisplay(lid),
-        officialCount: officialCommentCount != null && Number.isFinite(officialCommentCount) ? officialCommentCount : null,
-        lastIngestAt: now,
-        recentRows: recentCommentRing,
-        nowMs: now
-      });
+      const official = officialCommentCount != null && Number.isFinite(officialCommentCount) ? officialCommentCount : null;
+      const summaryPayload = buildCommentSummary({ liveId: lid, recordedCount: recordedCountForDisplay(lid), officialCount: official, lastIngestAt: now, recentRows: recentCommentRing, nowMs: now });
       const panelPayload = buildPanelSummaryPayloadForCurrentLive(now);
+      const writes = { [summaryStorageKey(lid)]: summaryPayload, ...(plan.foldLen ? { [tailStorageKey(lid)]: tailRowsBuffer } : {}), ...(panelPayload ? { [panelSummaryStorageKey(lid)]: panelPayload } : {}) };
       try {
-        await runStorageOpWithTimeout(
-          () =>
-            chrome.storage.local.set({
-              ...(plan.foldLen ? { [tailStorageKey(lid)]: tailRowsBuffer } : {}),
-              [summaryStorageKey(lid)]: summaryPayload,
-              ...(panelPayload ? { [panelSummaryStorageKey(lid)]: panelPayload } : {})
-            }),
-          INGEST_TIMING.persistWriteTimeoutMs
-        );
+        await runStorageOpWithTimeout(() => chrome.storage.local.set(writes), INGEST_TIMING.persistWriteTimeoutMs);
       } catch (err) {
         if (err !== STORAGE_OP_TIMED_OUT) throw err;
       }
