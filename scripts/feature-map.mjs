@@ -106,6 +106,8 @@ const EXCLUDE = [/\.test\.js$/, /node_modules/];
  *   意図的に片側だけにするなら、ここに1行足してから再生成する。
  */
 const DOM_ATTR_DISCONNECT_BASELINE = new Set([
+  /* v0.1.2217: 書き手は venueBusyCalm.applyVenueBusyCalm(toggleAttribute・定数経由)、読み手は同じ部品の CSS 文字列(VENUE_BUSY_CALM_CSS)。繋がっている。 */
+  'data-nls-busy',
   /* ── YouTube 版(2026-11-05 本体に同梱): 書き手は extension-youtube/content-chat-main.js(ページの世界・setAttribute)、
    * 読み手は src/lib/youtube/ytChatParse.js の el.getAttribute?.(…)(?. 付きの呼び出しをこの解析が拾えない)。繋がっている。 */
   'data-nl-author-photo',

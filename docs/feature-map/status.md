@@ -20,6 +20,7 @@ graph LR
   n_status --> n_src_extension_phonePostRelay_js["extension/phonePostRelay.js"]
   n_status --> n_src_extension_phoneVoicePublisher_js["extension/phoneVoicePublisher.js"]
   n_status --> n_src_extension_statusDeviceCred_js["extension/statusDeviceCred.js"]
+  n_status --> n_src_extension_statusOtherServicesDump_js["extension/statusOtherServicesDump.js"]
   n_status --> n_src_extension_statusSmartphoneCard_js["extension/statusSmartphoneCard.js"]
   n_status --> n_src_extension_voiceQualitySetting_js["extension/voiceQualitySetting.js"]:::shared
   n_status --> n_src_lib_adMessageLines_js["lib/adMessageLines.js"]:::shared
@@ -52,8 +53,7 @@ graph LR
   n_status --> n_src_lib_chikuranCard_js["lib/chikuranCard.js"]
   n_status --> n_src_lib_chikuranHeaderDom_js["lib/chikuranHeaderDom.js"]
   n_status --> n_src_lib_comeviewActions_js["lib/comeviewActions.js"]:::shared
-  n_status --> n_src_lib_comeviewRows_js["lib/comeviewRows.js"]:::shared
   classDef shared fill:#eee,stroke:#999,color:#666;
 ```
 
-> ほか 177 ファイル省略（全件は storage-bus.md / metafile 参照）。
+> ほか 179 ファイル省略（全件は storage-bus.md / metafile 参照）。

@@ -315,7 +315,7 @@ import {
   resolveVenueHeatLevel,
   buildVenueHeatPaint
 } from '../lib/venueHeat.js';
-import { shouldSkipVenueSpeechPollRead, VENUE_SPEECH_POLL_INTERVAL_MS } from '../lib/venueSpeechPollGate.js';
+import { shouldSkipVenueSpeechPollRead, VENUE_SPEECH_POLL_INTERVAL_MS } from '../lib/venueSpeechPollGate.js'; import { applyVenueBusyCalm, VENUE_BUSY_CALM_CSS } from '../lib/venueBusyCalm.js';
 import { resolveVenueCrowdFrameMs } from '../lib/venueCrowdFramePolicy.js';
 import { readExtDocRecentLagMs } from '../lib/extDocBusyCensus.js';
 import { VoicePlayer } from '../lib/voicePlayer.js';
@@ -2423,7 +2423,7 @@ function ensureVenueStyle() {
   if (document.getElementById(STYLE_ID)) return;
   const style = document.createElement('style');
   style.id = STYLE_ID;
-  style.textContent = VENUE_CSS + VENUE_STAT_STRIP_CSS;
+  style.textContent = VENUE_CSS + VENUE_STAT_STRIP_CSS + VENUE_BUSY_CALM_CSS;
   (document.head || document.documentElement).appendChild(style);
 }
 
@@ -5308,6 +5308,7 @@ export function mountVenueBarButton(options = {}) {
     // 「生きている会場」: この盛り上がりで観客の揺れの速さ/大きさが決まる(群衆は従来どおり丸めない値)。
     crowdHeatLevel = level;
     const paint = buildVenueHeatPaint(level);
+    applyVenueBusyCalm(stage, level); // v0.1.2217: コメントが速い間だけ飾りの動きを止める(理由は venueBusyCalm.js・同じ値なら DOM は触らない)
     if (paint.sig === _venueHeatPaintSig && stage.hasAttribute('data-nls-heat')) return;
     _venueHeatPaintSig = paint.sig;
     stage.style.setProperty('--nlsb-heat-color', paint.color);
@@ -5874,7 +5875,7 @@ export function mountVenueBarButton(options = {}) {
             if (!node) return tileEl;
             // 席の持ち主ではない段(同じ人が別の段にも居る)は席に包まない=席の要素を奪わない。
             if (seatOwnerItem.has(seatIndexRaw) && seatOwnerItem.get(seatIndexRaw) !== item) return tileEl;
-            node.seat.replaceChildren(tileEl);
+            if (!(node.seat.firstChild === tileEl && node.seat.childNodes.length === 1)) node.seat.replaceChildren(tileEl); // v0.1.2217: 使い回したタイルが既に唯一の中身なら付け直さない(アニメの鳴り直し・描き直しを防ぐ)
             node.tile = tileEl;
             return node.seat;
           }

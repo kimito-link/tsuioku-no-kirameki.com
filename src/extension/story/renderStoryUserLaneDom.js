@@ -582,6 +582,21 @@ export function resetStoryUserLaneDom(els) {
 }
 
 /**
+ * v0.1.2217: 前の回のタイルを使い回してよいか。段の直下(①パネル)か、段の直下の包み(会場の席)の中に居るものだけ。
+ *   席を片付けて外れたタイル・別の段へ移ったタイル・枠だけ(hollow)の後で消えたタイルは使わない(新しく作る)。
+ * @param {Node | null | undefined} n
+ * @param {Element} el 段
+ * @returns {boolean}
+ */
+export function isReusableLaneTile(n, el) {
+  if (!n || !el) return false;
+  const parent = n.parentNode;
+  if (!parent) return false;
+  if (parent === el) return true;
+  return parent.parentNode === el;
+}
+
+/**
  * v0.1.1967: 段の子を nodes の並びにそろえる。同じ場所にあるものは触らず、要らないものを外し、
  *   足りないもの・場所が変わったものだけ insertBefore で動かす(結果の並びは replaceChildren(...nodes) と同じ)。
  *   1人が順位を上げた/下げた・新しい人が入った、のどれも数回の移動で済む。
@@ -683,18 +698,23 @@ function fillLaneTier(el, items, io, wrapTileEl, onSettled, carry) {
   /** @type {Array<HTMLElement|null>} */
   const tileNodes = new Array(items.length).fill(null);
   // v0.1.1692: 前回と見た目の鍵が同じ人のタイルは作り直さず使い回す(1人変わるたびに段の全員の <img> が新品になり、
-  //   合成済みの顔が仮の顔に戻る=ちらつきを止める)。会場(wrapTileEl あり)は席ごとの包みがあるので従来どおり全部作る。
+  //   合成済みの顔が仮の顔に戻る=ちらつきを止める)。
+  // v0.1.2217: 会場(wrapTileEl あり)も使い回す。会場だけ毎回全員のタイルを作り直していたため、コメント1件ごとに
+  //   段の全員の <img> が新品になり(画像の読み直し)、「熱い人」の弾むアニメも毎回最初から鳴り直して、
+  //   会場の描き直しが止まらなかった(2026-11-25 箱の実測: GPU 切りで拡張だけで CPU 約1.2コア・lane の付け直し 1,200回/8秒)。
+  //   会場のタイルは席(段の直下の包み)の中に居るので、「段の直下か、段の直下の包みの中」に居るタイルだけを使い回す。
+  //   包み直し(wrapTileEl)は毎回呼ぶ=席の持ち主・並びの決まりは今までどおり。
   const tileKeys = carry ? carry.tileKeys : items.map(storyLaneTileKey);
   /** @type {Map<string, HTMLElement[]> | null} */
   let reusePool = null;
-  if (typeof wrapTileEl !== 'function') {
+  {
     const prevNodes = _laneTileNodes.get(el);
     const prevKeys = _laneTierTileKeys.get(el);
     if (prevNodes && prevKeys && prevNodes.length === prevKeys.length) {
       reusePool = new Map();
       for (let j = 0; j < prevNodes.length; j += 1) {
         const n = prevNodes[j];
-        if (!n || n.parentNode !== el) continue; // 枠だけ(hollow)・外れたタイルは使い回さない
+        if (!isReusableLaneTile(n, el)) continue; // 枠だけ(hollow)・外れたタイルは使い回さない
         const list = reusePool.get(prevKeys[j]);
         if (list) list.push(n);
         else reusePool.set(prevKeys[j], [n]);
@@ -745,7 +765,7 @@ function fillLaneTier(el, items, io, wrapTileEl, onSettled, carry) {
     if (reused) {
       applyLaneTileStatsAttr(reused, p);
       tileNodes[i] = reused;
-      order.push(reused);
+      order.push(typeof wrapTileEl === 'function' ? wrapTileEl(reused, p, i) : reused);
       continue;
     }
     // ★v0.1.2008: この回で作る数を超えた「新しく作るマス」は次の回へ回す(既に出ているマスは上で使い回し済み)

@@ -1202,7 +1202,7 @@
   - `gift-coin-hq.wav`
   - `gift-register-hq.wav`
   - `gift-register.mp3`
-- 📁 **src/** (2643)
+- 📁 **src/** (2644)
   - 📁 **data/** (7)
     - 📁 **acquirers/** (2)
       - `laneFromStorage.js` — 応援レーン acquirer: chrome.storage.local(nls_comments) → laneStore の橋渡し。
@@ -1548,7 +1548,7 @@
         - `logo_funlink_white_RGB_link_black.png`
         - `logo_funlink_white_RGB_maru_black.png`
     - `hero-connect-hub.svg`
-  - 📁 **lib/** (2322)
+  - 📁 **lib/** (2323)
     - 📁 **__snapshots__/** (4)
       - `marketing-abema-baseline.html`
       - `marketing-niconico.html`
@@ -2319,6 +2319,7 @@
     - `extDocBusyCensus.test.js`
     - `extDocBusyCensusBoot.js` — 【層】L2 配線層(副作用あり・各拡張文書から1行 import で起動する)
     - `extDocBusyCensusBoot.test.js`
+    - `extDocBusyCensusOnChangedSkip.test.js`
     - `extProcessCensusKey.js` — 拡張プロセスの忙しさ台帳の storage キーとメッセージ型(書き手と読み手が同じ名前を使うための1か所)。
     - `extensionCspInlineScript.test.js`
     - `externalFetchCells.js` — 外部API(貢献度/ニコニ広告)の取得をセルにする(純関数)。

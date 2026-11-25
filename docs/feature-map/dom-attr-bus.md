@@ -21,7 +21,6 @@
 - 🟠 **data-nl-usage-terms-ack** — 書く人だけ: extension/popup-entry.js, lib/cloakNotForSidePanel.js
 - 🟠 **data-nls-backfill** — 書く人だけ: extension/content-entry.js
 - 🟠 **data-nls-backfill-diag** — 書く人だけ: extension/content-entry.js
-- 🟠 **data-nls-heat** — 書く人だけ: extension/venueBar.js
 - 🟠 **data-nls-hidden-injected** — 書く人だけ: extension/content-entry.js
 - 🟠 **data-nls-intercept-visitor-probe** — 書く人だけ: extension/page-intercept-entry.js
 - 🟠 **data-nls-ndgr-dedupe** — 書く人だけ: extension/page-intercept-entry.js
@@ -33,6 +32,7 @@
 - 🔵 **data-nl-page-count-only** — 読む人だけ: extension/popup-entry.js
 - 🔵 **data-nl-src** — 読む人だけ: extension/sidepanel-iframe-boot-entry.js
 - 🔵 **data-nl-trio-slot** — 読む人だけ: extension/popup-entry.js, lib/platform/platformMetricChrome.js
+- 🔵 **data-nls-busy** — 読む人だけ: lib/venueBusyCalm.js
 
 ## 全属性
 
@@ -51,7 +51,7 @@
 | `data-nl-gift-rank-metric` | lib/paintTopSupportRankStyleIntoElement.js | extension/popup-entry.js<br>lib/paintTopSupportRankStyleIntoElement.js |
 | `data-nl-hoisted` | extension/popup-entry.js | extension/popup-entry.js |
 | `data-nl-lane-user-detail-wired` | extension/popup/wireLaneUserDetailOpen.js | extension/popup/wireLaneUserDetailOpen.js |
-| `data-nl-metric` | lib/platform/platformMetricChrome.js | lib/platform/platformMetricChrome.js |
+| `data-nl-metric` | extension/popup/nicoEstimatedSpendChip.js<br>lib/platform/platformMetricChrome.js | extension/popup/nicoEstimatedSpendChip.js<br>lib/platform/platformMetricChrome.js |
 | `data-nl-on-error-bound` | extension/popup-entry.js | extension/popup-entry.js |
 | `data-nl-orig-label` | lib/platform/platformMetricChrome.js | lib/platform/platformMetricChrome.js |
 | `data-nl-orig-sub` | lib/platform/platformMetricChrome.js | lib/platform/platformMetricChrome.js |
@@ -93,6 +93,7 @@
 | `data-nls-auto-open` | extension/content-entry.js | extension/content-entry.js |
 | `data-nls-backfill` | extension/content-entry.js | — |
 | `data-nls-backfill-diag` | extension/content-entry.js | — |
+| `data-nls-busy` | — | lib/venueBusyCalm.js |
 | `data-nls-comment-av-bound` | extension/content-entry.js | extension/content-entry.js |
 | `data-nls-fetch-log` | extension/page-intercept-entry.js | extension/content-entry.js |
 | `data-nls-fetch-other` | extension/page-intercept-entry.js | extension/content-entry.js |
@@ -104,7 +105,7 @@
 | `data-nls-fiber-scans` | extension/page-intercept-entry.js | extension/content-entry.js |
 | `data-nls-fiber-step` | extension/page-intercept-entry.js | extension/content-entry.js |
 | `data-nls-first-paint-gate` | extension/content-entry.js | extension/content-entry.js |
-| `data-nls-heat` | extension/venueBar.js | — |
+| `data-nls-heat` | extension/venueBar.js | extension/venueBar.js |
 | `data-nls-hidden` | extension/content-entry.js | extension/content-entry.js<br>lib/inlineHostVisibilityIntent.js |
 | `data-nls-hidden-injected` | extension/content-entry.js | — |
 | `data-nls-inline-close` | extension/content-entry.js | extension/content-entry.js |
