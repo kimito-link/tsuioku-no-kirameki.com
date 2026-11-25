@@ -95,19 +95,19 @@ describe('パーサの行 → 横欄・会場のチップ(全サービス)', () 
       parseSrGift({ t: 2, u: 8, ac: 'B', g: 1601, n: 3, av: 1, created_at: 1700000002 }, { roomId: '99', gifts }),
     ];
     const chips = chipsOf('showroom', rows);
-    expect(chips.map((c) => c.key)).toEqual(['estimatedStreamerTakeHome', 'nativeTotal', 'paidGifts']);
+    expect(chips.map((c) => c.key)).toEqual(['nativeTotal', 'paidGifts']);
     expect(textOf(chips, 'nativeTotal')).toBe('30pt');
     // 単位は数のすぐ後ろ(横欄で2行に割れない)
     expect(chips[0].unit).toBe('');
-    expect(chips[1].title).toContain('円にはしていません');
-    expect(chips[0].text).toBe('—'); // 受取: SHOWROOM はシェア率が非公開(公式が明記)なので出さない(v0.1.2225)
+    expect(chips[0].title).toContain('円にはしていません');
+    expect(chips.some((c) => c.key === 'estimatedStreamerTakeHome')).toBe(false); // SHOWROOM は円の推定を出さない(受取も)(v0.1.2225)
     expect(chips.some((c) => c.key === 'estimatedViewerSpend')).toBe(false);
   });
 
   it('ふわっち: アイテム(記録)の個数 → 件数。推定は出さない', () => {
     const c = { id: 3, comment_type: 'BY_PLAYITEM', user: { id: 9, name: 'ファンC' }, message: 'ハート', item_count: 3, play_item_pattern: { id: 5, name: 'ハート', image_url: '', quantity: 1 } };
     const chips = chipsOf('whowatch', [parseWwComment(c, { liveId: '1' })]);
-    expect(chips.map((c2) => c2.key)).toEqual(['estimatedStreamerTakeHome', 'nativeTotal', 'paidGifts']);
+    expect(chips.map((c2) => c2.key)).toEqual(['nativeTotal', 'paidGifts']);
     expect(textOf(chips, 'nativeTotal')).toBe('3個');
     expect(textOf(chips, 'paidGifts')).toBe('1件');
   });

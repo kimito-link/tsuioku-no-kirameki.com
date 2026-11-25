@@ -32,7 +32,7 @@ import {
 } from './estimatedViewerSpend.js';
 
 /** 振り返りで受取（推定）を出すサービス(応援を記録するサービス。金額は公式の率がある YouTube・Kick・Twitch だけ) */
-const MARKETING_TAKE_HOME_PLATFORMS = new Set(['youtube', 'twitch', 'kick', 'twitcasting', 'mixch', 'tiktok', 'showroom', 'whowatch']);
+const MARKETING_TAKE_HOME_PLATFORMS = new Set(['youtube', 'twitch', 'kick', 'twitcasting', 'mixch', 'tiktok']);
 import { buildCommenterFollowAnalytics } from './commenterFollowAnalytics.js';
 import { buildUserProfileLinkedLabelHtml } from './userProfileLinkHtml.js';
 import {

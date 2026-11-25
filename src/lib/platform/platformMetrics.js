@@ -911,8 +911,9 @@ function supportChips(id, support) {
   return [...base.slice(0, at), takeHomeChip(id, support), ...base.slice(at)];
 }
 
-/** 受取（推定）のチップを出すサービス(応援を記録するサービス全部。式があるのは YouTube・Kick・Twitch だけ) */
-const TAKE_HOME_CHIP_PLATFORMS = new Set(['youtube', 'twitch', 'kick', 'twitcasting', 'mixch', 'tiktok', 'showroom', 'whowatch']);
+/** 受取（推定）のチップを出すサービス。推定（視聴者の購入額）の欄があるサービスだけ(式があるのは YouTube・Kick・Twitch。
+ *   ほかは理由つきの「—」)。SHOWROOM・ふわっちは円の推定を出さない決まり(件数と pt だけ)なので受取も出さない(v0.1.2225) */
+const TAKE_HOME_CHIP_PLATFORMS = new Set(['youtube', 'twitch', 'kick', 'twitcasting', 'mixch', 'tiktok']);
 
 /** @param {string} id @param {any} support */
 function supportChipsBase(id, support) {
