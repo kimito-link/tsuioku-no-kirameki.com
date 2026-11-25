@@ -360,7 +360,7 @@
   - `src/lib/giftThrowProjectile.js`
 - **吹き出し寿命管理** — 会場の吹き出しの表示上限・追い出し(eviction)ライフサイクル
   - `src/lib/venueBubbleLifecycle.js`
-<details><summary>🗂 このカテゴリの全担当ファイル(自動分類) 317</summary>
+<details><summary>🗂 このカテゴリの全担当ファイル(自動分類) 318</summary>
 
 - `app/live-view-sound.js` — v0.1.1737: スマホの WEB版でギフトの効果音を鳴らす(拡張の会場モードと同じ音・同じ金額帯の選び方)。
 - `app/live-view-venue.js` — v0.1.1739: スマホの「かんたん会場モード」。右下の 🎪 を押すと全画面の会場になる。
@@ -565,6 +565,7 @@
 - `src/lib/privacyDisplay.js` — 共有・掲載向けに表示ラベルを短く伏せる（完全一致検索を難しくする程度。暗号化や匿名化ではない）。
 - `src/lib/provisionalLaneCommentRows.js` — heavy read 完了前に応援ランキングへ載せる暫定コメント行の合成（0 秒表示用）。
 - `src/lib/rememberedAvatarIndex.js` — 「同じ userId で過去に取れた avatarUrl」を O(1) で引く索引(純粋関数)。
+- `src/lib/renderCadence.js` — コメントで動く画面(①パネル・会場)が「何 ms に1回まで描き直すか」を決める共通の決まり。
 - `src/lib/repaintReasonCensus.js` — 「描き直しが何回・どの理由で起きたか」を数える純関数群。
 - `src/lib/reportUserThumb.js` — HTML レポート / マーケ分析の各ユーザー行に「最低サムネ」を必ず出すための
 - `src/lib/resolveVisitorCount.js` — v0.1.646: 「来場(累計来場者数)」の単一定義。表示場所(popup / status / レポート)で
@@ -1244,7 +1245,7 @@
   - `src/extension/live-ranking-entry.js`
   - `tsuioku-no-kirameki/live/index.html`
   - `.github/workflows/live-ranking.yml`
-<details><summary>🗂 このカテゴリの全担当ファイル(自動分類) 364</summary>
+<details><summary>🗂 このカテゴリの全担当ファイル(自動分類) 366</summary>
 
 - `app/app.js` — スマホ閲覧用 status Web 版。
 - `app/live-view-block.js` — iPhone アプリの「🚩 見たくない人を隠す・報告する」(App Store の審査 1.2: ほかの人の書き込みを見せるアプリの決まり)。
@@ -1367,6 +1368,7 @@
 - `src/extension/self-update.d.ts` — self-update.js(キットの写し・無改変)の型。写しを型検査から外し、ここで形だけ示す。
 - `src/extension/self-update.js` — 開発中（展開して読み込んだ）拡張が、作業フォルダの新しい版に自分で入れ替わる。
 - `src/extension/self-update.kit-test.mjs` — self-update.test.mjs — self-update.js の試験。拡張へ写すときは import 先のパスだけ直す。
+- `src/extension/whatsNewNoticeUi.js` — ポップアップ／横の欄に「この版で変わったこと」を出す。
 - `src/lib/aboutBlankGapVerdict.js` — ★about:blank の隙間(残り32ms)に対する【確定した判定】。
 - `src/lib/adMessageCensus.js` — 「広告/ギフトの生データに【メッセージ】が入っているか」を数えるだけの計器。
 - `src/lib/adObservationLog.js` — 広告(ニコニ広告)の「いつ増えたか」を、拡張が【気づいた時刻】として残す(純関数)。v0.1.1665。
@@ -1580,6 +1582,7 @@
 - `src/lib/watchSnapshotOfficialFields.js` — collectWatchPageSnapshot が返すオブジェクトのうち、公式統計・キャプチャ率まわり（DOM 非依存）。
 - `src/lib/watchSnapshotPartialMerge.js` — watchMetaCache.snapshot を更新する際の partial-merge 純粋関数。
 - `src/lib/watchUrlFreshness.js` — 「最後に視聴した URL（nls_last_watch_url）」フォールバックの鮮度判定。
+- `src/lib/whatsNewNotice.js` — 版を上げたあと「この版で変わったこと」を出す判定と、
 - `src/lib/youtube/ytActiveVideoId.js` — 「いま見ている配信」(yt_active_video_id) を書いてよいか。
 - `src/lib/youtube/ytChatContinuationVideoId.js` — チャット欄(/live_chat?continuation=…)の URL から、そのチャットが「どの配信のものか」を読む純関数。
 - `src/lib/youtube/ytChatInputBlock.js` — YouTube のチャット欄に入力欄が無いとき、その理由を見分ける(content-chat-entry の「ここから発言」用)。
@@ -1631,9 +1634,9 @@
 ### 🏟 会場・席 (13版)
 - `v0.1.2218` 2026-11-25 — コメントが速いときは画面の描き直しをまとめて、固まりにくく
 - `v0.1.2217` 2026-11-25 — コメントが多い配信でも会場が軽く動くように
-- `v0.1.2214` 2026-11-25 — 忙しい PC では会場の観客の動きを間引く
-- `v0.1.2213` 2026-11-25 — 混雑中は VOICEVOX を休ませて早く戻す
-- `v0.1.2212` 2026-11-25 — 会場が開いている間の負荷を減らし低スペックPCでも軽く
+- `v0.1.2214` 2026-11-25 — PCが忙しいときだけ客席の動きをゆるく
+- `v0.1.2213` 2026-11-25 — 読み上げが混んでいるあいだは声を休ませる
+- `v0.1.2212` 2026-11-25 — 会場を開いていても軽く動くように
 - `v0.1.2211` 2026-11-25 — SHOWROOM のコメント送信が途中で止まることがあったのを直す
 - `v0.1.2208` 2026-11-24 — 応援の数字を全サービスで先頭に表示
 - `v0.1.2206` 2026-11-24 — 推定（視聴者の消費）の対象をTikTok LIVEへ拡大
@@ -1655,13 +1658,12 @@
 - `v0.1.2203` 2026-11-24 — 推定購入額・消費をKick/Twitch/ツイキャスへ拡大
 - `v0.1.2201` 2026-11-23 — 会場・横欄・マーケレポートに「推定（視聴者の購入額）」を追加
 
-### 🔊 読み上げ (6版)
-- `v0.1.2215` 2026-11-25 — 使わない画面に記録の中身を送らない
-- `v0.1.2214` 2026-11-25 — 忙しい PC では会場の観客の動きを間引く
-- `v0.1.2213` 2026-11-25 — 混雑中は VOICEVOX を休ませて早く戻す
-- `v0.1.2212` 2026-11-25 — 会場が開いている間の負荷を減らし低スペックPCでも軽く
+### 🔊 読み上げ (5版)
+- `v0.1.2215` 2026-11-25 — 記録の保存が使っていない画面を重くしにくい
+- `v0.1.2214` 2026-11-25 — PCが忙しいときだけ客席の動きをゆるく
+- `v0.1.2213` 2026-11-25 — 読み上げが混んでいるあいだは声を休ませる
+- `v0.1.2212` 2026-11-25 — 会場を開いていても軽く動くように
 - `v0.1.2199` 2026-11-23 — 全サービスへ孤児タブ自動復帰・診断間引き・会場負荷抑制を横展開
-- `v0.1.2196` 2026-11-23 — ふわっち・ツイキャス・TikTok・ABEMA の復帰再接続を修正
 
 ### 🪟 応援レーン・タイル (1版)
 - `v0.1.2218` 2026-11-25 — コメントが速いときは画面の描き直しをまとめて、固まりにくく
@@ -1676,3 +1678,6 @@
 ### ⚡ 描画・性能 (2版)
 - `v0.1.2198` 2026-11-23 — ニコ生の常駐タイマーを共通スケジューラへ集約し裏タブを間引き
 - `v0.1.2197` 2026-11-23 — YouTube チャットの監視を共通 Observer ハブへ統合
+
+### その他 (1版)
+- `v0.1.2219` 2026-11-25 — 更新したら「この版で変わったこと」が出ます

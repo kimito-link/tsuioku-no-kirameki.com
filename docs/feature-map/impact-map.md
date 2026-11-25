@@ -623,6 +623,7 @@
 | `src/extension/statusSmartphoneCard.js` | 1 | 状態速報ページ |
 | `src/extension/venue-entry.js` | 1 | 会場モード(standalone) |
 | `src/extension/voice-native-guide-entry.js` | 1 | ローカル音声補助の導入案内 |
+| `src/extension/whatsNewNoticeUi.js` | 1 | ポップアップ(応援レーン) |
 | `src/lib/acquisitionDashboardChart.js` | 1 | ポップアップ(応援レーン) |
 | `src/lib/adLanePicksFromRooms.js` | 1 | ポップアップ(応援レーン) |
 | `src/lib/aiShareDiagnosticsMarkdown.js` | 1 | ポップアップ(応援レーン) |
@@ -1160,6 +1161,7 @@
 | `src/lib/watchSnapshotPartialMerge.js` | 1 | ポップアップ(応援レーン) |
 | `src/lib/watchTabPrioritize.js` | 1 | ポップアップ(応援レーン) |
 | `src/lib/watchUrlFreshness.js` | 1 | 状態速報ページ |
+| `src/lib/whatsNewNotice.js` | 1 | ポップアップ(応援レーン) |
 | `src/lib/xIntentUrl.js` | 1 | Web版 追憶のきらめき ランキング(/live/) |
 | `src/lib/yieldToBrowserPaint.js` | 1 | ポップアップ(応援レーン) |
 | `src/lib/youtube/ytGiftOnlyRow.js` | 1 | コメビュ(別窓) |

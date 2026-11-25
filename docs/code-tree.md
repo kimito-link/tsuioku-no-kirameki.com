@@ -27,7 +27,7 @@
 
 > 値が次の段へ届かない「断線」(broadcaster バグ型)は `npm run feature-map -- --check` が機械検知。
 
-## ⚠️ 役割コメントが無いソース 15 / 1361 件
+## ⚠️ 役割コメントが無いソース 15 / 1370 件
 - `docs/handoff/bench/bench-interval.mjs`
 - `docs/handoff/bench/bench-lane.mjs`
 - `extension-youtube/cloak-failsafe.js`
@@ -246,7 +246,7 @@
     - `2026-10-06.md`
     - `2026-10-12.md`
     - `2026-10-14.md`
-- 📁 **docs/** (372)
+- 📁 **docs/** (386)
   - 📁 **article-assets/** (87)
     - 📁 **venue-frames/** (12)
       - `f01.png`
@@ -568,6 +568,10 @@
   - `backfill-complete-loading-flow.html`
   - `bug-investigation-loading-scroll-2026-07-10.html`
   - `code-tree.html`
+  - `code-tree.html`
+  - `code-tree.html`
+  - `code-tree.md`
+  - `code-tree.md`
   - `code-tree.md`
   - `codex-commenter-follow-analytics-v0535.md`
   - `codex-event-lane-stuck-fix-v0613.md`
@@ -590,12 +594,18 @@
   - `dist-fingerprint-gate-IMPLEMENTATION-HANDOFF.md`
   - `extension-bump-checklist.md`
   - `feature-sitemap.html`
+  - `feature-sitemap.html`
+  - `feature-sitemap.html`
+  - `feature-sitemap.md`
+  - `feature-sitemap.md`
   - `feature-sitemap.md`
   - `inline-popup-sync.md`
   - `investigation-prompt-popup-not-appearing.md`
   - `kb-web-perf-diagnosis.md`
   - `koken-contrib-hidden-tab-stuck-fix-v0616.md`
   - `lane-architecture-redesign.md`
+  - `layer-map.html`
+  - `layer-map.html`
   - `layer-map.html`
   - `live-comment-heat-chips-DESIGN.md`
   - `live-comment-heat-chips-IMPLEMENTATION-HANDOFF.md`
@@ -624,6 +634,10 @@
   - `referral-commission.md`
   - `reliability-backlog-phase-b.md`
   - `repo-tree-map.html`
+  - `repo-tree-map.html`
+  - `repo-tree-map.html`
+  - `repo-tree-map.md`
+  - `repo-tree-map.md`
   - `repo-tree-map.md`
   - `research-nicolive-pc-comments.md`
   - `self-improvement-loop-DESIGN.md`
@@ -634,7 +648,7 @@
   - `venue-pop-parity-loop-flow.html`
   - `visual-explainer.md`
   - `voice-quality-pipeline-flow.html`
-- 📁 **extension/** (145)
+- 📁 **extension/** (149)
   - 📁 **data/** (1)
     - `ouen-banner.json`
   - 📁 **images/** (87)
@@ -776,8 +790,12 @@
     - `voice-complete.mp3`
     - `voice-watch.mp3`
   - `background.js` — MV3 Service Worker
+  - `background.js` — MV3 Service Worker
+  - `background.js` — MV3 Service Worker
   - `comeview.html`
   - `live-view.html`
+  - `manifest.json`
+  - `manifest.json`
   - `manifest.json`
   - `marketing-export-guard.js` — マーケ分析タブ(marketing-export.html)の「何があっても開く」保険。
   - `marketing-export.html`
@@ -1202,7 +1220,7 @@
   - `gift-coin-hq.wav`
   - `gift-register-hq.wav`
   - `gift-register.mp3`
-- 📁 **src/** (2646)
+- 📁 **src/** (2655)
   - 📁 **data/** (7)
     - 📁 **acquirers/** (2)
       - `laneFromStorage.js` — 応援レーン acquirer: chrome.storage.local(nls_comments) → laneStore の橋渡し。
@@ -1239,7 +1257,7 @@
       - `avatarResolver.test.js`
       - `identity.js` — ニコ生ユーザー ID の「匿名性」判定と関連アイデンティティ・ユーティリティ。
       - `nickname.js` — 表示名（ニックネーム）の「強弱」判定。
-  - 📁 **extension/** (123)
+  - 📁 **extension/** (124)
     - 📁 **popup/** (24)
       - 📁 **init/** (4)
         - `devMonitorExport.js` — devMonitorExport — 開発モニタの「エクスポート/ダウンロード/較正データ消去」一式。
@@ -1366,6 +1384,7 @@
     - `voiceTestHook.js` — 読み上げ試験(voiceTestRun.js)の入口をコメビュ・会場につなぐ(開発版だけ・2026-10-26)。
     - `voiceTestHook.test.js`
     - `voiceTogglePanel.wiring.test.js`
+    - `whatsNewNoticeUi.js` — ポップアップ／横の欄に「この版で変わったこと」を出す。
     - `yt-page-boot.js` — 会場(yt-venue-inline.js・約800KB)を配信の視聴ページだけに載せる。
   - 📁 **fixtures/** (3)
     - 📁 **kouhaku/** (2)
@@ -1548,7 +1567,7 @@
         - `logo_funlink_white_RGB_link_black.png`
         - `logo_funlink_white_RGB_maru_black.png`
     - `hero-connect-hub.svg`
-  - 📁 **lib/** (2325)
+  - 📁 **lib/** (2333)
     - 📁 **__snapshots__/** (4)
       - `marketing-abema-baseline.html`
       - `marketing-niconico.html`
@@ -2006,6 +2025,10 @@
     - `censusWatch.js` — 状態速報の「拡張プロセスの忙しさ(文書別)」を、数字だけで機械的に読む純関数(2026-10-20)。
     - `censusWatch.test.js`
     - `changelog-archive.js` — 追憶のきらめき 更新履歴アーカイブ（popup のバンドル外）。
+    - `changelog-archive.js` — 追憶のきらめき 更新履歴アーカイブ（popup のバンドル外）。
+    - `changelog-archive.js` — 追憶のきらめき 更新履歴アーカイブ（popup のバンドル外）。
+    - `changelog.js` — 拡張の更新履歴データと semver 比較ヘルパ。
+    - `changelog.js` — 拡張の更新履歴データと semver 比較ヘルパ。
     - `changelog.js` — 拡張の更新履歴データと semver 比較ヘルパ。
     - `changelog.test.js`
     - `changelogBundleBudget.test.js`
@@ -3166,6 +3189,8 @@
     - `refreshTaskGuard.test.js`
     - `rememberedAvatarIndex.js` — 「同じ userId で過去に取れた avatarUrl」を O(1) で引く索引(純粋関数)。
     - `rememberedAvatarIndex.test.js`
+    - `renderCadence.js` — コメントで動く画面(①パネル・会場)が「何 ms に1回まで描き直すか」を決める共通の決まり。
+    - `renderCadence.test.js`
     - `repaintReasonCensus.js` — 「描き直しが何回・どの理由で起きたか」を数える純関数群。
     - `repaintReasonCensus.test.js`
     - `reportCommentsCsv.js` — 保存コメント配列を「Excel / LibreOffice / Google Sheets で安全に開ける CSV」に変換する純関数。
@@ -3885,6 +3910,8 @@
     - `watchTabPrioritize.test.js`
     - `watchUrlFreshness.js` — 「最後に視聴した URL（nls_last_watch_url）」フォールバックの鮮度判定。
     - `watchUrlFreshness.test.js`
+    - `whatsNewNotice.js` — 版を上げたあと「この版で変わったこと」を出す判定と、
+    - `whatsNewNotice.test.js`
     - `xIntentUrl.js` — X（旧 Twitter）の Web Intent（投稿画面）URL を組み立てる純関数。
     - `xIntentUrl.test.js`
     - `yieldToBrowserPaint.js` — 【層】L0 判定層(依存ゼロ・chrome.* 非依存)
@@ -4049,7 +4076,7 @@
   - `kouhaku_og.py`
   - `og-live-compose.py`
   - `render-og.js` — 追憶の煌めき LP 用 OG 画像（1200×630）を生成する。
-- 📁 **tsuioku-no-kirameki/** (82)
+- 📁 **tsuioku-no-kirameki/** (84)
   - 📁 **articles/** (14)
     - 📁 **role-separation-design/** (2)
       - 📁 **img/** (1)
@@ -4143,6 +4170,8 @@
   - `.htaccess`
   - `google7e3e79636d884c2.html`
   - `google7e3e79636d884c2f.html`
+  - `index.html`
+  - `index.html`
   - `index.html`
   - `privacy.html`
   - `robots.txt`

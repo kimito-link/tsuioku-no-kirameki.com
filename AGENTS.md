@@ -405,11 +405,14 @@ Claude Code main → 複数の `.claude/agents/judge-*.md` を並列起動
 「ユーザーに説明できる単位」ごとに分ける。複数の無関係な修正を1バンプに混ぜない(履歴と changelog が
 追えなくなる)。逆に、1ファイル・挙動不変の typo 修正だけならバンプ不要。
 
-**bump 3点セット(必ず同期・`npm run verify:bump` が機械チェック):**
+**bump 4点セット + ユーザー向け説明(必ず同期・`npm run verify:bump` が機械チェック):**
 - `extension/manifest.json` の `version`
 - `package.json` の `version`
 - `src/lib/changelog.js` 先頭エントリ(`version` 一致・`summary` は **35字以内**・`items` は配布物の
-  ユーザー向け説明)
+  ユーザー向け説明。配信者・視聴者にとって何が良くなったかを短い日本語で書く。開発用語や
+  「有料」「LINE」「紹介コード」、恐れを煽る表現、GPU案内は入れない。無いと verify:bump が失敗する)
+- 紹介LP `tsuioku-no-kirameki/index.html` の版数4箇所と、`#lp-whats-new`（この版で変わったこと）
+- 更新したあと、拡張のポップアップ／横の欄に「この版で変わったこと」が一度だけ出る（正本は changelog）
 
 **★v0.1.1802 から開発版は自分で入れ替わる(キット `templates/extension-self-update`)。** service worker が2分おきに
 読み込み元フォルダの manifest.json の version を見て、新しければ `chrome.runtime.reload()` する(拡張の画面を前面で

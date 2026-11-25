@@ -14,6 +14,7 @@
  *   5. flamboyant worktree が同じ commit にいる（本体 pull 漏れ検出）
  *   6. 紹介LP の掲載【版数】が package と一致（版数表記は常に追従）
  *   7. ★紹介LP の掲載【内容】が何版ぶん止まっているか（警告のみ・載せることは強制しない）
+ *   8. 紹介LP の「この版で変わったこと」が今の版のユーザー向け説明と一致（無い・古いと失敗）
  *
  * 失敗したら exit 1。CI でも手元でも回せる。
  */
@@ -27,6 +28,10 @@ import {
 import { execSync } from 'node:child_process';
 import { EXTENSION_CHANGELOG } from '../src/lib/changelog.js';
 import { checkChangelogConsistency } from '../src/lib/changelogConsistency.js';
+import {
+  checkUserFacingChangelogNote,
+  checkLpWhatsNewSection
+} from '../src/lib/whatsNewNotice.js';
 
 const ROOT = process.cwd();
 
@@ -87,6 +92,12 @@ console.log('[0] changelog/manifest/package 版番号の三者一致');
     log.ok(`三者一致 OK (${manifest.version})`);
   } else {
     for (const v of violations) fail(v);
+  }
+  const noteViolations = checkUserFacingChangelogNote(head);
+  if (noteViolations.length === 0) {
+    log.ok('先頭エントリにユーザー向けの説明がある');
+  } else {
+    for (const v of noteViolations) fail(v);
   }
 }
 
@@ -260,9 +271,32 @@ console.log(`
   }
 }
 
+// [8] 紹介LP の「この版で変わったこと」が今の版の説明と一致するか
+//    版を上げるたびに、配信者・視聴者向けの短い説明を LP にも載せる（載せ忘れは赤）。
+console.log(`\n[8] 紹介LP の「この版で変わったこと」が今の版と一致`);
+{
+  const lpPath = path.join(ROOT, 'tsuioku-no-kirameki/index.html');
+  const head = EXTENSION_CHANGELOG[0];
+  if (!fs.existsSync(lpPath)) {
+    fail('紹介LP が見つからない（tsuioku-no-kirameki/index.html）');
+  } else {
+    const violations = checkLpWhatsNewSection({
+      html: fs.readFileSync(lpPath, 'utf8'),
+      version: pkg.version,
+      summary: head?.summary,
+      items: head?.items
+    });
+    if (violations.length === 0) {
+      log.ok(`#lp-whats-new が v${pkg.version} と一致`);
+    } else {
+      for (const v of violations) fail(v);
+    }
+  }
+}
+
 console.log();
 if (failed > 0) {
   console.log(`\x1b[31m✗ ${failed} 件失敗。ship 前に解消してください。\x1b[0m`);
   process.exit(1);
 }
-console.log('\x1b[32m✓ 全 7 ステップ OK。Chrome をリロードすれば反映されるはず。\x1b[0m');
+console.log('\x1b[32m✓ 全 8 ステップ OK。Chrome をリロードすれば反映されるはず。\x1b[0m');

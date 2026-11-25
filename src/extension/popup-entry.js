@@ -467,6 +467,7 @@ import {
   normalizeRecentCheerKeys
 } from '../lib/cheerPalette.js';
 import { EXTENSION_CHANGELOG } from '../lib/changelog.js';
+import { wireWhatsNewNotice } from './whatsNewNoticeUi.js';
 import { detectCommentKindnessNudge } from '../lib/commentKindnessNudge.js';
 import { resolveCommentKindnessDisplayModel } from '../lib/commentKindnessDisplayModel.js';
 import {
@@ -21383,7 +21384,6 @@ async function initPopup() {
    *   - summary 行に「最新: 0.1.12」を出して、開かなくてもバージョンが分かるように。
    */
   const changelogListEl = /** @type {HTMLOListElement|null} */ ($('changelogList'));
-  const changelogLatestLabelEl = $('changelogLatestLabel');
   if (changelogListEl) {
     while (changelogListEl.firstChild) {
       changelogListEl.removeChild(changelogListEl.firstChild);
@@ -21417,9 +21417,7 @@ async function initPopup() {
       changelogListEl.appendChild(li);
     }
   }
-  if (changelogLatestLabelEl && EXTENSION_CHANGELOG.length > 0) {
-    changelogLatestLabelEl.textContent = `v${EXTENSION_CHANGELOG[0].version}`;
-  }
+  void wireWhatsNewNotice({ document, surfaceFlags: { embedWatch: INLINE_EMBED_WATCH, embedLiveView: INLINE_EMBED_LIVEVIEW, passive: INLINE_PASSIVE } }).catch(() => {});
 
   loadPopupFrameSettings((id) => $(id), document)
     .catch(() => {
