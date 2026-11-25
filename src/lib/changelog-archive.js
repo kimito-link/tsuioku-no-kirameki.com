@@ -24,6 +24,14 @@
 /** @type {ChangelogEntry[]} */
 const ARCHIVE_ENTRIES = [
   Object.freeze({
+    version: '0.1.2191',
+    date: '2026-11-23',
+    summary: '戻る・進むで復帰した視聴ページでも監視を再開するように修正',
+    items: Object.freeze([
+      'YouTube 会場・重ね表示・Twitch・Kick の視聴ページで、ブラウザの「戻る・進む」（bfcache 復元）から戻ったあとも定期監視が止まったままにならないよう pageshow で再開するようにしました。',
+    ])
+  }),
+  Object.freeze({
     version: '0.1.2190',
     date: '2026-11-23',
     summary: '裏タブや視聴ページの定期監視を共通スケジューラへ集約',

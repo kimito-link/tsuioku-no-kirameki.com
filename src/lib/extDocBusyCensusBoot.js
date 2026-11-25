@@ -26,7 +26,8 @@ import {
   noteLongTask,
   noteOnChanged,
   approxJsonBytes,
-  summarizeDocCensus
+  summarizeDocCensus,
+  foldRecentLagMs
 } from './extDocBusyCensus.js';
 import { EXT_CENSUS_MESSAGE_TYPE } from './extProcessCensusKey.js';
 
@@ -49,7 +50,7 @@ const FIRST_REPORT_MS = 10_000;
 
 /**
  * @param {CensusEnv} env
- * @returns {{ stop: () => void }}
+ * @returns {{ stop: () => void, recentLagMs: () => number }}
  */
 export function startExtDocBusyCensus(env) {
   const now = typeof env.now === 'function' ? env.now : () => Date.now();
@@ -92,11 +93,16 @@ export function startExtDocBusyCensus(env) {
 
   // ② 自分が受けた遅れ(心拍のずれ)=被害側。★非表示のあいだは数えない(裏タブのタイマー間引きは忙しさではない)。
   let lastBeat = now();
+  // v0.1.2214: 直近の遅れ(心拍のずれの EMA)。同じ心拍で足すだけ(タイマー・見張りは増やさない)。会場の群衆の間引きが読む。
+  let recentLag = 0;
   const hb = setInterval(() => {
     try {
       const t = now();
       const hidden = !!(env.win.document && env.win.document.hidden);
-      if (!hidden) noteLag(census, t - lastBeat - HEARTBEAT_MS);
+      if (!hidden) {
+        noteLag(census, t - lastBeat - HEARTBEAT_MS);
+        recentLag = foldRecentLagMs(recentLag, t - lastBeat - HEARTBEAT_MS);
+      }
       lastBeat = t;
     } catch { /* no-op */ }
   }, HEARTBEAT_MS);
@@ -144,7 +150,9 @@ export function startExtDocBusyCensus(env) {
   return {
     stop() {
       for (const fn of cleanups.splice(0)) fn();
-    }
+    },
+    /** v0.1.2214: 直近の遅れ[ms](可視中の心拍のずれの EMA)。 */
+    recentLagMs: () => recentLag
   };
 }
 

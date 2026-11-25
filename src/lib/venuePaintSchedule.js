@@ -190,8 +190,10 @@ export function createVenuePaintSchedule(opts = {}) {
  *   now?: () => number,
  *   allowed?: () => boolean,
  *   minFrameMs?: number,
+ *   frameMs?: () => number,
  *   draw?: (timeMs: number) => void
  * }} [opts]
+ *   frameMs: v0.1.2214 毎コマ読む描く間隔(弱い PC で間引く・venueCrowdFramePolicy.js)。無ければ minFrameMs 固定。
  */
 export function createVenueCrowdMotion(opts = {}) {
   const raf =
@@ -203,6 +205,15 @@ export function createVenueCrowdMotion(opts = {}) {
   const now = opts.now || (() => Date.now());
   const allowed = opts.allowed || (() => false);
   const minFrameMs = Math.max(0, Number(opts.minFrameMs) || 55);
+  const frameMsOf = () => {
+    if (typeof opts.frameMs !== 'function') return minFrameMs;
+    try {
+      const v = Number(opts.frameMs());
+      return Number.isFinite(v) && v > 0 ? Math.max(minFrameMs, Math.min(1000, v)) : minFrameMs;
+    } catch {
+      return minFrameMs;
+    }
+  };
   const draw = typeof opts.draw === 'function' ? opts.draw : () => {};
   let id = 0;
   let lastDraw = 0;
@@ -210,7 +221,7 @@ export function createVenueCrowdMotion(opts = {}) {
     id = 0;
     if (!allowed()) return;
     const t = now();
-    if (t - lastDraw >= minFrameMs) {
+    if (t - lastDraw >= frameMsOf()) {
       lastDraw = t;
       draw(t);
     }

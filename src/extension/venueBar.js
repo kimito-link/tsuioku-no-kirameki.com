@@ -316,6 +316,8 @@ import {
   buildVenueHeatPaint
 } from '../lib/venueHeat.js';
 import { shouldSkipVenueSpeechPollRead, VENUE_SPEECH_POLL_INTERVAL_MS } from '../lib/venueSpeechPollGate.js';
+import { resolveVenueCrowdFrameMs } from '../lib/venueCrowdFramePolicy.js';
+import { readExtDocRecentLagMs } from '../lib/extDocBusyCensus.js';
 import { VoicePlayer } from '../lib/voicePlayer.js';
 import { KEY_VOICE_DIAG } from '../lib/voiceDiagKey.js';
 import { buildVoiceDiagSnapshot } from '../lib/voiceDiag.js';
@@ -5319,11 +5321,8 @@ export function mountVenueBarButton(options = {}) {
       ? performance.now()
       : Date.now();
 
-  /**
-   * 群衆canvasの寸法を戻す(v0.1.1239)。stopCrowdMotion が 0 に落としてバックストアを
-   * 解放するため、描き始める前に必ず復元する。既に正しい寸法なら何もしない
-   * (寸法代入は canvas をクリアする副作用があるため、無条件代入は避ける)。
-   */
+  /** 群衆canvasの寸法を戻す(v0.1.1239)。stopCrowdMotion が 0 に落としてバックストアを解放するため、描き始める前に必ず復元する。
+   *  既に正しい寸法なら何もしない(寸法代入は canvas をクリアする副作用があるため、無条件代入は避ける)。 */
   const ensureCrowdCanvasSize = () => {
     try {
       if (crowdCanvas && crowdCanvas.width !== CROWD_CANVAS_W) {
@@ -5336,7 +5335,8 @@ export function mountVenueBarButton(options = {}) {
   const crowdMotion = createVenueCrowdMotion({
     allowed: crowdAnimAllowed,
     now: nowMs,
-    minFrameMs: 55,
+    minFrameMs: 55, // v0.1.2214: 弱い PC では間引く(既存の合図だけ・venueCrowdFramePolicy.js)
+    frameMs: () => resolveVenueCrowdFrameMs({ recentLagMs: readExtDocRecentLagMs(), voiceOverloaded: voicePlayer._overload?.overloaded === true, lightVoiceActive: /** @type {any} */ (voicePlayer.diag).lightVoiceActive === true, weakVoicePc: voicePlayer._slowEngine === true }),
     draw: (t) => {
       drawCrowdOnCanvas(crowdCanvas, crowdAnimCount, crowdAnimSeed, { timeMs: t, heatLevel: crowdHeatLevel });
     },
@@ -5351,8 +5351,7 @@ export function mountVenueBarButton(options = {}) {
 
   const stopCrowdMotion = () => {
     crowdMotion.stop();
-    // ★v0.1.1239: 群衆canvasのバックストア(1200x350x4B = 1.68MB)を解放する。
-    //   従来は rAF を止めるだけでピクセルバッファが残り続けていた。
+    // ★v0.1.1239: 群衆canvasのバックストア(1200x350x4B = 1.68MB)を解放する(rAF を止めるだけではピクセルバッファが残る)。
     //   width=0 でバックストアが破棄される(次に描くとき setupCrowd 側が寸法を戻す)。
     try {
       if (crowdCanvas && crowdCanvas.width > 0) {

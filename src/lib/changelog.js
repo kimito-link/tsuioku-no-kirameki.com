@@ -18,6 +18,14 @@
 /** @type {readonly ChangelogEntry[]} */
 export const EXTENSION_CHANGELOG = Object.freeze([
   Object.freeze({
+    version: '0.1.2214',
+    date: '2026-11-25',
+    summary: '忙しい PC では会場の観客の動きを間引く',
+    items: Object.freeze([
+      '会場の観客（そよぐ群衆）の描き直しを、PC が忙しいときだけ間引くようにしました。ふつうのノート PC ではこれまでどおり約18コマ/秒です。VOICEVOX の合成が遅い PC では約12コマ、VOICEVOX が混雑して PC の声で読んでいるときや画面の処理が詰まっているときは8コマ、固まりかけているときは4コマに落とします。忙しさは拡張がもともと測っている値だけで判断し、新しい見張りは増やしていません。',
+    ])
+  }),
+  Object.freeze({
     version: '0.1.2213',
     date: '2026-11-25',
     summary: '混雑中は VOICEVOX を休ませて早く戻す',
@@ -192,14 +200,6 @@ export const EXTENSION_CHANGELOG = Object.freeze([
     items: Object.freeze([
       'Twitch・Kick・ミクチャ・SHOWROOM でページ離脱（pagehide）後に戻る・進むやタブ復帰したとき、同じ配信でも記録と読み上げを確実に再接続するように修正しました。',
       'Twitch のチャット（IRC）にも無通信の見張りを追加し、裏タブでは間隔を広げつつ表に戻ったらすぐ切断・再接続を検査するようにしました。',
-    ])
-  }),
-  Object.freeze({
-    version: '0.1.2191',
-    date: '2026-11-23',
-    summary: '戻る・進むで復帰した視聴ページでも監視を再開するように修正',
-    items: Object.freeze([
-      'YouTube 会場・重ね表示・Twitch・Kick の視聴ページで、ブラウザの「戻る・進む」（bfcache 復元）から戻ったあとも定期監視が止まったままにならないよう pageshow で再開するようにしました。',
     ])
   })
 ]);

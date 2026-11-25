@@ -1202,7 +1202,7 @@
   - `gift-coin-hq.wav`
   - `gift-register-hq.wav`
   - `gift-register.mp3`
-- 📁 **src/** (2640)
+- 📁 **src/** (2641)
   - 📁 **data/** (7)
     - 📁 **acquirers/** (2)
       - `laneFromStorage.js` — 応援レーン acquirer: chrome.storage.local(nls_comments) → laneStore の橋渡し。
@@ -1548,7 +1548,7 @@
         - `logo_funlink_white_RGB_link_black.png`
         - `logo_funlink_white_RGB_maru_black.png`
     - `hero-connect-hub.svg`
-  - 📁 **lib/** (2319)
+  - 📁 **lib/** (2320)
     - 📁 **__snapshots__/** (4)
       - `marketing-abema-baseline.html`
       - `marketing-niconico.html`
@@ -3803,6 +3803,7 @@
     - `voicePlayerChorus.test.js`
     - `voicePlayerClipCache.test.js`
     - `voicePlayerMaxCharsCap.wiring.test.js`
+    - `voicePlayerOverloadFeedPause.test.js`
     - `voicePlayerOverloadKeep.test.js`
     - `voicePlayerPipeline.sim.test.js`
     - `voicePlayerPipeline.test.js`
