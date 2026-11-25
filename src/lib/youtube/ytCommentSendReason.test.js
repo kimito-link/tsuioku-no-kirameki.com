@@ -5,6 +5,8 @@ describe('YouTube へ送れなかった理由の日本語', () => {
   it('知っている理由は日本語・知らない理由は空', () => {
     expect(ytCommentSendReasonText('not-signed-in')).toContain('ログイン');
     expect(ytCommentSendReasonText('zzz')).toBe('');
+    expect(ytCommentSendReasonText('value-not-set', '', 'showroom')).toContain('公式の入力欄');
+    expect(ytCommentSendReasonText('value-not-set', '', 'showroom')).toContain('SHOWROOM');
   });
   it('制限中はログインと言わず、YouTube の案内文を添える', () => {
     const t = ytCommentSendReasonText('chat-restricted', 'メンバー限定モードです');
