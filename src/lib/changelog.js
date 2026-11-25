@@ -18,6 +18,14 @@
 /** @type {readonly ChangelogEntry[]} */
 export const EXTENSION_CHANGELOG = Object.freeze([
   Object.freeze({
+    version: '0.1.2222',
+    date: '2026-11-25',
+    summary: '別窓の幅が広がったままにならないようにした',
+    items: Object.freeze([
+      '別ウィンドウで開いたとき、環境によって窓の幅だけが広く残ることがあったので、決めた幅に直すようにしました。設定はいりません。',
+    ])
+  }),
+  Object.freeze({
     version: '0.1.2221',
     date: '2026-11-25',
     summary: 'コメントが届くたびの画面の描き直しを小さく',
@@ -189,15 +197,6 @@ export const EXTENSION_CHANGELOG = Object.freeze([
       'Twitch・Kick・ミクチャ・SHOWROOM・ふわっち・ツイキャス・TikTok・ABEMA・YouTube チャットに拡張更新後の自動復帰（orphanTabAutoReload）を配線しました。',
       'Kick・ミクチャ・SHOWROOM のランキング定期タイマーを共通スケジューラ（裏タブ停止）へ移行し、Twitch・Kick の診断書き込みを差分・間隔抑制つき書き手へ統一しました。',
       '会場モードで閉鎖中・しまい中・裏タブの吹き出し位置再計算と読み上げ OFF 時の裏タブ発言ポーリングを抑止しました。',
-    ])
-  }),
-  Object.freeze({
-    version: '0.1.2198',
-    date: '2026-11-23',
-    summary: 'ニコ生の常駐タイマーを共通スケジューラへ集約し裏タブを間引き',
-    items: Object.freeze([
-      'ニコ生視聴ページ（content-entry.js）の常駐タイマー 6 本（360ms 枠更新・550ms パネルスキャン・4s 配信ID監視・5s 公式DOM・45s 統計・120s deep harvest）を共通ページ監視スケジューラへ集約しました。',
-      '表タブの間隔とスクロール中見送り保護はそのまま維持し、裏タブでは間引きまたは停止、bfcache 復帰時は pageshow で再開します。',
     ])
   })
 ]);
