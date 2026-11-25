@@ -4,7 +4,7 @@
  * - 初回インストール/ブラウザ起動時: 既存 watch タブへ注入して即利用可能にする
  * - 拡張更新時: 既存 watch タブをリロードし、古い extension context を残さない
  */
-// nls-sw-fingerprint: 989fe37326b9
+// nls-sw-fingerprint: 7e46ef75385b
 
 // @ts-nocheck — service worker; Chrome API と動的インデックスが多く checkJs コストが高い
 // PR1-b-1: backfill SW エンジン(ビルド産物)。既存コードは無改修(設計正本: memory/reference_backfill_sw_migration_pr1b.md)
@@ -3997,8 +3997,10 @@ chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
   const now = Date.now();
   const cur = voiceReaderByLive.get(lv);
   let granted = true;
+  // 2026-11-25: 見えている会場・コメビュ(prio 1)は、閉じた会場(prio 0・声だけ)から読み手を引き継ぐ(同じ優先度は先着)。
+  const prio = Number(msg.prio) > 0 ? 1 : 0;
   if (lv && holder) {
-    if (!cur || cur.holder === holder || now - cur.at > VOICE_READER_LEASE_TTL_MS) voiceReaderByLive.set(lv, { holder, at: now });
+    if (!cur || cur.holder === holder || now - cur.at > VOICE_READER_LEASE_TTL_MS || prio > (Number(cur.prio) || 0)) voiceReaderByLive.set(lv, { holder, at: now, prio });
     else granted = false;
   }
   sendResponse({ granted });

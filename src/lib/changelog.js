@@ -18,6 +18,16 @@
 /** @type {readonly ChangelogEntry[]} */
 export const EXTENSION_CHANGELOG = Object.freeze([
   Object.freeze({
+    version: '0.1.2222',
+    date: '2026-11-25',
+    summary: '別窓の会場でも、読み上げの声と吹き出しがいっしょに出ます',
+    items: Object.freeze([
+      '会場を別の窓で開いていると、声は視聴ページの側で読まれ、会場の吹き出しは声より数秒早く出ていました。いま見えている会場が読み上げを受け持つようにしたので、吹き出しは声が鳴り始めるのと同時に出ます。',
+      '吹き出しを出す瞬間を、再生を頼んだときから「音が実際に出始めたとき」に変えました。動きの遅い PC でも、吹き出しが声より先に出にくくなります。',
+      'コメントが速い間（1分に27件くらいから）は、声を待たせるのを6秒までにしました。ずっと前のコメントが今ごろ声つきで出ることがなくなり、今のコメントを読みます。読まなかったコメントも吹き出しと記録にはそのまま残ります。',
+    ])
+  }),
+  Object.freeze({
     version: '0.1.2219',
     date: '2026-11-25',
     summary: '更新したら「この版で変わったこと」が出ます',
@@ -189,16 +199,6 @@ export const EXTENSION_CHANGELOG = Object.freeze([
     items: Object.freeze([
       'ニコ生視聴ページ（content-entry.js）の常駐タイマー 6 本（360ms 枠更新・550ms パネルスキャン・4s 配信ID監視・5s 公式DOM・45s 統計・120s deep harvest）を共通ページ監視スケジューラへ集約しました。',
       '表タブの間隔とスクロール中見送り保護はそのまま維持し、裏タブでは間引きまたは停止、bfcache 復帰時は pageshow で再開します。',
-    ])
-  }),
-  Object.freeze({
-    version: '0.1.2197',
-    date: '2026-11-23',
-    summary: 'YouTube チャットの監視を共通 Observer ハブへ統合',
-    items: Object.freeze([
-      'YouTube ライブチャットの 4 つの DOM 監視（新着・遅延アイコン・スパチャ送信後・購入窓検出）を共通の MutationObserver ハブへ統合しました。',
-      '混雑チャットでのバッチ集約・件数上限・スクロール中見送り（domHarvestScrollDefer 再利用）と overflow 時の全体回収を入れ、定期スキャンも共通スケジューラ（裏タブ 10 秒間引き）へ移行しました。',
-      'ABEMA のチャット受信で同一配信キー内の chatId 表記揺れによる重複取り込み（seen 誤リセット）を防止しました。',
     ])
   })
 ]);
