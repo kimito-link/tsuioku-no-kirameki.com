@@ -6,16 +6,46 @@ import { fileURLToPath } from 'node:url';
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const extensionPath = path.resolve(__dirname, '../../extension');
 
+/**
+ * 拡張を読み込んだ persistent context を起動する。
+ * `viewport` を渡さない既定では Playwright が 1280×720 を全ページに強制する。
+ * 別ウィンドウ popup の外形を測るテストでは、それが窓の幅と争い、
+ * chrome.windows 上の幅が 1288（1280+枠）になることがある。
+ * そのときは viewport: null で実窓サイズを使う（testWithRealWindow）。
+ * @param {{ viewport?: import('@playwright/test').ViewportSize | null }} [opts]
+ */
+async function launchExtensionContext(opts = {}) {
+  /** @type {Parameters<typeof chromium.launchPersistentContext>[1]} */
+  const launchOpts = {
+    channel: 'chromium',
+    args: [
+      `--disable-extensions-except=${extensionPath}`,
+      `--load-extension=${extensionPath}`
+    ]
+  };
+  if (Object.prototype.hasOwnProperty.call(opts, 'viewport')) {
+    launchOpts.viewport = opts.viewport;
+  }
+  return chromium.launchPersistentContext('', launchOpts);
+}
+
 export const test = base.extend({
   // eslint-disable-next-line no-empty-pattern -- Playwright fixture API
   context: async ({}, use) => {
-    const context = await chromium.launchPersistentContext('', {
-      channel: 'chromium',
-      args: [
-        `--disable-extensions-except=${extensionPath}`,
-        `--load-extension=${extensionPath}`
-      ]
-    });
+    const context = await launchExtensionContext();
+    try {
+      await use(context);
+    } finally {
+      await context.close();
+    }
+  }
+});
+
+/** 別ウィンドウの外形を測るテスト用。Playwright の既定 viewport を掛けない。 */
+export const testWithRealWindow = base.extend({
+  // eslint-disable-next-line no-empty-pattern -- Playwright fixture API
+  context: async ({}, use) => {
+    const context = await launchExtensionContext({ viewport: null });
     try {
       await use(context);
     } finally {

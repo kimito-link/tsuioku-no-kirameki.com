@@ -7,7 +7,7 @@
  * 下端」を突き合わせ、下空白(= ウィンドウ高 > コンテンツ高)が出るかを確定する。
  */
 
-import { test, expect, dismissExtensionUsageTermsGate } from './fixtures.js';
+import { testWithRealWindow as test, expect, dismissExtensionUsageTermsGate } from './fixtures.js';
 
 async function swOf(context) {
   let sw = context.serviceWorkers()[0];
