@@ -304,6 +304,15 @@ export const KEY_YT_CHANNEL_COMMENTERS = 'yt_channel_commenters_v1';
 /** いま見ている YouTube 通常動画のカード（会場・横の欄が読む。ライブのコメント正本ではない） */
 export const KEY_YT_VIDEO_WATCH_CARD = 'yt_video_watch_card_v1';
 
+/** ニコニコの投稿者（数値ユーザー ID）ごとのコメント投稿者索引（名前・回数・日時だけ。本文は持たない） */
+export const KEY_NICO_CHANNEL_COMMENTERS = 'nls_nico_channel_commenters_v1';
+
+/** いま見ているニコニコ動画の通常動画カード（ライブのコメント正本ではない） */
+export const KEY_NICO_VIDEO_WATCH_CARD = 'nls_nico_video_watch_card_v1';
+
+/** いま見えている人の「視聴者の行動」ボード（動画・配信で共通。記録の正本ではない） */
+export const KEY_VIEWER_BEHAVIOR_BOARD = 'nls_viewer_behavior_board_v1';
+
 
 /**
  * v0.1.541: コメンター（数値 userId）のフォロー先 userId リスト横断キャッシュ。

@@ -24,6 +24,15 @@
 /** @type {ChangelogEntry[]} */
 const ARCHIVE_ENTRIES = [
   Object.freeze({
+    version: '0.1.2205',
+    date: '2026-11-24',
+    summary: '推定（視聴者の消費）の対象をミクチャへ拡大',
+    items: Object.freeze([
+      'ミクチャ（mixch）で記録したギフトのコイン数を Web クレカ/Paidy 最小パック（400コイン=480円・税込、1コイン=1.2円）で換算し、「推定（視聴者の消費）」として横欄・会場・マーケレポートに表示するようにしました。',
+      'コイン数が不明なギフトは円換算せず、件数のみを併記するようにしました。',
+    ])
+  }),
+  Object.freeze({
     version: '0.1.2204',
     date: '2026-11-24',
     summary: 'ツイキャスのチケット基準円推定とTwitch出典裏取りを追加',

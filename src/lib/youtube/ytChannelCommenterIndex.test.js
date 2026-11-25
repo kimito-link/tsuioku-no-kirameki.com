@@ -16,8 +16,8 @@ describe('applyLiveCommentsToChannelIndex', () => {
       { channelId: B, name: '太郎', postedAtMs: 21 },
     ], 200);
     const people = peopleInChannelCommenterIndex(twice, CH);
-    expect(people[A]).toEqual({ n: '花子', c: 2, t: 20 });
-    expect(people[B]).toEqual({ n: '太郎', c: 1, t: 21 });
+    expect(people[A]).toEqual({ n: '花子', c: 2, t: 20, f: 10 });
+    expect(people[B]).toEqual({ n: '太郎', c: 1, t: 21, f: 21 });
     expect(people[CH]).toBeUndefined();
     expect(JSON.stringify(twice)).not.toMatch(/コメント本文|hello/);
   });
@@ -34,5 +34,23 @@ describe('applyLiveCommentsToChannelIndex', () => {
   });
   it('チャンネル ID が不正なら索引を増やさない', () => {
     expect(applyLiveCommentsToChannelIndex({}, 'not-a-channel', [{ channelId: A, name: 'x' }])).toEqual({});
+  });
+  it('ギフトと訪問回数を足し、同じ配信では回数を増やさない', () => {
+    const once = applyLiveCommentsToChannelIndex({}, CH, [
+      { channelId: A, name: '花子', postedAtMs: 10, kind: 'superthanks', amount: 500, currency: 'JPY' },
+    ], 100, { streamId: 'vid11111111', contentKind: 'live' });
+    const same = applyLiveCommentsToChannelIndex(once, CH, [
+      { channelId: A, name: '花子', postedAtMs: 11 },
+    ], 200, { streamId: 'vid11111111', contentKind: 'live' });
+    const next = applyLiveCommentsToChannelIndex(same, CH, [
+      { channelId: A, name: '花子', postedAtMs: 12 },
+    ], 300, { streamId: 'vid22222222', contentKind: 'video' });
+    const people = peopleInChannelCommenterIndex(next, CH);
+    expect(people[A].g).toBe(1);
+    expect(people[A].a).toBe(500);
+    expect(people[A].lv).toBe(1);
+    expect(people[A].vv).toBe(1);
+    expect(people[A].c).toBe(3);
+    expect(people[A].f).toBe(10);
   });
 });

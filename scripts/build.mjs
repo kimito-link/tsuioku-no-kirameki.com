@@ -142,6 +142,12 @@ const targets = [
     target: 'chrome100'
   },
   {
+    // ニコニコ動画の通常動画（sm/so/nm）向けの小さい入口。記録エンジン（content.js）は載せない。
+    entryPoints: ['src/extension/nico-video-watch-entry.js'],
+    outfile: 'extension/dist/nico-video-watch.js',
+    target: 'chrome100'
+  },
+  {
     // 配信の視聴ページだけ yt-venue-inline.js を載せる薄い入口。
     entryPoints: ['src/extension/yt-page-boot.js'],
     outfile: 'extension/dist/yt-page-boot.js',

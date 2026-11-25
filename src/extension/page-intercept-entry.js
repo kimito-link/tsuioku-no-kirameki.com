@@ -35,6 +35,7 @@ import {
   generateNlsAuthToken,
   NLS_AUTH_TOKEN_ATTR
 } from '../lib/nlsInterceptAuth.js';
+import { isNicoVideoWatchUrl, isNicoVideoNvcommentUrl, packNicoVideoCommentersAttr } from '../lib/niconico/nicoVideoWatchMeta.js';
 
 (() => {
   'use strict';
@@ -937,6 +938,17 @@ import {
             url.includes('127.0.0.1:3456') ||
             url.includes('localhost:3456');
           if (!isNico) return;
+          if (isNicoVideoNvcommentUrl(url) && isNicoVideoWatchUrl(String(location.href || '')) && res.ok) {
+            try {
+              const cj = await res.clone().json();
+              const packed = packNicoVideoCommentersAttr(cj);
+              if (packed && document.documentElement) {
+                document.documentElement.setAttribute('data-nlsb-nico-video-commenters', packed);
+              }
+            } catch {
+              /* 動画コメントの取り込みは配信の記録とは別 */
+            }
+          }
           const method = (typeof args[1] === 'object' && args[1]?.method || 'GET').toUpperCase();
           if (method === 'POST' && /api\/(v\d+\/)?comment/.test(url) && res.ok) {
             try {

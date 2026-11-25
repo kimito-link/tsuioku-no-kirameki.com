@@ -77,3 +77,24 @@ describe('スーパーサンクスの推定', () => {
     expect(html).not.toMatch(/推定（配信者の受取） —</);
   });
 });
+
+describe('視聴者の行動を最初に出す', () => {
+  it('カードの先頭は視聴者の行動で、なじみと初めてが分かる', () => {
+    const html = ytVideoWatchCardInnerHtml(
+      buildYtVideoWatchCardModel({
+        videoId: 'abcdefghijk',
+        viewCount: 10,
+        recorded: { streamCount: 2, itemCount: 8 },
+        videoAuthors: [
+          { channelId: A, name: '花子', amount: null, currency: '', handle: '' },
+          { channelId: 'UCdddddddddddddddddddddd', name: '新しい人', amount: null, currency: '', handle: '' },
+        ],
+        livePeople: { [A]: { n: '花子', c: 4, t: 1, f: 1, lv: 2, seenLive: true } },
+      }),
+    );
+    expect(html.indexOf('視聴者の行動')).toBeGreaterThanOrEqual(0);
+    expect(html.indexOf('nlsb-viewer-behavior')).toBeLessThan(html.indexOf('nlsb-video-watch-card__title'));
+    expect(html).toContain('なじみ');
+    expect(html).toContain('初めて');
+  });
+});

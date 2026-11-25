@@ -7,6 +7,7 @@
  */
 
 import { formatEstimatedViewerSpendDisplay, formatStreamerTakeHomeDisplay } from '../estimatedViewerSpend.js';
+import { buildViewerBehaviorBoard, viewerBehaviorBoardInnerHtml } from '../viewerBehavior.js';
 import { matchVideoCommentersToLive, tallyVisibleSuperThanks } from './ytVideoWatchMeta.js';
 
 /** カードの見出し */
@@ -75,6 +76,22 @@ export function buildYtVideoWatchCardModel(input) {
     .map((m) => m.name || m.channelId)
     .filter(Boolean)
     .slice(0, 5);
+  const authors = Array.isArray(src.videoAuthors) ? src.videoAuthors : [];
+  const livePeople = src.livePeople || {};
+  const histCount = livePeople instanceof Map ? livePeople.size : Object.keys(livePeople || {}).length;
+  const behavior = buildViewerBehaviorBoard({
+    visiblePeople: authors.map((a) => ({
+      id: String(a?.channelId || a?.id || '').trim(),
+      name: String(a?.name || '').trim(),
+      commentCount: 1,
+      giftCount: Number(a?.amount) > 0 ? 1 : null,
+      knownAmountJpy: String(a?.currency || '').toUpperCase() === 'JPY' && Number(a?.amount) > 0 ? Math.floor(Number(a.amount)) : null,
+      at: a?.postedAtMs,
+    })),
+    historyById: livePeople,
+    historyReady: streamCount > 0 || histCount > 0,
+    nowMs: src.nowMs,
+  });
 
   return {
     videoId: String(src.videoId || '').trim(),
@@ -92,6 +109,7 @@ export function buildYtVideoWatchCardModel(input) {
     superThanksCount: thanks.count,
     spend: src.spend || null,
     takeHome: src.takeHome || null,
+    behavior,
   };
 }
 
@@ -123,6 +141,7 @@ export function ytVideoWatchCardInnerHtml(model) {
   }
   return (
     `<section class="nlsb-video-watch-card" data-video-id="${esc(model.videoId)}" aria-label="${esc(YT_VIDEO_WATCH_CARD_TITLE)}">` +
+    viewerBehaviorBoardInnerHtml(model.behavior) +
     `<h2 class="nlsb-video-watch-card__title">${esc(YT_VIDEO_WATCH_CARD_TITLE)}</h2>` +
     `<p class="nlsb-video-watch-card__views"><span class="nlsb-video-watch-card__label">再生</span> ${esc(model.viewCountText)}</p>` +
     `<p class="nlsb-video-watch-card__recorded">${esc(model.recordedSummary)}</p>` +
