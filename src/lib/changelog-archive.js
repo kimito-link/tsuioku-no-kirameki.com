@@ -24,6 +24,15 @@
 /** @type {ChangelogEntry[]} */
 const ARCHIVE_ENTRIES = [
   Object.freeze({
+    version: '0.1.2201',
+    date: '2026-11-23',
+    summary: '会場・横欄・マーケレポートに「推定（視聴者の購入額）」を追加',
+    items: Object.freeze([
+      'YouTube のスーパーチャット・スーパーステッカーとニコ生の有料ギフト pt のみを対象に、会場・横欄・マーケ分析レポートへ「推定（視聴者の購入額）」チップ/KPI カードを追加しました（配信者の手取りは表示しません）。',
+      'ニコニコポイントの標準単価（2026-11-23 確認）と ECB 基準為替レート（2026-11-20 確定値）を日付・出典 URL つきで 1 ファイル（estimatedViewerSpend.js）に集約しました。',
+    ])
+  }),
+  Object.freeze({
     version: '0.1.2200',
     date: '2026-11-23',
     summary: '状態ダンプ（JSON）にニコ生以外のサービス計器・タブ一覧を追加',

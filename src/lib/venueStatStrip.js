@@ -25,7 +25,7 @@
 import { ageMsOf } from './timeAuthority.js';
 import { resolveRecordsCountForDisplay } from './displayRecordedCount.js';
 import { venueItemsForPlatform } from './platform/platformMetrics.js';
-import { estimateNiconicoGiftSpendJpy, formatEstimatedViewerSpendDisplay } from './estimatedViewerSpend.js';
+import { estimateNiconicoGiftSpendJpy, formatEstimatedViewerSpendDisplay, formatStreamerTakeHomeDisplay } from './estimatedViewerSpend.js';
 
 /** 鏡がこれより古ければ「パネルが閉じている」とみなす[ms](鏡は中身が同じでも15秒ごとに書き直される)。 */
 /** 数字の帯に出す3キャラの顔(拡張の中の画像)。視聴ページの中の会場はこれを先に blob: へ読んでおく(venue-inline-entry.js)。 */
@@ -176,6 +176,9 @@ export function buildVenueStatStripModel(snap, opts = {}) {
         });
       }
     }
+    // 配信者の受取（推定）: どのサービスも推定の後ろの同じ場所。ニコ生は奨励金の計算が非公開なので「—（公式の率が非公開）」(v0.1.2227)
+    const th = formatStreamerTakeHomeDisplay('niconico', null);
+    items.push({ key: th.key, label: th.label, text: th.text, unit: '', isPlaceholder: true, face: '', title: th.title });
   }
 
   /** @type {'mirror'|'self'|'fallback'|'none'} */

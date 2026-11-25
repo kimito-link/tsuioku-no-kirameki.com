@@ -16,6 +16,7 @@ import https from 'node:https';
 import { execFileSync } from 'node:child_process';
 import { fileURLToPath } from 'node:url';
 import { WebSocketServer } from 'ws';
+import { captureSupportEvidence } from './supportEvidence.js';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const extensionPath = path.resolve(__dirname, '../../extension');
@@ -402,6 +403,7 @@ test('Kick のチャットを記録し、送信も届く', async ({ context, rt 
       return e ? `${e.textContent}|${e.classList.contains('is-ready')}|${row}` : '';
     }), { timeout: 20_000 })
     .toBe('|true|わこつ');
+  await captureSupportEvidence(ext, 'kick');
 });
 
 test('Centrifugo が使えないときは、API が返す Pusher の鍵で読む', async ({ context, rt }) => {
