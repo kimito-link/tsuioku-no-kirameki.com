@@ -92,6 +92,7 @@ export const VOICE_DIAG_FRESH_MS = 60_000;
  *   bgInitMaxMs: number,         // 同上の最長ms
  *   bgInitYieldTotal: number,    // もう片方のページが使用中で裏の読み込みを見送った回数(v0.1.1781)
  *   readerYieldTotal: number,    // 同じ配信をもう片方のページが読んでいるので読まなかったコメント数(v0.1.1794)
+ *   venuePollReadSkipTotal: number, // v0.1.2212: テールが直接届いていたので会場の0.8秒読みを省いた回数(低スペック対策の効き目)
  *   ngMutedTotal: number,        // v0.1.1812: コメビュで NG にした人なので読まなかったコメント数(会場)
  *   busySkipTotal: number,       // v0.1.1861: 混雑(待ち2件以上)で大事でないので読まなかったコメント数(吹き出しだけ)
  *   busyImportantTotal: number,  // v0.1.1861: 混雑中でも大事なもの(ギフト・広告・配信者・初コメ)として読む列に入れた数
@@ -230,6 +231,7 @@ export function makeInitialVoiceDiag() {
     bgInitMaxMs: 0,
     bgInitYieldTotal: 0,
     readerYieldTotal: 0,
+    venuePollReadSkipTotal: 0,
     ngMutedTotal: 0,
     busySkipTotal: 0,
     busyImportantTotal: 0,
@@ -413,6 +415,7 @@ export function buildVoiceDiagSnapshot(diag, nowMs, liveId) {
     bgInitMaxMs: num(d.bgInitMaxMs, base.bgInitMaxMs),
     bgInitYieldTotal: num(d.bgInitYieldTotal, base.bgInitYieldTotal),
     readerYieldTotal: num(d.readerYieldTotal, base.readerYieldTotal),
+    venuePollReadSkipTotal: num(d.venuePollReadSkipTotal, base.venuePollReadSkipTotal),
     ngMutedTotal: num(d.ngMutedTotal, base.ngMutedTotal),
     busySkipTotal: num(d.busySkipTotal, base.busySkipTotal),
     busyImportantTotal: num(d.busyImportantTotal, base.busyImportantTotal),

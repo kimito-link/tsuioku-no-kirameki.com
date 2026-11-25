@@ -106,3 +106,38 @@ export function heatLevelToLabel(level) {
   if (t < 0.75) return '盛り上がり';
   return '大盛況';
 }
+
+/**
+ * 熱量レベルを刻む幅(0.05 = 21段)。
+ * v0.1.2212(低スペックで固まらない): 熱量は連続値なので、コメントが流れている間は読み直しのたびに
+ *   不透明度の文字列(例 0.1834567)が少しずつ変わり、会場の stage に CSS 変数を書き直していた。
+ *   stage の変数は全席に継承され、背景は画面いっぱいの radial-gradient なので、書くたびに
+ *   全席のスタイル計算と全面の塗り直しが起きる(グラフィックのハードウェアアクセラレーションを切った PC では
+ *   塗り直しが CPU で行われる)。見た目で区別できない差は書かない。
+ */
+export const VENUE_HEAT_LEVEL_STEP = 0.05;
+
+/**
+ * 熱量レベルを VENUE_HEAT_LEVEL_STEP 刻みに丸める(0..1 に収める)。
+ * @param {number} level
+ * @returns {number}
+ */
+export function quantizeVenueHeatLevel(level) {
+  const t = Number.isFinite(level) ? Math.max(0, Math.min(1, level)) : 0;
+  const q = Math.round(t / VENUE_HEAT_LEVEL_STEP) * VENUE_HEAT_LEVEL_STEP;
+  return Math.max(0, Math.min(1, Math.round(q * 100) / 100));
+}
+
+/**
+ * 会場の stage に書く熱量の見た目(色・不透明度・ことば)をまとめて返す純関数。
+ *   sig が前回と同じなら DOM に書かなくてよい(venueBar 側が比べる)。
+ * @param {number} level 0..1(丸める前)
+ * @returns {{ level: number, color: string, opacity: string, label: string, sig: string }}
+ */
+export function buildVenueHeatPaint(level) {
+  const q = quantizeVenueHeatLevel(level);
+  const color = heatLevelToWarmColor(q);
+  const opacity = String(Math.round(heatLevelToGlowOpacity(q) * 1000) / 1000);
+  const label = heatLevelToLabel(q);
+  return { level: q, color, opacity, label, sig: `${color}|${opacity}|${label}` };
+}

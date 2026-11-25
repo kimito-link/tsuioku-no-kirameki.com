@@ -24,6 +24,14 @@
 /** @type {ChangelogEntry[]} */
 const ARCHIVE_ENTRIES = [
   Object.freeze({
+    version: '0.1.2189',
+    date: '2026-11-23',
+    summary: 'ミクチャの欄を探す部品の型を直す',
+    items: Object.freeze([
+      '拡張の動きは 0.1.2186 と同じです。ミクチャの公式コメント欄を探す部品に型の注釈が足りず、型検査が落ちていたので注釈だけ足しました。欄の探し方は変えていません。',
+    ])
+  }),
+  Object.freeze({
     version: '0.1.2188',
     date: '2026-11-23',
     summary: '会場の本体ファイルを行数の上限内に収める',
