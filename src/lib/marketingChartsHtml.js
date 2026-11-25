@@ -4088,7 +4088,8 @@ function sectionKpi(r, gap, followerSeries, estimatedSpends) {
     )
     .join('');
   const spendNote = spendList
-    .map((sp) => `<p class="mkt-note">${escapeHtml(sp.note)}（出典: ${escapeHtml(sp.sourceUrl)}）</p>`)
+    // 出典の無い注記(受取の「—（公式の率が非公開）」)は空の「（出典: ）」を付けない(v0.1.2227)
+    .map((sp) => `<p class="mkt-note">${escapeHtml(sp.note)}${sp.sourceUrl ? `（出典: ${escapeHtml(sp.sourceUrl)}）` : ''}</p>`)
     .join('');
   return `<section class="mkt-section"><h2>KPI サマリ</h2><div class="mkt-kpi-grid">${inner}</div>${spendNote}</section>`;
 }
