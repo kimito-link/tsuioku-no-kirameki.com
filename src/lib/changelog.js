@@ -18,6 +18,14 @@
 /** @type {readonly ChangelogEntry[]} */
 export const EXTENSION_CHANGELOG = Object.freeze([
   Object.freeze({
+    version: '0.1.2211',
+    date: '2026-11-25',
+    summary: 'SHOWROOM のコメント送信が途中で止まることがあったのを直す',
+    items: Object.freeze([
+      'SHOWROOM の会場やサイドパネルからコメントを送ったとき、「送信ボタンを押しましたが、文字が入力欄に残っています」と出ることがありました。公式の欄に文字が入ったかを送る前に確かめ、欄が空になるのをニコ生と同じ待ち方で見るようにしました。',
+    ])
+  }),
+  Object.freeze({
     version: '0.1.2210',
     date: '2026-11-24',
     summary: '配信者にゆっくり顔を出さない',
@@ -191,14 +199,6 @@ export const EXTENSION_CHANGELOG = Object.freeze([
     summary: 'ミクチャの欄を探す部品の型を直す',
     items: Object.freeze([
       '拡張の動きは 0.1.2186 と同じです。ミクチャの公式コメント欄を探す部品に型の注釈が足りず、型検査が落ちていたので注釈だけ足しました。欄の探し方は変えていません。',
-    ])
-  }),
-  Object.freeze({
-    version: '0.1.2188',
-    date: '2026-11-23',
-    summary: '会場の本体ファイルを行数の上限内に収める',
-    items: Object.freeze([
-      '拡張の動きは 0.1.2186 と同じです。会場モードの本体ファイルが行数の上限を超えて試験が落ちていたので、送りの通過印を外す処理を小さな部品に移し、上限内に収めました。',
     ])
   })
 ]);

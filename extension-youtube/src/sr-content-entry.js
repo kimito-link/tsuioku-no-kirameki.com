@@ -1,5 +1,5 @@
 // sr-content-entry.js — SHOWROOM の部屋のページ(www.showroom-live.com/r/<room_url_key>)で、コメントとギフトを読んで記録に渡す入口。
-/* global chrome, WebSocket, location, setTimeout, clearTimeout, setInterval, clearInterval, window, fetch, document, HTMLInputElement, HTMLTextAreaElement, Event, KeyboardEvent */
+/* global chrome, WebSocket, location, setTimeout, clearTimeout, setInterval, clearInterval, window, fetch, document, HTMLInputElement, HTMLTextAreaElement, Event, InputEvent, KeyboardEvent */
 //
 // ★設計(council/showroom-support-PLAN.md・Kick の kick-content-entry.js と同じ形)
 //   - 形は 2026-11-08 の PC 実測(本物・ログインなし)から。ページ自身と同じ口を読む:
@@ -49,6 +49,8 @@ import { platformFetchTimeoutSignal } from '../../src/lib/platform/fetchTimeout.
 import { followerSampleFromDom, followerSampleFromShowroom } from '../../src/lib/platform/followerCountSample.js';
 import { createSlowFollowerFetch } from '../../src/lib/platform/slowFollowerFetch.js';
 import { findSrCommentInput, findSrSendButton } from '../../src/lib/showroom/srCommentInput.js';
+import { readSrCommentConfirmText } from '../../src/lib/showroom/srSendConfirm.js';
+import { waitUntilEditorReflectsSubmit } from '../../src/lib/commentSubmitConfirm.js';
 import { withRevealedVenueOfficialComposer } from '../../src/lib/venueRevealOfficialComposer.js';
 
 const META_EVERY_MS = 30_000;
@@ -550,6 +552,42 @@ function noteSendFail(reason) {
   }
 }
 
+/**
+ * ニコ生の setEditorText と同じく、ページ側の状態に届くよう InputEvent も飛ばす。
+ * @param {HTMLInputElement | HTMLTextAreaElement} el
+ * @param {string} text
+ */
+function fillSrCommentInput(el, text) {
+  const proto = el instanceof HTMLTextAreaElement ? HTMLTextAreaElement.prototype : HTMLInputElement.prototype;
+  Object.getOwnPropertyDescriptor(proto, 'value')?.set?.call(el, text);
+  el.dispatchEvent(new Event('input', { bubbles: true }));
+  try {
+    el.dispatchEvent(new InputEvent('input', { bubbles: true, cancelable: true, inputType: 'insertText', data: text }));
+  } catch {
+    /* InputEvent 非対応でも Event('input') は飛ばしてある */
+  }
+  el.dispatchEvent(new Event('change', { bubbles: true }));
+}
+
+/**
+ * @param {HTMLInputElement | HTMLTextAreaElement} el
+ * @returns {{ disabled: boolean, via: 'button' | 'enter' }}
+ */
+function clickSrSend(el) {
+  const btn = findSrSendButton(document, el);
+  if (btn && (btn.disabled || btn.getAttribute('aria-disabled') === 'true')) {
+    return { disabled: true, via: 'button' };
+  }
+  if (btn) {
+    btn.click();
+    return { disabled: false, via: 'button' };
+  }
+  const opts = { key: 'Enter', code: 'Enter', keyCode: 13, which: 13, bubbles: true, cancelable: true };
+  el.dispatchEvent(new KeyboardEvent('keydown', opts));
+  el.dispatchEvent(new KeyboardEvent('keyup', opts));
+  return { disabled: false, via: 'enter' };
+}
+
 try {
   chrome.runtime.onMessage.addListener((msg, _sender, sendResponse) => {
     if (!msg || msg.type !== 'SR_SEND_COMMENT') return undefined;
@@ -574,26 +612,51 @@ try {
       }
       try { input.scrollIntoView({ block: 'nearest', inline: 'nearest' }); } catch { /* 送れればよい */ }
       input.focus();
-      const proto = input instanceof HTMLTextAreaElement ? HTMLTextAreaElement.prototype : HTMLInputElement.prototype;
-      Object.getOwnPropertyDescriptor(proto, 'value')?.set?.call(input, text);
-      input.dispatchEvent(new Event('input', { bubbles: true }));
-      input.dispatchEvent(new Event('change', { bubbles: true }));
+      fillSrCommentInput(input, text);
       await sleep(150);
-      const btn = findSrSendButton(document, input);
-      if (btn && (btn.disabled || btn.getAttribute('aria-disabled') === 'true')) {
+      // scroll や再描画で欄が差し替わっていることがある。今の公式の欄に文字が入ってから押す。
+      let live = findSrCommentInput(document) || (input.isConnected ? input : null);
+      if (live && String(live.value || '').trim() !== text) {
+        try { live.focus(); } catch { /* 入れられればよい */ }
+        fillSrCommentInput(live, text);
+        await sleep(150);
+        live = findSrCommentInput(document) || (live.isConnected ? live : null);
+      }
+      if (!live || String(live.value || '').trim() !== text) {
+        noteSendFail('value-not-set');
+        return { ok: false, reason: 'value-not-set' };
+      }
+      input = live;
+      const first = clickSrSend(input);
+      if (first.disabled) {
         noteSendFail('send-disabled');
         return { ok: false, reason: 'send-disabled' };
       }
-      if (btn) btn.click();
-      else {
-        const opts = { key: 'Enter', code: 'Enter', keyCode: 13, which: 13, bubbles: true, cancelable: true };
-        input.dispatchEvent(new KeyboardEvent('keydown', opts));
-        input.dispatchEvent(new KeyboardEvent('keyup', opts));
+      let via = first.via;
+      let retried = false;
+      const readConfirm = () => readSrCommentConfirmText(input, findSrCommentInput(document));
+      let ok = await waitUntilEditorReflectsSubmit({
+        expectedNormalized: text,
+        readNormalized: readConfirm,
+      });
+      // 同じ文が残っているときだけもう一度押す（遅れて消えたあとに押して二重投稿しない）。
+      if (!ok && readConfirm() === text) {
+        const again = findSrCommentInput(document) || (input.isConnected ? input : null);
+        if (again) input = again;
+        const second = clickSrSend(input);
+        if (second.disabled) {
+          noteSendFail('send-disabled');
+          return { ok: false, reason: 'send-disabled' };
+        }
+        retried = true;
+        via = second.via;
+        ok = await waitUntilEditorReflectsSubmit({
+          expectedNormalized: text,
+          readNormalized: () => readSrCommentConfirmText(input, findSrCommentInput(document)),
+        });
       }
-      await sleep(400);
-      const ok = String(input.value || '').trim() !== text;
       try {
-        void chrome.storage.local.set({ yt_diag_sr_send_last: { at: Date.now(), ok, len: text.length, roomKey: diag.roomKey, via: btn ? 'button' : 'enter' } });
+        void chrome.storage.local.set({ yt_diag_sr_send_last: { at: Date.now(), ok, len: text.length, roomKey: diag.roomKey, via, retried } });
       } catch {
         /* no-op */
       }

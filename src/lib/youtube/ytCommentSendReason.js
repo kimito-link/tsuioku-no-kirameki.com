@@ -11,6 +11,7 @@ export const YT_COMMENT_SEND_REASON_JA = Object.freeze({
   'no-send-button': '送信ボタンが見つかりません。YouTube の画面が変わったかもしれません。',
   'send-disabled': 'YouTube 側で送信できない状態です（低速モード・メンバー限定など）。',
   'still-in-box': '送信ボタンを押しましたが、文字が入力欄に残っています。YouTube 側の画面を確認してください。',
+  'value-not-set': '公式の入力欄に文字を入れられませんでした。YouTube 側の画面を確認してください。',
   empty: 'コメントが空です。',
 });
 
