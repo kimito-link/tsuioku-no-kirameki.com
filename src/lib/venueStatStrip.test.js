@@ -37,7 +37,7 @@ describe('buildVenueStatStripModel', () => {
     expect(m.source).toBe('mirror');
     expect(m.stale).toBe(false);
     expect(m.items.map((i) => i.label)).toEqual(['記録', '推定同時接続', '来場者数', '来場', '本家コメ', '経過', '広告pt', 'ギフトpt', '推定（視聴者の購入額）', '推定（配信者の受取）']);
-    // 受取: ニコ生は奨励金の計算が非公開なので金額を作らない(v0.1.2225)
+    // 受取: ニコ生は奨励金の計算が非公開なので金額を作らない(v0.1.2227)
     expect(byKey(m).estimatedStreamerTakeHome.text).toBe('—（公式の率が非公開）');
     const k = byKey(m);
     expect(k.records.text).toBe('999'); // 正本と鏡があるときは大きい方（凍った「記録 1」で正本を潰さない）

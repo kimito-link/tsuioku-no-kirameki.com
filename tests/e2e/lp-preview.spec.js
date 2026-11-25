@@ -109,7 +109,7 @@ test.describe('lp-preview', () => {
     await page.goto(`${lpHref}#record-foundation`, { waitUntil: 'domcontentloaded' });
 
     const heroCopy = page.locator('.hero-copy');
-    await expect(heroCopy.locator('h1')).toContainText('取りこぼしにくく');
+    await expect(heroCopy.locator('.hero-h1')).toContainText('取りこぼしにくく');
     await expect(heroCopy.locator('.lp-record-hero-stats .stat')).toHaveCount(3);
 
     const foundation = page.locator('#record-foundation');

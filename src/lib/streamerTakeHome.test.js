@@ -1,4 +1,4 @@
-// streamerTakeHome.test.js — 配信者の受取（推定）は公式の率・単価だけ(v0.1.2225・りんくさん承認 2026-11-25)
+// streamerTakeHome.test.js — 配信者の受取（推定）は公式の率・単価だけ(v0.1.2227・りんくさん承認 2026-11-25)
 import { describe, it, expect } from 'vitest';
 import {
   estimateStreamerTakeHomeJpy,

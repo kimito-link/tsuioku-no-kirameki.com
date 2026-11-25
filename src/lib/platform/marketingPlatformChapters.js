@@ -175,7 +175,7 @@ export function sectionPlatformDedicatedHtml(comments, view, pageCount, pageFact
   let milestoneMax = 0;
   /** ギフト・アイテムの名前がある応援の行数(件数のカード・v0.1.2207) */
   let giftRows = 0;
-  /** YouTube のスーパーチャット・ステッカーの件数(横の欄の「スパチャ N件」と同じ数・v0.1.2225) */
+  /** YouTube のスーパーチャット・ステッカーの件数(横の欄の「スパチャ N件」と同じ数・v0.1.2227) */
   let paidChatRows = 0;
   /** @type {number[]} */
   const months = [];
@@ -257,7 +257,7 @@ export function sectionPlatformDedicatedHtml(comments, view, pageCount, pageFact
     cards.push([ESTIMATED_VIEWER_SPEND_LABEL, '—']);
     spendNotes.push(ESTIMATED_VIEWER_SPEND_EMPTY_NOTE);
   }
-  // 配信者の受取（推定）は視聴者の推定のすぐ後ろ。公式の率が無いサービスは理由つきの「—」(v0.1.2225)
+  // 配信者の受取（推定）は視聴者の推定のすぐ後ろ。公式の率が無いサービスは理由つきの「—」(v0.1.2227)
   for (const sp of spends.filter((x) => x.key === 'estimatedStreamerTakeHome')) {
     cards.push([sp.label, sp.text]);
     spendNotes.push(sp.sourceUrl ? `${sp.note}（${sp.sourceUrl}）` : sp.note);
@@ -267,7 +267,7 @@ export function sectionPlatformDedicatedHtml(comments, view, pageCount, pageFact
     cards.push([CURRENCY_LABEL[cur] || `${cur} の合計（記録）`, String(sum)]);
   }
   if (view.id === 'youtube') {
-    // YouTube で名前のある応援はジュエルのギフトだけ。スパチャの件数とは分けて、横の欄と同じ言葉で出す(v0.1.2225)
+    // YouTube で名前のある応援はジュエルのギフトだけ。スパチャの件数とは分けて、横の欄と同じ言葉で出す(v0.1.2227)
     if (paidChatRows > 0) cards.push(['スーパーチャット・ステッカーの件数（記録）', `${paidChatRows.toLocaleString('ja-JP')}件`]);
     if (giftRows > 0) cards.push(['ギフトの件数（記録）', `${giftRows.toLocaleString('ja-JP')}件`]);
   } else if (giftRows > 0) cards.push([`${view.giftWord || 'ギフト'}の件数（記録）`, `${giftRows.toLocaleString('ja-JP')}件`]);

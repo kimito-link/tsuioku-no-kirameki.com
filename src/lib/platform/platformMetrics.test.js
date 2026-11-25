@@ -128,7 +128,7 @@ describe('venueItemsForPlatform', () => {
     const items = venueItemsForPlatform('youtube', bag({ support: ytSupport() }));
     const paid = items.find((i) => i.key === 'superchat');
     expect(paid.label).toBe('スパチャ');
-    expect(paid.text).toBe('¥1,200 · 3件'); // v0.1.2225: 件数を添える(ほかの通貨のスパチャでも数字が動く)
+    expect(paid.text).toBe('¥1,200 · 3件'); // v0.1.2227: 件数を添える(ほかの通貨のスパチャでも数字が動く)
     expect(paid.title).toContain('USD 5');
     expect(paid.title).toContain('このPCの記録');
     // v0.1.2207: 推定が先頭、メンバー加入・メンバーギフトは 1 以上のとき出す

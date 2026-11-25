@@ -560,9 +560,9 @@ export function tallySupportItems(items) {
     fanCount: 0,
     /** TikTok のフォロー(follow)の回数 */
     followCount: 0,
-    /** YouTube の「ギフト」(ジュエルで送るスタンプ・kind=yt_gift)の件数。値段は出ないので件数だけ(v0.1.2225) */
+    /** YouTube の「ギフト」(ジュエルで送るスタンプ・kind=yt_gift)の件数。値段は出ないので件数だけ(v0.1.2227) */
     ytGiftCount: 0,
-    /** 会場の投げの演出が出る応援の行数(isSupportEventRow・演出と同じ決まり)。この数が増えたら、どれかのチップが必ず動く(v0.1.2225) */
+    /** 会場の投げの演出が出る応援の行数(isSupportEventRow・演出と同じ決まり)。この数が増えたら、どれかのチップが必ず動く(v0.1.2227) */
     supportEventCount: 0,
     /** そのうちメンバー・サブスク以外(スパチャ・ステッカー・ギフト・アイテム)の行数。ギフトのサービスの「件数」のチップに使う */
     giftEventCount: 0,
@@ -888,7 +888,7 @@ function estimateChips(id, est, extraTitle = '') {
   }];
 }
 
-/** 受取（推定）のチップ。推定（視聴者の購入額）のすぐ後ろに置く(v0.1.2225) @param {string} id @param {any} support */
+/** 受取（推定）のチップ。推定（視聴者の購入額）のすぐ後ろに置く(v0.1.2227) @param {string} id @param {any} support */
 function takeHomeChip(id, support) {
   const d = formatStreamerTakeHomeDisplay(id, estimateStreamerTakeHomeJpy(id, support));
   return { key: d.key, label: d.label, text: d.text, unit: '', placeholder: d.placeholder, title: d.title };
@@ -905,7 +905,7 @@ function takeHomeChip(id, support) {
 function supportChips(id, support) {
   const base = supportChipsBase(id, support);
   if (!base.length || !TAKE_HOME_CHIP_PLATFORMS.has(id)) return base;
-  // 推定（視聴者の購入額・消費）の直後に受取（推定）を置く。率の無いサービスは理由つきの「—」(v0.1.2225)
+  // 推定（視聴者の購入額・消費）の直後に受取（推定）を置く。率の無いサービスは理由つきの「—」(v0.1.2227)
   let at = 0;
   while (at < base.length && /^estimat/.test(base[at].key)) at += 1;
   return [...base.slice(0, at), takeHomeChip(id, support), ...base.slice(at)];
@@ -935,7 +935,7 @@ function supportChipsBase(id, support) {
   /** @param {string} code */
   const nativeTotal = (code) => formatInt(Math.max(0, Number(native[code]) || 0));
   // 新しいチップの単位は数のすぐ後ろに付ける(横欄で単位が別の行に落ちると「60」「コイン」と2行に割れる・officialChips と同じ)
-  // 件数のチップは、会場の投げの演出と同じ決まりで数えた行数(isSupportEventRow・v0.1.2225)。
+  // 件数のチップは、会場の投げの演出と同じ決まりで数えた行数(isSupportEventRow・v0.1.2227)。
   //   前は値段の表で数えた行だけで、ツイキャスのお茶・SHOWROOM の一覧に無いギフトは演出が出ても件数が動かなかった
   const paidRows = Math.max(num(support.giftEventCount) || 0, num(support.paidGiftCount) || 0);
   const paidUnits = num(support.paidGiftUnits) || 0;
@@ -948,7 +948,7 @@ function supportChipsBase(id, support) {
     const hideSuperchat = 'superchatWhenPositive' in cap && cap.superchatWhenPositive && paid.text === '0' && count === 0;
     const out = estimateChips(id, estimateYoutubeSupportSpendJpy(amounts));
     if (!hideSuperchat) {
-      // ★v0.1.2225: 件数を添える。合計はいちばん多い通貨だけなので、ほかの通貨のスパチャ(メキシコの配信の USD 等)が来ても
+      // ★v0.1.2227: 件数を添える。合計はいちばん多い通貨だけなので、ほかの通貨のスパチャ(メキシコの配信の USD 等)が来ても
       //   数字が動かなかった(投げと効果音は出るのに・2026-11-25 りんくさん)。件数は通貨によらず1件ごとに必ず増える
       const countText = `${formatInt(count)}件`;
       out.push(chip(
@@ -963,7 +963,7 @@ function supportChipsBase(id, support) {
     const memberGifts = num(support.membershipGiftCount) || 0;
     if (members > 0) out.push(chip('members', 'メンバー加入', `${formatInt(members)}人`, '', RECORDED));
     if (memberGifts > 0) out.push(chip('memberGifts', 'メンバーギフト', `${formatInt(memberGifts)}件`, '', RECORDED));
-    // YouTube の「ギフト」(ジュエル)。会場では投げと効果音が出るのに、どの数字にも入っていなかった(v0.1.2225)。値段は出ないので件数だけ
+    // YouTube の「ギフト」(ジュエル)。会場では投げと効果音が出るのに、どの数字にも入っていなかった(v0.1.2227)。値段は出ないので件数だけ
     const ytGifts = num(support.ytGiftCount) || 0;
     if (ytGifts > 0) out.push(chip('ytGifts', 'ギフト', `${formatInt(ytGifts)}件`, '', `${RECORDED}YouTube のギフト（ジュエル）は値段が出ていないので、円にも推定にも入れていません。`));
     return out.concat(countSinceChip(id, support));

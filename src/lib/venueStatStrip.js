@@ -176,7 +176,7 @@ export function buildVenueStatStripModel(snap, opts = {}) {
         });
       }
     }
-    // 配信者の受取（推定）: どのサービスも推定の後ろの同じ場所。ニコ生は奨励金の計算が非公開なので「—（公式の率が非公開）」(v0.1.2225)
+    // 配信者の受取（推定）: どのサービスも推定の後ろの同じ場所。ニコ生は奨励金の計算が非公開なので「—（公式の率が非公開）」(v0.1.2227)
     const th = formatStreamerTakeHomeDisplay('niconico', null);
     items.push({ key: th.key, label: th.label, text: th.text, unit: '', isPlaceholder: true, face: '', title: th.title });
   }

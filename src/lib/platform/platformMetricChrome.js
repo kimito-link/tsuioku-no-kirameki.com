@@ -461,7 +461,7 @@ export function applyPlatformMetricChrome(root, state) {
   const sup = facts && facts.support;
   const rootHtml = /** @type {Document} */ (root).documentElement || root.ownerDocument?.documentElement;
   if (rootHtml && sup && sup.ready === true) {
-    // 演出と同じ決まりで数えた応援(supportEventCount・v0.1.2225)。ジュエルのギフトだけの配信でも欄を出す
+    // 演出と同じ決まりで数えた応援(supportEventCount・v0.1.2227)。ジュエルのギフトだけの配信でも欄を出す
     const has = (Number(sup.superchatCount) || 0) + (Number(sup.stickerCount) || 0)
         + (Number(sup.membershipCount) || 0) + (Number(sup.membershipGiftCount) || 0) + (Number(sup.supportEventCount) || 0) > 0;
     if (has && rootHtml.getAttribute('data-nl-gift-has') !== '1') rootHtml.setAttribute('data-nl-gift-has', '1');

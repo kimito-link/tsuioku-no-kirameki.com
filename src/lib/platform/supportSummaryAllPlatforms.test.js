@@ -17,7 +17,7 @@ const chipsOf = (id, rows) => panelExtraChips(id, { support: tallySupportItems(r
 const textOf = (chips, key) => chips.find((c) => c.key === key)?.text;
 
 describe('パーサの行 → 横欄・会場のチップ(全サービス)', () => {
-  it('ツイキャス: 推定(チケット基準) → お茶爆の消費pt → アイテム。お茶は推定に入れないが、演出が出るので件数には入る(v0.1.2225)', () => {
+  it('ツイキャス: 推定(チケット基準) → お茶爆の消費pt → アイテム。お茶は推定に入れないが、演出が出るので件数には入る(v0.1.2227)', () => {
     const gift = {
       type: 'gift',
       id: 'g1',
@@ -100,7 +100,7 @@ describe('パーサの行 → 横欄・会場のチップ(全サービス)', () 
     // 単位は数のすぐ後ろ(横欄で2行に割れない)
     expect(chips[1].unit).toBe('');
     expect(chips[1].title).toContain('円にはしていません');
-    // 受取の欄はどのサービスも同じ場所。SHOWROOM はシェア率が非公開なので金額を作らない(v0.1.2225)
+    // 受取の欄はどのサービスも同じ場所。SHOWROOM はシェア率が非公開なので金額を作らない(v0.1.2227)
     expect(chips.find((c) => c.key === 'estimatedStreamerTakeHome')?.text).toBe('—（公式の率が非公開）');
     expect(chips.some((c) => c.key === 'estimatedViewerSpend')).toBe(false);
   });

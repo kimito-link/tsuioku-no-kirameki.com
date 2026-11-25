@@ -272,7 +272,7 @@ test('SHOWROOM のコメント・ギフト・公式の順位を記録し、送�
   expect(await chipText('eventRank')).toContain('イベント順位');
   expect(await chipText('eventPoint')).toContain('123,456pt');
   expect(await chipText('quest')).toContain('Lv3');
-  // v0.1.2225(2026-11-25 りんくさん決定): 受取（推定）の欄はどのサービスも同じ場所に出す。SHOWROOM はシェア率が非公開なので
+  // v0.1.2227(2026-11-25 りんくさん決定): 受取（推定）の欄はどのサービスも同じ場所に出す。SHOWROOM はシェア率が非公開なので
   //   「—（公式の率が非公開）」だけ。金額(約¥)や視聴者の購入額の推定は作らない
   await expect.poll(() => chipText('estimatedStreamerTakeHome'), { timeout: 30_000 }).toBe('推定（配信者の受取）—（公式の率が非公開）');
   const bodyWithoutSlot = (await bodyText()).replaceAll('推定（配信者の受取）', '');

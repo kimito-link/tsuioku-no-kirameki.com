@@ -128,7 +128,7 @@ export function buildYtGiftBags(entries, lv, opts = {}) {
   const now = Number(opts.now) || Date.now();
   const beginSec = Number(opts.startedAt) > 0 ? Math.floor(Number(opts.startedAt) / 1000) : 0;
   // 投げの演出(ギフトの1件ずつ)にする行は、数字と同じ決まり(estimatedViewerSpend.js の isSupportEventRow)で選ぶ。
-  //   演出だけ出て数字が動かない/数字だけ動いて演出が出ない、を作らない(v0.1.2225)
+  //   演出だけ出て数字が動かない/数字だけ動いて演出が出ない、を作らない(v0.1.2227)
   const paid = (Array.isArray(entries) ? entries : []).filter((e) => isSupportEventRow(e));
 
   /** @type {any[]} */

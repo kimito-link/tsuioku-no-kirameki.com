@@ -1,4 +1,4 @@
-// supportEvidence.js — SPC_EVIDENCE_DIR があるときだけ、横の欄の応援のチップ・ギフト欄の「投げN件」・画面を残す(v0.1.2225)。
+// supportEvidence.js — SPC_EVIDENCE_DIR があるときだけ、横の欄の応援のチップ・ギフト欄の「投げN件」・画面を残す(v0.1.2227)。
 //   同じ記録(各 spec のモック配信)を前の版とこの版で流して、数字が同じか/なぜ違うかを並べるための計器。ふだんの e2e では何もしない。
 import fs from 'node:fs';
 import path from 'node:path';

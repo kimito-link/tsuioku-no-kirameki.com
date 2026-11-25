@@ -1037,7 +1037,7 @@ async function getCommentsViaBackground(vid) {
   const full = !cur || now - cur.fullAt > ytFullRefreshIntervalMs(cur.byPk.size);
   try {
     const items = await fetchStreamRows(vid, full ? undefined : /** @type {NonNullable<typeof cur>} */ (cur).lastRecordedAt);
-    // ★v0.1.2225: 全件の読み直しでも番号を 0 に戻さない(前の控えの続きから)。数字の数え直し(noteSupportTally)は番号だけを見るので、
+    // ★v0.1.2227: 全件の読み直しでも番号を 0 に戻さない(前の控えの続きから)。数字の数え直し(noteSupportTally)は番号だけを見るので、
     //   戻すと前の控えと同じ番号になったときに古い合計のまま止まる
     const next = full ? { byPk: new Map(), lastRecordedAt: 0, fullAt: now, ver: cur ? Number(cur.ver) || 0 : 0 } : /** @type {NonNullable<typeof cur>} */ (cur);
     // ★v0.1.1981: 控えが本当に変わったときだけ番号を進める。「新しい分だけ」の読み出しは最後の1行をもう一度返すので、

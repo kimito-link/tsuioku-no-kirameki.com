@@ -5654,6 +5654,16 @@
       ]
     },
     {
+      "file": "src/lib/applyPopupWindowBounds.js",
+      "featureCount": 1,
+      "features": [
+        "popup"
+      ],
+      "labels": [
+        "ポップアップ(応援レーン)"
+      ]
+    },
+    {
       "file": "src/lib/audienceEngagementGap.js",
       "featureCount": 1,
       "features": [

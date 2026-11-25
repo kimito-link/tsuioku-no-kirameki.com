@@ -11,7 +11,7 @@
     <link rel="apple-touch-icon" sizes="180x180" href="images/apple-touch-icon.png">
     <link rel="icon" type="image/png" sizes="192x192" href="images/favicon-192.png">
 
-    <meta name="description" content="ニコ生・YouTube・Twitch・Kick・SHOWROOM・ふわっち・ミクチャ・TikTok LIVE・ツイキャス・ABEMA の10サービスに対応。応援コメントを取りこぼしにくく、あとから育つコメント記録へ。会場モード・OBS 透過のコメビュ・人ごとに違う声の読み上げ（VOICEVOX 連携）・マーケ分析レポートまで備えた Chrome 拡張（v0.1.2225）。">
+    <meta name="description" content="ニコ生・YouTube・Twitch・Kick・SHOWROOM・ふわっち・ミクチャ・TikTok LIVE・ツイキャス・ABEMA の10サービスに対応。応援コメントを取りこぼしにくく、あとから育つコメント記録へ。会場モード・OBS 透過のコメビュ・人ごとに違う声の読み上げ（VOICEVOX 連携）・マーケ分析レポートまで備えた Chrome 拡張（v0.1.2227）。">
     <meta name="theme-color" content="#0a1228">
     <link rel="manifest" href="site.webmanifest">
     <meta name="mobile-web-app-capable" content="yes">
@@ -25,7 +25,7 @@
       {"@context":"https://schema.org","@type":"WebSite","name":"君斗りんくの追憶のきらめき","url":"https://tsuioku-no-kirameki.com/","description":"ニコ生・YouTube・Twitch・Kick・SHOWROOM・ふわっち・ミクチャ・TikTok LIVE・ツイキャス・ABEMA の10サービスに対応。応援コメントを取りこぼしにくく、あとから育つコメント記録へ。会場モード・コメビュ（OBS 透過）・人ごとに違う声の読み上げ（VOICEVOX 連携）まで備えた Chrome 拡張。","inLanguage":"ja-JP","publisher":{"@type":"Organization","name":"Kimito-Link Project","url":"https://kimito-link.com/"}}
     </script>
     <script type="application/ld+json">
-      {"@context":"https://schema.org","@type":"SoftwareApplication","name":"君斗りんくの追憶のきらめき","alternateName":"追憶のきらめき","operatingSystem":"Google Chrome","applicationCategory":"BrowserApplication","softwareVersion":"0.1.2225","url":"https://tsuioku-no-kirameki.com/","inLanguage":"ja-JP","description":"ニコ生・YouTube・Twitch・Kick・SHOWROOM・ふわっち・ミクチャ・TikTok LIVE・ツイキャス・ABEMA の10サービスで応援コメントを取りこぼしにくく記録する Chrome 拡張。会場モード・コメビュ（OBS 透過）・人ごとに違う声の読み上げ（VOICEVOX 連携）まで無料、配信後のマーケ分析レポート（サポーター）も搭載。","publisher":{"@type":"Organization","name":"Kimito-Link Project","url":"https://kimito-link.com/"},"offers":{"@type":"Offer","price":"0","priceCurrency":"JPY"},"license":"https://opensource.org/licenses/MIT"}
+      {"@context":"https://schema.org","@type":"SoftwareApplication","name":"君斗りんくの追憶のきらめき","alternateName":"追憶のきらめき","operatingSystem":"Google Chrome","applicationCategory":"BrowserApplication","softwareVersion":"0.1.2227","url":"https://tsuioku-no-kirameki.com/","inLanguage":"ja-JP","description":"ニコ生・YouTube・Twitch・Kick・SHOWROOM・ふわっち・ミクチャ・TikTok LIVE・ツイキャス・ABEMA の10サービスで応援コメントを取りこぼしにくく記録する Chrome 拡張。会場モード・コメビュ（OBS 透過）・人ごとに違う声の読み上げ（VOICEVOX 連携）まで無料、配信後のマーケ分析レポート（サポーター）も搭載。","publisher":{"@type":"Organization","name":"Kimito-Link Project","url":"https://kimito-link.com/"},"offers":{"@type":"Offer","price":"0","priceCurrency":"JPY"},"license":"https://opensource.org/licenses/MIT"}
     </script>
 
     <meta property="og:type" content="website">
@@ -42,7 +42,7 @@
 
     <meta name="twitter:card" content="summary_large_image">
     <meta name="twitter:title" content="君斗りんくの追憶のきらめき ― 取りこぼしにくく、あとから育つコメント記録へ">
-    <meta name="twitter:description" content="10の配信サービスに対応。応援コメントを取りこぼしにくく、あとから育つ記録へ。ライブ会場モード + OBS 透過コメビュ + VOICEVOX 読み上げ + マーケ分析（v0.1.2225）。">
+    <meta name="twitter:description" content="10の配信サービスに対応。応援コメントを取りこぼしにくく、あとから育つ記録へ。ライブ会場モード + OBS 透過コメビュ + VOICEVOX 読み上げ + マーケ分析（v0.1.2227）。">
     <meta name="twitter:image" content="https://tsuioku-no-kirameki.com/images/og-image.png">
     <meta name="twitter:image:alt" content="追憶のきらめき ― 流れ星みたいに消えていくコメントを、星座みたいに、つながりが残る世界へ。">
     <style>
@@ -5717,6 +5717,76 @@
       .lp-price-amount{font-size:1.25rem;font-weight:800;color:var(--brown);margin:0 0 8px}
       .lp-price-card ul{margin:8px 0 0;padding-left:18px;font-size:.87rem;line-height:1.7;color:var(--muted)}
       .lp-cta-row{display:flex;flex-wrap:wrap;gap:10px;margin-top:var(--space-md)}
+      /* ★配信者向けの要約ブロック(2026-11-25・feat/lp-streamer-benefits)。結果を先に・得ごとに「いままで→これから」。
+         正本の会議メモ: 得4つ→始め方→記録の行き先→よくある質問→最後のCTA。既存の節には触れない(lp-sb- 接頭辞だけ)。 */
+      .lp-sb{padding:clamp(20px,4vw,40px) 0 clamp(8px,2vw,16px);position:relative}
+      .lp-sb-hero{display:grid;gap:clamp(18px,3vw,32px);align-items:center;
+        background:rgba(255,252,247,.94);border:1px solid var(--line);border-radius:var(--r1);box-shadow:var(--shadow);
+        padding:clamp(20px,4.5vw,40px)}
+      @media (min-width:960px){.lp-sb-hero{grid-template-columns:minmax(0,1.1fr) minmax(0,.9fr)}}
+      .lp-sb-nb{display:inline-block}
+      .lp-sb-eyebrow{display:inline-block;margin:0;padding:6px 12px;border-radius:999px;background:#fff6e4;
+        border:1px solid rgba(138,90,10,.18);color:#7a4c06;font-size:.84rem;font-weight:700;letter-spacing:.04em}
+      .lp-sb h1{margin:14px 0 12px;font-size:clamp(1.7rem,4vw,2.9rem);line-height:1.32}
+      .lp-sb h1 strong{color:#8f2f2a}
+      .lp-sb-lead{margin:0;color:var(--text-secondary);font-size:clamp(1rem,2.6vw,1.1rem);line-height:1.85;max-width:38em}
+      .lp-sb-cta{display:flex;flex-wrap:wrap;gap:12px;margin-top:22px;align-items:center}
+      .lp-sb-btn{display:inline-flex;align-items:center;justify-content:center;min-height:52px;padding:0 24px;border-radius:999px;
+        font-weight:800;text-decoration:none;font-size:1.02rem}
+      .lp-sb-btn--main{background:linear-gradient(135deg,#3f7fa3,#2f6688);color:#fff;box-shadow:0 8px 22px rgba(47,102,136,.28)}
+      .lp-sb-btn--main:hover,.lp-sb-btn--main:focus-visible{background:linear-gradient(135deg,#356f90,#255673)}
+      .lp-sb-btn--sub{background:#fff;border:1px solid rgba(88,62,28,.16);color:var(--ink)}
+      .lp-sb-btn:focus-visible{outline:3px solid var(--gold);outline-offset:3px}
+      .lp-sb-micro{list-style:none;margin:14px 0 0;padding:0;display:flex;flex-wrap:wrap;gap:6px 14px;font-size:.86rem;color:var(--text-secondary)}
+      .lp-sb-micro li::before{content:"✓ ";color:#2f7a4a;font-weight:800}
+      .lp-sb-pf{margin:18px 0 0;font-size:.84rem;color:var(--text-secondary)}
+      .lp-sb-pf ul{list-style:none;margin:6px 0 0;padding:0;display:flex;flex-wrap:wrap;gap:6px}
+      .lp-sb-pf li{padding:4px 10px;border-radius:999px;background:rgba(132,184,207,.18);border:1px solid rgba(83,136,165,.25);color:var(--ink);font-size:.82rem}
+      .lp-sb-shot{margin:0}
+      .lp-sb-shot img{display:block;width:100%;height:auto;border-radius:14px;border:1px solid rgba(0,0,0,.12);background:#111}
+      .lp-sb-shot figcaption{margin-top:8px;font-size:.84rem;color:var(--text-secondary);line-height:1.6}
+      .lp-sb-sec{margin-top:clamp(28px,5vw,56px)}
+      .lp-sb-sec > h2{margin:0 0 6px;font-size:clamp(1.45rem,3.4vw,2.1rem)}
+      .lp-sb-sec > .lp-sb-sub{margin:0 0 18px;color:var(--text-secondary);line-height:1.75}
+      .lp-sb-benefits{display:grid;gap:16px;grid-template-columns:1fr}
+      @media (min-width:860px){.lp-sb-benefits{grid-template-columns:repeat(2,minmax(0,1fr))}}
+      .lp-sb-card{background:rgba(255,252,247,.94);border:1px solid var(--line);border-radius:18px;padding:clamp(16px,3vw,24px);min-width:0;
+        display:flex;flex-direction:column;gap:12px}
+      .lp-sb-card h3{margin:0;font-size:clamp(1.12rem,2.6vw,1.3rem);line-height:1.45;color:var(--ink)}
+      .lp-sb-card h3 span{display:block;font-size:.8rem;color:#8a5a0a;letter-spacing:.06em;margin-bottom:4px}
+      .lp-sb-ba{display:grid;gap:8px;margin:0}
+      .lp-sb-ba div{border-radius:12px;padding:10px 12px;font-size:.92rem;line-height:1.7}
+      .lp-sb-ba dt{font-weight:800;font-size:.78rem;letter-spacing:.06em;margin:0 0 2px}
+      .lp-sb-ba dd{margin:0}
+      .lp-sb-ba .lp-sb-before{background:#f3efe8;color:#5b5247}
+      .lp-sb-ba .lp-sb-after{background:#eaf5ee;color:#1f4b31;border:1px solid rgba(47,122,74,.2)}
+      .lp-sb-card p{margin:0;font-size:.88rem;line-height:1.75;color:var(--text-secondary)}
+      .lp-sb-card img{display:block;width:100%;height:auto;border-radius:12px;border:1px solid rgba(0,0,0,.1);background:#111}
+      .lp-sb-card a{color:#2f6688}
+      .lp-sb-steps{list-style:none;margin:0;padding:0;display:grid;gap:12px;grid-template-columns:1fr;counter-reset:sbstep}
+      @media (min-width:760px){.lp-sb-steps{grid-template-columns:repeat(3,minmax(0,1fr))}}
+      .lp-sb-steps li{counter-increment:sbstep;background:rgba(255,252,247,.94);border:1px solid var(--line);border-radius:16px;padding:16px 16px 16px 58px;position:relative;line-height:1.7;font-size:.92rem;color:var(--text-secondary)}
+      .lp-sb-steps li::before{content:counter(sbstep);position:absolute;left:16px;top:16px;width:30px;height:30px;border-radius:50%;
+        background:#2f6688;color:#fff;font-weight:800;display:flex;align-items:center;justify-content:center}
+      .lp-sb-steps strong{display:block;color:var(--ink);font-size:1rem}
+      .lp-sb-trust{display:grid;gap:12px;grid-template-columns:1fr}
+      @media (min-width:760px){.lp-sb-trust{grid-template-columns:repeat(2,minmax(0,1fr))}}
+      .lp-sb-trust div{background:rgba(255,252,247,.94);border:1px solid var(--line);border-radius:14px;padding:14px 16px}
+      .lp-sb-trust h3{margin:0 0 4px;font-size:1rem;color:var(--ink)}
+      .lp-sb-trust p{margin:0;font-size:.88rem;line-height:1.7;color:var(--text-secondary)}
+      .lp-sb-more{margin:14px 0 0;font-size:.88rem}
+      .lp-sb-more a{color:#2f6688}
+      .lp-sb-faq details{background:rgba(255,252,247,.94);border:1px solid var(--line);border-radius:14px;padding:0 16px;margin-bottom:10px}
+      .lp-sb-faq summary{cursor:pointer;padding:14px 0;font-weight:700;color:var(--ink);line-height:1.6}
+      .lp-sb-faq details p{margin:0 0 14px;font-size:.9rem;line-height:1.8;color:var(--text-secondary)}
+      .lp-sb-faq a{color:#2f6688}
+      .lp-sb-final{margin-top:clamp(28px,5vw,56px);text-align:center;background:linear-gradient(180deg,rgba(255,248,230,.96),rgba(255,252,247,.96));
+        border:1px solid rgba(138,90,10,.2);border-radius:var(--r1);padding:clamp(22px,4.5vw,40px)}
+      .lp-sb-final h2{margin:0 0 10px;font-size:clamp(1.35rem,3.4vw,2rem)}
+      .lp-sb-final p{margin:0 auto;max-width:34em;color:var(--text-secondary);line-height:1.8}
+      .lp-sb-final .lp-sb-cta{justify-content:center}
+      .hero-copy h2.hero-h1{margin:clamp(16px,3vw,24px) 0 clamp(10px,1.8vw,16px);font-size:clamp(1.7rem,3.8vw,3.4rem);line-height:1.2}
+      .hero-copy h2.hero-h1 strong{color:#8f2f2a}
     </style>
   </head>
   <body>
@@ -5730,6 +5800,143 @@
 
 
     <main id="main-content">
+      <!-- ★配信者向けの要約ブロック(2026-11-25・feat/lp-streamer-benefits)。会議メモ: 結果を先に→得4つ→始め方→記録の行き先→よくある質問→CTA。
+           数字・利用者数・評価・お客様の声は載せない(事実がないものは作らない)。料金は下の #supporter-pricing の表記をそのまま使う。 -->
+      <section class="lp-sb" id="for-streamers" aria-labelledby="lp-sb-heading">
+        <div class="shell">
+          <div class="lp-sb-hero">
+            <div>
+              <p class="lp-sb-eyebrow">配信する人のための Chrome 拡張</p>
+              <h1 id="lp-sb-heading"><span class="lp-sb-nb">来てくれた人の</span><span class="lp-sb-nb">名前を、</span><br><strong><span class="lp-sb-nb">ちゃんと呼べる</span><span class="lp-sb-nb">配信に。</span></strong></h1>
+              <p class="lp-sb-lead">
+                だれがコメントして、だれがギフトをくれたか。配信しながら、その場で順番に見えます。
+                コメントは人ごとに違う声で読み上げ、記録はこのパソコンの中に残るので、配信のあとも振り返れます。
+              </p>
+              <div class="lp-sb-cta">
+                <a class="lp-sb-btn lp-sb-btn--main" href="https://chromewebstore.google.com/detail/cjbabignmmodaickpeckiojjabnlogdb" rel="noopener" data-lp-cta="sb-hero">Chrome に追加する（無料）</a>
+                <a class="lp-sb-btn lp-sb-btn--sub" href="#lp-sb-benefits">できることを見る</a>
+              </div>
+              <ul class="lp-sb-micro" aria-label="はじめる前に">
+                <li>記録・読み上げ・会場・コメビュは無料</li>
+                <li>アカウント登録なし</li>
+                <li>記録はこのパソコンの中</li>
+              </ul>
+              <div class="lp-sb-pf">
+                対応している 10 の配信サービス
+                <ul>
+                  <li>ニコニコ生放送</li><li>YouTube</li><li>Twitch</li><li>Kick</li><li>SHOWROOM</li>
+                  <li>ふわっち</li><li>ミクチャ</li><li>TikTok LIVE</li><li>ツイキャス</li><li>ABEMA</li>
+                </ul>
+              </div>
+            </div>
+            <figure class="lp-sb-shot">
+              <img src="images/venue/venue-living-overview.jpg" width="900" height="374" alt="実際の会場モードの画面。来てくれた人のアイコンが客席に並び、応援してくれた人の席が金色に光っている" decoding="async" fetchpriority="high">
+              <figcaption>実際の画面（会場モード）。来てくれた人がアイコンで並び、応援してくれた人の席は金色に光ります。</figcaption>
+            </figure>
+          </div>
+
+          <section class="lp-sb-sec" id="lp-sb-benefits" aria-labelledby="lp-sb-benefits-heading">
+            <h2 id="lp-sb-benefits-heading">次の配信から、こう変わります</h2>
+            <p class="lp-sb-sub">配信の前に準備することは、ほとんどありません。いつもの配信ページを開くだけです。</p>
+            <div class="lp-sb-benefits">
+              <article class="lp-sb-card">
+                <h3><span>名前を呼ぶ・お礼を言う</span>応援してくれた人に、その場でお礼が言える</h3>
+                <dl class="lp-sb-ba">
+                  <div class="lp-sb-before"><dt>いままで</dt><dd>流れていったコメントをさかのぼって、だれだったかを探していました。</dd></div>
+                  <div class="lp-sb-after"><dt>これから</dt><dd>コメントやギフトの多い人が、配信中にその場で順番に並びます。名前を呼ぶきっかけが、すぐ見つかります。</dd></div>
+                </dl>
+                <img src="images/venue/venue-living-vip.jpg" width="900" height="330" alt="会場モードの客席。応援してくれた人の席が金色に光っている" loading="lazy" decoding="async">
+                <p>気になる人には、自分だけが見るニックネームやメモを付けられます（匿名の人にも付けられます）。</p>
+              </article>
+              <article class="lp-sb-card">
+                <h3><span>読み上げ</span>画面を見ていなくても、声で「あの人だ」とわかる</h3>
+                <dl class="lp-sb-ba">
+                  <div class="lp-sb-before"><dt>いままで</dt><dd>ゲームや作業の手を止めて、コメント欄を見に行っていました。</dd></div>
+                  <div class="lp-sb-after"><dt>これから</dt><dd>コメントを、人ごとに違う声で読み上げます。同じ人はいつ来ても同じ声なので、声だけでだれか分かります（特許出願中）。</dd></div>
+                </dl>
+                <p>読み上げには無料の VOICEVOX を使います。声はこのパソコンの中で作られ、インターネットには出ません。コメントが多いときは古いものを飛ばして「今」のコメントに追いつきます。<a href="#voice-reading">読み上げをくわしく見る</a></p>
+              </article>
+              <article class="lp-sb-card">
+                <h3><span>会場モード</span>ひとりの配信でも、みんなで過ごしている感じに</h3>
+                <dl class="lp-sb-ba">
+                  <div class="lp-sb-before"><dt>いままで</dt><dd>コメントは、文字で横や下に流れていくだけでした。</dd></div>
+                  <div class="lp-sb-after"><dt>これから</dt><dd>来てくれた人がアイコンで客席に並び、しゃべると吹き出しが出ます。OBS の透過コメビュで、配信画面にも出せます。</dd></div>
+                </dl>
+                <img src="images/venue/venue-poster.jpg" width="600" height="820" alt="ニコニコ生放送の画面の下に会場モードが出ている実際の画面。客席のアイコンから吹き出しが出ている" loading="lazy" decoding="async" style="max-height:300px;object-fit:cover;object-position:bottom">
+                <p>無料のまま使えます（OBS の透過表示では、画面の隅に小さく「追憶のきらめき」と出ます）。<a href="#venue">会場モードを動画で見る</a></p>
+              </article>
+              <article class="lp-sb-card">
+                <h3><span>振り返り</span>配信のあとに、来てくれた人ともう一度会える</h3>
+                <dl class="lp-sb-ba">
+                  <div class="lp-sb-before"><dt>いままで</dt><dd>配信が終わると、コメントは流れたままで、見返すのがたいへんでした。</dd></div>
+                  <div class="lp-sb-after"><dt>これから</dt><dd>コメントはこのパソコンの中に自動で残り、配信のあとに 3 つのレーンで振り返れます。次の配信の前に、前回来てくれた人を見返せます。</dd></div>
+                </dl>
+                <p>配信中に追いきれなかった分も、あとから補って記録を育てます。スマホで見たいときは、Android アプリ（Google Play で配信中）もあります。<a href="#smartphone">スマホで見る</a></p>
+              </article>
+            </div>
+            <div class="lp-sb-cta">
+              <a class="lp-sb-btn lp-sb-btn--main" href="https://chromewebstore.google.com/detail/cjbabignmmodaickpeckiojjabnlogdb" rel="noopener" data-lp-cta="sb-benefits">Chrome に追加する（無料）</a>
+              <a class="lp-sb-btn lp-sb-btn--sub" href="#difference">ほかのコメントツールとの違い</a>
+            </div>
+          </section>
+
+          <section class="lp-sb-sec" id="lp-sb-start" aria-labelledby="lp-sb-start-heading">
+            <h2 id="lp-sb-start-heading">はじめ方は 3 つだけ</h2>
+            <p class="lp-sb-sub">ソフトをダウンロードしたり、配信ごとに URL を貼ったりする手間はありません。</p>
+            <ol class="lp-sb-steps">
+              <li><strong>Chrome に追加する</strong>Chrome ウェブストアで「Chrome に追加」を押します。</li>
+              <li><strong>いつもの配信ページを開く</strong>自分の配信でも、見に行った配信でも大丈夫です。</li>
+              <li><strong>記録が始まる</strong>配信ページに出るボタンや拡張のアイコンから、会場・コメビュ・読み上げを使えます。</li>
+            </ol>
+          </section>
+
+          <section class="lp-sb-sec" id="lp-sb-trust" aria-labelledby="lp-sb-trust-heading">
+            <h2 id="lp-sb-trust-heading">記録の行き先</h2>
+            <p class="lp-sb-sub">コメントはリスナーさんの大切な言葉なので、どこに残り、何が外に出るかをはっきりさせています。</p>
+            <div class="lp-sb-trust">
+              <div><h3>記録はこのパソコンの中</h3><p>コメントの記録は、このパソコンの Chrome の中に保存されます。ほかのサイトやほかの拡張からは読めません。データの販売や提供はしません。</p></div>
+              <div><h3>外に送るのは、自分でオンにしたときだけ</h3><p>ニコ生の「📱 スマホで見る」を自分でオンにしたときだけ、その画面の範囲をサーバーへ送ります（はじめはオフ・24時間で削除）。</p></div>
+              <div><h3>読み上げの声もこのパソコンの中</h3><p>読み上げは、同じパソコンで動いている VOICEVOX とだけやりとりします。</p></div>
+              <div><h3>広告やアクセス解析は入れていません</h3><p>公式サイトと拡張に、広告のトラッキングや Google Analytics は入れていません。お支払いは Stripe が扱い、カード番号はこちらに届きません。</p></div>
+            </div>
+            <p class="lp-sb-more"><a href="#trust-privacy">記録の場所と信頼をくわしく見る</a> ／ <a href="https://tsuioku-no-kirameki.com/privacy.html">プライバシーポリシー</a></p>
+          </section>
+
+          <section class="lp-sb-sec lp-sb-faq" id="lp-sb-faq" aria-labelledby="lp-sb-faq-heading">
+            <h2 id="lp-sb-faq-heading">よくある質問</h2>
+            <details>
+              <summary>お金はかかりますか？</summary>
+              <p>コメントの記録・振り返り・会場モード・コメビュ（OBS 透過）・読み上げ・スマホ表示は無料です。有料なのは、配信のあとに開く「マーケ分析レポート」だけで、プラン「サポーター」（月額 980 円／年額 9,800 円・税込）です。初めてレポートを開いた日から 14 日間は無料で試せます。<a href="#supporter-pricing">料金をくわしく見る</a></p>
+            </details>
+            <details>
+              <summary>何が必要ですか？</summary>
+              <p>パソコンの Chrome があれば始められます。読み上げを使うときだけ、無料の VOICEVOX をパソコンに入れて起動しておきます。</p>
+            </details>
+            <details>
+              <summary>パソコンが重くなりませんか？</summary>
+              <p>いま普通に使われているノートパソコンで軽く動くことを目安に、重い処理を減らす改善を続けています。読み上げが追いつかないときは、自動でパソコンの声に切り替わり、落ち着くと VOICEVOX の声に戻ります。</p>
+            </details>
+            <details>
+              <summary>自分の配信でなくても使えますか？</summary>
+              <p>使えます。開いた配信ページのコメントを記録するので、推しの配信を見ているときにも使えます。</p>
+            </details>
+            <details>
+              <summary>スマホだけでも使えますか？</summary>
+              <p>Android アプリ「追憶のきらめき ライブビュー」を Google Play で配信中です。iPhone 版は準備中で、それまではスマホのブラウザで同じ画面を開けます。<a href="#smartphone">スマホについて見る</a></p>
+            </details>
+          </section>
+
+          <div class="lp-sb-final">
+            <h2>次の配信で、来てくれた人の名前を呼んでみませんか。</h2>
+            <p>入れるのは 1 回だけ。あとは、いつもどおり配信するだけです。</p>
+            <div class="lp-sb-cta">
+              <a class="lp-sb-btn lp-sb-btn--main" href="https://chromewebstore.google.com/detail/cjbabignmmodaickpeckiojjabnlogdb" rel="noopener" data-lp-cta="sb-final">Chrome に追加する（無料）</a>
+              <a class="lp-sb-btn lp-sb-btn--sub" href="#worldview">この拡張が生まれた理由を読む</a>
+            </div>
+          </div>
+        </div>
+      </section>
+
       <div class="lp-dawn-arc">
         <div class="lp-dawn-arc__milky-river" aria-hidden="true"></div>
         <div class="lp-dawn-arc__milky-river lp-dawn-arc__milky-river--soft" aria-hidden="true"></div>
@@ -6367,10 +6574,10 @@
         <div class="shell hero-grid">
           <article class="hero-copy fade">
             <div class="eyebrow">Comment Record, Built To Recover</div>
-            <h1>
+            <h2 class="hero-h1">
               <strong>取りこぼしにくく、</strong>
               あとから育つコメント記録へ。
-            </h1>
+            </h2>
             <p class="lead">
               <strong>ギフトの瞬間（ギフト前後5分のコメント件数の増減）</strong>や応援が届いた瞬間の流れを、<strong>基本はこの PC の中に記録</strong>（ニコ生のスマホ共有を本人が ON にしたときだけ送信）して残せます。<br>
               <strong>ニコニコ生放送・YouTube・Twitch・Kick・SHOWROOM・ふわっち・ミクチャ・TikTok LIVE・ツイキャス・ABEMA の 10 サービス</strong>に対応。コメント記録・3レーン・会場モード・コメビュ（OBS 透過）・VOICEVOX 読み上げは<strong>無料</strong>、配信後の「マーケ分析レポート（マーケ HTML）」だけを有料（サポーター・14 日お試しあり）で提供しています。
@@ -6443,13 +6650,13 @@
       </section>
 
 
-      <section class="section" id="lp-whats-new" aria-labelledby="lp-whats-new-heading" data-whats-new-version="0.1.2225">
+      <section class="section" id="lp-whats-new" aria-labelledby="lp-whats-new-heading" data-whats-new-version="0.1.2227">
         <div class="shell">
           <div class="board lp-whats-new-box">
             <div class="section-head">
               <h2 id="lp-whats-new-heading">この版で変わったこと</h2>
               <p class="lp-whats-new-box__lead">
-                <strong>v0.1.2225</strong>
+                <strong>v0.1.2227</strong>
                 <span data-whats-new-summary>応援の演出と数字をそろえ、配信者の受取（推定）を追加</span>
               </p>
             </div>
@@ -6464,6 +6671,7 @@
             </ul>
             <p class="lp-whats-new-recent-lead">直近の版</p>
             <ul class="lp-whats-new-recent">
+              <li data-whats-new-recent="0.1.2226"><strong>v0.1.2226</strong> 紹介ページの最初を、配信する人向けの説明にしました。</li>
               <li data-whats-new-recent="0.1.2224"><strong>v0.1.2224</strong> 別窓の会場でも、声と吹き出しが同時に出るようにしました。</li>
               <li data-whats-new-recent="0.1.2222"><strong>v0.1.2222</strong> 別窓の幅が広がったままにならないようにしました。</li>
               <li data-whats-new-recent="0.1.2221"><strong>v0.1.2221</strong> コメントが届くたびの画面の描き直しを小さくしました。</li>
@@ -6471,9 +6679,6 @@
               <li data-whats-new-recent="0.1.2215"><strong>v0.1.2215</strong> 記録の保存が、使っていない画面を重くしにくくなりました。</li>
               <li data-whats-new-recent="0.1.2214"><strong>v0.1.2214</strong> ふつうのノートPCでは客席の動きはそのまま、忙しいときだけゆるくして軽くします。</li>
               <li data-whats-new-recent="0.1.2213"><strong>v0.1.2213</strong> 読み上げが混んでいるあいだは VOICEVOX を休ませ、落ち着いたら声を戻します。</li>
-              <li data-whats-new-recent="0.1.2212"><strong>v0.1.2212</strong> 会場を開いていても、コメントの読み直しや光の描き直しが減って軽く動きます。</li>
-              <li data-whats-new-recent="0.1.2211"><strong>v0.1.2211</strong> SHOWROOM からコメントを送るとき、欄に残ったままになりにくくなりました。</li>
-              <li data-whats-new-recent="0.1.2210"><strong>v0.1.2210</strong> 配信者や順位のアイコンに、本人の顔の代わりのゆっくり顔を出さないようにしました。</li>
             </ul>
           </div>
         </div>
@@ -6483,7 +6688,7 @@
         <div class="shell">
           <div class="board">
             <div class="section-head">
-              <h2 id="lp-support-counting-heading">応援の数え方と、円にするもの・しないもの（v0.1.2225）</h2>
+              <h2 id="lp-support-counting-heading">応援の数え方と、円にするもの・しないもの（v0.1.2227）</h2>
               <p>会場で投げの演出と効果音が出た応援は、横の欄・ページ内パネル・会場の帯・マーケ分析のどれかの数字が必ず動きます（全サービス同じ決まり）。円の推定は、<strong>公式が値段や率を公開しているものだけ</strong>です。公式に無い数字は作らず「—」と出し、件数や pt だけを数えます。「推定（配信者の受取）」の欄はどのサービスでも同じ場所（推定（視聴者の購入額）のすぐ後ろ）にあり、率が非公開のサービスは「—（公式の率が非公開）」と出します。</p>
             </div>
             <div class="lp-pf-overview-wrap">
@@ -10924,7 +11129,7 @@
     </main>
 
     <script src="assets/js/app-store-badges.js"></script>
-    <script src="assets/js/site-chrome-lp.js" data-part="footer" data-base="" data-version="0.1.2225"></script>
+    <script src="assets/js/site-chrome-lp.js" data-part="footer" data-base="" data-version="0.1.2227"></script>
 
     <button type="button" id="lp-bgm-toggle" aria-label="音を再生">&#9835;</button>
 

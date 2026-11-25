@@ -1,5 +1,5 @@
 /** @vitest-environment happy-dom */
-// ニコ生の横欄にも「推定（配信者の受取）」の欄を、ほかのサービスと同じ並び(推定の後ろ)で出す(v0.1.2225・2026-11-25 りんくさん決定)
+// ニコ生の横欄にも「推定（配信者の受取）」の欄を、ほかのサービスと同じ並び(推定の後ろ)で出す(v0.1.2227・2026-11-25 りんくさん決定)
 import { describe, it, expect } from 'vitest';
 import { syncNicoEstimatedViewerSpendChip } from './nicoEstimatedSpendChip.js';
 

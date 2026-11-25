@@ -40,7 +40,7 @@ export function syncNicoEstimatedViewerSpendChip(giftValEl, giftChip) {
   keepTakeHomeLast(row);
 }
 
-/** 受取の欄は推定の後ろ(推定が無ければギフトptの後ろ)に置く。どのサービスも同じ並び(v0.1.2225) @param {HTMLElement} row */
+/** 受取の欄は推定の後ろ(推定が無ければギフトptの後ろ)に置く。どのサービスも同じ並び(v0.1.2227) @param {HTMLElement} row */
 function keepTakeHomeLast(row) {
   const th = row.querySelector('[data-nl-metric="nicoEstimatedStreamerTakeHome"]');
   if (th && row.lastElementChild !== th) row.appendChild(th);

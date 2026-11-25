@@ -168,7 +168,7 @@ export function isMarketingSupportRow(c) {
   if (!c || typeof c !== 'object') return false;
   const k = /** @type {{ ytKind?: unknown }} */ (c).ytKind;
   if (k == null || k === '') return false;
-  // 値段の分からないギフト(kind=text・名前あり)も、会場で投げの演出が出る応援なので振り返りに入れる(isSupportEventRow・v0.1.2225)
+  // 値段の分からないギフト(kind=text・名前あり)も、会場で投げの演出が出る応援なので振り返りに入れる(isSupportEventRow・v0.1.2227)
   if (String(k) === 'text') return isSupportEventRow(c);
   return true;
 }

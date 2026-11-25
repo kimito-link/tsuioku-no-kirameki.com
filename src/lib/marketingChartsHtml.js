@@ -3542,7 +3542,7 @@ export function buildMarketingDashboardHtml(r, opts = {}) {
         { key: nicoTh.key, label: nicoTh.label, text: nicoTh.text, title: nicoTh.title, note: nicoTh.note, sourceUrl: '', asOf: '' }];
     }
     const viewer = formatEstimatedViewerSpendDisplays(estimateViewerSpendFromComments(view.id, commentsRaw));
-    // 配信者の受取（推定）。公式の率・単価があるサービス(YouTube・Kick・Twitch)だけ金額、ほかは理由つきの「—」(v0.1.2225)
+    // 配信者の受取（推定）。公式の率・単価があるサービス(YouTube・Kick・Twitch)だけ金額、ほかは理由つきの「—」(v0.1.2227)
     if (!MARKETING_TAKE_HOME_PLATFORMS.has(view.id)) return viewer;
     const th = formatStreamerTakeHomeDisplay(view.id, estimateStreamerTakeHomeFromComments(view.id, commentsRaw));
     return [...viewer, { key: th.key, label: th.label, text: th.text, title: th.title, note: th.note, sourceUrl: th.sourceUrl, asOf: th.asOf }];

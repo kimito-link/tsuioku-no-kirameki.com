@@ -13,7 +13,7 @@ describe('ytNicoShim: 組み立て結果の使い回し', () => {
     expect(shim).toContain('if (changed) next.ver = (Number(next.ver) || 0) + 1;');
     // 中身が同じ行では番号を進めない(JSON.stringify は行が大きいほどメインスレッドを止めるので使わない)
     expect(shim).toContain('else if (ytLiveRowMateriallyChanged(old, r))');
-    // v0.1.2225: 全件の読み直しでも番号は前の控えの続きから(0 に戻すと数字の数え直しが古いまま止まることがある)
+    // v0.1.2227: 全件の読み直しでも番号は前の控えの続きから(0 に戻すと数字の数え直しが古いまま止まることがある)
     expect(shim).toContain('fullAt: now, ver: cur ? Number(cur.ver) || 0 : 0 }');
     expect(shim).toContain('cur.ver = (Number(cur.ver) || 0) + 1;');
   });
