@@ -27,7 +27,7 @@
 
 > 値が次の段へ届かない「断線」(broadcaster バグ型)は `npm run feature-map -- --check` が機械検知。
 
-## ⚠️ 役割コメントが無いソース 15 / 1365 件
+## ⚠️ 役割コメントが無いソース 15 / 1369 件
 - `docs/handoff/bench/bench-interval.mjs`
 - `docs/handoff/bench/bench-lane.mjs`
 - `extension-youtube/cloak-failsafe.js`
@@ -634,7 +634,7 @@
   - `venue-pop-parity-loop-flow.html`
   - `visual-explainer.md`
   - `voice-quality-pipeline-flow.html`
-- 📁 **extension/** (145)
+- 📁 **extension/** (149)
   - 📁 **data/** (1)
     - `ouen-banner.json`
   - 📁 **images/** (87)
@@ -776,8 +776,12 @@
     - `voice-complete.mp3`
     - `voice-watch.mp3`
   - `background.js` — MV3 Service Worker
+  - `background.js` — MV3 Service Worker
+  - `background.js` — MV3 Service Worker
   - `comeview.html`
   - `live-view.html`
+  - `manifest.json`
+  - `manifest.json`
   - `manifest.json`
   - `marketing-export-guard.js` — マーケ分析タブ(marketing-export.html)の「何があっても開く」保険。
   - `marketing-export.html`
@@ -1202,7 +1206,7 @@
   - `gift-coin-hq.wav`
   - `gift-register-hq.wav`
   - `gift-register.mp3`
-- 📁 **src/** (2654)
+- 📁 **src/** (2657)
   - 📁 **data/** (7)
     - 📁 **acquirers/** (2)
       - `laneFromStorage.js` — 応援レーン acquirer: chrome.storage.local(nls_comments) → laneStore の橋渡し。
@@ -1549,7 +1553,7 @@
         - `logo_funlink_white_RGB_link_black.png`
         - `logo_funlink_white_RGB_maru_black.png`
     - `hero-connect-hub.svg`
-  - 📁 **lib/** (2332)
+  - 📁 **lib/** (2335)
     - 📁 **__snapshots__/** (4)
       - `marketing-abema-baseline.html`
       - `marketing-niconico.html`
@@ -2009,6 +2013,8 @@
     - `censusWatch.js` — 状態速報の「拡張プロセスの忙しさ(文書別)」を、数字だけで機械的に読む純関数(2026-10-20)。
     - `censusWatch.test.js`
     - `changelog-archive.js` — 追憶のきらめき 更新履歴アーカイブ（popup のバンドル外）。
+    - `changelog.js` — 拡張の更新履歴データと semver 比較ヘルパ。
+    - `changelog.js` — 拡張の更新履歴データと semver 比較ヘルパ。
     - `changelog.js` — 拡張の更新履歴データと semver 比較ヘルパ。
     - `changelog.test.js`
     - `changelogBundleBudget.test.js`
@@ -3732,6 +3738,7 @@
     - `venueTuckState.test.js`
     - `venueViewport.js` — v0.1.715: 会場モードの「映像セーフエリア」と「同時表示人数」を決める純関数。
     - `venueViewport.test.js`
+    - `venueVoiceBubbleTogether.wiring.test.js`
     - `venueWatchPageVisibility.js` — 視聴ページ判定が一瞬でも外れると会場を閉じていたのを防ぐ。
     - `venueWatchPageVisibility.test.js`
     - `venueWatchPageVisibility.wiring.test.js`
@@ -4057,7 +4064,7 @@
   - `kouhaku_og.py`
   - `og-live-compose.py`
   - `render-og.js` — 追憶の煌めき LP 用 OG 画像（1200×630）を生成する。
-- 📁 **tsuioku-no-kirameki/** (82)
+- 📁 **tsuioku-no-kirameki/** (84)
   - 📁 **articles/** (14)
     - 📁 **role-separation-design/** (2)
       - 📁 **img/** (1)
@@ -4151,6 +4158,8 @@
   - `.htaccess`
   - `google7e3e79636d884c2.html`
   - `google7e3e79636d884c2f.html`
+  - `index.html`
+  - `index.html`
   - `index.html`
   - `privacy.html`
   - `robots.txt`
