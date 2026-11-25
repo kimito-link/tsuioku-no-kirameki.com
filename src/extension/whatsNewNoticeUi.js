@@ -2,10 +2,16 @@
  * whatsNewNoticeUi.js — ポップアップ／横の欄に「この版で変わったこと」を出す。
  *
  * 新しい監視・タイマー・通信は増やさない。開いたときに storage を一度読み、
- * 閉じる（または更新履歴を開く）ときに今の版を覚えるだけ。
+ * 閉じる（または版番号・「詳しく」を押す）ときに今の版を覚えるだけ。
+ *
+ * 0.1.2229（りんく「LP とか、バージョン番号をクリックしたときに飛ぶようにすべき」）:
+ *   中に全部の項目を並べると長くて使いづらいので、「版番号＋一言」だけにした。
+ *   版番号と「詳しく」は紹介ページのその版（changelog.html#v<版>）を新しいタブで開く
+ *   （ふつうの <a target="_blank">。権限・通信は増やさない）。
  */
 
 import { getLatestChangelogEntry } from '../lib/changelog.js';
+import { lpChangelogUrl } from '../lib/lpChangelogLink.js';
 import {
   WHATS_NEW_SEEN_STORAGE_KEY,
   resolveWhatsNewState,
@@ -18,6 +24,21 @@ import {
  */
 function asText(text) {
   return String(text || '');
+}
+
+/**
+ * <a> を紹介ページのその版の説明へ向ける（新しいタブ）。
+ * @param {Element|null|undefined} el
+ * @param {unknown} version
+ */
+export function applyLpChangelogLink(el, version) {
+  if (!el || typeof el.setAttribute !== 'function') return;
+  el.setAttribute('href', lpChangelogUrl(version));
+  el.setAttribute('target', '_blank');
+  el.setAttribute('rel', 'noopener noreferrer');
+  if (!el.getAttribute('title')) {
+    el.setAttribute('title', '紹介ページでこの版の説明を開く');
+  }
 }
 
 /**
@@ -106,20 +127,13 @@ export async function wireWhatsNewNotice(opts = {}) {
 
   const versionEl = root.getElementById('whatsNewNoticeVersion');
   const summaryEl = root.getElementById('whatsNewNoticeSummary');
-  const itemsEl = root.getElementById('whatsNewNoticeItems');
+  const moreEl = root.getElementById('whatsNewNoticeMore');
   if (versionEl) {
-    const date = asText(entry.date);
-    versionEl.textContent = date ? `v${currentVersion}（${date}）` : `v${currentVersion}`;
+    versionEl.textContent = `v${currentVersion}`;
+    applyLpChangelogLink(versionEl, currentVersion);
   }
   if (summaryEl) summaryEl.textContent = asText(entry.summary);
-  if (itemsEl) {
-    while (itemsEl.firstChild) itemsEl.removeChild(itemsEl.firstChild);
-    for (const item of entry.items || []) {
-      const li = root.createElement('li');
-      li.textContent = asText(item);
-      itemsEl.appendChild(li);
-    }
-  }
+  applyLpChangelogLink(moreEl, currentVersion);
 
   const dismiss = async () => {
     await persistSeen(currentVersion);
@@ -127,41 +141,13 @@ export async function wireWhatsNewNotice(opts = {}) {
   };
 
   const closeBtn = root.getElementById('whatsNewNoticeClose');
-  if (closeBtn && !closeBtn.dataset.nlWhatsNewWired) {
-    closeBtn.dataset.nlWhatsNewWired = '1';
-    closeBtn.addEventListener('click', () => {
+  for (const el of [closeBtn, versionEl, moreEl]) {
+    if (!el || el.dataset.nlWhatsNewWired) continue;
+    el.dataset.nlWhatsNewWired = '1';
+    // リンクは既定の動き（新しいタブで開く）を止めない。開いたら「見た」にする。
+    el.addEventListener('click', () => {
       void dismiss();
     });
-  }
-
-  const openBtn = root.getElementById('whatsNewNoticeOpenLog');
-  const details = /** @type {HTMLDetailsElement|null} */ (
-    root.getElementById('changelogDetails')
-  );
-  const changelogSection = details && details.closest
-    ? details.closest('.nl-changelog-section')
-    : null;
-  const changelogVisible =
-    !!details &&
-    (!changelogSection ||
-      (typeof window !== 'undefined' &&
-        window.getComputedStyle &&
-        window.getComputedStyle(changelogSection).display !== 'none'));
-  if (openBtn) {
-    if (!changelogVisible) {
-      openBtn.hidden = true;
-    } else if (!openBtn.dataset.nlWhatsNewWired) {
-      openBtn.dataset.nlWhatsNewWired = '1';
-      openBtn.addEventListener('click', () => {
-        details.open = true;
-        try {
-          details.scrollIntoView({ block: 'nearest' });
-        } catch {
-          /* ignore */
-        }
-        void dismiss();
-      });
-    }
   }
 
   notice.hidden = false;

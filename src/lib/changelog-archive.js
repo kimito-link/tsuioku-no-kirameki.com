@@ -24,6 +24,15 @@
 /** @type {ChangelogEntry[]} */
 const ARCHIVE_ENTRIES = [
   Object.freeze({
+    version: '0.1.2203',
+    date: '2026-11-24',
+    summary: '推定購入額・消費をKick/Twitch/ツイキャスへ拡大',
+    items: Object.freeze([
+      'Kick（サブスク・ギフトサブ 1件=$5 USD）と Twitch（有料サブ・ギフトサブ Tier1 $4.99 / Tier2 $9.99 / Tier3 $24.99、Prime除外）の推定購入額を ECB 基準為替（2026-11-20）で円換算して横欄・会場・マーケレポートに表示するようにしました（Kicks・Bits は対象外）。',
+      'ツイキャスで公式確認済みの有料アイテム（お茶爆50=500pt・お茶爆100=1,000pt）を「推定（視聴者の消費）」として pt 表記で合算し、表外の有料アイテムは件数のみ表示するようにしました（無料のお茶・応援アイテム・お団子スコアは対象外）。',
+    ])
+  }),
+  Object.freeze({
     version: '0.1.2202',
     date: '2026-11-24',
     summary: 'ニコ生会場の推定同時接続と記録件数の表示ずれを修正',
