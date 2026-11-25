@@ -24,6 +24,15 @@
 /** @type {ChangelogEntry[]} */
 const ARCHIVE_ENTRIES = [
   Object.freeze({
+    version: '0.1.2196',
+    date: '2026-11-23',
+    summary: 'ふわっち・ツイキャス・TikTok・ABEMA の復帰再接続を修正',
+    items: Object.freeze([
+      'ふわっち・ツイキャス・TikTok・ABEMA の視聴ページでも、ページ離脱（pagehide）後に戻る・進むやタブ復帰したときに同じ配信の記録・読み上げを確実に再接続するように修正しました。',
+      '4 サービスの 1 秒定期監視を共通のページ監視スケジューラへ移行し、裏タブでは 10 秒に間引くようにしました。',
+    ])
+  }),
+  Object.freeze({
     version: '0.1.2195',
     date: '2026-11-23',
     summary: '読み上げONのVOICEVOX未接続時は裏タブの未読を保持',

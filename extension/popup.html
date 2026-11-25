@@ -2463,6 +2463,72 @@
         word-break: break-word;
       }
 
+      /* 0.1.2216: 更新した直後だけ出す「この版で変わったこと」。
+         視聴ページへの埋め込みでは出さない（横の欄・ツールバーでは出す）。 */
+      .nl-whats-new-notice {
+        margin: 0 0 10px;
+        padding: 8px 10px;
+        border: 1px solid var(--nl-border);
+        border-radius: 10px;
+        background: var(--nl-bg-soft);
+        box-sizing: border-box;
+        max-width: 100%;
+        color: var(--nl-text);
+      }
+      .nl-whats-new-notice__title {
+        margin: 0 0 4px;
+        font-size: 12.5px;
+        font-weight: 700;
+        color: var(--nl-accent);
+      }
+      .nl-whats-new-notice__head {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 6px;
+        align-items: baseline;
+        margin: 0 0 4px;
+        font-size: 11.5px;
+      }
+      .nl-whats-new-notice__version {
+        font-weight: 700;
+      }
+      .nl-whats-new-notice__summary {
+        font-weight: 600;
+        color: var(--nl-text-sub, var(--nl-muted));
+      }
+      .nl-whats-new-notice__items {
+        margin: 0 0 8px;
+        padding-left: 18px;
+        font-size: 11.5px;
+        line-height: 1.45;
+        box-sizing: border-box;
+        max-width: 100%;
+      }
+      .nl-whats-new-notice__items li {
+        margin: 2px 0;
+        overflow-wrap: anywhere;
+        word-break: break-word;
+      }
+      .nl-whats-new-notice__actions {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 8px;
+      }
+      .nl-whats-new-notice__actions button {
+        font-size: 11.5px;
+        line-height: 1.3;
+        padding: 3px 8px;
+        border-radius: 8px;
+        border: 1px solid var(--nl-border);
+        background: var(--nl-bg, #fff);
+        color: var(--nl-text);
+        cursor: pointer;
+      }
+      html.nl-inline-embed-watch #whatsNewNotice,
+      html.nl-inline-embed-liveview #whatsNewNotice {
+        display: none !important;
+      }
+
       @media (prefers-reduced-motion: reduce) {
         .nl-frame-theme-details__summary::before {
           transition: none;
@@ -11007,6 +11073,28 @@
         aria-busy="true"
       >
       <!--
+        v0.1.2216: 新しい版に更新したあと、一度だけ「この版で変わったこと」を出す。
+        既定 hidden。JS が覚えた版より新しいときだけ hidden を外す。
+        視聴ページへの埋め込みでは出さない（横の欄・ツールバーでは出す）。
+      -->
+      <aside
+        id="whatsNewNotice"
+        class="nl-whats-new-notice"
+        hidden
+        aria-label="この版で変わったこと"
+      >
+        <p class="nl-whats-new-notice__title">この版で変わったこと</p>
+        <div class="nl-whats-new-notice__head">
+          <span id="whatsNewNoticeVersion" class="nl-whats-new-notice__version"></span>
+          <span id="whatsNewNoticeSummary" class="nl-whats-new-notice__summary"></span>
+        </div>
+        <ul id="whatsNewNoticeItems" class="nl-whats-new-notice__items"></ul>
+        <div class="nl-whats-new-notice__actions">
+          <button type="button" id="whatsNewNoticeClose">閉じる</button>
+          <button type="button" id="whatsNewNoticeOpenLog">更新履歴を見る</button>
+        </div>
+      </aside>
+      <!--
         v0.1.334: ページ内パネルの位置クイック切替（詳細設定の奥にあった
         inlinePanelPlacement を、ヘッダーから直接操作）。
         既定 hidden。JS が「watch を扱える文脈」と判定したら外す。
@@ -13269,7 +13357,7 @@
           <summary class="nl-frame-theme-details__summary">
             <span class="nl-frame-theme-details__summary-text">
               <span class="nl-frame-theme-details__summary-label"
-                >更新履歴（クリックで開く）</span
+                >この版で変わったこと・更新履歴（クリックで開く）</span
               >
               <span class="nl-frame-current" aria-live="polite"
                 >最新: <span id="changelogLatestLabel">-</span></span
