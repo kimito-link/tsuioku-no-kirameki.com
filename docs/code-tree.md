@@ -27,7 +27,7 @@
 
 > 値が次の段へ届かない「断線」(broadcaster バグ型)は `npm run feature-map -- --check` が機械検知。
 
-## ⚠️ 役割コメントが無いソース 15 / 1369 件
+## ⚠️ 役割コメントが無いソース 15 / 1368 件
 - `docs/handoff/bench/bench-interval.mjs`
 - `docs/handoff/bench/bench-lane.mjs`
 - `extension-youtube/cloak-failsafe.js`
@@ -634,7 +634,7 @@
   - `venue-pop-parity-loop-flow.html`
   - `visual-explainer.md`
   - `voice-quality-pipeline-flow.html`
-- 📁 **extension/** (149)
+- 📁 **extension/** (145)
   - 📁 **data/** (1)
     - `ouen-banner.json`
   - 📁 **images/** (87)
@@ -776,12 +776,8 @@
     - `voice-complete.mp3`
     - `voice-watch.mp3`
   - `background.js` — MV3 Service Worker
-  - `background.js` — MV3 Service Worker
-  - `background.js` — MV3 Service Worker
   - `comeview.html`
   - `live-view.html`
-  - `manifest.json`
-  - `manifest.json`
   - `manifest.json`
   - `marketing-export-guard.js` — マーケ分析タブ(marketing-export.html)の「何があっても開く」保険。
   - `marketing-export.html`
@@ -1057,7 +1053,7 @@
     - `verify-extension.mjs` — global Buffer, URL, chrome, console
     - `verify-host.mjs` — global process, Buffer, setTimeout, clearTimeout, URL, console
     - `verify-setup.ps1`
-- 📁 **scripts/** (119)
+- 📁 **scripts/** (120)
   - 📁 **audit/** (4)
     - `dead-selector-baseline.json`
     - `make-dead-selector-baseline.mjs` — 静的デッドセレクタ監査(static-dead-selectors.mjs)の基準値(dead-selector-baseline.json)を作る/更新する。
@@ -1145,6 +1141,7 @@
   - `loop-adapter-status-live.test.js`
   - `loop-glossary-status-live.mjs` — 自己改善ループの「用語集」を、拡張のコードから機械的に作る。
   - `loop-glossary-status-live.test.js`
+  - `lp-changelog-page.mjs` — 紹介ページの「更新履歴（全版）」tsuioku-no-kirameki/changelog.html を changelog から書き直す。
   - `lp-optimize-images.mjs` — LP(tsuioku-no-kirameki/index.html)用に、拡張の元画像(1500x1500 の PNG・1枚 400〜520KB)を、
   - `measure-chat-input-widths.mjs` — 窓の幅で、各サービスの公式のコメント入力欄・送信ボタンが DOM にあるか/見えているかを測る計器。
   - `measure-comment-flood.mjs` — コメントが続くときに、画面のメインスレッドがどれだけ止まるかを測る。
@@ -2014,8 +2011,6 @@
     - `censusWatch.test.js`
     - `changelog-archive.js` — 追憶のきらめき 更新履歴アーカイブ（popup のバンドル外）。
     - `changelog.js` — 拡張の更新履歴データと semver 比較ヘルパ。
-    - `changelog.js` — 拡張の更新履歴データと semver 比較ヘルパ。
-    - `changelog.js` — 拡張の更新履歴データと semver 比較ヘルパ。
     - `changelog.test.js`
     - `changelogBundleBudget.test.js`
     - `changelogConsistency.js` — 版番号の三者一致を機械照合する純関数(v0.1.835)。
@@ -2749,6 +2744,8 @@
     - `loadLastBroadcastSummary.test.js`
     - `longTaskTracker.js` — メインスレッドを長時間ブロックした「Long Task」を有界に記録する純関数群。
     - `longTaskTracker.test.js`
+    - `lpChangelogLink.js` — 拡張の版番号から、紹介ページの「その版の説明」への URL を作る（純関数）。
+    - `lpChangelogPage.js` — 紹介ページの「更新履歴（全版）」HTML を作る（純関数・副作用なし）。
     - `lpContentStaleness.js` — 【層】L0 判定層(純粋関数・I/O禁止)
     - `lpContentStaleness.test.js`
     - `lpImages.test.js`
@@ -4064,7 +4061,7 @@
   - `kouhaku_og.py`
   - `og-live-compose.py`
   - `render-og.js` — 追憶の煌めき LP 用 OG 画像（1200×630）を生成する。
-- 📁 **tsuioku-no-kirameki/** (84)
+- 📁 **tsuioku-no-kirameki/** (83)
   - 📁 **articles/** (14)
     - 📁 **role-separation-design/** (2)
       - 📁 **img/** (1)
@@ -4156,10 +4153,9 @@
   - 📁 **sound/** (1)
     - `yozora-small-yell.mp3`
   - `.htaccess`
+  - `changelog.html`
   - `google7e3e79636d884c2.html`
   - `google7e3e79636d884c2f.html`
-  - `index.html`
-  - `index.html`
   - `index.html`
   - `privacy.html`
   - `robots.txt`

@@ -885,7 +885,7 @@
 - **影響範囲ゲート(規律を自動化)** — 星野ロミ式「規律を自動ゲートに」。diff から影響大(複数機能波及)の変更ファイルを検出し波及先機能を列挙。警告のみ(摩擦ゼロ)・--strict で exit1。AGENTS.md §10 のルールを diff 発火に
   - `scripts/impact-check.mjs`
   - `docs/feature-map/impact-map.json`
-<details><summary>🗂 このカテゴリの全担当ファイル(自動分類) 94</summary>
+<details><summary>🗂 このカテゴリの全担当ファイル(自動分類) 97</summary>
 
 - `extension/status-guard.js` — 状態速報ページ(status.html)の「何があっても開く」保険。
 - `mobile/scripts/verify-android-signing-config.mjs` — Android「未署名 AAB 出荷事故」防止ゲート。
@@ -897,6 +897,7 @@
 - `scripts/council-env.mjs` — 会議ハーネスに必要な env の診断と流し込み（2026-08-25 新設）
 - `scripts/loop-adapter-status-live.mjs` — 自己改善ループの「アダプタ」: 状態速報(status:live --json)→症状カード。
 - `scripts/loop-glossary-status-live.mjs` — 自己改善ループの「用語集」を、拡張のコードから機械的に作る。
+- `scripts/lp-changelog-page.mjs` — 紹介ページの「更新履歴（全版）」tsuioku-no-kirameki/changelog.html を changelog から書き直す。
 - `scripts/perf-ab/profile-status.mjs` — 診断ページ(status.html)自身のメインスレッド CPU プロファイル。「診断ページが重くて出てこない」の原因探し用。
 - `scripts/perf-ab/status-publish-repro.mjs` — 状態画面(status.html)が「自動公開(WEBへ2分ごとに送信)」を実際に試みるかを、一時プロファイルで再現する。
 - `scripts/run-verify-cc.mjs` — Claude Code 向け verify ランナー。
@@ -948,6 +949,8 @@
 - `src/lib/liveHealthScore.js` — 配信ごとの「健康チェック」5段階評価(純関数)。
 - `src/lib/liveviewPublishSelfDiag.js` — 純Web公開コピーの自己診断（council/status-self-diagnoses-SYNTHESIS.md）。
 - `src/lib/liveViewPublishSignature.js` — 状態速報「重さ根治 P4」: publishLiveViewPublishPayload(status-entry.js)は 3秒 min-gap を
+- `src/lib/lpChangelogLink.js` — 拡張の版番号から、紹介ページの「その版の説明」への URL を作る（純関数）。
+- `src/lib/lpChangelogPage.js` — 紹介ページの「更新履歴（全版）」HTML を作る（純関数・副作用なし）。
 - `src/lib/mcpDiagDumpServices.js` — ニコ生以外のサービス計器・タブを軽量ダンプするための純粋ロジック（L0）。
 - `src/lib/milestoneEffectDiag.js` — コメント数マイルストーン(100/200/500/1000/2000/3000/5000/10000件)の
 - `src/lib/milestoneEffectDiagKey.js` — コメント数マイルストーンの「検知→演出→効果音」が揃っているかの観測値を popup-entry.js が
@@ -1632,7 +1635,7 @@
 ### 📥 コメント取得 (1版)
 - `v0.1.2210` 2026-11-24 — 配信者にゆっくり顔を出さない
 
-### 🏟 会場・席 (14版)
+### 🏟 会場・席 (13版)
 - `v0.1.2226` 2026-11-25 — 紹介ページの最初を、配信する人向けの説明にしました
 - `v0.1.2224` 2026-11-25 — 別窓の会場でも、声と吹き出しが同時に
 - `v0.1.2218` 2026-11-25 — コメントが速いときは画面の描き直しをまとめて、固まりにくく
@@ -1646,19 +1649,17 @@
 - `v0.1.2205` 2026-11-24 — 推定（視聴者の消費）の対象をミクチャへ拡大
 - `v0.1.2203` 2026-11-24 — 推定購入額・消費をKick/Twitch/ツイキャスへ拡大
 - `v0.1.2202` 2026-11-24 — ニコ生会場の推定同時接続と記録件数の表示ずれを修正
-- `v0.1.2201` 2026-11-23 — 会場・横欄・マーケレポートに「推定（視聴者の購入額）」を追加
 
 ### 🎈 吹き出し (2版)
 - `v0.1.2224` 2026-11-25 — 別窓の会場でも、声と吹き出しが同時に
 - `v0.1.2217` 2026-11-25 — コメントが多い配信でも会場が軽く動くように
 
-### 🎁 ギフト (6版)
+### 🎁 ギフト (5版)
 - `v0.1.2208` 2026-11-24 — 応援の数字を全サービスで先頭に表示
 - `v0.1.2206` 2026-11-24 — 推定（視聴者の消費）の対象をTikTok LIVEへ拡大
 - `v0.1.2205` 2026-11-24 — 推定（視聴者の消費）の対象をミクチャへ拡大
 - `v0.1.2204` 2026-11-24 — ツイキャスのチケット基準円推定とTwitch出典裏取りを追加
 - `v0.1.2203` 2026-11-24 — 推定購入額・消費をKick/Twitch/ツイキャスへ拡大
-- `v0.1.2201` 2026-11-23 — 会場・横欄・マーケレポートに「推定（視聴者の購入額）」を追加
 
 ### 🔊 読み上げ (5版)
 - `v0.1.2224` 2026-11-25 — 別窓の会場でも、声と吹き出しが同時に
@@ -1673,6 +1674,7 @@
 ### ⚡ 描画・性能 (1版)
 - `v0.1.2221` 2026-11-25 — コメントが届くたびの画面の描き直しを小さく
 
-### その他 (2版)
+### その他 (3版)
+- `v0.1.2229` 2026-11-25 — この版で変わったことを短く・版番号から説明へ
 - `v0.1.2222` 2026-11-25 — 別窓の幅が広がったままにならないようにした
 - `v0.1.2219` 2026-11-25 — 更新したら「この版で変わったこと」が出ます

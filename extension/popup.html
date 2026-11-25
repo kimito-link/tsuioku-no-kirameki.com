@@ -2046,7 +2046,8 @@
         font-variant-numeric: tabular-nums;
         letter-spacing: 0.02em;
         width: fit-content;
-        cursor: help;
+        cursor: pointer;
+        text-decoration: none;
       }
 
       .nl-version-badge__label {
@@ -2433,6 +2434,8 @@
         font-size: 12px;
         color: var(--nl-accent);
         letter-spacing: 0.02em;
+        text-decoration: underline;
+        text-underline-offset: 2px;
       }
 
       .nl-changelog-entry__date {
@@ -2443,31 +2446,30 @@
       .nl-changelog-entry__summary {
         font-size: 11.5px;
         font-weight: 600;
-        margin-left: auto;
         color: var(--nl-text-sub, var(--nl-muted));
       }
 
-      .nl-changelog-entry__items {
-        margin: 0;
-        padding-left: 18px;
-        /* v0.1.333: padding-left 込みで親幅に収める（list-style 分が右へ押し出さない）。 */
-        box-sizing: border-box;
-        max-width: 100%;
+      .nl-changelog-more {
+        margin: 8px 0 0;
+        font-size: 11px;
+        line-height: 1.5;
+        color: var(--nl-muted);
       }
 
-      .nl-changelog-entry__items li {
-        margin: 2px 0;
-        line-height: 1.4;
-        /* 長い語も折り返して枠内に収める（見切れ防止）。 */
-        overflow-wrap: anywhere;
-        word-break: break-word;
+      .nl-changelog-more a {
+        color: var(--nl-accent);
+        font-weight: 700;
       }
 
       /* 0.1.2216: 更新した直後だけ出す「この版で変わったこと」。
          視聴ページへの埋め込みでは出さない（横の欄・ツールバーでは出す）。 */
       .nl-whats-new-notice {
+        display: flex;
+        flex-wrap: wrap;
+        align-items: center;
+        gap: 4px 10px;
         margin: 0 0 10px;
-        padding: 8px 10px;
+        padding: 6px 10px;
         border: 1px solid var(--nl-border);
         border-radius: 10px;
         background: var(--nl-bg-soft);
@@ -2475,44 +2477,46 @@
         max-width: 100%;
         color: var(--nl-text);
       }
-      .nl-whats-new-notice__title {
-        margin: 0 0 4px;
-        font-size: 12.5px;
-        font-weight: 700;
-        color: var(--nl-accent);
+      .nl-whats-new-notice[hidden] {
+        display: none;
       }
+      /* 0.1.2229: 中は「版番号＋一言」だけ（詳しい説明は紹介ページ）。 */
       .nl-whats-new-notice__head {
         display: flex;
         flex-wrap: wrap;
-        gap: 6px;
+        gap: 2px 6px;
         align-items: baseline;
-        margin: 0 0 4px;
+        flex: 1 1 200px;
+        min-width: 0;
+        margin: 0;
         font-size: 11.5px;
+        line-height: 1.4;
       }
-      .nl-whats-new-notice__version {
+      .nl-whats-new-notice__title {
+        font-size: 12px;
         font-weight: 700;
+        color: var(--nl-accent);
+      }
+      .nl-whats-new-notice__version,
+      .nl-whats-new-notice__more {
+        font-weight: 700;
+        color: var(--nl-accent);
+        text-decoration: underline;
+        text-underline-offset: 2px;
+        font-variant-numeric: tabular-nums;
       }
       .nl-whats-new-notice__summary {
         font-weight: 600;
-        color: var(--nl-text-sub, var(--nl-muted));
-      }
-      .nl-whats-new-notice__items {
-        margin: 0 0 8px;
-        padding-left: 18px;
-        font-size: 11.5px;
-        line-height: 1.45;
-        box-sizing: border-box;
-        max-width: 100%;
-      }
-      .nl-whats-new-notice__items li {
-        margin: 2px 0;
+        color: var(--nl-text);
         overflow-wrap: anywhere;
-        word-break: break-word;
       }
       .nl-whats-new-notice__actions {
         display: flex;
         flex-wrap: wrap;
-        gap: 8px;
+        align-items: center;
+        gap: 10px;
+        margin-left: auto;
+        font-size: 11.5px;
       }
       .nl-whats-new-notice__actions button {
         font-size: 11.5px;
@@ -11087,6 +11091,7 @@
       >
       <!--
         v0.1.2216: 新しい版に更新したあと、一度だけ「この版で変わったこと」を出す。
+        v0.1.2229: 中は「版番号＋一言」だけ。版番号と「詳しく」は紹介ページのその版を新しいタブで開く。
         既定 hidden。JS が覚えた版より新しいときだけ hidden を外す。
         視聴ページへの埋め込みでは出さない（横の欄・ツールバーでは出す）。
       -->
@@ -11096,15 +11101,26 @@
         hidden
         aria-label="この版で変わったこと"
       >
-        <p class="nl-whats-new-notice__title">この版で変わったこと</p>
-        <div class="nl-whats-new-notice__head">
-          <span id="whatsNewNoticeVersion" class="nl-whats-new-notice__version"></span>
+        <p class="nl-whats-new-notice__head">
+          <span class="nl-whats-new-notice__title">この版で変わったこと</span>
+          <a
+            id="whatsNewNoticeVersion"
+            class="nl-whats-new-notice__version"
+            href="https://tsuioku-no-kirameki.com/changelog.html"
+            target="_blank"
+            rel="noopener noreferrer"
+          ></a>
           <span id="whatsNewNoticeSummary" class="nl-whats-new-notice__summary"></span>
-        </div>
-        <ul id="whatsNewNoticeItems" class="nl-whats-new-notice__items"></ul>
+        </p>
         <div class="nl-whats-new-notice__actions">
+          <a
+            id="whatsNewNoticeMore"
+            class="nl-whats-new-notice__more"
+            href="https://tsuioku-no-kirameki.com/changelog.html"
+            target="_blank"
+            rel="noopener noreferrer"
+          >詳しく</a>
           <button type="button" id="whatsNewNoticeClose">閉じる</button>
-          <button type="button" id="whatsNewNoticeOpenLog">更新履歴を見る</button>
         </div>
       </aside>
       <!--
@@ -13071,16 +13087,18 @@
       <details class="nl-dev-monitor-details" id="devMonitorDetails">
         <summary>詳しい状況（開発・切り分け用・折りたたみ）</summary>
         <div class="nl-dev-monitor-details__body">
-          <div
+          <a
             id="nlVersionBadge"
             class="nl-version-badge"
-            role="status"
-            aria-label="拡張バージョン（新ビルド反映の確認用）"
-            title="左の v… は manifest の版（bump しないと変わりません）。b… がビルド時刻です。npm run build のあと chrome://extensions で「更新」し、watch ページも再読み込みしてください。"
+            href="https://tsuioku-no-kirameki.com/changelog.html"
+            target="_blank"
+            rel="noopener noreferrer"
+            aria-label="拡張バージョン（押すと紹介ページでこの版の説明を開く）"
+            title="左の v… は manifest の版（bump しないと変わりません）。b… がビルド時刻です。押すと紹介ページでこの版の説明を開きます。"
           >
             <span class="nl-version-badge__label">ビルド</span>
             <span id="nlVersionBadgeValue" class="nl-version-badge__value">—</span>
-          </div>
+          </a>
           <div
             id="storyAvatarDiagDevMonitor"
             class="nl-story-diag-dev"
@@ -13379,6 +13397,14 @@
           </summary>
           <div class="nl-frame-theme-details__body">
             <ol id="changelogList" class="nl-changelog-list" aria-live="polite"></ol>
+            <p class="nl-changelog-more">
+              版番号を押すと、紹介ページでその版の詳しい説明が開きます。
+              <a
+                href="https://tsuioku-no-kirameki.com/changelog.html"
+                target="_blank"
+                rel="noopener noreferrer"
+              >すべての版の更新履歴</a>
+            </p>
           </div>
         </details>
       </section>

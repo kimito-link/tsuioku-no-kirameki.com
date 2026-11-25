@@ -40,11 +40,20 @@ export function safeHttpUrl(v) {
 }
 
 /**
+ * v0.1.2226: 桁区切りの整形係を1つだけ作って使い回す(出る文字は toLocaleString('ja-JP') と同じ=仕様上同じ整形係)。
+ *   Chrome では toLocaleString('ja-JP') が呼ぶたびに整形係を作り直し、1回約9.5µs(使い回すと約0.26µs・箱の実測)。
+ *   横の欄は描き直しのたびに全タイルの数字(🎁/📣/💬・+N件)を整形するので、遅い PC で積み上がっていた。
+ */
+const JA_NUMBER_FORMAT = typeof Intl !== 'undefined' && typeof Intl.NumberFormat === 'function' ? new Intl.NumberFormat('ja-JP') : null;
+
+/**
  * 整数を日本語ロケールの桁区切りで(12757 → "12,757")。数にならないものは "0"。
  * @param {unknown} n
  * @returns {string}
  */
 export function formatNumberJa(n) {
   const v = Number(n);
-  return (Number.isFinite(v) ? v : 0).toLocaleString('ja-JP');
+  const x = Number.isFinite(v) ? v : 0;
+  return JA_NUMBER_FORMAT ? JA_NUMBER_FORMAT.format(x) : x.toLocaleString('ja-JP');
 }
+

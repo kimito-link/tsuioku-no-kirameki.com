@@ -5700,6 +5700,9 @@
       .lp-whats-new-box__items{margin:0 0 14px;padding-left:1.2em;font-size:.9rem;line-height:1.7;color:var(--ink)}
       .lp-whats-new-recent-lead{margin:0 0 6px;font-size:.86rem;font-weight:700;color:var(--ink)}
       .lp-whats-new-recent{margin:0;padding-left:1.2em;font-size:.86rem;line-height:1.65;color:var(--muted)}
+      .lp-whats-new-recent a,.lp-whats-new-box__ver{color:inherit;text-underline-offset:2px}
+      .lp-whats-new-all{margin:10px 0 0;font-size:.86rem;color:var(--muted)}
+      .lp-whats-new-all a{font-weight:700}
       .lp-trust-grid{display:grid;grid-template-columns:1fr;gap:14px;margin-top:var(--space-sm)}
       @media (min-width:760px){.lp-trust-grid{grid-template-columns:repeat(2,minmax(0,1fr))}}
       .lp-trust-card{
@@ -6656,7 +6659,7 @@
             <div class="section-head">
               <h2 id="lp-whats-new-heading">この版で変わったこと</h2>
               <p class="lp-whats-new-box__lead">
-                <strong>v0.1.2230</strong>
+                <a class="lp-whats-new-box__ver" href="/changelog.html#v0.1.2230"><strong>v0.1.2230</strong></a>
                 <span data-whats-new-summary>「記録」の数が、保存したコメントより多く出たままになるのを直しました</span>
               </p>
             </div>
@@ -6666,14 +6669,49 @@
             </ul>
             <p class="lp-whats-new-recent-lead">直近の版</p>
             <ul class="lp-whats-new-recent">
-              <li data-whats-new-recent="0.1.2226"><strong>v0.1.2226</strong> 紹介ページの最初を、配信する人向けの説明にしました</li>
-              <li data-whats-new-recent="0.1.2224"><strong>v0.1.2224</strong> 別窓の会場でも、声と吹き出しが同時に</li>
-              <li data-whats-new-recent="0.1.2222"><strong>v0.1.2222</strong> 別窓の幅が広がったままにならないようにしました。</li>
-              <li data-whats-new-recent="0.1.2221"><strong>v0.1.2221</strong> コメントが届くたびの画面の描き直しを小さくしました。</li>
-              <li data-whats-new-recent="0.1.2219"><strong>v0.1.2219</strong> 更新したあと「この版で変わったこと」が一度だけ出るようになりました。</li>
-              <li data-whats-new-recent="0.1.2215"><strong>v0.1.2215</strong> 記録の保存が、使っていない画面を重くしにくくなりました。</li>
-              <li data-whats-new-recent="0.1.2214"><strong>v0.1.2214</strong> ふつうのノートPCでは客席の動きはそのまま、忙しいときだけゆるくして軽くします。</li>
+              <li data-whats-new-recent="0.1.2229"><a href="/changelog.html#v0.1.2229"><strong>v0.1.2229</strong></a> この版で変わったことを短くし、版番号から説明へ飛べるようにしました。</li>
+              <li data-whats-new-recent="0.1.2228"><a href="/changelog.html#v0.1.2228"><strong>v0.1.2228</strong></a> 遅いPCでも横の欄がコメントで詰まりにくくしました。</li>
+              <li data-whats-new-recent="0.1.2227"><a href="/changelog.html#v0.1.2227"><strong>v0.1.2227</strong></a> 応援の演出と数字をそろえ、配信者の受取（推定）を追加しました。</li>
+              <li data-whats-new-recent="0.1.2226"><a href="/changelog.html#v0.1.2226"><strong>v0.1.2226</strong></a> 紹介ページの最初を、配信する人向けの説明にしました。</li>
+              <li data-whats-new-recent="0.1.2224"><a href="/changelog.html#v0.1.2224"><strong>v0.1.2224</strong></a> 別窓の会場でも、声と吹き出しが同時に出るようにしました。</li>
+              <li data-whats-new-recent="0.1.2222"><a href="/changelog.html#v0.1.2222"><strong>v0.1.2222</strong></a> 別窓の幅が広がったままにならないようにしました。</li>
+              <li data-whats-new-recent="0.1.2221"><a href="/changelog.html#v0.1.2221"><strong>v0.1.2221</strong></a> コメントが届くたびの画面の描き直しを小さくしました。</li>
+              <li data-whats-new-recent="0.1.2219"><a href="/changelog.html#v0.1.2219"><strong>v0.1.2219</strong></a> 更新したあと「この版で変わったこと」が一度だけ出るようになりました。</li>
+              <li data-whats-new-recent="0.1.2215"><a href="/changelog.html#v0.1.2215"><strong>v0.1.2215</strong></a> 記録の保存が、使っていない画面を重くしにくくなりました。</li>
+              <li data-whats-new-recent="0.1.2214"><a href="/changelog.html#v0.1.2214"><strong>v0.1.2214</strong></a> ふつうのノートPCでは客席の動きはそのまま、忙しいときだけゆるくして軽くします。</li>
             </ul>
+            <p class="lp-whats-new-all"><a href="/changelog.html">すべての版の更新履歴を見る</a>（版番号ごとに決まった場所があります）</p>
+          </div>
+        </div>
+      </section>
+
+      <section class="section" id="lp-support-counting" aria-labelledby="lp-support-counting-heading" data-lp-feature="support-counting">
+        <div class="shell">
+          <div class="board">
+            <div class="section-head">
+              <h2 id="lp-support-counting-heading">応援の数え方と、円にするもの・しないもの（v0.1.2227）</h2>
+              <p>会場で投げの演出と効果音が出た応援は、横の欄・ページ内パネル・会場の帯・マーケ分析のどれかの数字が必ず動きます（全サービス同じ決まり）。円の推定は、<strong>公式が値段や率を公開しているものだけ</strong>です。公式に無い数字は作らず「—」と出し、件数や pt だけを数えます。「推定（配信者の受取）」の欄はどのサービスでも同じ場所（推定（視聴者の購入額）のすぐ後ろ）にあり、率が非公開のサービスは「—（公式の率が非公開）」と出します。</p>
+            </div>
+            <div class="lp-pf-overview-wrap">
+              <table class="lp-pf-overview" aria-label="応援の数え方と円にするもの">
+                <thead>
+                  <tr><th>サービス</th><th>数えるもの（演出が出る応援）</th><th>推定（視聴者の購入額）</th><th>推定（配信者の受取）</th></tr>
+                </thead>
+                <tbody>
+                  <tr><td><strong>YouTube</strong></td><td>スーパーチャット・スーパーステッカー（通貨ごとの合計と件数）、メンバー加入、メンバーギフト、ギフト（ジュエル・件数）</td><td>スパチャ・ステッカーを ECB 基準為替で円に</td><td>スパチャ・ステッカーの 70%（YouTube ヘルプ）。メンバーとジュエルのギフトは値段が記録に出ないので入れません</td></tr>
+                  <tr><td><strong>Twitch</strong></td><td>Bits、サブスク、ギフトサブ、レイド</td><td>サブスク・ギフトサブ（Tier 1 $4.99 など）</td><td>Bits 1つにつき 1セント（Twitch Partners）。サブスクの取り分は契約で変わるので入れません</td></tr>
+                  <tr><td><strong>Kick</strong></td><td>KICKs（数）、サブスク、ギフトサブ、ホスト</td><td>サブスク・ギフトサブ 1件 $5</td><td>サブスク・ギフトサブ 1件 $4.75（Kick ヘルプの 95%）。KICKs は 1 KICK の値段が公式に無いので入れません</td></tr>
+                  <tr><td><strong>SHOWROOM</strong></td><td>ギフトの pt と件数（一覧に無いギフトも件数に入ります。星・種の無料ギフトは記録しません）</td><td>出しません（「1G＝1円」の公式の表記が無いため）</td><td>—（公式の率が非公開）。シェア率は非公開と公式が明記</td></tr>
+                  <tr><td><strong>ミクチャ</strong></td><td>ギフトのコインと件数、ファン登録</td><td>1コイン 1.2円（公式 Web の最小パック）</td><td>—（公式の率が非公開）。公式の分配率が見当たらない</td></tr>
+                  <tr><td><strong>TikTok LIVE</strong></td><td>ギフトのコインと件数、フォロー</td><td>1コイン 56/30円（公式 Web の最小パック）</td><td>—（公式の率が非公開）。公式の固定の率が見当たらない</td></tr>
+                  <tr><td><strong>ふわっち</strong></td><td>アイテムの個数と件数</td><td>出しません（値段がコメントにも公開の情報にも出ず、セットで 1個の値段が変わるため）</td><td>—（公式の率が非公開）。ポイントの付与条件は非公開と公式が明記</td></tr>
+                  <tr><td><strong>ツイキャス</strong></td><td>アイテムの件数（お茶も含む）、お茶爆の消費 pt</td><td>公式チケット表にあるお茶爆（チケット基準）。お茶は入れません</td><td>—（公式の率が非公開）。公式の率が見当たらない</td></tr>
+                  <tr><td><strong>ニコ生</strong></td><td>公式のギフト pt・広告 pt</td><td>ギフト 1pt＝1円</td><td>—（公式の率が非公開）。奨励金の計算は非公開</td></tr>
+                  <tr><td><strong>ABEMA</strong></td><td>応援は記録しません（コメントのみ）</td><td>—</td><td>—（応援を記録しないので欄も出しません）</td></tr>
+                </tbody>
+              </table>
+            </div>
+            <p style="margin:12px 0 0">「推定（配信者の受取）」は<strong>手数料・税差引前の目安</strong>です。事務所・MCN との契約、iOS の手数料、地方消費税、源泉徴収などで実際の額は変わります。率と出典・確認日（2026-11-25）は、拡張のカードの説明とマーケ分析の注記に書いてあります。数字はこの PC で記録を始めてから後の分です。</p>
           </div>
         </div>
       </section>
@@ -9269,8 +9307,10 @@
             <p><strong>会場でも配信の数字が見える（v0.1.1960〜2005）</strong> — 横の欄の上にある<strong>記録・推定同時接続・来場者数・本家コメ・経過・広告pt・ギフトpt</strong>を、会場モードのヘッダーにも同じ数字で出します。横の欄を開いていなくても数字が出ます（v0.1.1995）。開いた直後の古い数字で止まらないようにしました（v0.1.2031）。ニコ生でも YouTube でも出ます。</p>
             <p id="lp-feat-1916"><strong>Kick・ふわっち・SHOWROOM・ミクチャ・TikTok LIVE にも対応（v0.1.2036）</strong> — それぞれの配信ページを開くと、ニコ生・YouTube・Twitch と同じ<strong>サイドパネル・同じ使い方</strong>でコメントと応援（ギフト・アイテム）を記録し、読み上げ・会場モード・振り返りまで使えます。記録はこの PC の中だけに保存し、外へは送りません。<strong>ABEMA（abema.tv）の放送ページ</strong>でも、そのページが受け取っているコメントを同じ画面で記録します。</p>
             <p id="lp-feat-2087"><strong>ツイキャスにも対応・どのサービスでもギフト音（v0.1.2087〜2097）</strong> — ツイキャスの配信ページでも同じサイドパネルでコメントとギフトを記録できます。会場モードのギフト・広告・順位の効果音は、YouTube・Twitch・Kick・ツイキャスなどの会場でも<strong>最初の1回目からきちんと鳴ります</strong>。</p>
+            <p id="lp-perf-2228"><strong>遅いPCでも横の欄がコメントで詰まりにくく（v0.1.2228）</strong> — コメントが速い配信で、横の欄（サイドパネル）が<strong>同じ描き直しを2回</strong>していたところを1回にし、数字や名前が変わっていないアイコン・応援レーンのタイルは書き直さないようにしました。CPU を4倍遅くした試験（8コメント/秒・90秒）では、横の欄が固まっていた時間が<strong>約16秒→約12秒</strong>に減りました。表示される数字・並び・見た目は変わらず、コメントも1件も捨てません。</p>
             <p id="lp-feat-2158"><strong>応援が届いた時刻とフォロワーの増え方（v0.1.2155〜2167）</strong> — マーケティングレポートの先頭に、応援（ギフト・スーパーチャット・フォローなど）が届いた時刻と、その直前のコメントを出します。配信中のフォロワー（チャンネル登録者・ファン・サポーター）の始まりと終わり、増えた時間も同じ章に出します。応援も人数の標本も無いときは、この章は出しません。</p>
             <p id="lp-feat-2230"><strong>「記録」の数は、保存したコメントの数と同じ（v0.1.2230）</strong> — コメントが速いときや、まとめて取り込んだときも、同じコメントを二重に数えません。横の欄・会場の「記録」は、この PC に保存したコメントの数と同じになります。一度出た数が途中で減って見えないしくみはそのままです。</p>
+            <p id="lp-feat-2229"><strong>更新したら版番号と一言だけ・詳しくは更新履歴へ（v0.1.2229）</strong> — 拡張を新しい版にすると、ポップアップや横の欄に<strong>版番号と一言</strong>だけが一度出ます。版番号か「詳しく」を押すと、<a href="/changelog.html">すべての版の更新履歴</a>のその版が開きます。古い版の場所もずっと残すので、拡張から開いたリンクが切れません。</p>
             <p><strong>会場からコメント・ギフト（v0.1.1867〜1883）</strong> — 会場モードのまま下の入力欄から<strong>コメントを送れます</strong>。「🎁 ギフト」を押すと公式のギフト画面が開き、会場の上には<strong>公式と同じアイテム</strong>（1,000pt まで・安い順）が並びます。押すとまず値段を出し、もう一度押すとニコニコ公式の購入の手続きを通して贈ります。</p>
             <p><strong>常連さん・応援者が金色に光る（v0.1.739）</strong> — その配信で<strong>よく発言してくれる常連さん</strong>や<strong>ギフトを送ってくれた人</strong>の席を、やわらかい<strong>金色のオーラ</strong>でそっと光らせます（上位の方だけ）。誰が会場を支えてくれているか、ひと目で伝わります。</p>
             <p><strong>サムネ持ちが一目で特別に（v0.1.744）</strong> — <strong>本物の顔写真アイコンを持つ人を、はっきり大きく＋金色の縁</strong>で際立たせます。これまでは差が小さく分かりにくかったのを、<strong>「大きさと金縁」だけ</strong>で（動かさず上品に）一目で伝わるようにしました。</p>

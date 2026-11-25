@@ -175,6 +175,8 @@ export function sectionPlatformDedicatedHtml(comments, view, pageCount, pageFact
   let milestoneMax = 0;
   /** ギフト・アイテムの名前がある応援の行数(件数のカード・v0.1.2207) */
   let giftRows = 0;
+  /** YouTube のスーパーチャット・ステッカーの件数(横の欄の「スパチャ N件」と同じ数・v0.1.2227) */
+  let paidChatRows = 0;
   /** @type {number[]} */
   const months = [];
   for (const c of rows) {
@@ -205,6 +207,7 @@ export function sectionPlatformDedicatedHtml(comments, view, pageCount, pageFact
       if (!prev.unit) prev.unit = unit;
       giftNames.set(giftName, prev);
     }
+    if (kind === 'superchat' || kind === 'sticker') paidChatRows += 1;
     if (EXTRA_KIND_LABEL[kind]) extraKinds.set(kind, (extraKinds.get(kind) || 0) + 1);
     if (kind === 'tw_milestone' && Number.isFinite(amt) && amt > 0) milestoneMax = Math.max(milestoneMax, Math.floor(amt));
     if (kind === 'tw_raid') {
@@ -244,8 +247,9 @@ export function sectionPlatformDedicatedHtml(comments, view, pageCount, pageFact
   const spends = Array.isArray(extra?.estimatedSpends) ? extra.estimatedSpends : [];
   /** @type {string[]} */
   const spendNotes = [];
-  if (spends.length) {
-    for (const sp of spends) {
+  const viewerSpends = spends.filter((sp) => sp.key !== 'estimatedStreamerTakeHome');
+  if (viewerSpends.length) {
+    for (const sp of viewerSpends) {
       cards.push([sp.label, sp.text]);
       spendNotes.push(`${sp.note}（出典: ${sp.sourceUrl}）`);
     }
@@ -253,11 +257,20 @@ export function sectionPlatformDedicatedHtml(comments, view, pageCount, pageFact
     cards.push([ESTIMATED_VIEWER_SPEND_LABEL, '—']);
     spendNotes.push(ESTIMATED_VIEWER_SPEND_EMPTY_NOTE);
   }
+  // 配信者の受取（推定）は視聴者の推定のすぐ後ろ。公式の率が無いサービスは理由つきの「—」(v0.1.2227)
+  for (const sp of spends.filter((x) => x.key === 'estimatedStreamerTakeHome')) {
+    cards.push([sp.label, sp.text]);
+    spendNotes.push(sp.sourceUrl ? `${sp.note}（${sp.sourceUrl}）` : sp.note);
+  }
   if (view.pageCountLabel && pageCount > 0) cards.push([view.pageCountLabel, `${pageCount.toLocaleString('ja-JP')}`]);
   for (const [cur, sum] of byCur) {
     cards.push([CURRENCY_LABEL[cur] || `${cur} の合計（記録）`, String(sum)]);
   }
-  if (giftRows > 0) cards.push([`${view.giftWord || 'ギフト'}の件数（記録）`, `${giftRows.toLocaleString('ja-JP')}件`]);
+  if (view.id === 'youtube') {
+    // YouTube で名前のある応援はジュエルのギフトだけ。スパチャの件数とは分けて、横の欄と同じ言葉で出す(v0.1.2227)
+    if (paidChatRows > 0) cards.push(['スーパーチャット・ステッカーの件数（記録）', `${paidChatRows.toLocaleString('ja-JP')}件`]);
+    if (giftRows > 0) cards.push(['ギフトの件数（記録）', `${giftRows.toLocaleString('ja-JP')}件`]);
+  } else if (giftRows > 0) cards.push([`${view.giftWord || 'ギフト'}の件数（記録）`, `${giftRows.toLocaleString('ja-JP')}件`]);
   if (subs > 0) cards.push(['新しいサブスク', `${subs}件`]);
   if (resubs > 0) cards.push(['継続のサブスク', `${resubs}件`]);
   if (giftSubs > 0) cards.push(['ギフトサブ', `${giftSubs}件`]);
@@ -293,7 +306,7 @@ export function sectionPlatformDedicatedHtml(comments, view, pageCount, pageFact
     for (const chip of panelExtraChips(view.id, pageFacts)) {
       if (chip.placeholder) continue;
       if (chip.key === 'totalViews' && pageCount > 0) continue;
-      if (chip.key === 'estimatedViewerSpend' || chip.key === 'estimatedViewerConsumption') continue;
+      if (chip.key === 'estimatedViewerSpend' || chip.key === 'estimatedViewerConsumption' || chip.key === 'estimatedStreamerTakeHome') continue;
       cards.push([`ページの${chip.label}`, chip.text]);
     }
   }

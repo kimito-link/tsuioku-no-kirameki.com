@@ -2,6 +2,8 @@
 // popup-entry.js — ポップアップ UI 本体。応援レーン描画・HTMLレポート生成・各種診断/共有のまとめ役。
 // v0.1.1580: 拡張プロセスの忙しさ台帳(文書別・ページを開かなくても犯人を名指しする)。import するだけで起動。
 import { createShortLivedMemo } from '../lib/shortLivedMemo.js';
+import { replayClassAnimation } from '../lib/replayClassAnimation.js';
+import { createElementValuesMemo } from '../lib/elementValuesMemo.js';
 import '../lib/extDocBusyCensusBoot.js';
 // v0.1.1686: ちらつき計(サイドパネルの popup だけ・画面の書き換えを数えて状態速報に出す)。import するだけで起動。
 import '../lib/flickerMeterBoot.js';
@@ -467,7 +469,7 @@ import {
   normalizeRecentCheerKeys
 } from '../lib/cheerPalette.js';
 import { EXTENSION_CHANGELOG } from '../lib/changelog.js';
-import { wireWhatsNewNotice } from './whatsNewNoticeUi.js';
+import { wireWhatsNewNotice, applyLpChangelogLink } from './whatsNewNoticeUi.js';
 import { detectCommentKindnessNudge } from '../lib/commentKindnessNudge.js';
 import { resolveCommentKindnessDisplayModel } from '../lib/commentKindnessDisplayModel.js';
 import {
@@ -488,7 +490,8 @@ import {
 import {
   panelSummaryStorageKey,
   isPanelLiveSummary,
-  watchSnapshotFromPanelSummary
+  watchSnapshotFromPanelSummary,
+  mergeWatchSnapshotWithPanelSummary
 } from '../lib/panelLiveSummary.js';
 import { resolveStoryDiagTotal } from '../lib/storyDiagTotalSource.js';
 import { perfDiagStorageKey, buildPerfDiag } from '../lib/perfDiag.js';
@@ -566,6 +569,7 @@ import {
   decorateTickerLine,
   makeTickerPickDiag,
   pickTickerHighlightEntry,
+  createTickerLastUserTracker,
   recordTickerPick,
   tickerArgsFromMirrorRow,
   tickerHighlightKey
@@ -1244,14 +1248,13 @@ function triggerCharaReaction(iconEl, { delta, thresholds, images }) {
   const bounceClass = `nl-chara-bounce-${rank}`;
 
   /** @type {HTMLImageElement} */ (iconEl).src = images[rank];
-  for (const c of CHARA_BOUNCE_CLASSES) iconEl.classList.remove(c);
-  void /** @type {HTMLElement} */ (iconEl).offsetWidth;
-  iconEl.classList.add(bounceClass);
+  replayClassAnimation(iconEl, bounceClass, CHARA_BOUNCE_CLASSES);
 
   const prev = _charaRevertTimers.get(iconEl);
   if (prev) clearTimeout(prev);
   _charaRevertTimers.set(iconEl, window.setTimeout(() => {
     /** @type {HTMLImageElement} */ (iconEl).src = images.default;
+    for (const c of CHARA_BOUNCE_CLASSES) iconEl.classList.remove(c);
     _charaRevertTimers.delete(iconEl);
   }, 600));
 }
@@ -3088,7 +3091,8 @@ function commentTickerDisplayLabel(entry, liveId, entries) {
 
 /** v0.1.1226: ティッカー選定の計器と、直前に選ばれた userId(1人占拠の防止・匿名には効かせない)。 */
 const _tickerPickDiag = makeTickerPickDiag();
-let _tickerLastUserId = '';
+// v0.1.2228: 「直前の人」は7秒バケット単位(同じバケットの中で A↔B を交互に書き直さない)。
+const _tickerLastUser = createTickerLastUserTracker();
 
 /** @param {PopupCommentEntry[]} comments */
 function renderCommentTicker(comments) {
@@ -3104,7 +3108,8 @@ function renderCommentTickerImpl(comments) {
 
   const list = Array.isArray(comments) ? comments : [];
   // v0.1.1226: 「最新1件を流す」→「7秒バケットで選んだ1件を留める」(埋もれ対策・候補ゼロなら現状維持)。
-  const _picked = pickTickerHighlightEntry(list, Date.now(), { lastUserId: _tickerLastUserId });
+  const _tickerNow = Date.now();
+  const _picked = pickTickerHighlightEntry(list, _tickerNow, { lastUserId: _tickerLastUser.lastUserIdFor(_tickerNow) });
   recordTickerPick(_tickerPickDiag, _picked);
   const latest = /** @type {PopupCommentEntry|null} */ (_picked.entry);
   const placeholder =
@@ -3134,7 +3139,7 @@ function renderCommentTickerImpl(comments) {
   const _tickerKey = tickerHighlightKey(_picked);
   if (segA.dataset.nlTickerKey === _tickerKey) return;
   segA.dataset.nlTickerKey = _tickerKey;
-  _tickerLastUserId = String(latest.userId || '');
+  _tickerLastUser.noteShown(latest.userId);
   _tickerPickDiag.domWriteTotal += 1;
   segA.innerHTML = buildCommentTickerLatestHtml({
     label,
@@ -5357,9 +5362,7 @@ function triggerStoryFaceHop(avatarsEl) {
   }
   const face = avatarsEl.querySelector('.nl-story-face');
   if (!face) return;
-  face.classList.remove('is-hop');
-  void avatarsEl.offsetWidth;
-  face.classList.add('is-hop');
+  replayClassAnimation(face, 'is-hop');
   STORY_HOP_STATE.clearTimer = window.setTimeout(() => {
     face.classList.remove('is-hop');
     STORY_HOP_STATE.clearTimer = null;
@@ -6097,9 +6100,12 @@ function getStoryEntryByStableId(stableId) {
   return null;
 }
 
+/** v0.1.2223: 問い合わせ(MediaQueryList)は1つを使い回す。matches は生きた値なので、マウスの抜き差しにも追従する。 */
+let _storyHoverMql = /** @type {MediaQueryList|null} */ (null);
 function storyHoverPreviewEnabled() {
   if (typeof window.matchMedia !== 'function') return false;
-  return window.matchMedia('(hover: hover) and (pointer: fine)').matches;
+  if (!_storyHoverMql) _storyHoverMql = window.matchMedia('(hover: hover) and (pointer: fine)');
+  return _storyHoverMql.matches;
 }
 
 function cancelStoryHoverClearTimer() {
@@ -8614,6 +8620,9 @@ function applyStoryGrowthIconAttributes(img, index, isNew, accent) {
   // v0.1.1691: 匿名の仮の顔(SVG)が要求されたとき、メモリに合成済みの顔(PNG)があれば最初からそれを出す(作り直したマスでも仮顔→本顔の差し替えが出ない。レーンと同じ型)。
   const cachedFace = requestedTile.startsWith('data:image/svg+xml') ? cachedAnonymousFace(entry?.userId) : '';
   const displayTile = cachedFace || storyAvatarLoadGuard.pickDisplaySrc(requestedTile);
+  // v0.1.2228 STORY_GROWTH_CELL_MEMO: 書く中身を決める値(顔の読み込み結果・いまの src も含む)が前回と全部同じマスは何も書かない。
+  const memoVals = storyGrowthCellMemoValues(img, entry, index, isNew, accent, stable, selected, requestedTile, displayTile);
+  if (accent && STORY_GROWTH_CELL_MEMO.same(img, memoVals)) return; // accent 無し(窓全体に依存)は毎回書く
   // v0.1.1683: 同じ人の合成済みの顔(PNG)が出ているマスは、SVG の仮の顔へ戻して差し替え直さない(無駄な代入とちらつきを止める)。
   if (!isAnonymousFaceShown(img, entry?.userId, displayTile)) {
     storyGrowthImgAssignSrc(img, displayTile);
@@ -8688,6 +8697,16 @@ function applyStoryGrowthIconAttributes(img, index, isNew, accent) {
       : `${index + 1}件目`
   );
   setAttrIfChanged(img, 'alt', '');
+  memoVals[memoVals.length - 2] = img.className; memoVals[memoVals.length - 1] = img.getAttribute('src') || ''; // 書き終えた後の class/src で控える(外から足された class も従来どおり書き直す)
+  STORY_GROWTH_CELL_MEMO.set(img, memoVals);
+}
+
+const STORY_GROWTH_CELL_MEMO = createElementValuesMemo();
+/** マスに書く中身を決める値。最後の2つは「いまの class・src」。 @returns {unknown[]} */
+function storyGrowthCellMemoValues(img, entry, index, isNew, accent, stable, selected, requestedTile, displayTile) {
+  return [entry ? 1 : 0, index, isNew, stable, selected, requestedTile, displayTile, accent ? accent.ordinal : -1, accent ? accent.total : -1,
+    (STORY_GROWTH_STATE.sourceOffset || 0) > 0, storyHoverPreviewEnabled(), STORY_SOURCE_STATE.liveId, entry?.commentNo, entry?.userId, entry?.text,
+    storyGrowthDisplayLabel(entry, STORY_SOURCE_STATE.liveId), img.className, img.getAttribute('src') || ''];
 }
 
 /**
@@ -8706,8 +8725,12 @@ function createStoryGrowthCell(isNew, index, accent) {
   media.appendChild(img);
   cell.appendChild(media);
   applyStoryGrowthIconAttributes(img, index, isNew, accent);
+  STORY_GROWTH_FRESH_IMGS.add(img);
   return cell;
 }
+
+/** v0.1.2228: この syncStoryGrowth で作ったばかりのアイコン(同じ accent で書いた直後=patch で書き直さない。入口と patch の最後で空にする)。 @type {Set<HTMLImageElement>} */
+const STORY_GROWTH_FRESH_IMGS = new Set();
 
 /**
  * 現在の描画ウィンドウ（sourceOffset から count 件）の同一ユーザー ordinal/total を
@@ -8749,7 +8772,9 @@ function patchStoryGrowthIconsFromSource(root, opts = {}) {
     });
   } catch { /* 計器の失敗は描画を止めない */ }
   for (let i = 0; i < n; i += 1) {
-    applyStoryGrowthIconAttributes(/** @type {HTMLImageElement} */ (imgs[i]), i, false, {
+    const img = /** @type {HTMLImageElement} */ (imgs[i]);
+    if (STORY_GROWTH_FRESH_IMGS.has(img)) continue;
+    applyStoryGrowthIconAttributes(img, i, false, {
       ordinal: accent.ordinals[i] || 0,
       total: accent.totals[i] || 0
     });
@@ -8757,11 +8782,9 @@ function patchStoryGrowthIconsFromSource(root, opts = {}) {
   noteStoryGrowthIdentitiesNow(n);
   if (opts.pulseLast && n > 0) {
     const last = /** @type {HTMLImageElement} */ (imgs[n - 1]);
-    last.classList.remove('is-new');
-    void last.offsetWidth;
-    last.classList.add('is-new');
-    window.setTimeout(() => last.classList.remove('is-new'), 820);
+    if (replayClassAnimation(last, 'is-new')) window.setTimeout(() => last.classList.remove('is-new'), 820);
   }
+  STORY_GROWTH_FRESH_IMGS.clear();
 }
 
 /**
@@ -8885,6 +8908,7 @@ function appendStoryGrowthCells(root, from, to) {
  * @param {HTMLElement|null} root
  */
 function syncStoryGrowth(liveId, count, root) {
+  STORY_GROWTH_FRESH_IMGS.clear();
   const nextLiveId = String(liveId || '');
   const targetFull = Math.max(0, Math.floor(Number(count) || 0));
   // 上限を超える分は描画しない（直近 STORY_GROWTH_MAX_CELLS 件だけをウィンドウ表示）。
@@ -9645,60 +9669,6 @@ function paintOfficialNdgrGiftCard(snap) {
 
 let _prevConcurrentEstimated = /** @type {number|null} */ (null);
 let _prevViewerCount = /** @type {number|null} */ (null);
-
-/**
- * content の軽量サマリで snapshot の数値（公式・来場・同接）だけを補完する。
- * タイトル等は panel 側が空のため、既存 snapshot を上書きしない。
- *
- * @param {WatchPageSnapshot|null} snapshot
- * @param {unknown} panelSummary
- * @returns {WatchPageSnapshot|null}
- */
-function mergeWatchSnapshotWithPanelSummary(snapshot, panelSummary) {
-  if (!isPanelLiveSummary(panelSummary)) return snapshot;
-  const fromPanel = watchSnapshotFromPanelSummary(
-    /** @type {ReturnType<import('../lib/panelLiveSummary.js').buildPanelLiveSummary>} */ (
-      panelSummary
-    )
-  );
-  if (!fromPanel) return snapshot;
-  if (!snapshot || typeof snapshot !== 'object') {
-    return /** @type {WatchPageSnapshot} */ (fromPanel);
-  }
-  const out = { ...snapshot };
-  for (const field of [
-    'officialCommentCount',
-    'viewerCountFromDom',
-    'recentActiveUsers',
-    'streamAgeMin',
-    'officialStatsUpdatedAt',
-    'officialStatsFreshnessMs',
-    'officialCommentStatsUpdatedAt',
-    'officialCommentStatsFreshnessMs',
-    'officialViewerIntervalMs',
-    'officialStatisticsCommentsDelta',
-    'officialReceivedCommentsDelta',
-    'officialCommentSampleWindowMs',
-    'officialCaptureRatio'
-  ]) {
-    const value = /** @type {Record<string, unknown>} */ (fromPanel)[field];
-    if (typeof value === 'number' && Number.isFinite(value)) {
-      /** @type {Record<string, unknown>} */ (out)[field] = value;
-    }
-  }
-  // 古い panel / snapshot の officialViewerCount:0 は同接 direct を壊すため載せない。
-  const ovc = /** @type {Record<string, unknown>} */ (fromPanel).officialViewerCount;
-  if (
-    typeof ovc === 'number' &&
-    Number.isFinite(ovc) &&
-    ovc > 0
-  ) {
-    out.officialViewerCount = ovc;
-  } else if (ovc === 0 || ovc === null) {
-    delete /** @type {Record<string, unknown>} */ (out).officialViewerCount;
-  }
-  return /** @type {WatchPageSnapshot} */ (out);
-}
 
 /**
  * content からの NLS_EXPORT_PANEL_METRICS をカードに即反映する。
@@ -16356,9 +16326,8 @@ async function refresh() {
    *   幕だけ t+1238ms まで残る=約1.2秒「中身が見えない」。冪等なので後続は no-op。
    */
   if (shouldRevealCloakAfterFirstPaint({ snapshotCacheHit, freshRefresh: isFreshRefresh() }).revealNow) {
-    paintWatchPopupUi();
-    markPopupRefreshContentPainted();
-    revealPopupPrimaryOnce();
+    // ★v0.1.2228 CACHE_HIT_SINGLE_PAINT: ここでは描かない。下の本描画まで await が無く同じ仕事で続く=以前は同じ描き直しを2回していた。
+    //   await を足すならここで描く形に戻す(popupCacheHitSinglePaint.wiring.test.js)。
   }
 
   if (!snapshotCacheHit) {
@@ -17824,7 +17793,9 @@ const coalescedRefreshScheduler = createCoalescedRefreshScheduler({
   // ★v0.1.1981: 描き直しが重いときの間隔の上限を 1.5秒→20秒に(間隔は描き直しの時間の3倍)。1回が数秒かかる配信(8万行・遅い PC)で
   //   1.5秒ごとに描き直すと画面が描き直しだけで埋まる。軽い配信(1回 150ms 未満)は 450ms のまま。
   // ★v0.1.1985: 上限を 20秒→60秒に(定期の見回りの門と同じ上限)。間隔は「描き直し1回まるごとの時間」の3倍でも決まるようになった。
-  maxAdaptiveMs: 60_000
+  maxAdaptiveMs: 60_000,
+  // ★v0.1.2228: 会場・応援レーンと同じ決まり(renderCadence.js)にも従う=心拍が固まりかけ(200ms 以上)なら 800ms に1回まで。コメントは捨てない。
+  minIntervalMs: () => resolveListRenderGapMs({ baseMs: 0, recentLagMs: readExtDocRecentLagMs() })
 });
 /**
  * ★v0.1.1450: 北極星 tick(独立レーン描画)専用のスロットル。
@@ -18525,6 +18496,8 @@ function paintVersionBadge() {
     const buildId =
       typeof NL_BUILD_ID !== 'undefined' && NL_BUILD_ID ? String(NL_BUILD_ID) : 'dev';
     valueEl.textContent = `v${version}・b${buildId}`;
+    // 0.1.2229: 版番号を押すと紹介ページのその版の説明を開く。
+    applyLpChangelogLink($('nlVersionBadge'), version);
   } catch {
     valueEl.textContent = '—';
   }
@@ -21395,9 +21368,11 @@ async function initPopup() {
       li.className = 'nl-changelog-entry';
       const head = document.createElement('div');
       head.className = 'nl-changelog-entry__head';
-      const ver = document.createElement('span');
+      // 0.1.2229: 版番号は紹介ページのその版（詳しい説明）を新しいタブで開くリンク。
+      const ver = document.createElement('a');
       ver.className = 'nl-changelog-entry__version';
       ver.textContent = `v${entry.version}`;
+      applyLpChangelogLink(ver, entry.version);
       const date = document.createElement('span');
       date.className = 'nl-changelog-entry__date';
       date.textContent = entry.date;
@@ -21407,15 +21382,8 @@ async function initPopup() {
       head.appendChild(ver);
       head.appendChild(date);
       head.appendChild(summary);
-      const ul = document.createElement('ul');
-      ul.className = 'nl-changelog-entry__items';
-      for (const item of entry.items) {
-        const itemLi = document.createElement('li');
-        itemLi.textContent = item;
-        ul.appendChild(itemLi);
-      }
+      // 0.1.2229: 項目の全文は紹介ページで読む（ここに並べると長くて使いづらい）。
       li.appendChild(head);
-      li.appendChild(ul);
       changelogListEl.appendChild(li);
     }
   }

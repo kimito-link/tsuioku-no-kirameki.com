@@ -2089,22 +2089,6 @@
         color: var(--nl-text-sub, var(--nl-muted));
       }
 
-      .nl-changelog-entry__items {
-        margin: 0;
-        padding-left: 18px;
-        /* v0.1.333: padding-left 込みで親幅に収める（list-style 分が右へ押し出さない）。 */
-        box-sizing: border-box;
-        max-width: 100%;
-      }
-
-      .nl-changelog-entry__items li {
-        margin: 2px 0;
-        line-height: 1.4;
-        /* 長い語も折り返して枠内に収める（見切れ防止）。 */
-        overflow-wrap: anywhere;
-        word-break: break-word;
-      }
-
       @media (prefers-reduced-motion: reduce) {
         .nl-frame-theme-details__summary::before {
           transition: none;
