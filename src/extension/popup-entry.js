@@ -2,6 +2,7 @@
 // popup-entry.js — ポップアップ UI 本体。応援レーン描画・HTMLレポート生成・各種診断/共有のまとめ役。
 // v0.1.1580: 拡張プロセスの忙しさ台帳(文書別・ページを開かなくても犯人を名指しする)。import するだけで起動。
 import { createShortLivedMemo } from '../lib/shortLivedMemo.js';
+import { replayClassAnimation } from '../lib/replayClassAnimation.js';
 import '../lib/extDocBusyCensusBoot.js';
 // v0.1.1686: ちらつき計(サイドパネルの popup だけ・画面の書き換えを数えて状態速報に出す)。import するだけで起動。
 import '../lib/flickerMeterBoot.js';
@@ -1240,14 +1241,15 @@ function triggerCharaReaction(iconEl, { delta, thresholds, images }) {
   const bounceClass = `nl-chara-bounce-${rank}`;
 
   /** @type {HTMLImageElement} */ (iconEl).src = images[rank];
-  for (const c of CHARA_BOUNCE_CLASSES) iconEl.classList.remove(c);
-  void /** @type {HTMLElement} */ (iconEl).offsetWidth;
-  iconEl.classList.add(bounceClass);
+  // v0.1.2223: 強制レイアウト(void offsetWidth)をやめた。同じ段の弾みが動いている最中なら続ける。
+  replayClassAnimation(iconEl, bounceClass, CHARA_BOUNCE_CLASSES);
 
   const prev = _charaRevertTimers.get(iconEl);
   if (prev) clearTimeout(prev);
   _charaRevertTimers.set(iconEl, window.setTimeout(() => {
     /** @type {HTMLImageElement} */ (iconEl).src = images.default;
+    // 弾み(最長0.55秒)は終わっている=外しておけば、次のコメントで付けるだけで最初から弾む。
+    for (const c of CHARA_BOUNCE_CLASSES) iconEl.classList.remove(c);
     _charaRevertTimers.delete(iconEl);
   }, 600));
 }
@@ -5353,9 +5355,8 @@ function triggerStoryFaceHop(avatarsEl) {
   }
   const face = avatarsEl.querySelector('.nl-story-face');
   if (!face) return;
-  face.classList.remove('is-hop');
-  void avatarsEl.offsetWidth;
-  face.classList.add('is-hop');
+  // v0.1.2223: 強制レイアウト(void offsetWidth)をやめた。跳ねている最中なら続ける(後始末タイマーは張り直す)。
+  replayClassAnimation(face, 'is-hop');
   STORY_HOP_STATE.clearTimer = window.setTimeout(() => {
     face.classList.remove('is-hop');
     STORY_HOP_STATE.clearTimer = null;
@@ -8702,8 +8703,19 @@ function createStoryGrowthCell(isNew, index, accent) {
   media.appendChild(img);
   cell.appendChild(media);
   applyStoryGrowthIconAttributes(img, index, isNew, accent);
+  STORY_GROWTH_FRESH_IMGS.add(img);
   return cell;
 }
+
+/**
+ * v0.1.2223 STORY_GROWTH_NO_FORCED_REFLOW: この syncStoryGrowth の中で作ったばかりのアイコン。
+ *   createStoryGrowthCell が同じ窓・同じ accent で属性を書いた直後なので、続く patch では書き直さない。
+ *   syncStoryGrowth の入口と patch の最後で空にする(作った回の中だけ有効=古い値のまま飛ばすことはない)。
+ *   あわせて patch の「is-new」は、付いていなければ付けるだけにした(以前は毎回 `void last.offsetWidth` で
+ *   レイアウトを強制していた。遅い PC の実測(4倍遅い CPU・8コメ/秒)で、横の欄の処理の約1割がこれだった)。
+ * @type {Set<HTMLImageElement>}
+ */
+const STORY_GROWTH_FRESH_IMGS = new Set();
 
 /**
  * 現在の描画ウィンドウ（sourceOffset から count 件）の同一ユーザー ordinal/total を
@@ -8745,7 +8757,10 @@ function patchStoryGrowthIconsFromSource(root, opts = {}) {
     });
   } catch { /* 計器の失敗は描画を止めない */ }
   for (let i = 0; i < n; i += 1) {
-    applyStoryGrowthIconAttributes(/** @type {HTMLImageElement} */ (imgs[i]), i, false, {
+    const img = /** @type {HTMLImageElement} */ (imgs[i]);
+    // 作ったばかりのマスは createStoryGrowthCell が同じ窓・同じ accent で書いた直後=書き直さない。
+    if (STORY_GROWTH_FRESH_IMGS.has(img)) continue;
+    applyStoryGrowthIconAttributes(img, i, false, {
       ordinal: accent.ordinals[i] || 0,
       total: accent.totals[i] || 0
     });
@@ -8753,11 +8768,10 @@ function patchStoryGrowthIconsFromSource(root, opts = {}) {
   noteStoryGrowthIdentitiesNow(n);
   if (opts.pulseLast && n > 0) {
     const last = /** @type {HTMLImageElement} */ (imgs[n - 1]);
-    last.classList.remove('is-new');
-    void last.offsetWidth;
-    last.classList.add('is-new');
-    window.setTimeout(() => last.classList.remove('is-new'), 820);
+    // 強制レイアウトなしで鳴らす(作ったばかりのマスは is-new 無し=付けるだけで最初から動く)。
+    if (replayClassAnimation(last, 'is-new')) window.setTimeout(() => last.classList.remove('is-new'), 820);
   }
+  STORY_GROWTH_FRESH_IMGS.clear();
 }
 
 /**
@@ -8881,6 +8895,7 @@ function appendStoryGrowthCells(root, from, to) {
  * @param {HTMLElement|null} root
  */
 function syncStoryGrowth(liveId, count, root) {
+  STORY_GROWTH_FRESH_IMGS.clear();
   const nextLiveId = String(liveId || '');
   const targetFull = Math.max(0, Math.floor(Number(count) || 0));
   // 上限を超える分は描画しない（直近 STORY_GROWTH_MAX_CELLS 件だけをウィンドウ表示）。
