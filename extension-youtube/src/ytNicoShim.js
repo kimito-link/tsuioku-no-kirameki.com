@@ -14,6 +14,7 @@
 //   4. YouTube 側の記録が増えたら(yt_stream_summaries の変化)、nls_comments_<疑似lv> が変わったと popup に知らせる。
 
 import { computePseudoLvForVideoId, isYtPseudoLvShape } from '../../src/lib/youtube/ytPseudoLv.js';
+import { setNicoUidAvatarGuessEnabled } from '../../src/lib/supportGrowthTileSrc.js';
 import { setYtLvMetaResolver } from '../../src/lib/youtube/ytLvKeyBridge.js';
 import { marketingViewFor } from '../../src/lib/platform/marketingPlatformPlan.js';
 import { makeYtDefaultIconJudge, YT_DEFAULT_ICON_STORE_KEY } from './ytDefaultIcon.js';
@@ -59,6 +60,8 @@ import { tallySupportItems } from '../../src/lib/platform/platformMetrics.js';
 import { watchPlatformMetricChrome } from '../../src/lib/platform/platformMetricChrome.js';
 import { createEventStandingController } from './ytEventStanding.js';
 import { SUB_BOARD_KEY_PREFIX, subBoardToNicoadApiValue, subBoardLaneWording, subBoardCelebrationWording } from '../../src/lib/platform/platformSubBoard.js';
+// v0.1.2250: ニコ生以外の画面では、数字の ID からニコの顔 URL を組まない(Twitch・Kick の数字 ID を 404 の白丸にしない)
+setNicoUidAvatarGuessEnabled(false);
 
 const KEY_YT_SUMMARIES = 'yt_stream_summaries';
 // 視聴ページの中(content script)で動いているか。ニコ生版の会場は視聴ページの中で動く(content-entry.js の mountVenueBarButton)。

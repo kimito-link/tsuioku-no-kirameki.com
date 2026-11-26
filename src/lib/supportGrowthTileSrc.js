@@ -3,6 +3,7 @@
  */
 
 import { deriveAvatarUrlFromUid } from './deriveAvatarUrlFromUid.js';
+import { anonymousIdenticonDataUrl } from './anonymousIdenticon.js';
 
 /**
  * @param {unknown} url
@@ -22,6 +23,45 @@ export function isHttpOrHttpsUrl(url) {
 export const NICONICO_OFFICIAL_DEFAULT_USERICON_HTTPS =
   'https://secure-dcdn.cdn.nimg.jp/nicoaccount/usericon/defaults/blank.jpg';
 
+/*
+ * v0.1.2250: 数字だけの ID からニコの usericon URL を組むのは【ニコ生の画面だけ】。
+ *   Twitch・Kick も利用者 ID が数字(例 8328376983)なので、形だけで判定すると存在しないニコの URL を組み、
+ *   404 → 白丸になっていた(実機: Twitch ライブ 629 人・Kick 8 人)。ニコ生以外の画面の入口
+ *   (extension-youtube/src/ytNicoShim.js: YouTube・Twitch・Kick ほか全サービス共通)が最初に false にする。
+ *   ニコ生版(popup.html / venue.html / status.html)は既定 true のまま=挙動不変。
+ */
+let nicoUidAvatarGuessEnabled = true;
+/** @param {boolean} on */
+export function setNicoUidAvatarGuessEnabled(on) {
+  nicoUidAvatarGuessEnabled = on !== false;
+}
+/**
+ * ニコ生以外の画面で、記録に残っていたニコの usericon URL(以前の版が数字 ID から組んで保存したもの)を捨てる。
+ * @param {unknown} url
+ * @returns {unknown}
+ */
+export function dropNicoUserIconOffNico(url) {
+  if (nicoUidAvatarGuessEnabled) return url;
+  return /nicoaccount\/usericon\/(?:[sm]\/)?\d/i.test(String(url || '')) ? '' : url;
+}
+
+/** @type {Map<string, string>} */
+const nonNicoFaceCache = new Map();
+/** @param {string} uid */
+function nonNicoNumericFace(uid) {
+  const hit = nonNicoFaceCache.get(uid);
+  if (hit) return hit;
+  const face = anonymousIdenticonDataUrl(uid) || '';
+  if (face) {
+    nonNicoFaceCache.set(uid, face);
+    if (nonNicoFaceCache.size > 4000) {
+      const k = nonNicoFaceCache.keys().next().value;
+      if (k) nonNicoFaceCache.delete(k);
+    }
+  }
+  return face;
+}
+
 /**
  * 数字のユーザーIDから、ニコニコで広く使われる usericon CDN の URL を組み立てる。
  * DOM に img が無い行でも ID だけ取れていればタイルに他者アイコンを出せる。
@@ -36,6 +76,7 @@ export const NICONICO_OFFICIAL_DEFAULT_USERICON_HTTPS =
  * @returns {string} 組み立て不可時は空
  */
 export function niconicoDefaultUserIconUrl(userId) {
+  if (!nicoUidAvatarGuessEnabled) return '';
   const s = String(userId || '').trim();
   if (!/^\d{5,14}$/.test(s)) return '';
   const n = Number(s);
@@ -114,6 +155,7 @@ export function pickSupportGrowthFallbackTileSrc(
   yukkuriSrc,
   tvSrc
 ) {
+  httpCandidate = dropNicoUserIconOffNico(httpCandidate);
   if (isHttpOrHttpsUrl(httpCandidate)) {
     return String(httpCandidate).trim();
   }
@@ -124,6 +166,12 @@ export function pickSupportGrowthFallbackTileSrc(
   }
   const syn = niconicoDefaultUserIconUrl(userId);
   if (isHttpOrHttpsUrl(syn)) return syn;
+  // v0.1.2250: ニコ生以外の数字 ID は、全員同じ絵でなくその人ごとのゆっくり顔
+  if (!nicoUidAvatarGuessEnabled) {
+    const u = String(userId || '').trim();
+    const face = /^\d{5,14}$/.test(u) ? nonNicoNumericFace(u) : '';
+    if (face) return face;
+  }
   return y || t;
 }
 
@@ -144,6 +192,7 @@ export function pickSupportGrowthTileWithOptionalIdenticon(
   tvSrc,
   identiconOpts
 ) {
+  httpCandidate = dropNicoUserIconOffNico(httpCandidate);
   if (isHttpOrHttpsUrl(httpCandidate)) {
     return String(httpCandidate).trim();
   }
@@ -155,6 +204,11 @@ export function pickSupportGrowthTileWithOptionalIdenticon(
   ) {
     const data = String(identiconOpts.anonymousIdenticonDataUrl || '').trim();
     if (data) return data;
+  }
+  // v0.1.2250: ニコ生以外(数字 ID でもニコの URL を組まない画面)は、その人ごとのゆっくり顔(白丸・全員同じ絵にしない)
+  if (!nicoUidAvatarGuessEnabled && /^\d{5,14}$/.test(uid) && identiconOpts?.anonymousIdenticonEnabled !== false) {
+    const face = nonNicoNumericFace(uid);
+    if (face) return face;
   }
   // 注: pickSupportGrowthFallbackTileSrc が数値ID→公式CDN usericon を既に導出する
   //   (niconicoDefaultUserIconUrl)。数値IDのサムネはここで CDN URL になる。匿名のみ識別アイコン/既定。
@@ -178,8 +232,9 @@ export function pickSupportGrowthTileWithOptionalIdenticon(
  */
 export function resolveSupportGrowthTileSrc(p) {
   const def = String(p.defaultSrc || '');
-  if (isHttpOrHttpsUrl(p.entryAvatarUrl)) {
-    return String(p.entryAvatarUrl).trim();
+  const entryAvatarUrl = dropNicoUserIconOffNico(p.entryAvatarUrl);
+  if (isHttpOrHttpsUrl(entryAvatarUrl)) {
+    return String(entryAvatarUrl).trim();
   }
   const derived = niconicoDefaultUserIconUrl(p.userId);
   if (isHttpOrHttpsUrl(derived)) {

@@ -1203,7 +1203,7 @@
   - `gift-coin-hq.wav`
   - `gift-register-hq.wav`
   - `gift-register.mp3`
-- 📁 **src/** (2736)
+- 📁 **src/** (2737)
   - 📁 **data/** (7)
     - 📁 **acquirers/** (2)
       - `laneFromStorage.js` — 応援レーン acquirer: chrome.storage.local(nls_comments) → laneStore の橋渡し。
@@ -1562,7 +1562,7 @@
         - `logo_funlink_white_RGB_link_black.png`
         - `logo_funlink_white_RGB_maru_black.png`
     - `hero-connect-hub.svg`
-  - 📁 **lib/** (2402)
+  - 📁 **lib/** (2403)
     - 📁 **__snapshots__/** (4)
       - `marketing-abema-baseline.html`
       - `marketing-niconico.html`
@@ -2945,6 +2945,7 @@
     - `nicoCommentPanelAssetLauncher.test.js`
     - `nicoEngineBoot.js` — 【層】L0 判定層(純粋関数・I/O禁止)
     - `nicoEngineBoot.test.js`
+    - `nicoUidGuessPlatform2250.test.js`
     - `nicoUserFollowingApi.js` — nvapi /v1/users/{uid}/following/users の URL 構築とレスポンス正規化。
     - `nicoUserFollowingApi.test.js`
     - `nicoUserPage.js` — 汎用: ニコ生ユーザーの公開ページ URL / 表示名 を作る純関数。
