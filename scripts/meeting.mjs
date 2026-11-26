@@ -409,7 +409,14 @@ function runFor(entry) {
 //  （COUNCIL-HOWTOのローカルのみ構成）であり、そこを壊さないため。
 const envMissing = {};   // env名 -> 落ちたメンバー数
 const envDroppedRoles = {};
+const tooLongFor = [];   // maxPromptChars を超える問いで外した席（2026-11-26・推論を止められない席の空打ちを防ぐ）
 for (const entry of LINEUP) {
+  // 推論を止められず、長い問いでは推論だけで上限を使い切って本文0字になる席（例: sakura/glm-5.3-flash）は、
+  // 問いがその長さを超えたら呼ばない。呼んでも FAILED になるだけで、無料枠（さくらは月3,000回）を減らす。
+  if (entry.maxPromptChars && question.length > entry.maxPromptChars) {
+    tooLongFor.push(entry.label);
+    continue;
+  }
   const lack = entry.requires.filter((k) => !ENV_FLAGS[k]);
   if (lack.length) {
     for (const k of lack) {
@@ -426,13 +433,16 @@ for (const entry of LINEUP) {
   push(entry.label, 'cloud', runFor(entry), verifiable ? entry.rawId : '', verifiable ? entry.provider : '');
 }
 {
-  const enabledCount = LINEUP.length - Object.values(envDroppedRoles).reduce((a, b) => a + b, 0);
+  const enabledCount = LINEUP.length - tooLongFor.length - Object.values(envDroppedRoles).reduce((a, b) => a + b, 0);
   if (Object.keys(envMissing).length) {
     const envs = Object.entries(envMissing).map(([n, c]) => `${n}(${c}体)`).join(', ');
     const roles = Object.entries(envDroppedRoles).map(([r, c]) => `${r} -${c}`).join(', ');
     console.error(`[env] 有効 ${enabledCount}/${LINEUP.length}体。欠落env: ${envs} → ${roles}`);
   } else {
     console.error(`[env] 有効 ${enabledCount}/${LINEUP.length}体（欠落なし）`);
+  }
+  if (tooLongFor.length) {
+    console.error(`[問いの長さ] ${question.length}字は上限を超えるので外した: ${tooLongFor.join(', ')}（council-lineup.mjs の maxPromptChars）`);
   }
 }
 // 司令塔 Claude(Opus 5.5) を会議の最強メンバー(統括/批判)として自動参加させる。
@@ -470,8 +480,11 @@ if (ANTHRO) push(`anthropic/${ANTHRO_MODEL}`, 'cloud', (p, s, o) => anthropicCha
 //   成立するので、**速い2体だけ**置く（遅い大物を足すと会議全体が待たされるだけ）。
 //  ★モデルを消したら、このリストも直すこと——とは言え**直し忘れても自動で外れる**ように
 //   verifyLiveModels() が /api/tags と突き合わせるようにした（2026-10-12・同コミット）。
+// ★2026-11-26: qwen2.5-coder-14b-8k は会社PCから消えていて（ollama list に無い）、毎会議「未インストール→除外」と出ていた。
+//  implement 役はクラウドの cloudflare/qwen2.5-coder-32b・sakura/kimi-k2.7-code が答えている（同日の実会議で成功）ので外す。
+//  残る qwen3.6-35b-a3b 系は上の実測で 185秒・42% GPU＝会議の席には遅すぎる（試験場・dispatch の1ファイル仕事で使う）。
 const LOCAL_DEFAULT = [
-  'qwen2.5-coder-14b-8k:latest', 'wwhite/whiterabbitneo-v3-7b:q4_k_m',
+  'wwhite/whiterabbitneo-v3-7b:q4_k_m',
 ];
 const localModels = (process.env.MEETING_LOCAL_MODELS || LOCAL_DEFAULT.join(','))
   .split(',').map((s) => s.trim()).filter(Boolean);
