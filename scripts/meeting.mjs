@@ -990,7 +990,10 @@ async function council(members, label, key) {
       //  2.5-flash が落ちた日に nemotron（推論で上限を使い切る実績あり）へ行く前の受け皿にする。
       // 2026-11-16: gemini-2.5-flash を外し、gemini-3.5-flash-lite を2番手に繰り上げた（12/1 に 2.5-flash は lite へ自動転送される。
       //  新顔は足さない。3.8-flash・3.6-flash は 503 が多く一発工程に預けられない＝council-lineup.mjs の lite 行の注記）。
-      priority = ['groq/gpt-oss-120b', 'gemini-3.5-flash-lite', 'cloudflare/nemotron-120b'];
+      // 2026-11-26: 3番手の cloudflare/nemotron-120b は Cloudflare 側で 11/20 に廃止（410）され名簿から外れた＝findが永久に外れる死に要素。
+      //  cloudflare/deepseek-v4.1-flash（推論オフ・max_tokens 2400）に替えた。統合の実測（digest 11000字・4見出し指定）で
+      //  2/2 合格・9.2/10.7秒・本文1276/1642字・finish=stop（りんくのPC）。groq と gemini が両方落ちた日の最後の砦。
+      priority = ['groq/gpt-oss-120b', 'gemini-3.5-flash-lite', 'cloudflare/deepseek-v4.1-flash'];
       synth = priority.map(l => allMembers.find(m => m.label === l && !exhaustedLabels.has(l))).find(Boolean)
         || allMembers.find(m => m.kind === 'cloud' && !exhaustedLabels.has(m.label));
       if (synth) console.error(`[${label}] ②統合役(能力優先): ${synth.label}`);
