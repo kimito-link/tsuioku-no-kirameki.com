@@ -358,12 +358,14 @@ export function parseYtPaidCommentAmount(node) {
  */
 export function ytVideoCommentAuthorsFromInnertube(data, opts = {}) {
   const limit = Number.isFinite(Number(opts.limit)) ? Math.max(1, Math.floor(Number(opts.limit))) : 80;
+  const nowMs = Number.isFinite(Number(opts.nowMs)) ? Number(opts.nowMs) : Date.now();
   /** @type {YtVideoCommentAuthor[]} */
   const out = [];
   const seen = new Set();
   /** @type {{ n: number }} */
   const budget = { n: 0 };
-  walkComments(data, out, seen, budget, 0, limit);
+  walkComments(data, out, seen, budget, 0, limit, nowMs);
+  out.sort((a, b) => (Number(b.postedAtMs) || 0) - (Number(a.postedAtMs) || 0));
   return out;
 }
 
@@ -374,10 +376,15 @@ export function ytVideoCommentAuthorsFromInnertube(data, opts = {}) {
  * @param {{ n: number }} budget
  * @param {number} depth
  * @param {number} limit
+ * @param {number} nowMs
  */
-function walkComments(node, out, seen, budget, depth, limit) {
+function walkComments(node, out, seen, budget, depth, limit, nowMs) {
   if (!node || typeof node !== 'object' || depth > 40 || budget.n > MAX_NODES || out.length >= limit) return;
   budget.n += 1;
+  const entity = node.commentEntityPayload;
+  if (entity && typeof entity === 'object') {
+    takeCommentEntityAuthor(entity, out, seen, nowMs);
+  }
   const renderer =
     node.commentRenderer ||
     node.commentViewModel ||
@@ -402,9 +409,49 @@ function walkComments(node, out, seen, budget, depth, limit) {
   const vals = Array.isArray(node) ? node : Object.values(node);
   for (const v of vals) {
     if (!v || typeof v !== 'object') continue;
-    walkComments(v, out, seen, budget, depth + 1, limit);
+    walkComments(v, out, seen, budget, depth + 1, limit, nowMs);
     if (out.length >= limit) return;
   }
+}
+
+/**
+ * 2026 年の公開 next 応答は commentRenderer ではなく commentEntityPayload で来る。
+ * 本文は返さない。同じ人は新しい投稿時刻を残す。
+ * @param {any} entity
+ * @param {YtVideoCommentAuthor[]} out
+ * @param {Set<string>} seen
+ * @param {number} nowMs
+ */
+function takeCommentEntityAuthor(entity, out, seen, nowMs) {
+  const author = entity && typeof entity === 'object' ? entity.author || {} : {};
+  const props = entity && typeof entity === 'object' ? entity.properties || {} : {};
+  const channelId = isYtChannelId(author.channelId) ? String(author.channelId) : '';
+  const display = String(author.displayName || '').replace(/\s+/g, ' ').trim().slice(0, 80);
+  const fromUrl = String(author.channelCommand?.innertubeCommand?.browseEndpoint?.canonicalBaseUrl || '').replace(/^\//, '');
+  const handle = display.startsWith('@') ? display : (fromUrl.startsWith('@') ? fromUrl : '');
+  const key = channelId || (display ? `name:${display}` : '');
+  if (!key) return;
+  const avatarUrl = String(author.avatarThumbnailUrl || '').trim();
+  const postedAtMs = parseYtCommentPublishedAtMs(props.publishedTime, nowMs);
+  if (seen.has(key)) {
+    const prev = out.find((row) => (row.channelId && row.channelId === channelId) || (!channelId && `name:${row.name}` === key));
+    if (prev) {
+      if (avatarUrl && !prev.avatarUrl) prev.avatarUrl = avatarUrl;
+      if (postedAtMs && (!prev.postedAtMs || postedAtMs > prev.postedAtMs)) prev.postedAtMs = postedAtMs;
+    }
+    return;
+  }
+  seen.add(key);
+  out.push({
+    channelId,
+    handle: handle.startsWith('@') ? handle : '',
+    name: display,
+    amount: null,
+    currency: '',
+    ...(avatarUrl ? { avatarUrl } : {}),
+    ...(props.commentId ? { commentId: String(props.commentId) } : {}),
+    ...(postedAtMs ? { postedAtMs } : {}),
+  });
 }
 
 /**
@@ -465,7 +512,7 @@ function ytCommentHostElements(root) {
  */
 export function parseYtCommentPublishedAtMs(text, nowMs = Date.now()) {
   const s = String(text || '').replace(/\s+/g, ' ').trim();
-  const m = s.match(/(\d+)\s*(秒|seconds?|分|minutes?|時間|hours?|日|days?|週間|週|weeks?|か[ヶケ]月|months?|年|years?)\s*(前|ago)/i);
+  const m = s.match(/(\d+)\s*(秒|seconds?|分|minutes?|時間|hours?|日|days?|週間|週|weeks?|(?:か|ヵ|ヶ|ケ|カ)?月|months?|年|years?)\s*(前|ago)/i);
   if (!m) return null;
   const n = Number(m[1]);
   if (!Number.isFinite(n) || n < 0) return null;

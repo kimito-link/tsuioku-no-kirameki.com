@@ -24,7 +24,8 @@ describe('buildNicoVideoWatchCardModel', () => {
     expect(html.indexOf('nlsb-viewer-behavior')).toBeLessThan(html.indexOf('nlsb-video-watch-card__title'));
     expect(html.indexOf(VIEWER_BEHAVIOR_TITLE)).toBeLessThan(html.indexOf('23,142,299 回'));
     expect(html).toContain('なじみ');
-    expect(html).toContain('花子');
+    expect(html).toContain('data-live-lane-host');
+    expect(model.behavior.rows.some((row) => row.name === '花子')).toBe(true);
     expect(html).not.toMatch(/有料|LINE|紹介/);
   });
 
