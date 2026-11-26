@@ -27,7 +27,7 @@
 
 > 値が次の段へ届かない「断線」(broadcaster バグ型)は `npm run feature-map -- --check` が機械検知。
 
-## ⚠️ 役割コメントが無いソース 15 / 1390 件
+## ⚠️ 役割コメントが無いソース 15 / 1391 件
 - `docs/handoff/bench/bench-interval.mjs`
 - `docs/handoff/bench/bench-lane.mjs`
 - `extension-youtube/cloak-failsafe.js`
@@ -1203,7 +1203,7 @@
   - `gift-coin-hq.wav`
   - `gift-register-hq.wav`
   - `gift-register.mp3`
-- 📁 **src/** (2730)
+- 📁 **src/** (2733)
   - 📁 **data/** (7)
     - 📁 **acquirers/** (2)
       - `laneFromStorage.js` — 応援レーン acquirer: chrome.storage.local(nls_comments) → laneStore の橋渡し。
@@ -1562,7 +1562,7 @@
         - `logo_funlink_white_RGB_link_black.png`
         - `logo_funlink_white_RGB_maru_black.png`
     - `hero-connect-hub.svg`
-  - 📁 **lib/** (2396)
+  - 📁 **lib/** (2399)
     - 📁 **__snapshots__/** (4)
       - `marketing-abema-baseline.html`
       - `marketing-niconico.html`
@@ -1713,10 +1713,11 @@
       - `twIrcParse.test.js`
       - `twShim.test.js`
       - `twStreamKey.js` — Twitch の「配信キー」(YouTube 版の videoId の位置に入る文字列)の作り方と読み方(純関数)
-    - 📁 **videoWatch/** (13)
+    - 📁 **videoWatch/** (14)
       - 📁 **fixtures/** (2)
         - `twitcasting-movie-843232645-comment-items.slim.html`
         - `twitch-vod-2940252213-replay-chat.slim.html`
+      - `kickVodReplay2247.test.js`
       - `videoIdentity.js` — 【層】L0 判定層(純粋関数・I/O禁止)
       - `videoIdentity2241.test.js`
       - `videoPanel2244.test.js`
@@ -1731,7 +1732,7 @@
     - 📁 **whowatch/** (2)
       - `wwParse.js` — ふわっち(whowatch.tv)の配信とコメントを、YouTube 版の記録と同じ形にする(純関数)
       - `wwParse.test.js`
-    - 📁 **youtube/** (122)
+    - 📁 **youtube/** (124)
       - 📁 **fixtures/** (9)
         - 📁 **real-dom/** (9)
           - `README.md`
@@ -1759,6 +1760,8 @@
       - `ytChatParse.test.js`
       - `ytChunkedRead.js` — 配信の記録を「少しずつ」読む(v0.1.1977)。
       - `ytChunkedRead.test.js`
+      - `ytCommentPhotoTag.js` — 【この箱の仕事】YouTube 動画のコメント欄で、まだ画面に出ていない投稿者の顔の URL を、ページの世界から属性に写す。
+      - `ytCommentPhotoTag2247.test.js`
       - `ytCommentSendReason.js` — YouTube のチャットへ送れなかった理由コード(content-chat-entry が返す)を日本語にする。
       - `ytCommentSendReason.test.js`
       - `ytConcurrentViewers.js` — YouTube の同時視聴者数を、ページの埋め込みと updated_metadata から読む（純関数）

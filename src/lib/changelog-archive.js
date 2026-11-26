@@ -24,6 +24,14 @@
 /** @type {ChangelogEntry[]} */
 const ARCHIVE_ENTRIES = [
   Object.freeze({
+    version: '0.1.2222',
+    date: '2026-11-25',
+    summary: '別窓の幅が広がったままにならないようにした',
+    items: Object.freeze([
+      '別ウィンドウで開いたとき、環境によって窓の幅だけが広く残ることがあったので、決めた幅に直すようにしました。設定はいりません。',
+    ])
+  }),
+  Object.freeze({
     version: '0.1.2221',
     date: '2026-11-25',
     summary: 'コメントが届くたびの画面の描き直しを小さく',

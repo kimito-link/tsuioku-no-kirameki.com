@@ -5,9 +5,40 @@
 import { paintStoryUserLaneDomFilled } from './story/renderStoryUserLaneDom.js';
 import { createVenueStatStrip } from '../lib/venueStatStrip.js';
 import { VIEWER_BEHAVIOR_FALLBACK_AVATAR, resolveViewerBehaviorAvatarUrl, viewerRelationLabel } from '../lib/viewerBehavior.js';
+import { createSupportAvatarLoadGuard } from '../lib/supportGrowthAvatarLoad.js';
+import { identiconFallbackForAvatarUrl } from '../lib/avatarFallbackFromUrl.js';
+import { anonymousIdenticonDataUrl } from '../lib/anonymousIdenticon.js';
+
+/**
+ * v0.1.2247: 顔の読み込みは、ライブの応援アイコン列と同じガード(supportGrowthAvatarLoad.js)と代替顔(avatarFallbackFromUrl.js)を通す。
+ *   これまでは何もしない仮のガードで、ニコ動の「アイコン未設定の人」の推測 URL(404)が壊れた画像のまま、
+ *   顔の URL が無い人(Twitch の録画チャットなど)は全員同じ灰色の丸だった。
+ *   失敗した URL はその人ごとのゆっくり顔(ニコの usericon なら uid から・それ以外は URL から)。必ず何か出る。
+ */
+const laneAvatarGuard = createSupportAvatarLoadGuard({
+  fallbackSrc: VIEWER_BEHAVIOR_FALLBACK_AVATAR,
+  fallbackSrcFor: (/** @type {string} */ u) => identiconFallbackForAvatarUrl(u) || anonymousIdenticonDataUrl(u, 64),
+});
+
+/**
+ * 顔の URL が無い人(公式の既定アイコンしか無い人を含む)は、ライブと同じ その人ごとのゆっくり顔にする。
+ * @param {any} row
+ * @returns {string}
+ */
+export function viewerBehaviorLaneFaceSrc(row) {
+  const resolved = resolveViewerBehaviorAvatarUrl(row?.isAnonymous ? '' : row?.id, row?.avatarUrl);
+  if (resolved && /^https?:/i.test(resolved) && !/usericon\/defaults\/blank\.jpg/i.test(resolved)) return resolved;
+  const key = String((row?.isAnonymous ? '' : row?.id) || row?.name || '').trim();
+  return anonymousIdenticonDataUrl(key, 64) || VIEWER_BEHAVIOR_FALLBACK_AVATAR;
+}
 
 const LANE_IO = {
-  storyAvatarLoadGuard: { pickDisplaySrc: (/** @type {string} */ s) => s || VIEWER_BEHAVIOR_FALLBACK_AVATAR, noteRemoteAttempt: () => {} },
+  storyAvatarLoadGuard: {
+    pickDisplaySrc: (/** @type {string} */ s) => laneAvatarGuard.pickDisplaySrc(s),
+    noteRemoteAttempt: (/** @type {HTMLImageElement} */ img, /** @type {string} */ s) => {
+      try { laneAvatarGuard.noteRemoteAttempt(img, s); } catch { /* 確かめられない環境では、最初に出した顔(必ず何か)のまま */ }
+    },
+  },
   isHttpOrHttpsUrl: (/** @type {unknown} */ u) => /^https?:/i.test(String(u || '')),
   storyTileUsesYukkuriTvStyle: () => false,
   upgradeAnonymousAvatarImage: () => {},
@@ -40,7 +71,7 @@ export function viewerBehaviorRowsToLaneBuckets(board, opts = {}) {
     const idLine = videoOrder
       ? (badges.length ? badges.join('・') : relLabel)
       : String(row.relationLabel || '');
-    const src = resolveViewerBehaviorAvatarUrl(row.isAnonymous ? '' : row.id, row.avatarUrl);
+    const src = viewerBehaviorLaneFaceSrc(row);
     const item = {
       displaySrc: src || VIEWER_BEHAVIOR_FALLBACK_AVATAR,
       title: String(row.name || ''),

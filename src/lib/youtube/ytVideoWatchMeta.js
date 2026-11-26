@@ -556,6 +556,27 @@ function commentRecordFromEntity(entity, nowMs) {
  * @returns {YtVideoCommentAuthor[]}
  */
 
+/** ページの世界(ytCommentPhotoTag.js)が、まだ空の顔の img の代わりに置く属性。チャット欄と同じ名前 */
+export const YT_COMMENT_TAGGED_PHOTO_ATTR = 'data-nl-author-photo';
+
+/**
+ * コメントの投稿者の顔の URL。img の src → data-src → ページの世界が写した属性(v0.1.2247・遅延読み込みでまだ空の顔)。
+ * @param {Element} el
+ * @returns {string}
+ */
+function ytCommentAvatarUrlFromEl(el) {
+  const img = queryDeep(el, '#author-thumbnail img, yt-img-shadow img, img#img, #author-photo img');
+  const fromImg = String(
+    (img && typeof img.getAttribute === 'function' && (img.getAttribute('src') || img.getAttribute('data-src')))
+    || (img && /** @type {any} */ (img).src)
+    || '',
+  ).trim();
+  if (/^https?:\/\//i.test(fromImg)) return fromImg;
+  const tagged = queryDeep(el, `[${YT_COMMENT_TAGGED_PHOTO_ATTR}]`);
+  const url = String(tagged?.getAttribute?.(YT_COMMENT_TAGGED_PHOTO_ATTR) || '').trim();
+  return /^https:\/\//i.test(url) ? url : fromImg;
+}
+
 /** @param {ParentNode | Element | null | undefined} root @param {string} sel */
 function queryDeep(root, sel) {
   if (!root || typeof root.querySelector !== 'function') return null;
@@ -668,12 +689,7 @@ export function ytVideoCommentAuthorsFromDom(root, opts = {}) {
     const name = String(nameEl?.textContent || '').replace(/\s+/g, ' ').trim().slice(0, 80);
     const paidEl = queryDeep(el, '[id*="super-thanks"], [class*="super-thanks"], [class*="superThanks"], #paid-comment-chip, .paid-comment-chip');
     const paid = parseYtPaidCommentAmount({ amount: String(paidEl?.textContent || '').trim() });
-    const img = queryDeep(el, '#author-thumbnail img, yt-img-shadow img, img#img, #author-photo img');
-    const avatarUrl = String(
-      (img && typeof img.getAttribute === 'function' && (img.getAttribute('src') || img.getAttribute('data-src')))
-      || (img && img.src)
-      || '',
-    ).trim();
+    const avatarUrl = ytCommentAvatarUrlFromEl(el);
     const creatorHeart = Boolean(queryDeep(el, '#creator-heart, ytd-creator-heart-renderer, [id*="creator-heart"], [class*="creator-heart"]'));
     const creatorReply = Boolean(queryDeep(el, 'ytd-author-comment-badge-renderer, #author-comment-badge, [class*="author-comment-badge"]'));
     const pending = !creatorHeart && !creatorReply;
@@ -827,12 +843,7 @@ function ytCommentRecordFromViewModel(el, opts = {}) {
     if (fromAria) name = fromAria.replace(/^@/, '').slice(0, 80);
   }
   if (!name) name = (handle ? handle.replace(/^@/, '') : '').slice(0, 80);
-  const img = queryDeep(el, '#author-thumbnail img, yt-img-shadow img, img#img, #author-photo img');
-  const avatarUrl = String(
-    (img && typeof img.getAttribute === 'function' && (img.getAttribute('src') || img.getAttribute('data-src')))
-    || (img && img.src)
-    || '',
-  ).trim();
+  const avatarUrl = ytCommentAvatarUrlFromEl(el);
   const isCreator = Boolean(
     queryDeep(el, '.channel-owner, [class*="channel-owner"]')
     || queryDeep(el, 'ytd-author-comment-badge-renderer[creator]'),

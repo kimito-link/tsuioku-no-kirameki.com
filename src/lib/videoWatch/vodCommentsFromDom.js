@@ -11,6 +11,8 @@
  *   - Twitch 録画: .vod-message と .chat-author__display-name
  *     （videos/2940252213 で再生チャット 11 件確認）。顔画像は DOM に無い。
  *   - Kick 録画: 実測 HTML（sirgime / 01a20e11-...）は年齢確認の壁で、チャット投稿者が無い。
+ *     v0.1.2247: 描かれたページでは右の「Chat Replay」に #chatroom-messages [data-index] の行があり、
+ *     名前は button[title][data-prevent-expand]（alnasty・BotRix を確認、年齢確認の壁の下でも出る）。顔画像は DOM に無い。
  *   - ABEMA: 公開エピソードの JSON-LD VideoObject（題）。コメント欄は実測 HTML に無い。
  *   - TikTok: __UNIVERSAL_DATA_FOR_REHYDRATION__ の comment 配列は実測で空。コメントは後から描かれることがある。
  */
@@ -18,6 +20,7 @@
 import { parseTcMovieCommentDoc, readTcPageInfo } from '../twitcasting/tcPageInfo.js';
 import { safeTcImageUrl } from '../twitcasting/tcParse.js';
 import { safeTtImageUrl } from '../tiktok/ttParse.js';
+import { kickSlugOfName } from '../kick/kickChatParse.js';
 
 /**
  * @typedef {{
@@ -184,6 +187,25 @@ function readTwitchVodReplayChat(doc) {
   return mergeAuthors(rows);
 }
 
+/**
+ * Kick 録画の Chat Replay(描かれた DOM)。人の区別はライブの Kick と同じ kk:@slug。
+ * @param {Document | null | undefined} doc
+ */
+function readKickVodReplayChat(doc) {
+  /** @type {{ id: string, name: string, avatarUrl?: string, postedAtMs?: number, commentId?: string }[]} */
+  const rows = [];
+  if (!doc || typeof doc.querySelectorAll !== 'function') return mergeAuthors(rows);
+  const items = doc.querySelectorAll('#chatroom-messages [data-index]');
+  for (let i = 0; i < items.length; i += 1) {
+    const userEl = items[i].querySelector('button[data-prevent-expand][title]');
+    const name = text(userEl?.getAttribute?.('title') || userEl?.textContent);
+    if (!name) continue;
+    const slug = kickSlugOfName(name);
+    rows.push({ id: slug ? `kk:@${slug}` : `kk:${name}`, name, avatarUrl: '', postedAtMs: 0 });
+  }
+  return mergeAuthors(rows);
+}
+
 /** @param {Document | null | undefined} doc @param {string} [user] */
 function readTwitcasting(doc, user) {
   /** @type {any} */
@@ -288,8 +310,11 @@ export function readVodWatchDom(doc, page) {
   } else if (platform === 'twitch') {
     authors = readTwitchVodReplayChat(doc);
     commentsVerified = true;
+  } else if (platform === 'kick') {
+    authors = readKickVodReplayChat(doc);
+    commentsVerified = authors.length > 0;
   }
-  // Kick / ABEMA の実測 HTML（2026-11-26・未ログイン）にはコメント投稿者が無かった。
+  // ABEMA の実測 HTML（2026-11-26・未ログイン）にはコメント投稿者が無かった。
   return {
     title,
     ownerName,

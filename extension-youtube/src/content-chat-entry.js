@@ -20,6 +20,7 @@ import {
   ytViewCountFromDom, ytCommentCountFromDom,
   concurrentViewersIsViewCountLeak,
 } from '../../src/lib/youtube/ytVideoWatchMeta.js';
+import { askPageToTagYtCommentPhotos } from '../../src/lib/youtube/ytCommentPhotoTag.js';
 import { ytVideoIdFromChatFrameUrl } from '../../src/lib/youtube/ytChatContinuationVideoId.js';
 import { relativeStreamStartedAtMs, startMsFromTimestampBlob } from '../../src/lib/youtube/ytStreamStart.js';
 import { followerSampleFromDom } from '../../src/lib/platform/followerCountSample.js';
@@ -700,6 +701,8 @@ function setupWatchPageMetaObserver() {
       hasLiveChat,
       hasLiveChatReplay,
     });
+    // v0.1.2247: 画面に出ていない投稿者の顔は img が空。ページの世界に1回合図して、本物の URL を属性に写してから読む
+    if (contentKind === 'video') askPageToTagYtCommentPhotos(document);
     const videoAuthors = contentKind === 'video' ? ytVideoCommentAuthorsFromDom(document) : [];
     const videoComments = contentKind === 'video' ? ytVideoCommentsFromDom(document) : [];
     const commentCount = contentKind === 'video' ? ytCommentCountFromDom(document) : null;
