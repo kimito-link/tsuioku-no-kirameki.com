@@ -71,17 +71,25 @@ export function buildYtVideoWatchCardModel(input) {
   if (streamCount > 0) {
     recordedSummary = `このチャンネルの配信を、このPCで ${streamCount.toLocaleString('ja-JP')} 本記録しています（コメント合計 ${itemCount.toLocaleString('ja-JP')} 件）。`;
   }
+  // v0.1.2245: 未ログインの YouTube は投稿者が @名前 だけ(UC… が無い)。照合の数(UC… だけ)を「見えている人数」に使うと、
+  //   顔は 20 人並ぶのに 0 人扱いになっていた(kKl0E22tU78 実機)。人数は横の欄に並べる人と同じ数え方にそろえる。
+  const shownAuthorIds = new Set();
+  for (const a of Array.isArray(src.videoAuthors) ? src.videoAuthors : []) {
+    const id = String(a?.channelId || a?.id || a?.handle || '').trim();
+    if (id) shownAuthorIds.add(id);
+  }
+  const videoAuthorCount = Math.max(overlap.videoAuthorCount, shownAuthorIds.size);
   let matchSummary = 'いま見えているコメントから、配信でも見かけた人を照合します。';
-  if (overlap.videoAuthorCount === 0) {
+  if (videoAuthorCount === 0) {
     matchSummary = streamCount > 0
       ? 'いま見えている範囲に、照合できるコメントの投稿者はまだありません。コメント欄が読み込まれると更新します。'
       : '配信の記録があると、この動画のコメント欄にいる人と照合できます。';
   } else if (streamCount === 0) {
-    matchSummary = `いま見えているコメントの投稿者は ${overlap.videoAuthorCount.toLocaleString('ja-JP')} 人です。このチャンネルの配信を記録すると、配信でもコメントしているか照合できます。`;
+    matchSummary = `いま見えているコメントの投稿者は ${videoAuthorCount.toLocaleString('ja-JP')} 人です。このチャンネルの配信を記録すると、配信でもコメントしているか照合できます。`;
   } else if (overlap.matchedCount === 0) {
-    matchSummary = `いま見えている ${overlap.videoAuthorCount.toLocaleString('ja-JP')} 人のうち、このチャンネルの配信でもコメントしていた人はまだ見つかりません。`;
+    matchSummary = `いま見えている ${videoAuthorCount.toLocaleString('ja-JP')} 人のうち、このチャンネルの配信でもコメントしていた人はまだ見つかりません。`;
   } else {
-    matchSummary = `いま見えている ${overlap.videoAuthorCount.toLocaleString('ja-JP')} 人のうち、${overlap.matchedCount.toLocaleString('ja-JP')} 人はこのチャンネルの配信でもコメントしていました。`;
+    matchSummary = `いま見えている ${videoAuthorCount.toLocaleString('ja-JP')} 人のうち、${overlap.matchedCount.toLocaleString('ja-JP')} 人はこのチャンネルの配信でもコメントしていました。`;
   }
   const matchedNames = overlap.matched
     .map((m) => m.name || m.channelId)
@@ -127,7 +135,7 @@ export function buildYtVideoWatchCardModel(input) {
     recordedStreams: streamCount,
     recordedComments: itemCount,
     recordedSummary,
-    videoAuthorCount: overlap.videoAuthorCount,
+    videoAuthorCount,
     matchedCount: overlap.matchedCount,
     matchSummary,
     matchedNames,

@@ -224,10 +224,16 @@ export const VIDEO_WATCH_HIDE_STYLE_ID = 'nlsb-video-watch-hide-live-stats';
 /**
  * 動画には「いま何人」が無い。ライブ用の枠を出すと「読み込み中」のまま止まって見える(0.1.2239 実機・全 7 ページ)。
  * 行や枠は足さず、既存の枠を隠すだけ。ライブのページでは印が付かないので何も変わらない。
+ * v0.1.2245: ライブ用の「記録 0 応援コメント」の札・りんくのイベント順位の一言(#nlEventStanding)・
+ *   下の「応援 0 コメント／まだ応援コメントがないのだ…」の欄(section.nl-stats)も、動画ページでは隠す。
+ *   どれも前に見ていたライブ配信のもので、動画のカード(人が並ぶ)と食い違って見えた(Twitch の動画で「りんく: YouTube には…」)。
  */
 export const VIDEO_WATCH_HIDE_LIVE_STATS_CSS =
   `html[${VIDEO_WATCH_ROOT_ATTR}="1"] #watchConcurrentCard,` +
-  `html[${VIDEO_WATCH_ROOT_ATTR}="1"] .nl-official-nico-stats__row{display:none !important;}`;
+  `html[${VIDEO_WATCH_ROOT_ATTR}="1"] .nl-official-nico-stats__row,` +
+  `html[${VIDEO_WATCH_ROOT_ATTR}="1"] #liveStatCards,` +
+  `html[${VIDEO_WATCH_ROOT_ATTR}="1"] #nlEventStanding,` +
+  `html[${VIDEO_WATCH_ROOT_ATTR}="1"] section.nl-stats{display:none !important;}`;
 
 /**
  * 横の欄の根元に「動画ページを見ている」印を付け外しする(印が変わるときだけ DOM を触る)。
