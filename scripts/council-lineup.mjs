@@ -185,7 +185,8 @@ export const LINEUP = [
   //  検知できない「一覧に存在するが無料枠では呼べない」劣化を実疎通で毎日確認する）。
   // ★2026-10-28 記録: 統合(入力1万字超)で推論が上限を使い切り本文なし(finish=length)。max_tokens 3000 も試したが
   //   推論が3304字→9145字に伸びただけで答えに届かず、効果なしのため戻した。統合の順番を gemini-2.5-flash の後ろへ回して対処（meeting.mjs）。
-  { label: 'cloudflare/nemotron-120b', provider: 'cloudflare', rawId: '@cf/nvidia/nemotron-3-120b-a12b', apiModel: '@cf/nvidia/nemotron-3-120b-a12b', opts: {}, timeoutMs: 90000, requires: ['CF', 'CF_ACC'], liveProbe: true },
+  // ★2026-11-26 撤去: Cloudflare 側で 2026-11-20 に廃止（410 "Model has been deprecated"・council-trial 実測）。
+  //  旧: { label: 'cloudflare/nemotron-120b', rawId/apiModel: '@cf/nvidia/nemotron-3-120b-a12b', timeoutMs: 90000 }（2026-06-27採用）
 
   // 2026-06-27 追加 → 2026-07-31 撤去（cloudflare/glm-5.2, cloudflare/kimi-k2.7-code）:
   //   実機でCloudflare Workers AI /ai/v1/chat/completions を叩いたところ両モデルとも
@@ -282,7 +283,16 @@ export const LINEUP = [
   //   日報の成績では「失敗0%」に見えていた（実際は推論の独白が回答になっていた）。meeting.mjs 側で正直に失敗として数えるよう直した。
   //   この枠: 既定でも収まる回があるが不安定(実会議で推論6855字・finish=length の回あり)。reasoning_effort:'low' で 1006→609トークン・本文は同等(485字)に減った。
   // ★2026-10-17 max_tokens: 3000 を追加: reasoning_effort:'low' でも実会議で推論6855字・finish=length に当たる回があった(3回中2回)。余裕を持たせる。
-  { label: 'cloudflare/qwen3-30b-a3b', provider: 'cloudflare', rawId: '@cf/qwen/qwen3-30b-a3b-fp8', apiModel: '@cf/qwen/qwen3-30b-a3b-fp8', opts: { reasoning_effort: 'low', max_tokens: 3000 }, timeoutMs: 60000, requires: ['CF', 'CF_ACC'], liveProbe: true },
+  // ★2026-11-26 撤去: Cloudflare 側で 2026-11-20 に廃止（410 "Model has been deprecated"・council-trial 実測）。
+  //  旧: { label: 'cloudflare/qwen3-30b-a3b', rawId/apiModel: '@cf/qwen/qwen3-30b-a3b-fp8', opts: { reasoning_effort: 'low', max_tokens: 3000 } }（2026-07-?? 採用）
+  // ★2026-11-26 後継（diverge の予備 weight4＝"cloudflare" の既定）: @cf/qwen/qwen3.8-27b。上で「2並列の2本目が76秒」で見送った対抗馬。
+  //  実測（scripts/council-trial.mjs・本番と同じ max_tokens 1600 / temperature 0.6・りんくのPC・11/26・3回ずつ）:
+  //   - 既定（推論あり）: 0/3＝推論で上限を使い切り本文0字（34〜74秒）。
+  //   - chat_template_kwargs.enable_thinking=false: 3/3 OK・15.0/33.7/37.8秒・本文874/1130/1048字。→ これで採用。
+  //  Workers Paid 専用ではない（/ai/models/search の properties に require_workers_paid が無い）。
+  //  diverge は groq/qwen3.8-27b（w1）と同じ系譜だが、groq が枯れた日の別プロバイダの受け皿という役目（qwen3-30b と同じ位置）。
+  //  timeoutMs 90000: 本番条件で最大38秒、以前は2並列で76秒の回があったため。
+  { label: 'cloudflare/qwen3.8-27b', provider: 'cloudflare', rawId: '@cf/qwen/qwen3.8-27b', apiModel: '@cf/qwen/qwen3.8-27b', opts: { chat_template_kwargs: { enable_thinking: false } }, timeoutMs: 90000, requires: ['CF', 'CF_ACC'], liveProbe: true },
 
   // 2026-07-14 追加 → 2026-07-23 EOL（nvidia/mistral-large-3-675b）:
   //   会議のlead(統括)枠が従来local/gemma4(8B)頼みで全役割中最弱だった穴を埋める本命として
@@ -412,7 +422,8 @@ export const LINEUP = [
   //   3/3 OK・約7秒・本文約891字・推論オフの指定は不要。中身: お題の弱点を「捨てアカ量産→SMS認証で塞ぐ」まで具体化でき、指摘の質が高かった。
   //  label に "nvidia" を含むので weightOf の "nvidia"→2 に当たる。council-roles.mjs に "diffusiongemma"→3 を足して予備から入れる（恒久ルール3）。
   //  昇格条件: 7日以上空けた実会議2回で FAILED ゼロ。
-  { label: 'nvidia/diffusiongemma-26b', provider: 'nvidia', rawId: 'google/diffusiongemma-26b-a4b-it', apiModel: 'google/diffusiongemma-26b-a4b-it', opts: {}, timeoutMs: 90000, requires: ['N'], liveProbe: true },
+  // ★2026-11-26 撤去: NVIDIA 側で 2026-11-12 に提供終了（410 "has reached its end of life"・council-trial 実測）。実会議の出番は0回のまま終わった。
+  //  旧: { label: 'nvidia/diffusiongemma-26b', rawId/apiModel: 'google/diffusiongemma-26b-a4b-it', timeoutMs: 90000 }（2026-11-11採用）
   // ★2026-11-11 試して見送った新顔・据え置き（council-trial 実測・りんくのPC。生データは同PCの council-trial-2026-11-11-*.json）:
   //  - nvidia/nemotron-3.5-bolt-e4b: 3/3 OK・5〜6秒だが内容は無難。generalist の nemotron が既に3体居るので見送り（足すなら diffusiongemma の次）。
   //  - nvidia/nemotron-3-nano-omni-30b-a3b-reasoning（推論オフ必須で3/3）・poolside/laguna-xs-2.1（3/3・12秒）: 同じ理由で見送り。
@@ -780,7 +791,10 @@ export const LINEUP = [
   //  昇格の実益が無い）。撤去: devstralの条件を引き継ぎ標準より厳しく——liveProbe2日連続失敗／
   //  実会議でimplement役として2回連続FAILED／カタログ消滅streak>=2／deprecation付与を検知、
   //  のいずれかで撤去会議へ。
-  { label: 'mistral/codestral', provider: 'mistral', rawId: 'codestral-2508', apiModel: 'codestral-2508', opts: {}, requires: ['MI'], liveProbe: true },
+  // ★2026-11-26 撤去: 402 "You need a subscription to access this API."（codestral-2508・codestral-latest とも）。
+  //  同じキーで Mistral の全モデル（ministral・mistral-medium・magistral・devstral 系）が 402＝無料枠そのものが無くなった。
+  //  撤去条件（402/403＝課金の要求）に当たる。有料プランには入らない（お金がかかる操作）。名簿の Mistral は0体になった。
+  //  旧: { label: 'mistral/codestral', rawId/apiModel: 'codestral-2508', requires: ['MI'], liveProbe: true }（2026-08-13採用）
 
   // 2026-08-25 追加（implement役の単騎解消）:
   //  implement役はmistral/codestralの単騎で、mistralが落ちると実装役が空になっていた。
@@ -893,6 +907,40 @@ export const LINEUP = [
   //   続けて叩くと 429（rate limit exceeded・月の上限ではない）が2回出た。再試験は別の日に max_tokens 6000 前後で。
   { label: 'sakura/deepseek-v4.1-flash', provider: 'sakura', rawId: 'preview/DeepSeek-V4.1-Flash-1017', apiModel: 'preview/DeepSeek-V4.1-Flash-1017', opts: {}, requires: ['SK'], liveProbe: true },
   { label: 'sakura/glm-5.3-flash', provider: 'sakura', rawId: 'preview/GLM-5.3-Flash', apiModel: 'preview/GLM-5.3-Flash', opts: { max_tokens: 3200 }, requires: ['SK'], liveProbe: true },
+  // ★2026-11-26 追加（implement の予備 weight3＝weightOf の "sakura/"→3）: さくらの preview/Kimi-K2.7-Code。11/18 に見送った候補の再試験。
+  //  mistral/codestral が 402 で抜け、implement は cloudflare/qwen2.5-coder-32b（w4）の単騎になったため、別プロバイダの席を足す。
+  //  実測（りんくのPC・11/26・本番と同じ問い・temperature 0.6・30秒間隔で3回）: max_tokens 6000 で 3/3 OK・12.0/15.0/13.4秒・
+  //   本文526/470/480字・推論2,554〜3,095字・finish=stop。429 は出なかった。roleOf は "kimi"+"code"→implement。
+  //  max_tokens 6000 必須: 1600 だと途中切れ、3200 だと推論で使い切り本文0（11/18 の実測）。
+  //  昇格条件: 7日以上空けた実会議2回で FAILED ゼロ。撤去条件: 一覧から消えた・402/403。
+  { label: 'sakura/kimi-k2.7-code', provider: 'sakura', rawId: 'preview/Kimi-K2.7-Code', apiModel: 'preview/Kimi-K2.7-Code', opts: { max_tokens: 6000 }, timeoutMs: 90000, requires: ['SK'], liveProbe: true },
+  // ★★2026-11-26 名簿の点検（会議メンバーを11/26時点の最新へ）。実測はすべて りんくのPC・scripts/council-trial.mjs
+  //  （本番と同じ max_tokens 1600 / temperature 0.6。Gemini は maxOutputTokens 8192）。生データは同PCの作業フォルダの
+  //  .artifacts/council-1126/trial-all.json・trial-3x.json（コミットしない）。
+  //  採用: cloudflare/qwen3.8-27b（diverge 予備・推論オフ 3/3）・sakura/kimi-k2.7-code（implement 予備・max_tokens 6000 で 3/3）。
+  //  撤去: cloudflare/nemotron-120b・cloudflare/qwen3-30b-a3b（11/20 廃止・410）・nvidia/diffusiongemma-26b（11/12 EOL・410）・
+  //        mistral/codestral（402＝Mistral の無料枠が無くなった）。統合の3番手も nemotron-120b → cloudflare/deepseek-v4.1-flash（meeting.mjs）。
+  //  ★NVIDIA は全モデルが 403 "Authorization failed"（/v1/models の一覧は取れる・chat だけ403）。実会議の記録では 11/15 23:15 から。
+  //   モデルの問題ではなくキー（NVIDIA_API_KEY）の失効なので名簿からは外さない。build.nvidia.com でキーを作り直せば戻る（本人のログインが要る）。
+  //   その間 nvidia の3体（nemotron-3-ultra・3.5-super・3.5-lightning）は会議で必ず落ちる。lead は openrouter/nemotron-3-ultra（3/3相当・23秒）と
+  //   gemini-4-hydrogen が受け持つ。NVIDIA の新顔（GLM 5.3 Flash・MiniMax M3.1 Flash・Step 5 Preview・Kimi K3.1 Pro・Mistral Large 4・
+  //   laguna-xs-2.1・nemotron-3-nano-omni）も同じ403で今回は測れなかった（推論オフも同じ）。meta/muse-glimmer-30b・google/gemma-4-31b-it は 11/24 EOL（410）。
+  //   Qwen 4 系は NVIDIA の一覧に出ていない。
+  //  昇格: なし。予備席（nemotron-3.5-super・3.5-lightning・diffusiongemma・gemini-4-hydrogen・sakura 2席）の実会議は、
+  //   council/auto の記録で 11/15 以降1回も無い。nemotron-3.5-super の3回（すべて 11/05 の同じ日・FAILED 0）だけで「7日以上空けた2回」に届かない。
+  //   統括の nvidia/nemotron-3-ultra は 11/05 以降 FAILED が多い（推論で上限を使い切る×6・403×1）が、キーを直すまで判断を保留。
+  //  見送り（理由つき）:
+  //   - gemini-3.8-flash（名簿・据え置き）: 一斉+指定で 0/4（503 と 180秒超え）。503 は容量の混雑なので撤去しない規約のまま。
+  //   - gemini-4-hydrogen thinkingLevel "low"（再測定）: 1/3（200・9.2秒・本文830字・思考920トークン／503×2）。503 が続くので opts は足さない。
+  //   - gemini-3-flash-preview: 3/3・8〜9秒・本文777〜902字で良好。ただし generalist の Gemini は既に lite と 3.8 の2席（恒久ルール5）。
+  //     3.8-flash の 503 が次回も続くなら、3.8 の席をこれに替える第一候補。gemini-3.1-flash-lite: 2/3（503×1）。
+  //   - gemini-4-argon・carbon・neon（新顔）: 429 "exceeded your current quota"＝無料枠では呼べない（有料専用）。
+  //   - cloudflare/thinkingmachines/inkling-2-small: 3/3（推論オフでも 3/3・6〜14秒）だが properties に require_workers_paid=true＝Workers Paid 専用。不採用。
+  //   - cloudflare/openai/gpt-oss-120b（effort low 3/3）: groq/gpt-oss-120b と同じ系譜で重複。cloudflare/glm-4.7-flash: 既定は 120秒切れ×3、推論オフで 3/3 だが23〜43秒と遅く、旧メンバー。
+  //   - cloudflare/qwen3.8 以外の CF 新顔（glm-5.3・gemma-4-26b 等）は推論で上限を使い切り本文0。clairic/clef 系は会話モデルではない（400）。
+  //   - openrouter/google/gemma-4-26b-a4b-it:free・gemma-4-31b-it:free: 429×4（枠なし）。inclusionai/ling-3.2-flash:free: 本文0×1・429×3。
+  //     11/23 以降に増えた :free は無い（最新は 11/13 の ling-3.2-flash）。nemotron-3.5-super-vl:free・lightning:free・nano-omni:free・ernie-5.5・flint・lfm-3 は本文0。
+  //   - sambanova: gemma-4-31B-it は一斉試験で1回 200 だったが、続けて 402×3（支払い方法の登録を要求）。全モデル 402＝不採用（支払い登録はしない）。
 
   // 2026-06-?? 追加 → 2026-07-31 撤去（openrouter/gpt-oss-120b）:
   //   本改修でrawIdを空('')から'openai/gpt-oss-120b:free'に埋めた直後の初回実行で
