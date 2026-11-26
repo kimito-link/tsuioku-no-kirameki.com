@@ -10,6 +10,11 @@ import {
   videoIdFromYtInitialData,
 } from './ytConcurrentViewers.js';
 import { parseYtVideoIdFromUrl } from './ytPageMeta.js';
+import {
+  classifyYtWatchContentKind,
+  viewCountInInnertube,
+  ytLiveFlagsFromPlayerOrInitial,
+} from './ytVideoWatchMeta.js';
 
 const VID_RE = /^[A-Za-z0-9_-]{11}$/;
 
@@ -68,6 +73,10 @@ export function startYtPageViewerReader() {
     const pageId = pageVideoId();
     if (pageId && pageId !== videoId) return;
     root.setAttribute('data-nl-yt-video-id', videoId);
+    if (root.getAttribute('data-nl-yt-is-live') === '0') {
+      root.removeAttribute('data-nl-yt-viewers');
+      return;
+    }
     root.setAttribute('data-nl-yt-viewers', String(Math.floor(count)));
   };
 
@@ -122,6 +131,38 @@ export function startYtPageViewerReader() {
     if (subText) document.documentElement?.setAttribute('data-nl-yt-subscribers', subText);
     if (count != null) publish(id, count);
     else flushPending();
+    publishVodSignals(data, /** @type {any} */ (window).ytInitialPlayerResponse, id);
+  };
+
+  /**
+   * 通常動画の再生数と、配信かどうかの印を data 属性に書く。同時視聴の属性は変えない。
+   * @param {any} data
+   * @param {any} player
+   * @param {string} id
+   */
+  const publishVodSignals = (data, player, id) => {
+    const root = document.documentElement;
+    if (!root || !id) return;
+    const views = viewCountInInnertube(data, id) ?? viewCountInInnertube(player, id);
+    if (views != null) root.setAttribute('data-nl-yt-view-count', String(views));
+    const fromPlayer = ytLiveFlagsFromPlayerOrInitial(player);
+    const fromData = ytLiveFlagsFromPlayerOrInitial(data);
+    const isLive = fromPlayer.isLive ?? fromData.isLive;
+    const isLiveContent = fromPlayer.isLiveContent ?? fromData.isLiveContent;
+    if (isLive === true) root.setAttribute('data-nl-yt-is-live', '1');
+    else if (isLive === false) root.setAttribute('data-nl-yt-is-live', '0');
+    if (isLiveContent === true) root.setAttribute('data-nl-yt-is-live-content', '1');
+    else if (isLiveContent === false) root.setAttribute('data-nl-yt-is-live-content', '0');
+    if (isLive === false) root.removeAttribute('data-nl-yt-viewers');
+    const viewersAttr = root.getAttribute('data-nl-yt-viewers');
+    const viewersN = viewersAttr && /^\d+$/.test(viewersAttr) ? Number(viewersAttr) : null;
+    const kind = classifyYtWatchContentKind({
+      url: String(location.href || ''),
+      isLive,
+      isLiveContent,
+      concurrentViewers: viewersN,
+    });
+    if (kind !== 'unknown') root.setAttribute('data-nl-yt-content-kind', kind);
   };
 
   /** @type {MutationObserver | null} */
@@ -208,6 +249,10 @@ export function startYtPageViewerReader() {
     const root = document.documentElement;
     root?.removeAttribute('data-nl-yt-viewers');
     root?.removeAttribute('data-nl-yt-video-id');
+    root?.removeAttribute('data-nl-yt-view-count');
+    root?.removeAttribute('data-nl-yt-is-live');
+    root?.removeAttribute('data-nl-yt-is-live-content');
+    root?.removeAttribute('data-nl-yt-content-kind');
     setTimeout(arm, 0);
   });
 }

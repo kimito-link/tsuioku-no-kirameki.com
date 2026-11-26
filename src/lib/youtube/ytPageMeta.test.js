@@ -4,6 +4,7 @@ import { parseYtVideoIdFromUrl, isYtWatchLikeUrl, ytHandleLivePendingKey, ytHand
 describe('parseYtVideoIdFromUrl', () => {
   it('watch / live / live_chat / youtu.be を読める', () => {
     expect(parseYtVideoIdFromUrl('https://www.youtube.com/watch?v=abcdefghijk&t=1')).toBe('abcdefghijk');
+    expect(parseYtVideoIdFromUrl('https://www.youtube.com/watch?v=SIk45QZsnDM&list=RDSIk45QZsnDM&start_radio=1')).toBe('SIk45QZsnDM');
     expect(parseYtVideoIdFromUrl('https://www.youtube.com/live/abcdefghijk?si=x')).toBe('abcdefghijk');
     expect(parseYtVideoIdFromUrl('https://www.youtube.com/live_chat?is_popout=1&v=abcdefghijk')).toBe('abcdefghijk');
     expect(parseYtVideoIdFromUrl('https://youtu.be/abcdefghijk')).toBe('abcdefghijk');

@@ -23,6 +23,7 @@
 
 import { isNumericNicoUserId } from '../domain/user/identity.js';
 import { nicoUserPageUrl } from './nicoUserPage.js';
+import { identiconFallbackForAvatarUrl } from './avatarFallbackFromUrl.js';
 
 /**
  * @typedef {{
@@ -89,7 +90,20 @@ export function buildPersonTileEl(p, io) {
   //   会場は 3D 変形で可視判定が崩れるので使わない(呼び出し側が渡さない・下の loading="lazy" 撤回の経緯と同じ)。
   const deferFar = io.deferFarImages === true && typeof io.whenNearViewport === 'function';
   if (deferFar) img.loading = 'lazy'; // src より先に付ける(後から付けても読み込みは始まっている)
-  img.src = cachedFace || displayLane;
+  // v0.1.2250: 遠いマスでも、ページから取った本物の顔の URL(YouTube・Twitch など。ニコの式の URL は除く=404 が多い)は
+  //   最初から本物を指す。読み込みはブラウザの遅延読み込みに任せる(近づくまで通信しない=確かめと同じ回数以下)。
+  //   読めなかったときは、その場で代わりの顔(ゆっくり)へ戻す。下の確かめ(noteRemoteAttempt)は今までどおり近づいてから。
+  const directFar =
+    deferFar && !cachedFace && displayLane !== requestedLane &&
+    io.isHttpOrHttpsUrl(requestedLane) && !identiconFallbackForAvatarUrl(requestedLane);
+  if (directFar) {
+    img.addEventListener('error', () => {
+      if (img.getAttribute('src') !== requestedLane) return;
+      img.src = displayLane;
+      img.classList.toggle('nl-avatar--tv-fallback', io.storyTileUsesYukkuriTvStyle(requestedLane, displayLane));
+    }, { once: true });
+  }
+  img.src = directFar ? requestedLane : cachedFace || displayLane;
   if (deferFar && displayLane !== requestedLane && io.isHttpOrHttpsUrl(requestedLane)) {
     // 本物の顔の確かめ(隠し画像での読み込み試験)は、マスが画面の近くに来てから始める。
     void Promise.resolve(io.whenNearViewport(img)).then((near) => {
@@ -101,7 +115,7 @@ export function buildPersonTileEl(p, io) {
   }
   img.classList.toggle(
     'nl-avatar--tv-fallback',
-    io.storyTileUsesYukkuriTvStyle(requestedLane, displayLane)
+    io.storyTileUsesYukkuriTvStyle(requestedLane, directFar ? requestedLane : displayLane)
   );
   img.alt = '';
   const tip =

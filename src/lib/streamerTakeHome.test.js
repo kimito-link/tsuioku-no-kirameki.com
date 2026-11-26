@@ -24,7 +24,7 @@ describe('配信者の受取（推定）', () => {
     expect(d.label).toBe('推定（配信者の受取）');
     expect(d.title).toContain('手数料・税差引前の目安');
     expect(d.sourceUrl).toBe('https://support.google.com/youtube/answer/7288782?hl=ja');
-    expect(STREAMER_TAKE_HOME_RATES.youtubePaidChat.asOf).toBe('2026-11-25');
+    expect(STREAMER_TAKE_HOME_RATES.youtubePaidChat.asOf).toBe('2026-11-26');
   });
   it('Kick: サブスク・ギフトサブ1件 $4.75。KICKs は入れない', () => {
     const est = estimateStreamerTakeHomeJpy('kick', { amounts: { KICKS: 10000 }, membershipCount: 1, membershipGiftCount: 3 });

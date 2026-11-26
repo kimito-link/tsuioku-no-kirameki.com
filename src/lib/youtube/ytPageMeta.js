@@ -112,6 +112,8 @@ export function isYtWatchLikeUrl(rawUrl) {
     if (p.startsWith('/live_chat')) return false;
     // チャンネルの「いま配信中」ページは YouTube だけ。TikTok も /@名前/live の形を使う。
     if (/\/live\/?$/.test(p) && !p.startsWith('/live/')) return Boolean(ytHandleLivePath(rawUrl));
+    // Shorts も1本の動画を見ているページ（会場は既に /shorts で載る。メタと配信キーも同じ扱いにする）
+    if (/^\/shorts\/[A-Za-z0-9_-]{11}(?:\/|$)/.test(p)) return true;
     return p === '/watch' || p.startsWith('/live/');
   } catch {
     return false;

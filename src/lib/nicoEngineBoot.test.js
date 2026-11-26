@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { needsNicoEngineFrame, shouldPollNicoEngine } from './nicoEngineBoot.js';
+import { needsNicoEngineFrame, shouldPollNicoEngine, needsNicoVideoWatchFrame } from './nicoEngineBoot.js';
 import { needsYtVenue, shouldPollYtVenue } from './youtube/ytVenueBoot.js';
 
 describe('needsNicoEngineFrame', () => {
@@ -9,6 +9,15 @@ describe('needsNicoEngineFrame', () => {
     expect(needsNicoEngineFrame('http://127.0.0.1:3456/watch/lv1/')).toBe(true);
     expect(needsNicoEngineFrame('https://www.nicovideo.jp/')).toBe(false);
     expect(needsNicoEngineFrame('https://www.nicovideo.jp/watch/sm123')).toBe(false);
+    expect(needsNicoEngineFrame('https://www.nicovideo.jp/watch/sm123', { hasCommentPanel: true })).toBe(false);
+    expect(needsNicoEngineFrame('https://www.nicovideo.jp/watch/so1', { hasCommentPanel: true })).toBe(false);
+  });
+
+  it('通常動画には小さい入口だけを載せる', () => {
+    expect(needsNicoVideoWatchFrame('https://www.nicovideo.jp/watch/sm9', true)).toBe(true);
+    expect(needsNicoVideoWatchFrame('https://www.nicovideo.jp/watch/so1', true)).toBe(true);
+    expect(needsNicoVideoWatchFrame('https://www.nicovideo.jp/watch/sm9', false)).toBe(false);
+    expect(needsNicoVideoWatchFrame('https://live.nicovideo.jp/watch/lv1', true)).toBe(false);
   });
 
   it('ギフトと貢献度の子フレームは載せる', () => {

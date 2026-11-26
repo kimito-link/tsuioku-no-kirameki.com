@@ -66,14 +66,8 @@ function walkSubscriberText(node, depth, budget) {
 export function concurrentFromVideoViewCountRenderer(renderer) {
   if (!renderer || typeof renderer !== 'object') return null;
   const text = viewCountText(renderer.viewCount);
-  const fromText = extractYtWatchConcurrentViewersFromText(text);
-  if (fromText !== null) return fromText;
-  const live = renderer.isLive === true || /視聴中|watching/i.test(text);
-  if (!live) return null;
-  const raw = renderer.originalViewCount;
-  const n = typeof raw === 'number' ? raw : typeof raw === 'string' && /^\d+$/.test(raw) ? Number(raw) : NaN;
-  if (!Number.isFinite(n) || n < 0 || n > 50_000_000) return null;
-  return Math.floor(n);
+  // 総再生（回視聴 / views / originalViewCount）は同時視聴にしない。
+  return extractYtWatchConcurrentViewersFromText(text);
 }
 
 /**
@@ -101,6 +95,28 @@ export function concurrentViewersInInnertube(data, wantId) {
 
 /**
  * @param {any} node
+ * @param {any} inherited
+ * @returns {any}
+ */
+function videoIdOfNode(node, inherited) {
+  if (!node || typeof node !== 'object') return inherited;
+  if (isVideoId(node.videoId)) return node.videoId;
+  const candidates = [
+    node.watchEndpoint?.videoId,
+    node.navigationEndpoint?.watchEndpoint?.videoId,
+    node.onTap?.innertubeCommand?.watchEndpoint?.videoId,
+    node.command?.watchEndpoint?.videoId,
+    node.currentVideoEndpoint?.watchEndpoint?.videoId,
+    node.endpoint?.watchEndpoint?.videoId,
+  ];
+  for (const c of candidates) {
+    if (isVideoId(c)) return c;
+  }
+  return inherited;
+}
+
+/**
+ * @param {any} node
  * @param {string} videoId
  * @param {string} want
  * @param {{ n: number }} budget
@@ -117,7 +133,7 @@ function walkCount(node, videoId, want, budget, depth) {
     }
     return null;
   }
-  const vid = isVideoId(node.videoId) ? node.videoId : videoId;
+  const vid = videoIdOfNode(node, videoId);
   const renderer = node.videoViewCountRenderer;
   if (renderer && typeof renderer === 'object') {
     const count = concurrentFromVideoViewCountRenderer(renderer);

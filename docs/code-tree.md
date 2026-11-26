@@ -27,7 +27,7 @@
 
 > 値が次の段へ届かない「断線」(broadcaster バグ型)は `npm run feature-map -- --check` が機械検知。
 
-## ⚠️ 役割コメントが無いソース 15 / 1368 件
+## ⚠️ 役割コメントが無いソース 15 / 1394 件
 - `docs/handoff/bench/bench-interval.mjs`
 - `docs/handoff/bench/bench-lane.mjs`
 - `extension-youtube/cloak-failsafe.js`
@@ -1203,7 +1203,7 @@
   - `gift-coin-hq.wav`
   - `gift-register-hq.wav`
   - `gift-register.mp3`
-- 📁 **src/** (2657)
+- 📁 **src/** (2743)
   - 📁 **data/** (7)
     - 📁 **acquirers/** (2)
       - `laneFromStorage.js` — 応援レーン acquirer: chrome.storage.local(nls_comments) → laneStore の橋渡し。
@@ -1240,8 +1240,8 @@
       - `avatarResolver.test.js`
       - `identity.js` — ニコ生ユーザー ID の「匿名性」判定と関連アイデンティティ・ユーティリティ。
       - `nickname.js` — 表示名（ニックネーム）の「強弱」判定。
-  - 📁 **extension/** (124)
-    - 📁 **popup/** (24)
+  - 📁 **extension/** (136)
+    - 📁 **popup/** (25)
       - 📁 **init/** (4)
         - `devMonitorExport.js` — devMonitorExport — 開発モニタの「エクスポート/ダウンロード/較正データ消去」一式。
         - `devMonitorExport.test.js`
@@ -1255,6 +1255,7 @@
       - `broadcasterCasterThumb.js` — 「配信者」カード／バナーのサムネ。ゆっくり顔へ倒さず、本人アイコンか中立な「未取得」を使う。
       - `eventLiveBoardPopup.js` — 2026-11-21 Phase 2: popup のイベント💎ボード（いまの順位・pt・次の順位まで）。popup-entry.js は
       - `nicoEstimatedSpendChip.js` — ニコ生横欄（.nl-official-nico-stats__row）へ「推定（視聴者の購入額）」チップを同期する。
+      - `nicoEstimatedSpendChip.test.js`
       - `renderAcquisitionDashboard.js` — renderAcquisitionDashboard — 開発者モニタの「データ取得率」ダッシュボードを描く。
       - `renderAcquisitionDashboard.test.js`
       - `wireLaneUserDetailOpen.js` — 応援レーン(story user lane)のタイルを押したら、その人の「この配信での発言一覧」を
@@ -1306,6 +1307,7 @@
     - `ndgrHiddenFlush.wiring.test.js`
     - `ndgrStatisticsPointsSanityGuard.wiring.test.js`
     - `ndgrViewBasePick.wiring.test.js`
+    - `nico-video-watch-entry.js` — ニコニコ動画の通常動画（sm / so / nm）向けの小さい入口。
     - `noSpeechNote.wiring.test.js`
     - `offscreen-entry.js` — feat/multitab-scale-globalcap（2026-05-31）: コメント IDB の「常駐・単一書き手」を担う
     - `orphanTabAutoReloadHost.js` — 放送ページ(content script の一番外側)で、拡張の入れ替え後に古い版のまま止まったページを自分で読み込み直す見回りを始める。
@@ -1327,6 +1329,7 @@
     - `popupAvatarRetry.wiring.test.js`
     - `popupBackfillCompleteState.wiring.test.js`
     - `popupUserLaneAvatarObservedFlow.test.js`
+    - `recordedCountTruth.wiring.test.js`
     - `repaintLoopGuard.wiring.test.js`
     - `self-update-sw-entry.js` — 開発版の拡張が、拡張のフォルダの新しい版に自分で入れ替わる(v0.1.1802)。
     - `self-update.d.ts` — self-update.js(キットの写し・無改変)の型。写しを型検査から外し、ここで形だけ示す。
@@ -1361,6 +1364,12 @@
     - `venueSpeechPanelRowsMax.wiring.test.js`
     - `venueSpeechPanelTailRead.test.js`
     - `venueSpeechPanelUserKey.wiring.test.js`
+    - `viewerBehaviorBoardPaint.js` — 視聴者の行動ボードを、既にある storage の変化だけを見て塗る。
+    - `viewerBehaviorLiveGate.test.js`
+    - `viewerBehaviorLiveLayout.js` — 視聴者の行動を、配信モードと同じ数字の帯と、同じ応援アイコン列で描く。
+    - `viewerBehaviorLiveLayout.test.js`
+    - `viewerBehaviorRelationLabel2246.test.js`
+    - `vod-video-watch-entry.js` — Twitch VOD・Kick VOD・ツイキャス録画・ABEMA エピソード・TikTok 通常動画向けの小さい入口。
     - `voice-native-guide-entry.js` — ⚠️ 役割コメント無し
     - `voiceQualitySetting.js` — 読み上げの声の音質の設定を、この画面の合成へ効かせる(2026-10-29)。
     - `voiceStreamAudio.js` — 少しずつ届く声(StreamedVoice)をブラウザで鳴らす部品(会場・コメビュ共通・2026-10-26)。
@@ -1368,6 +1377,9 @@
     - `voiceTestHook.test.js`
     - `voiceTogglePanel.wiring.test.js`
     - `whatsNewNoticeUi.js` — ポップアップ／横の欄に「この版で変わったこと」を出す。
+    - `whatsNewNoticeUi.test.js`
+    - `wireVideoLanePersonDetail.js` — 通常動画のサムネイルを押したとき、横の欄の中にその人の行動を出す。
+    - `wireVideoLanePersonDetail.test.js`
     - `yt-page-boot.js` — 会場(yt-venue-inline.js・約800KB)を配信の視聴ページだけに載せる。
   - 📁 **fixtures/** (3)
     - 📁 **kouhaku/** (2)
@@ -1550,7 +1562,7 @@
         - `logo_funlink_white_RGB_link_black.png`
         - `logo_funlink_white_RGB_maru_black.png`
     - `hero-connect-hub.svg`
-  - 📁 **lib/** (2335)
+  - 📁 **lib/** (2409)
     - 📁 **__snapshots__/** (4)
       - `marketing-abema-baseline.html`
       - `marketing-niconico.html`
@@ -1612,7 +1624,18 @@
       - `mxParse.js` — ミクチャ(mixch.tv)の配信・コメント・ギフトを、YouTube 版の記録と同じ形にする(純関数)
       - `mxParse.test.js`
       - `mxSendPath.wiring.test.js`
-    - 📁 **platform/** (47)
+    - 📁 **niconico/** (8)
+      - 📁 **fixtures/** (2)
+        - 📁 **real-dom/** (2)
+          - `README.md`
+          - `sm9.jsonld.json`
+      - `nicoChannelCommenterIndex.js` — 【層】L0 判定層(純粋関数・I/O禁止)
+      - `nicoVideoWatchCard.js` — 【層】L0 判定層(純粋関数・I/O禁止)
+      - `nicoVideoWatchCard.test.js`
+      - `nicoVideoWatchMeta.js` — 【層】L0 判定層(純粋関数・I/O禁止)
+      - `nicoVideoWatchMeta.test.js`
+      - `nicoVideoWatchSm9RealDom.test.js`
+    - 📁 **platform/** (50)
       - 📁 **__fixtures__/** (1)
         - `eventStanding.2026-11-21.json`
       - `diagTabShare.js` — 計器(yt_diag_*_chat)は1つの置き場を全タブで分け合う。
@@ -1634,6 +1657,8 @@
       - `historyBackfill.test.js`
       - `infoPollGate.js` — 配信の情報の口を何秒おきに読むかを決める小さな門(純関数)
       - `infoPollGate.test.js`
+      - `liveIconStore.js` — v0.1.2254: ライブで分かった顔(名前 → 顔の URL)を storage(yt_tw_icons など)に置くときの、純粋な部品。
+      - `liveIconStore2254.test.js`
       - `marketingExportBudget.test.js`
       - `marketingPlatformChapters.js` — ニコ生以外のマーケHTMLに足す章。見た目のクラスは既存の mkt-* を使う。
       - `marketingPlatformPlan.js` — 【層】L0 判定層(純粋関数・I/O禁止)
@@ -1660,6 +1685,7 @@
       - `streamPlatform.reload.test.js`
       - `supportArrival.js` — 【層】L0 判定層(純粋関数・I/O禁止)
       - `supportArrival.test.js`
+      - `supportEventParity.test.js`
       - `supportSummaryAllPlatforms.test.js`
     - 📁 **showroom/** (7)
       - `srCommentInput.js` — SHOWROOM の公式コメント欄を探す(会場の「ここから発言」は拾わない)。
@@ -1689,14 +1715,45 @@
       - `twIrcParse.test.js`
       - `twShim.test.js`
       - `twStreamKey.js` — Twitch の「配信キー」(YouTube 版の videoId の位置に入る文字列)の作り方と読み方(純関数)
+    - 📁 **videoWatch/** (16)
+      - 📁 **fixtures/** (2)
+        - `twitcasting-movie-843232645-comment-items.slim.html`
+        - `twitch-vod-2940252213-replay-chat.slim.html`
+      - `kickVodReplay2247.test.js`
+      - `twVodLiveIcons.js` — v0.1.2253: Twitch の録画チャットには顔の画像が無い(実測 DOM)。ライブの Twitch でこの PC が覚えた顔
+      - `twVodLiveIcons2253.test.js`
+      - `videoIdentity.js` — 【層】L0 判定層(純粋関数・I/O禁止)
+      - `videoIdentity2241.test.js`
+      - `videoPanel2244.test.js`
+      - `videoPanel2245.test.js`
+      - `videoPanelRoute.js` — 横の欄の外枠(sidepanel-iframe-boot-entry.js)が、録画・通常動画のページで中身を付け替えるかを決める純関数。v0.1.2244
+      - `videoWatchCard.js` — 【層】L0 判定層(純粋関数・I/O禁止)
+      - `videoWatchCard.test.js`
+      - `vodCommentsFromDom.js` — 【層】L0 判定層(純粋関数・I/O禁止)
+      - `vodCommentsFromDom.test.js`
+      - `vodWatchUrl.js` — 【層】L0 判定層(純粋関数・I/O禁止)
+      - `vodWatchUrl.test.js`
     - 📁 **whowatch/** (2)
       - `wwParse.js` — ふわっち(whowatch.tv)の配信とコメントを、YouTube 版の記録と同じ形にする(純関数)
       - `wwParse.test.js`
-    - 📁 **youtube/** (102)
+    - 📁 **youtube/** (127)
+      - 📁 **fixtures/** (9)
+        - 📁 **real-dom/** (9)
+          - `README.md`
+          - `SIk45QZsnDM.playability.json`
+          - `kKl0E22tU78-thread-kvibaba.slim.html`
+          - `kKl0E22tU78-thread-pinned-hikakin.slim.html`
+          - `mlfY1WYFpEc.comments-page1.json`
+          - `mlfY1WYFpEc.initial-viewcount.json`
+          - `mlfY1WYFpEc.player.json`
+          - `mlfY1WYFpEc.reply-abingdonboyse.json`
+          - `mlfY1WYFpEc.reply-viewer.json`
       - `exportStoredComments.js` — 疑似 lv の書き出しは、画面用の組み立て（人物・アイコン・ランキング）を待たない。
       - `pfLastStreamUrl.test.js`
       - `ytActiveVideoId.js` — 「いま見ている配信」(yt_active_video_id) を書いてよいか。
       - `ytActiveVideoId.test.js`
+      - `ytChannelCommenterIndex.js` — 【層】L0 判定層(純粋関数・I/O禁止)
+      - `ytChannelCommenterIndex.test.js`
       - `ytChatContinuationVideoId.js` — チャット欄(/live_chat?continuation=…)の URL から、そのチャットが「どの配信のものか」を読む純関数。
       - `ytChatContinuationVideoId.test.js`
       - `ytChatEchoDedupe.js` — 自分の送ったコメントが「2回」記録・読み上げされるのを防ぐ(0.1.1905・2026-11-06 りんく実機)。
@@ -1707,6 +1764,11 @@
       - `ytChatParse.test.js`
       - `ytChunkedRead.js` — 配信の記録を「少しずつ」読む(v0.1.1977)。
       - `ytChunkedRead.test.js`
+      - `ytCommentEntities2252.test.js`
+      - `ytCommentPhotoTag.js` — 【この箱の仕事】YouTube 動画のコメント欄で、まだ画面に出ていない投稿者の顔の URL を、ページの世界から属性に写す。
+      - `ytCommentPhotoTag2247.test.js`
+      - `ytCommentScanGate.js` — v0.1.2249: YouTube 動画のコメント欄の読み直し(既存の 5 秒ごとの sendMeta)を、変わっていないときは省く。
+      - `ytCommentScanGate2249.test.js`
       - `ytCommentSendReason.js` — YouTube のチャットへ送れなかった理由コード(content-chat-entry が返す)を日本語にする。
       - `ytCommentSendReason.test.js`
       - `ytConcurrentViewers.js` — YouTube の同時視聴者数を、ページの埋め込みと updated_metadata から読む（純関数）
@@ -1781,6 +1843,15 @@
       - `ytUserLaneTiers.test.js`
       - `ytVenueBoot.js` — 【層】L0 判定層(純粋関数・I/O禁止)
       - `ytVenueBoot.test.js`
+      - `ytVideoWatch2234.test.js`
+      - `ytVideoWatch2235.test.js`
+      - `ytVideoWatchCard.js` — 【層】L0 判定層(純粋関数・I/O禁止)
+      - `ytVideoWatchCard.test.js`
+      - `ytVideoWatchMeta.js` — 【層】L0 判定層(純粋関数・I/O禁止)
+      - `ytVideoWatchMeta.test.js`
+      - `ytVideoWatchRealDom2236.test.js`
+      - `ytVideoWatchRealDom2237.test.js`
+      - `ytVideoWatchRealDom2239.test.js`
       - `ytViewerSampler.js` — YouTube の同時視聴者数を、パネルを閉じていても1分ごとに記録する(2026-11-05 りんく
       - `ytViewerSampler.test.js`
       - `ytVoiceAssignPersist.js` — YouTube 系(YouTube・Twitch・Kick ほか)の「人ごとの声の割り当て」(yt_voice_assignments)を
@@ -1873,6 +1944,7 @@
     - `avatarFaceWorkerClient.js` — 【層】L2 配線層(Worker を持つ・DOM/chrome.* には触れない。Worker の作り方は deps で注入)
     - `avatarFaceWorkerClient.test.js`
     - `avatarFaceWorkerWiring.wiring.test.js`
+    - `avatarFallbackFace2248.test.js`
     - `avatarFallbackFromUrl.js` — 【層】L0 判定層(純粋関数・I/O禁止)
     - `avatarFallbackFromUrl.test.js`
     - `avatarLoadReport.js` — アイコン画像(usericon)の【実際のロード失敗】を状態速報の対処候補カードに出す純関数(v0.1.1026)。
@@ -2019,6 +2091,7 @@
     - `changelogLineage.test.js`
     - `channelBroadcasterMeta.js` — 公式チャンネル放送（運営・業者）の broadcaster メタを embedded-data から
     - `channelBroadcasterMeta.test.js`
+    - `channelCommenterIndex.js` — 【層】L0 判定層(純粋関数・I/O禁止)
     - `channelSwitchDiag.js` — 配信切替(SPA遷移)の「送信N/受信N/初描画ms」観測値を組み立てる純関数群。
     - `channelSwitchDiag.test.js`
     - `channelSwitchDiagKey.js` — 配信切替(SPA遷移でパネルを作り直さず in-place 切替する経路)の「切替回数/初描画ms」観測値を
@@ -2281,6 +2354,8 @@
     - `effectSoundPlayer.js` — ギフト/広告/応援者ランキング順位変動に鳴らす短い効果音の再生ロジック(純関数+再生本体)。
     - `effectSoundPlayer.test.js`
     - `effectSoundPrefetch.test.js`
+    - `elementValuesMemo.js` — 要素ごとに「前回書いたときの値の並び」を控え、全部同じなら書かずに済ませるための小さな台帳。
+    - `elementValuesMemo.test.js`
     - `embeddedDataExtract.js` — ニコ生 watch ページの `#embedded-data[data-props]` から初期メタ情報を抽出する純関数。
     - `embeddedDataExtract.test.js`
     - `enrichUserLaneAggregatesEquivalence.test.js`
@@ -2348,6 +2423,7 @@
     - `formatDateTime.test.js`
     - `formatGiftSubAppHistory.js` — v0.1.198: gift sub-app DOM 由来の history / totalCounts を popup 表示用に
     - `formatGiftSubAppHistory.test.js`
+    - `formatNumberJaCached.test.js`
     - `formatOfficialStreamAgeMinutes.js` — 視聴ページ由来の「放送開始からの経過（分）」を短い日本語にする。
     - `formatOfficialStreamAgeMinutes.test.js`
     - `forwardReactivation.js` — v0.1.765「最終系(a): 入口が死んだ時だけ forward crawl を起動して再接続」の判定(純ロジック)。
@@ -2745,7 +2821,9 @@
     - `longTaskTracker.js` — メインスレッドを長時間ブロックした「Long Task」を有界に記録する純関数群。
     - `longTaskTracker.test.js`
     - `lpChangelogLink.js` — 拡張の版番号から、紹介ページの「その版の説明」への URL を作る（純関数）。
+    - `lpChangelogLink.test.js`
     - `lpChangelogPage.js` — 紹介ページの「更新履歴（全版）」HTML を作る（純関数・副作用なし）。
+    - `lpChangelogPage.test.js`
     - `lpContentStaleness.js` — 【層】L0 判定層(純粋関数・I/O禁止)
     - `lpContentStaleness.test.js`
     - `lpImages.test.js`
@@ -2872,6 +2950,7 @@
     - `nicoCommentPanelAssetLauncher.test.js`
     - `nicoEngineBoot.js` — 【層】L0 判定層(純粋関数・I/O禁止)
     - `nicoEngineBoot.test.js`
+    - `nicoUidGuessPlatform2250.test.js`
     - `nicoUserFollowingApi.js` — nvapi /v1/users/{uid}/following/users の URL 構築とレスポンス正規化。
     - `nicoUserFollowingApi.test.js`
     - `nicoUserPage.js` — 汎用: ニコ生ユーザーの公開ページ URL / 表示名 を作る純関数。
@@ -2999,6 +3078,7 @@
     - `panelMetricsRequestPolicy.js` — 【層】L0 判定層(純粋関数・I/O禁止)
     - `panelMetricsRequestPolicy.test.js`
     - `panelMetricsRequestWiring.test.js`
+    - `panelNoForcedReflowWiring.wiring.test.js`
     - `panelWakeCurtain.js` — 「黒いまま」を見せないための、いつでも出せる幕。
     - `panelWakeCurtain.test.js`
     - `panelWakeCurtain.wiring.test.js`
@@ -3064,6 +3144,7 @@
     - `popupBooleanSettingsRegistry.js` — popup のブール設定コントローラをまとめて扱うレジストリ。
     - `popupBooleanSettingsRegistry.test.js`
     - `popupBootNoImageWarmup.wiring.test.js`
+    - `popupCacheHitSinglePaint.wiring.test.js`
     - `popupCelebrationGate.js` — popup / watch 埋め込みパネル再描画時の応援演出ゲート（単一の開幕判定）。
     - `popupCelebrationGate.test.js`
     - `popupCloakRevealTiming.js` — 幕(cloak)をいつ外してよいかを決める純関数(v0.1.1315)。
@@ -3096,6 +3177,7 @@
     - `popupMainScrollDefer.test.js`
     - `popupOverlayShownWiring.wiring.test.js`
     - `popupRankingFullCountStable.wiring.test.js`
+    - `popupRefreshRenderCadence.test.js`
     - `popupStorageRefreshCoalesce.js` — popup / inline のコメント再描画スケジューラ。
     - `popupStorageRefreshCoalesce.test.js`
     - `popupVisibilityGate.js` — popup / inline コメント再描画の可視性ゲート（v0.1.440）。
@@ -3156,6 +3238,7 @@
     - `recordPathUntouched.test.js`
     - `recordRate.js` — 取得スピード(records/sec)の算出と健康スコア化(純ロジック)。
     - `recordRate.test.js`
+    - `recordedCountTruth.test.js`
     - `recordingStallWatchdog.js` — 記録停止ウォッチドッグの純粋判定ロジック。
     - `recordingStallWatchdog.test.js`
     - `referralAttribution.js` — 【層】L0 判定層(純粋関数・I/O禁止)
@@ -3177,6 +3260,8 @@
     - `renderCadence.test.js`
     - `repaintReasonCensus.js` — 「描き直しが何回・どの理由で起きたか」を数える純関数群。
     - `repaintReasonCensus.test.js`
+    - `replayClassAnimation.js` — v0.1.2223: CSS の一発アニメ(クラスを付けると1回動く)を、レイアウトを強制せずに鳴らす。
+    - `replayClassAnimation.test.js`
     - `reportCommentsCsv.js` — 保存コメント配列を「Excel / LibreOffice / Google Sheets で安全に開ける CSV」に変換する純関数。
     - `reportCommentsCsv.test.js`
     - `reportCommentsTableSection.js` — HTML レポート「保存コメント一覧」セクション。
@@ -3262,6 +3347,7 @@
     - `sessionSummaryMirrorKey.js` — セッション比較(記録サマリの推移)鏡の storage キー正本
     - `shareKeysFile.js` — 【層】L0 判定層(純粋関数・I/O禁止)
     - `shareKeysFile.test.js`
+    - `sharedAvatarLoadMemory2251.test.js`
     - `shortLivedMemo.js` — 0.1.1961: 同じ問い合わせを短い間だけ使い回す(答えを待っている間の重複もまとめる)。
     - `shortLivedMemo.test.js`
     - `shouldRearmBackfillForOfficialGap.js` — 自動補充の核心: 「公式コメント件数と記録件数のギャップが大きいまま、NDGR バックフィルが
@@ -3441,6 +3527,7 @@
     - `storyUserLaneRowModel.test.js`
     - `storyUserLaneSort.js` — 応援ユーザーレーンの候補ソート正本。
     - `storyUserLaneSort.test.js`
+    - `streamerTakeHome.test.js`
     - `suggestInitialInlinePanelPlacement.js` — 新規インストール直後の「おすすめ」インライン配置（storage 未設定時のみ migrate が使う）。
     - `suggestInitialInlinePanelPlacement.test.js`
     - `summarizeDevMonitorGiftRanking.js` — v0.1.202 A-0: popup「詳しい状況（開発・切り分け用・折りたたみ）」の
@@ -3513,6 +3600,7 @@
     - `thumbFifo.test.js`
     - `thumbSettings.js` — 定期サムネイル設定（ストレージ値の正規化）
     - `thumbSettings.test.js`
+    - `tickerLastUserTracker.test.js`
     - `timeAuthority.js` — timeAuthority — 「その値がいつ真だったか」と「その値は判定に使えるか」の【唯一の正本】。
     - `timeAuthority.test.js`
     - `timeAuthorityRegistry.js` — timeAuthorityRegistry — 「独自に時点フィールドを持つファイル」の凍結リスト(祖父条項)。
@@ -3750,6 +3838,11 @@
     - `versionMismatch.test.js`
     - `videoCapture.js` — watch ページの video から PNG を取るためのユーティリティ。
     - `videoCapture.test.js`
+    - `viewerBehavior.js` — 【層】L0 判定層(純粋関数・I/O禁止)
+    - `viewerBehavior.test.js`
+    - `viewerBehaviorMatch.js` — 【層】L0 判定層(純粋関数・I/O禁止)
+    - `viewerBehaviorMatch.test.js`
+    - `viewerBehaviorPersonDetail.test.js`
     - `viewerCelebrationMatch.js` — 視聴者本人のギフト／広告システムコメント判定（ニコ生の表記揺れに耐える）。
     - `viewerCelebrationMatch.test.js`
     - `viewerCountProbeMerge.js` — 【層】L0 判定層(純粋関数・I/O禁止)
@@ -3942,13 +4035,13 @@
     - `yozora-small-yell.mp3`
   - `build-globals.d.ts` — ビルド時に esbuild の `define` で注入される定数の型宣言。
   - `speech-recognition-globals.d.ts` — Web Speech API（Chrome は webkit 接頭辞のことがある）
-- 📁 **tests/** (102)
+- 📁 **tests/** (103)
   - 📁 **contract/** (4)
     - `contentEntryFunctionBudget.test.js`
     - `layer-dependency.test.js`
     - `popupEntryFunctionBudget.test.js`
     - `wiringTestSource.test.js`
-  - 📁 **e2e/** (95)
+  - 📁 **e2e/** (96)
     - 📁 **fixtures/** (2)
       - 📁 **watch/** (1)
         - 📁 **lv888888888/** (1)
@@ -4034,6 +4127,7 @@
     - `story-user-lane-visibility.spec.js`
     - `support-activity-timeline.spec.js`
     - `support-timeline-persist-open.spec.js`
+    - `supportEvidence.js` — SPC_EVIDENCE_DIR があるときだけ、横の欄の応援のチップ・ギフト欄の「投げN件」・画面を残す(v0.1.2227)。
     - `thumbnail-capture.spec.js`
     - `tiktok-recording.spec.js`
     - `timeline-fill-standalone-window.spec.js`

@@ -10,6 +10,7 @@ import '../lib/flickerMeterBoot.js';
 // v0.1.1687: 黒い幕の年表(サイドパネルの popup だけ・子の節目/長い処理/段階を親の起点に直して並べるための控え)。
 import '../lib/bootTimelineBoot.js';
 import { extractLiveIdFromUrl, isNicoLiveWatchUrl, watchPageUrlsMatchForSnapshot } from '../lib/broadcastUrl.js';
+import { installViewerBehaviorBoardFromStorage, noteVideoPageTabForSidePanel, pulseVideoPageTabForSidePanel } from './viewerBehaviorBoardPaint.js';
 import { shouldSkipMirrorForLiveId } from '../lib/passiveMirrorLiveIdGuard.js';
 import { resolveOfficialPoints } from '../lib/resolveOfficialPoints.js';
 // v0.1.1057: HTMLレポート組み立てクラスタを popup/report/ へ切り出し(max-linesラチェット対応・挙動不変)。
@@ -703,7 +704,7 @@ import { formatLaneCountOrderLine, makeLaneCountOrderState, orderLaneCandidatesB
 // 人物タイルの ID 行・名前行の正本(person-tile-unify 第3コミット)。popup と会場で共有。
 import { storyUserLaneMetaLines } from '../lib/storyUserLaneMeta.js';
 import { anonymousIdenticonDataUrl } from '../lib/anonymousIdenticon.js';
-import { identiconFallbackForAvatarUrl } from '../lib/avatarFallbackFromUrl.js';
+import { avatarFallbackFaceForUrl, identiconFallbackForAvatarUrl } from '../lib/avatarFallbackFromUrl.js';
 import {
   bindCasterThumbElement,
   bindNeutralAvatarError,
@@ -4429,7 +4430,7 @@ function maybeFlushVerifiedAvatars() {
 const storyAvatarLoadGuard = createSupportAvatarLoadGuard({
   fallbackSrc: STORY_REMOTE_FAILED_PLACEHOLDER_IMG,
   // 2026-10-13: 失敗(アイコン未設定の404等)の代替顔は会場と共通(白丸でなく、その人ごとのゆっくり顔)。正本=avatarFallbackFromUrl.js
-  fallbackSrcFor: identiconFallbackForAvatarUrl,
+  fallbackSrcFor: avatarFallbackFaceForUrl, sharedMemory: true, // v0.1.2248: Twitch 等の失敗も白丸でなくゆっくり顔 / v0.1.2251: 動画の顔の列と覚えを共有
   onFallbackApplied: applyStoryAvatarTvFallbackClass,
   onRemoteSuccess: (img) => {
     removeStoryAvatarTvFallbackClass(img);
@@ -15006,6 +15007,7 @@ async function refresh() {
   if (openBagRaw) lastGoodRefreshOpenBag = openBagRaw;
   const lastFocusedNormalActiveTab =
     lastFocusedNormal?.tabs?.find((t) => t?.active) ?? null;
+  if (INLINE_SIDE_PANEL) noteVideoPageTabForSidePanel(tabs[0] || null); // v0.1.2241: 前面タブを動画カードの照合へ(問い合わせは増やさない)
   applySelfPostedRecentsFromBag(openBag);
   const calmOn = normalizeCalmPanelMotion(openBag[KEY_CALM_PANEL_MOTION], {
     inlineDefault: INLINE_MODE
@@ -21538,6 +21540,7 @@ async function initPopup() {
           return;
         }
         if (_panelHidden()) return;
+        if (INLINE_SIDE_PANEL) pulseVideoPageTabForSidePanel(); // v0.1.2244: 動画ページだけ読み直しを頼む(下の間引きで refresh() まで進まないことが多いため)
         // v0.1.392: 短間隔 polling で fetch が重ならないよう、前回の取得がまだ
         //   進行中なら今回の tick は見送る（その fetch がじき新しい値を届ける）。
         if (watchMetaCache.snapshotFetchActive) {
@@ -21890,4 +21893,31 @@ if (typeof window !== 'undefined') {
       // no-op
     }
   }, 400);
+}
+
+// ライブ配信（全サービス）には視聴者の行動ボードを出さない。
+//   2235 ではコメントのたびに storage へ書き、横の欄の全体更新が走って内訳がちらつき、会場の上にも板が重なった。
+//   通常動画のサイドパネルだけ出す（ツールバーの POPUP とライブは master と同じ）。
+try {
+  if (INLINE_SIDE_PANEL) {
+    installViewerBehaviorBoardFromStorage({
+      document,
+      storage: typeof chrome !== 'undefined' ? chrome.storage : undefined,
+      getUrl: () => {
+        if (typeof INLINE_OWN_WATCH_URL === 'string' && INLINE_OWN_WATCH_URL) return INLINE_OWN_WATCH_URL;
+        try {
+          const fromState = String((typeof COMMENT_POST_UI_STATE !== 'undefined' && COMMENT_POST_UI_STATE && COMMENT_POST_UI_STATE.watchUrl) || '').trim();
+          if (fromState) return fromState;
+        } catch { /* 横の欄の URL がまだでも storage の最後の視聴 URL を使う */ }
+        return '';
+      },
+      placement: 'flow',
+      sources: 'video',
+      mountParent: document.getElementById('nlPopupPrimary'),
+      // 動画ページの入口に「DOM を読み直して」と頼む(既存の見回りに乗せる)・前面タブは chrome.tabs の既存の知らせで受け取る(v0.1.2244)
+      sendToTab: (tabId, msg) => chrome.tabs.sendMessage(tabId, msg), tabs: chrome.tabs, windows: chrome.windows,
+    });
+  }
+} catch {
+  /* ボードが出せなくても横の欄の数字は出す */
 }
