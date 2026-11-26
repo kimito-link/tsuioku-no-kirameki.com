@@ -409,7 +409,14 @@ function runFor(entry) {
 //  （COUNCIL-HOWTOのローカルのみ構成）であり、そこを壊さないため。
 const envMissing = {};   // env名 -> 落ちたメンバー数
 const envDroppedRoles = {};
+const tooLongFor = [];   // maxPromptChars を超える問いで外した席（2026-11-26・推論を止められない席の空打ちを防ぐ）
 for (const entry of LINEUP) {
+  // 推論を止められず、長い問いでは推論だけで上限を使い切って本文0字になる席（例: sakura/glm-5.3-flash）は、
+  // 問いがその長さを超えたら呼ばない。呼んでも FAILED になるだけで、無料枠（さくらは月3,000回）を減らす。
+  if (entry.maxPromptChars && question.length > entry.maxPromptChars) {
+    tooLongFor.push(entry.label);
+    continue;
+  }
   const lack = entry.requires.filter((k) => !ENV_FLAGS[k]);
   if (lack.length) {
     for (const k of lack) {
@@ -426,13 +433,16 @@ for (const entry of LINEUP) {
   push(entry.label, 'cloud', runFor(entry), verifiable ? entry.rawId : '', verifiable ? entry.provider : '');
 }
 {
-  const enabledCount = LINEUP.length - Object.values(envDroppedRoles).reduce((a, b) => a + b, 0);
+  const enabledCount = LINEUP.length - tooLongFor.length - Object.values(envDroppedRoles).reduce((a, b) => a + b, 0);
   if (Object.keys(envMissing).length) {
     const envs = Object.entries(envMissing).map(([n, c]) => `${n}(${c}体)`).join(', ');
     const roles = Object.entries(envDroppedRoles).map(([r, c]) => `${r} -${c}`).join(', ');
     console.error(`[env] 有効 ${enabledCount}/${LINEUP.length}体。欠落env: ${envs} → ${roles}`);
   } else {
     console.error(`[env] 有効 ${enabledCount}/${LINEUP.length}体（欠落なし）`);
+  }
+  if (tooLongFor.length) {
+    console.error(`[問いの長さ] ${question.length}字は上限を超えるので外した: ${tooLongFor.join(', ')}（council-lineup.mjs の maxPromptChars）`);
   }
 }
 // 司令塔 Claude(Opus 5.5) を会議の最強メンバー(統括/批判)として自動参加させる。
