@@ -5,7 +5,7 @@
 import { KEY_VIEWER_BEHAVIOR_BOARD, KEY_YT_VIDEO_WATCH_CARD, KEY_NICO_VIDEO_WATCH_CARD, KEY_VOD_VIDEO_WATCH_CARD, KEY_LAST_WATCH_URL } from '../lib/storageKeys.js';
 import { hydrateViewerBehaviorLiveLayout } from './viewerBehaviorLiveLayout.js';
 import { wireVideoLanePersonDetail } from './wireVideoLanePersonDetail.js';
-import { viewerBehaviorWrapMatchesUrl } from '../lib/viewerBehaviorMatch.js';
+import { videoIdentityFromUrl, videoCardWrapMatchesIdentity, videoPageUrlOfTab } from '../lib/videoWatch/videoIdentity.js';
 import { ytVideoWatchCardInnerHtml } from '../lib/youtube/ytVideoWatchCard.js';
 import { nicoVideoWatchCardInnerHtml } from '../lib/niconico/nicoVideoWatchCard.js';
 import { vodVideoWatchCardInnerHtml } from '../lib/videoWatch/videoWatchCard.js';
@@ -193,22 +193,60 @@ export function paintViewerBehaviorBoardEl(opts = {}) {
 }
 
 /**
+ * 動画の身元(videoIdentity.js)で照合する。書く側(視聴ページ)と同じ関数で作った鍵なので、サービスが増えてもずれない。
  * @param {{ videoId?: string, card?: any }} wrap
- * @param {string} url
+ * @param {import('../lib/videoWatch/videoIdentity.js').VideoIdentity | null} identity
+ * @param {'youtube' | 'niconico'} slot
  * @returns {string}
  */
-function videoCardHtmlIfMatches(wrap, url) {
+function videoCardHtmlIfMatches(wrap, identity, slot) {
   if (!wrap || typeof wrap !== 'object') return '';
-  if (!viewerBehaviorWrapMatchesUrl({ pageKey: wrap.videoId }, url)) return '';
-  return wrap.card?.platform === 'niconico' || wrap.card?.kind === 'video' && wrap.card?.ownerId
-    ? nicoVideoWatchCardInnerHtml(wrap.card)
-    : ytVideoWatchCardInnerHtml(wrap.card);
+  if (!videoCardWrapMatchesIdentity(wrap, identity, slot)) return '';
+  return slot === 'niconico' ? nicoVideoWatchCardInnerHtml(wrap.card) : ytVideoWatchCardInnerHtml(wrap.card);
 }
 
-function vodCardHtmlIfMatches(wrap, url) {
+/**
+ * @param {{ videoId?: string, card?: any }} wrap
+ * @param {import('../lib/videoWatch/videoIdentity.js').VideoIdentity | null} identity
+ */
+function vodCardHtmlIfMatches(wrap, identity) {
   if (!wrap || typeof wrap !== 'object') return '';
-  if (!viewerBehaviorWrapMatchesUrl({ pageKey: wrap.videoId }, url)) return '';
+  if (!videoCardWrapMatchesIdentity(wrap, identity, 'vod')) return '';
   return vodVideoWatchCardInnerHtml(wrap.card);
+}
+
+/** 動画ページを前に出しているとき、横の欄のライブ用の数字(同時視聴・来場・経過など)を隠す印 */
+export const VIDEO_WATCH_ROOT_ATTR = 'data-nl-video-watch';
+export const VIDEO_WATCH_HIDE_STYLE_ID = 'nlsb-video-watch-hide-live-stats';
+/**
+ * 動画には「いま何人」が無い。ライブ用の枠を出すと「読み込み中」のまま止まって見える(0.1.2239 実機・全 7 ページ)。
+ * 行や枠は足さず、既存の枠を隠すだけ。ライブのページでは印が付かないので何も変わらない。
+ */
+export const VIDEO_WATCH_HIDE_LIVE_STATS_CSS =
+  `html[${VIDEO_WATCH_ROOT_ATTR}="1"] #watchConcurrentCard,` +
+  `html[${VIDEO_WATCH_ROOT_ATTR}="1"] .nl-official-nico-stats__row{display:none !important;}`;
+
+/**
+ * 横の欄の根元に「動画ページを見ている」印を付け外しする(印が変わるときだけ DOM を触る)。
+ * @param {Document | null | undefined} doc
+ * @param {boolean} on
+ */
+export function applyVideoWatchRootMark(doc, on) {
+  const root = doc?.documentElement;
+  if (!root) return;
+  const cur = root.getAttribute(VIDEO_WATCH_ROOT_ATTR) === '1';
+  if (cur === on) return;
+  if (on) {
+    if (!doc.getElementById(VIDEO_WATCH_HIDE_STYLE_ID)) {
+      const st = doc.createElement('style');
+      st.id = VIDEO_WATCH_HIDE_STYLE_ID;
+      st.textContent = VIDEO_WATCH_HIDE_LIVE_STATS_CSS;
+      (doc.head || root).appendChild(st);
+    }
+    root.setAttribute(VIDEO_WATCH_ROOT_ATTR, '1');
+  } else {
+    root.removeAttribute(VIDEO_WATCH_ROOT_ATTR);
+  }
 }
 
 /**
@@ -231,22 +269,36 @@ export function planViewerBehaviorBoardPaint(input) {
   const src = input && typeof input === 'object' ? input : {};
   const url = String(src.url || '');
   const sources = src.sources === 'live' ? 'live' : 'video';
-  const nico = sources !== 'live' ? videoCardHtmlIfMatches(src.nicoCard, url) : '';
-  const yt = sources !== 'live' ? videoCardHtmlIfMatches(src.ytCard, url) : '';
-  const vod = sources !== 'live' && !nico && !yt ? vodCardHtmlIfMatches(src.vodCard, url) : '';
+  // ライブ配信の URL・知らない URL は身元が null = 何も塗らない(ライブの画面は master と同じ)。
+  const identity = sources !== 'live' ? videoIdentityFromUrl(url) : null;
+  const nico = videoCardHtmlIfMatches(src.nicoCard, identity, 'niconico');
+  const yt = videoCardHtmlIfMatches(src.ytCard, identity, 'youtube');
+  const vod = !nico && !yt ? vodCardHtmlIfMatches(src.vodCard, identity) : '';
   // ライブ配信の「視聴者の行動」は出さない（コメントごとに書いて横の欄をちらつかせない）。
   return {
     html: nico || yt || vod || '',
     board: (nico && src.nicoCard?.card?.behavior) || (yt && src.ytCard?.card?.behavior) || (vod && src.vodCard?.card?.behavior) || null,
     hide: !(nico || yt || vod),
     source: nico ? 'niconico-video' : yt ? 'youtube-video' : vod ? 'vod-video' : 'none',
+    identityKey: identity ? identity.key : '',
   };
 }
+
+/** 視聴ページの入口(vod-video-watch / nico-video-watch)に「いまの DOM を読み直して」と頼む合図 */
+export const VIDEO_WATCH_REREAD_MESSAGE = 'NLS_VIDEO_WATCH_REREAD';
 
 export function installViewerBehaviorBoardFromStorage(opts) {
   const doc = opts.document || (typeof document !== 'undefined' ? document : null);
   const storage = opts.storage;
-  if (!doc || !storage?.local?.get) return { refresh: () => {} };
+  const noop = { refresh: () => {}, notePageTab: () => {} };
+  if (!doc || !storage?.local?.get) return noop;
+
+  /**
+   * 横の欄が前に出しているタブの本当の URL(既存の refresh() が既に問い合わせたタブを渡してもらう)。
+   * 動画の身元が取れたときだけ入る。ライブ・知らないページでは '' のまま=照合の道は今までどおり。
+   */
+  let pageTabUrl = '';
+  let pageTabKey = '';
 
   const refresh = () => {
     try {
@@ -260,7 +312,7 @@ export function installViewerBehaviorBoardFromStorage(opts) {
             paintViewerBehaviorBoardEl({ document: doc, hide: true });
             return;
           }
-          const url = String(opts.getUrl ? opts.getUrl() : '') || String(bag?.[KEY_LAST_WATCH_URL] || '');
+          const url = pageTabUrl || String(opts.getUrl ? opts.getUrl() : '') || String(bag?.[KEY_LAST_WATCH_URL] || '');
           const planned = planViewerBehaviorBoardPaint({
             url,
             sources: opts.sources,
@@ -289,6 +341,38 @@ export function installViewerBehaviorBoardFromStorage(opts) {
     }
   };
 
+  /**
+   * 既存の refresh()(横の欄の定期の見回り・可視復帰)が問い合わせた前面タブを受け取る。
+   * 新しいタイマー・Observer・通信は足さない。動画ページのときだけ、
+   *   ① 横の欄のライブ用の数字を隠す印を付け、② 身元が変わったら塗り直し、③ ページの入口に DOM の読み直しを頼む
+   *   (Twitch の録画チャットのように、開いたあとで描かれるコメントを拾うため。変化が無ければページ側は書かない)。
+   * ライブ・知らないページでは、URL を読むだけで何もしない。
+   * @param {{ id?: number, url?: string, pendingUrl?: string, __ytUrl?: string } | null | undefined} tab
+   */
+  const notePageTab = (tab) => {
+    try {
+      const url = videoPageUrlOfTab(tab);
+      const identity = videoIdentityFromUrl(url);
+      const key = identity ? identity.key : '';
+      if (!key && !pageTabKey) return;
+      applyVideoWatchRootMark(doc, !!key);
+      const changed = key !== pageTabKey;
+      pageTabKey = key;
+      pageTabUrl = key ? url : '';
+      if (changed) refresh();
+      if (key && tab && typeof tab.id === 'number' && typeof opts.sendToTab === 'function') {
+        try {
+          const p = opts.sendToTab(tab.id, { type: VIDEO_WATCH_REREAD_MESSAGE, key });
+          if (p && typeof p.catch === 'function') p.catch(() => {});
+        } catch {
+          /* 入口がまだ無いタブでも塗りは続く */
+        }
+      }
+    } catch {
+      /* 前面タブが読めなくても、今までの照合で塗る */
+    }
+  };
+
   try {
     storage.onChanged?.addListener?.((changes, area) => {
       if (area !== 'local') return;
@@ -299,5 +383,22 @@ export function installViewerBehaviorBoardFromStorage(opts) {
     /* 監視できなくても初回の塗で足りる */
   }
   refresh();
-  return { refresh };
+  lastInstalledBoard = { refresh, notePageTab };
+  return lastInstalledBoard;
+}
+
+/** @type {{ refresh: () => void, notePageTab: (tab: any) => void } | null} */
+let lastInstalledBoard = null;
+
+/**
+ * v0.1.2241: 横の欄の refresh() が既に問い合わせた前面タブを、動画カードの照合へ渡す(問い合わせは増やさない)。
+ *   ライブのタブなら URL を読むだけで何もしない(notePageTab)。失敗しても横の欄は続ける。
+ * @param {any} tab
+ */
+export function noteVideoPageTabForSidePanel(tab) {
+  try {
+    lastInstalledBoard?.notePageTab(tab);
+  } catch {
+    /* 動画カードが出せなくても横の欄は続ける */
+  }
 }

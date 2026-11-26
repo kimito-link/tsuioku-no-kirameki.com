@@ -18,6 +18,7 @@ import {
   ytVideoCommentAuthorsFromDom,
   ytVideoCommentsFromDom,
   ytViewCountFromDom, ytCommentCountFromDom,
+  concurrentViewersIsViewCountLeak,
 } from '../../src/lib/youtube/ytVideoWatchMeta.js';
 import { ytVideoIdFromChatFrameUrl } from '../../src/lib/youtube/ytChatContinuationVideoId.js';
 import { relativeStreamStartedAtMs, startMsFromTimestampBlob } from '../../src/lib/youtube/ytStreamStart.js';
@@ -688,7 +689,8 @@ function setupWatchPageMetaObserver() {
       /* フレームが読めなくても種別は他の印で決める */
     }
     let viewersForKind = viewers;
-    if (viewCount != null && viewersForKind === viewCount) viewersForKind = null;
+    // v0.1.2241: 丸めた再生回数(474万)と概要欄の再生回数(4,740,759)も同じ数とみなす(ytVideoWatchMeta.js)
+    if (viewCount != null && concurrentViewersIsViewCountLeak(viewersForKind, viewCount)) viewersForKind = null;
     const contentKind = classifyYtWatchContentKind({
       url: String(location.href || ''),
       concurrentViewers: viewersForKind,

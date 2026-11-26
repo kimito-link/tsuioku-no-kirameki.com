@@ -53,7 +53,8 @@ export const YT_VIDEO_WATCH_CARD_TITLE = 'この動画のデータ';
  */
 export function buildYtVideoWatchCardModel(input) {
   const src = input && typeof input === 'object' ? input : {};
-  const viewCount = Number.isFinite(Number(src.viewCount)) && Number(src.viewCount) >= 0
+  // v0.1.2241: 読めなかった(null)を 0 回にしない(Number(null) は 0)
+  const viewCount = src.viewCount != null && String(src.viewCount) !== '' && Number.isFinite(Number(src.viewCount)) && Number(src.viewCount) >= 0
     ? Math.floor(Number(src.viewCount))
     : null;
   const recorded = src.recorded && typeof src.recorded === 'object' ? src.recorded : {};
@@ -87,7 +88,9 @@ export function buildYtVideoWatchCardModel(input) {
   const livePeople = src.livePeople || {};
   const histCount = livePeople instanceof Map ? livePeople.size : Object.keys(livePeople || {}).length;
   const visiblePeople = attachRepliesToPeople(authors.map((a) => ({
-      id: String(a?.channelId || a?.id || '').trim(),
+      // v0.1.2241: 未ログインの YouTube のコメント欄は、投稿者のリンクが /@名前 だけ(UC… が無い・kKl0E22tU78 実測)。
+      //   UC… が無い人を id 空=匿名にまとめていたため、横の欄が「匿名 39人」の1枚になっていた。@名前 でも一人ずつ並べる。
+      id: String(a?.channelId || a?.id || a?.handle || '').trim(),
       name: String(a?.name || '').trim(),
       avatarUrl: String(a?.avatarUrl || '').trim(),
       commentCount: Number(a?.commentCount) > 0 ? Math.floor(Number(a.commentCount)) : 1,

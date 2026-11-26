@@ -7,6 +7,10 @@ import { KEY_VOD_VIDEO_WATCH_CARD } from '../lib/storageKeys.js';
 import { isVodVideoWatchUrl, vodWatchPageFromUrl } from '../lib/videoWatch/vodWatchUrl.js';
 import { readVodWatchDom } from '../lib/videoWatch/vodCommentsFromDom.js';
 import { buildVodVideoWatchCardModel } from '../lib/videoWatch/videoWatchCard.js';
+import { videoIdentityFromUrl } from '../lib/videoWatch/videoIdentity.js';
+
+/** 横の欄(viewerBehaviorBoardPaint.js)が既存の見回りで送る「読み直して」の合図 */
+const VIDEO_WATCH_REREAD_MESSAGE = 'NLS_VIDEO_WATCH_REREAD';
 
 function hideVenueModeForVideoPage(hide) {
   try {
@@ -36,11 +40,14 @@ function refresh() {
     return;
   }
   hideVenueModeForVideoPage(true);
+  // 横の欄と同じ関数で作った身元の鍵で書く(書く鍵と探す鍵を 1 つにする・v0.1.2241)
+  const identity = videoIdentityFromUrl(href);
+  const key = identity ? identity.key : page.pageKey;
   const read = readVodWatchDom(document, page);
   const card = buildVodVideoWatchCardModel({
     platform: page.platform,
     videoId: page.videoId,
-    pageKey: page.pageKey,
+    pageKey: key,
     title: read.title,
     viewCount: read.viewCount,
     ownerId: page.ownerId,
@@ -48,12 +55,12 @@ function refresh() {
     videoAuthors: read.authors,
     nowMs: Date.now(),
   });
-  const sig = `${page.pageKey}:${card ? (card.videoAuthorCount || 0) : 0}:${card?.title || ''}:${card?.viewCountText || ''}`;
+  const sig = `${key}:${card ? (card.videoAuthorCount || 0) : 0}:${card?.title || ''}:${card?.viewCountText || ''}`;
   if (sig === lastSig) return;
   lastSig = sig;
   try {
     void chrome.storage.local.set({
-      [KEY_VOD_VIDEO_WATCH_CARD]: { videoId: page.pageKey, at: Date.now(), card },
+      [KEY_VOD_VIDEO_WATCH_CARD]: { videoId: key, at: Date.now(), card },
     });
   } catch {
     /* 横の欄が読めなくても会場は隠す */
@@ -74,6 +81,16 @@ if (isVodVideoWatchUrl(String(location.href || ''))) {
   try {
     window.addEventListener('pageshow', () => refresh());
   } catch { /* 同上 */ }
+  try {
+    // 横の欄が開いている間だけ届く(既存の見回りに乗る)。録画チャットのように後から描かれるコメントを拾う。
+    //   DOM を読むだけで、変化が無ければ書かない(上の sig)。新しいタイマー・Observer は使わない。
+    chrome.runtime.onMessage.addListener((msg) => {
+      if (!msg || msg.type !== VIDEO_WATCH_REREAD_MESSAGE) return;
+      refresh();
+    });
+  } catch {
+    /* 合図が無くてもクリック・可視復帰で読む */
+  }
   try {
     chrome.storage.onChanged.addListener((changes, area) => {
       if (area !== 'local' || !changes?.[KEY_VOD_VIDEO_WATCH_CARD]) return;

@@ -244,6 +244,10 @@ export function ytWatchMayShowConcurrentViewers(signals) {
 
 /**
  * 同時視聴の欄に入っている数が、再生回数と同じなら取り違え。
+ * v0.1.2241: 再生回数が丸めた表示(「474万回視聴」= 4,740,000)から読めたときは、その桁の中の数(4,740,759)も同じ数とみなす。
+ *   0.1.2239 実機(kKl0E22tU78): 概要欄の「4,740,759 回視聴」が同時視聴に入り、丸めた再生回数と完全一致しないので
+ *   ライブ扱いになり、横の欄に「同時視聴者数 4,740,759 人」と出て、動画のカードが作られなかった。
+ *   YouTube の丸め(万・K・M)は切り捨てなので、a は b 以上・b + 桁 未満。丸めでない数(末尾の 0 が 3 個未満)は完全一致だけ。
  * @param {unknown} concurrent
  * @param {unknown} viewCount
  * @returns {boolean}
@@ -252,7 +256,18 @@ export function concurrentViewersIsViewCountLeak(concurrent, viewCount) {
   const a = Number(concurrent);
   const b = Number(viewCount);
   if (!Number.isFinite(a) || !Number.isFinite(b) || a < 0 || b < 0) return false;
-  return Math.floor(a) === Math.floor(b);
+  const fa = Math.floor(a);
+  const fb = Math.floor(b);
+  if (fa === fb) return true;
+  if (fb <= 0) return false;
+  let unit = 1;
+  let rest = fb;
+  while (rest % 10 === 0 && unit < 100_000_000) {
+    rest /= 10;
+    unit *= 10;
+  }
+  if (unit < 1000) return false;
+  return fa > fb && fa - fb < unit;
 }
 
 export function classifyYtWatchContentKind(signals) {
@@ -261,8 +276,11 @@ export function classifyYtWatchContentKind(signals) {
   if (s.isLive === true) return 'live';
   // 公式が「いまは配信ではない」と出しているときは、取り違えた同時視聴の数や残ったチャット枠で live にしない
   if (s.hasLiveChat === true && s.isLive !== false) return 'live';
+  // v0.1.2241: 公式が「この動画はライブ配信ではない」(isLiveContent=false)と出していれば、同時視聴の欄に数が入っていても通常動画。
+  //   ライブ・ライブのアーカイブは isLiveContent=true なので、この行はライブの判定を変えない。
+  if (s.isLiveContent === false && s.isLive !== true && s.hasLiveChat !== true) return 'video';
   const viewCount = typeof s.viewCount === 'number' && Number.isFinite(s.viewCount) ? s.viewCount : null;
-  const concurrentIsViewCount = viewCount != null && s.concurrentViewers === viewCount;
+  const concurrentIsViewCount = viewCount != null && concurrentViewersIsViewCountLeak(s.concurrentViewers, viewCount);
   if (s.isLive !== true && viewCount != null && (s.concurrentViewers == null || concurrentIsViewCount) && s.hasLiveChatReplay !== true) {
     if (s.isLiveContent === true) return 'live_replay';
     return 'video';

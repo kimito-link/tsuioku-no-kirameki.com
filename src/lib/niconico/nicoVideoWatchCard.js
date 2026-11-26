@@ -27,7 +27,8 @@ export const NICO_VIDEO_WATCH_CARD_TITLE = 'この動画のデータ';
  */
 export function buildNicoVideoWatchCardModel(input) {
   const src = input && typeof input === 'object' ? input : {};
-  const viewCount = Number.isFinite(Number(src.viewCount)) && Number(src.viewCount) >= 0
+  // v0.1.2241: 読めなかった(null)を 0 回にしない(Number(null) は 0)
+  const viewCount = src.viewCount != null && String(src.viewCount) !== '' && Number.isFinite(Number(src.viewCount)) && Number(src.viewCount) >= 0
     ? Math.floor(Number(src.viewCount))
     : null;
   const recorded = src.recorded && typeof src.recorded === 'object' ? src.recorded : {};

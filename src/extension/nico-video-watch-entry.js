@@ -7,7 +7,6 @@ import {
   KEY_NICO_VIDEO_WATCH_CARD,
 } from '../lib/storageKeys.js';
 import {
-  nicoVideoIdFromUrl,
   parseNicoVideoWatchMeta,
   viewCountFromNicoJsonLd,
   unpackNicoVideoCommentersAttr,
@@ -16,39 +15,18 @@ import {
 } from '../lib/niconico/nicoVideoWatchMeta.js';
 import { applyNicoCommentsToChannelIndex, peopleInNicoChannelCommenterIndex } from '../lib/niconico/nicoChannelCommenterIndex.js';
 import { buildNicoVideoWatchCardModel, nicoVideoWatchCardInnerHtml } from '../lib/niconico/nicoVideoWatchCard.js';
+import { videoIdentityFromUrl } from '../lib/videoWatch/videoIdentity.js';
+
+/** 横の欄(viewerBehaviorBoardPaint.js)が既存の見回りで送る「読み直して」の合図 */
+const VIDEO_WATCH_REREAD_MESSAGE = 'NLS_VIDEO_WATCH_REREAD';
 
 const CARD_ID = 'nlsb-video-watch-card';
 const STYLE_ID = 'nlsb-video-watch-card-style';
 
-const CARD_STYLE =
-  '#' + CARD_ID + '{' +
-    'position:fixed;z-index:2147483646;right:12px;bottom:72px;max-width:320px;max-height:70vh;overflow:auto;' +
-    'font:14px/1.55 system-ui,sans-serif;color:#1b1b1b;background:rgba(255,252,245,.96);' +
-    'border:1px solid rgba(80,60,20,.28);border-radius:10px;padding:10px 12px;' +
-    'box-shadow:0 4px 16px rgba(0,0,0,.14);pointer-events:auto;' +
-  '}' +
-  '#' + CARD_ID + ' .nlsb-viewer-behavior__title,' +
-  '#' + CARD_ID + ' .nlsb-video-watch-card__title{margin:0 0 6px;font-size:13px;font-weight:700;}' +
-  '#' + CARD_ID + ' p{margin:0 0 6px;}' +
-  '#' + CARD_ID + ' p:last-child{margin-bottom:0;}' +
-  '#' + CARD_ID + ' .nlsb-viewer-behavior{margin-bottom:10px;}' +
-  '#' + CARD_ID + ' .nlsb-viewer-behavior__list{margin:0;padding:0;list-style:none;}' +
-  '#' + CARD_ID + ' .nlsb-viewer-behavior__row{margin:0 0 6px;padding:0 0 6px;border-bottom:1px solid rgba(80,60,20,.12);}' +
-  '#' + CARD_ID + ' .nlsb-viewer-behavior__row:last-child{margin-bottom:0;padding-bottom:0;border-bottom:0;}' +
-  '#' + CARD_ID + ' .nlsb-viewer-behavior__name{font-weight:700;margin-right:6px;}' +
-  '#' + CARD_ID + ' .nlsb-viewer-behavior__rel{font-weight:600;margin-right:6px;}' +
-  '#' + CARD_ID + ' .nlsb-viewer-behavior__facts{display:block;font-size:12px;line-height:1.45;}';
-
-function ensureStyle() {
-  if (document.getElementById(STYLE_ID)) return;
-  const st = document.createElement('style');
-  st.id = STYLE_ID;
-  st.textContent = CARD_STYLE;
-  (document.head || document.documentElement).appendChild(st);
-}
-
 function currentVideoId() {
-  return nicoVideoIdFromUrl(String(location.href || ''));
+  // 横の欄と同じ関数で作った身元の鍵(sm9 など)。書く鍵と探す鍵を 1 つにする(v0.1.2241)
+  const identity = videoIdentityFromUrl(String(location.href || ''));
+  return identity && identity.service === 'niconico' ? identity.key : '';
 }
 
 function unescapeMetaContent(raw) {
@@ -112,22 +90,18 @@ function readVisibleCommenters() {
   return mergeNicoVideoCommenters(fromAttr, fromDom);
 }
 
-function paintHtml(html) {
-  const existing = document.getElementById(CARD_ID);
-  if (!html) {
-    existing?.remove();
-    return;
+/**
+ * v0.1.2241: 視聴ページの右下には何も浮かせない(カードは横の欄にだけ出す・YouTube の venue-inline-entry.js と同じ)。
+ *   0.1.2239 実機(sm9)で、古い文字だけのカードがページの右下に重なっていた。前の版が残した枠も消す。
+ * @param {string} [_html]
+ */
+function paintHtml(_html) {
+  try {
+    document.getElementById(CARD_ID)?.remove();
+    document.getElementById(STYLE_ID)?.remove();
+  } catch {
+    /* 消せなくても視聴は続く */
   }
-  ensureStyle();
-  if (existing) {
-    if (existing.innerHTML === html) return;
-    existing.innerHTML = html;
-    return;
-  }
-  const box = document.createElement('div');
-  box.id = CARD_ID;
-  box.innerHTML = html;
-  (document.body || document.documentElement).appendChild(box);
 }
 
 /** @type {string} */
@@ -200,16 +174,17 @@ function refresh() {
       });
       const html = nicoVideoWatchCardInnerHtml(card);
       const sig = `${videoId}:${html.length}:${authors.length}:${card.viewCountText}:${histCount}`;
+      paintHtml('');
+      // 中身が変わったときだけ書く(クリックや読み直しの合図のたびに横の欄を塗り直させない)
       if (sig !== lastPaintSig) {
         lastPaintSig = sig;
-        paintHtml(html);
-      }
-      try {
-        await chrome.storage.local.set({
-          [KEY_NICO_VIDEO_WATCH_CARD]: { videoId, at: Date.now(), card },
-        });
-      } catch {
-        /* 横の欄が読めなくてもページのカードは出す */
+        try {
+          await chrome.storage.local.set({
+            [KEY_NICO_VIDEO_WATCH_CARD]: { videoId, at: Date.now(), card },
+          });
+        } catch {
+          lastPaintSig = '';
+        }
       }
       rememberVideoCommenters(meta.ownerId, videoId, authors);
     } catch {
@@ -233,6 +208,13 @@ try {
 try {
   window.addEventListener('pageshow', () => refresh());
 } catch { /* 同上 */ }
+try {
+  // 横の欄が開いている間だけ届く(既存の見回りに乗る)。DOM を読み直し、変化が無ければ書かない。
+  chrome.runtime.onMessage.addListener((msg) => {
+    if (!msg || msg.type !== VIDEO_WATCH_REREAD_MESSAGE) return;
+    refresh();
+  });
+} catch { /* 合図が無くてもクリック・可視復帰で読む */ }
 try {
   chrome.storage.onChanged.addListener((changes, area) => {
     if (area !== 'local' || !changes?.[KEY_NICO_CHANNEL_COMMENTERS]) return;

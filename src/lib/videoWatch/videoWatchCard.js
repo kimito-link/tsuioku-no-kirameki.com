@@ -31,7 +31,9 @@ export function buildVodVideoWatchCardModel(input) {
   const src = input && typeof input === 'object' ? input : {};
   const platform = PLATFORMS.has(String(src.platform || '')) ? String(src.platform) : '';
   if (!platform) return null;
-  const viewCount = Number.isFinite(Number(src.viewCount)) && Number(src.viewCount) >= 0
+  // v0.1.2241: 読めなかった(null / 空)を 0 回にしない。Number(null) は 0 なので、0.1.2239 は Kick・ABEMA・TikTok・ツイキャスで
+  //   「再生 0 回」と作った数を出していた(数字を作らない)。
+  const viewCount = src.viewCount != null && String(src.viewCount) !== '' && Number.isFinite(Number(src.viewCount)) && Number(src.viewCount) >= 0
     ? Math.floor(Number(src.viewCount))
     : null;
   const authors = Array.isArray(src.videoAuthors) ? src.videoAuthors : [];

@@ -10,7 +10,7 @@ import '../lib/flickerMeterBoot.js';
 // v0.1.1687: 黒い幕の年表(サイドパネルの popup だけ・子の節目/長い処理/段階を親の起点に直して並べるための控え)。
 import '../lib/bootTimelineBoot.js';
 import { extractLiveIdFromUrl, isNicoLiveWatchUrl, watchPageUrlsMatchForSnapshot } from '../lib/broadcastUrl.js';
-import { installViewerBehaviorBoardFromStorage } from './viewerBehaviorBoardPaint.js';
+import { installViewerBehaviorBoardFromStorage, noteVideoPageTabForSidePanel } from './viewerBehaviorBoardPaint.js';
 import { shouldSkipMirrorForLiveId } from '../lib/passiveMirrorLiveIdGuard.js';
 import { resolveOfficialPoints } from '../lib/resolveOfficialPoints.js';
 // v0.1.1057: HTMLレポート組み立てクラスタを popup/report/ へ切り出し(max-linesラチェット対応・挙動不変)。
@@ -15007,6 +15007,7 @@ async function refresh() {
   if (openBagRaw) lastGoodRefreshOpenBag = openBagRaw;
   const lastFocusedNormalActiveTab =
     lastFocusedNormal?.tabs?.find((t) => t?.active) ?? null;
+  if (INLINE_SIDE_PANEL) noteVideoPageTabForSidePanel(tabs[0] || null); // v0.1.2241: 前面タブを動画カードの照合へ(問い合わせは増やさない)
   applySelfPostedRecentsFromBag(openBag);
   const calmOn = normalizeCalmPanelMotion(openBag[KEY_CALM_PANEL_MOTION], {
     inlineDefault: INLINE_MODE
@@ -21912,6 +21913,8 @@ try {
       placement: 'flow',
       sources: 'video',
       mountParent: document.getElementById('nlPopupPrimary'),
+      // 動画ページの入口に「DOM を読み直して」と頼む(既存の refresh() の見回りに乗せる。新しいタイマーは無い)
+      sendToTab: (tabId, msg) => chrome.tabs.sendMessage(tabId, msg),
     });
   }
 } catch {
