@@ -6,7 +6,7 @@ import { paintStoryUserLaneDomFilled } from './story/renderStoryUserLaneDom.js';
 import { createVenueStatStrip } from '../lib/venueStatStrip.js';
 import { VIEWER_BEHAVIOR_FALLBACK_AVATAR, resolveViewerBehaviorAvatarUrl, viewerRelationLabel } from '../lib/viewerBehavior.js';
 import { createSupportAvatarLoadGuard } from '../lib/supportGrowthAvatarLoad.js';
-import { identiconFallbackForAvatarUrl } from '../lib/avatarFallbackFromUrl.js';
+import { avatarFallbackFaceForUrl } from '../lib/avatarFallbackFromUrl.js';
 import { anonymousIdenticonDataUrl } from '../lib/anonymousIdenticon.js';
 
 /**
@@ -17,7 +17,7 @@ import { anonymousIdenticonDataUrl } from '../lib/anonymousIdenticon.js';
  */
 const laneAvatarGuard = createSupportAvatarLoadGuard({
   fallbackSrc: VIEWER_BEHAVIOR_FALLBACK_AVATAR,
-  fallbackSrcFor: (/** @type {string} */ u) => identiconFallbackForAvatarUrl(u) || anonymousIdenticonDataUrl(u, 64),
+  fallbackSrcFor: avatarFallbackFaceForUrl,
 });
 
 /**

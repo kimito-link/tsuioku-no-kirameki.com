@@ -704,7 +704,7 @@ import { formatLaneCountOrderLine, makeLaneCountOrderState, orderLaneCandidatesB
 // 人物タイルの ID 行・名前行の正本(person-tile-unify 第3コミット)。popup と会場で共有。
 import { storyUserLaneMetaLines } from '../lib/storyUserLaneMeta.js';
 import { anonymousIdenticonDataUrl } from '../lib/anonymousIdenticon.js';
-import { identiconFallbackForAvatarUrl } from '../lib/avatarFallbackFromUrl.js';
+import { avatarFallbackFaceForUrl, identiconFallbackForAvatarUrl } from '../lib/avatarFallbackFromUrl.js';
 import {
   bindCasterThumbElement,
   bindNeutralAvatarError,
@@ -4430,7 +4430,7 @@ function maybeFlushVerifiedAvatars() {
 const storyAvatarLoadGuard = createSupportAvatarLoadGuard({
   fallbackSrc: STORY_REMOTE_FAILED_PLACEHOLDER_IMG,
   // 2026-10-13: 失敗(アイコン未設定の404等)の代替顔は会場と共通(白丸でなく、その人ごとのゆっくり顔)。正本=avatarFallbackFromUrl.js
-  fallbackSrcFor: identiconFallbackForAvatarUrl,
+  fallbackSrcFor: avatarFallbackFaceForUrl, // v0.1.2248: Twitch 等の失敗も白丸でなくゆっくり顔
   onFallbackApplied: applyStoryAvatarTvFallbackClass,
   onRemoteSuccess: (img) => {
     removeStoryAvatarTvFallbackClass(img);

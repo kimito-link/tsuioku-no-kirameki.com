@@ -35,3 +35,22 @@ export function identiconFallbackForAvatarUrl(requestedSrc) {
     return ''; // 失敗時は共通 fallback へ倒れる
   }
 }
+
+/**
+ * v0.1.2248: 失敗したサムネの代替顔(全サービス共通)。ニコの usericon は uid のゆっくり顔、
+ *   それ以外(Twitch・YouTube など)は URL ごとのゆっくり顔。公式の既定アイコン(白い丸)にはしない。
+ *   ライブの横の欄・会場・状態ページ・動画の顔の列が同じこの1関数を使う。
+ * @param {unknown} requestedSrc
+ * @returns {string}
+ */
+export function avatarFallbackFaceForUrl(requestedSrc) {
+  const byUid = identiconFallbackForAvatarUrl(requestedSrc);
+  if (byUid) return byUid;
+  try {
+    const s = String(requestedSrc || '').trim();
+    if (!s || /usericon\/defaults\/blank\.jpg/i.test(s)) return '';
+    return anonymousIdenticonDataUrl(s, 64) || '';
+  } catch {
+    return '';
+  }
+}

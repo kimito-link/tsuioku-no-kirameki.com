@@ -7,6 +7,8 @@
  */
 
 import { isHttpOrHttpsUrl } from './supportGrowthTileSrc.js';
+/** v0.1.2248: 失敗時の代替顔(全サービス共通)。ガードと一緒に使う呼び出し側のために同じ場所からも出す */
+export { avatarFallbackFaceForUrl } from './avatarFallbackFromUrl.js';
 
 /**
  * @param {string} url

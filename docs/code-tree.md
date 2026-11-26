@@ -1203,7 +1203,7 @@
   - `gift-coin-hq.wav`
   - `gift-register-hq.wav`
   - `gift-register.mp3`
-- 📁 **src/** (2733)
+- 📁 **src/** (2734)
   - 📁 **data/** (7)
     - 📁 **acquirers/** (2)
       - `laneFromStorage.js` — 応援レーン acquirer: chrome.storage.local(nls_comments) → laneStore の橋渡し。
@@ -1562,7 +1562,7 @@
         - `logo_funlink_white_RGB_link_black.png`
         - `logo_funlink_white_RGB_maru_black.png`
     - `hero-connect-hub.svg`
-  - 📁 **lib/** (2399)
+  - 📁 **lib/** (2400)
     - 📁 **__snapshots__/** (4)
       - `marketing-abema-baseline.html`
       - `marketing-niconico.html`
@@ -1937,6 +1937,7 @@
     - `avatarFaceWorkerClient.js` — 【層】L2 配線層(Worker を持つ・DOM/chrome.* には触れない。Worker の作り方は deps で注入)
     - `avatarFaceWorkerClient.test.js`
     - `avatarFaceWorkerWiring.wiring.test.js`
+    - `avatarFallbackFace2248.test.js`
     - `avatarFallbackFromUrl.js` — 【層】L0 判定層(純粋関数・I/O禁止)
     - `avatarFallbackFromUrl.test.js`
     - `avatarLoadReport.js` — アイコン画像(usericon)の【実際のロード失敗】を状態速報の対処候補カードに出す純関数(v0.1.1026)。

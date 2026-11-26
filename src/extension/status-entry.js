@@ -181,7 +181,7 @@ import { KEY_STAT_CARDS_MIRROR } from '../lib/statCardsMirrorKey.js';
 import { KEY_NORTH_STAR_MIRROR } from '../lib/northStarMirrorKey.js';
 // コメントタイムライン鏡(第2段): 純Webで「コメントが進む」ため popup が publish した最新N件を jsonBlob に相乗り。
 import { KEY_COMMENT_TIMELINE_MIRROR } from '../lib/commentTimelineMirrorKey.js';
-import { createSupportAvatarLoadGuard } from '../lib/supportGrowthAvatarLoad.js';
+import { avatarFallbackFaceForUrl, createSupportAvatarLoadGuard } from '../lib/supportGrowthAvatarLoad.js';
 import { isHttpOrHttpsUrl, NICONICO_OFFICIAL_DEFAULT_USERICON_HTTPS } from '../lib/supportGrowthTileSrc.js';
 import { storyTileUsesYukkuriTvStyle } from '../lib/storyTileTvStyle.js';
 import { upgradeAnonymousAvatarImage } from '../lib/avatarPartsComposer.js';
@@ -509,7 +509,7 @@ let _lastActionSig = ' init';
  *   ここで status 専用に1つ作る(状態=成功/失敗 URL セットは status の鏡描画ぶんだけ保持)。
  */
 const _laneMirrorAvatarLoadGuard = createSupportAvatarLoadGuard({
-  fallbackSrc: NICONICO_OFFICIAL_DEFAULT_USERICON_HTTPS,
+  fallbackSrc: NICONICO_OFFICIAL_DEFAULT_USERICON_HTTPS, fallbackSrcFor: avatarFallbackFaceForUrl, // v0.1.2248: POP・会場と同じ代替顔
   onFallbackApplied: applyStoryAvatarTvFallbackClass,
   onRemoteSuccess: removeStoryAvatarTvFallbackClass
 });

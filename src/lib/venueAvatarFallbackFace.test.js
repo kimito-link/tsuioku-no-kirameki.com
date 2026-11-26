@@ -72,7 +72,7 @@ describe('会場のアイコン未設定フォールバック', () => {
   describe('★配線: venueBar が解決器を guard に渡している', () => {
     it('代替顔の解決器(共通部品 avatarFallbackFromUrl.js)を import している', () => {
       expect(venueBar).toMatch(
-        /import\s*\{\s*identiconFallbackForAvatarUrl\s*\}\s*from\s*'\.\.\/lib\/avatarFallbackFromUrl\.js'/
+        /import\s*\{\s*avatarFallbackFaceForUrl\s*\}\s*from\s*'\.\.\/lib\/avatarFallbackFromUrl\.js'/
       );
     });
 
@@ -81,7 +81,7 @@ describe('会場のアイコン未設定フォールバック', () => {
     });
 
     it('★解決器は共通部品そのもの(会場に別実装を持たない)で、共通部品が uid を抽出して identicon を返す', () => {
-      expect(venueBar).toMatch(/const venueAvatarFallbackFor = identiconFallbackForAvatarUrl;/);
+      expect(venueBar).toMatch(/const venueAvatarFallbackFor = avatarFallbackFaceForUrl;/);
       // このテストの extractUid と共通部品の結果が、あらゆる URL で一致する(抽出規則を揃える)
       for (const u of [
         'https://secure-dcdn.cdn.nimg.jp/nicoaccount/usericon/s/13531/135315894.jpg',

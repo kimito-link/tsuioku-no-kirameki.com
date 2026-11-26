@@ -125,7 +125,7 @@ describe('動画の顔の列は、ライブと同じ顔の決め方を通す (0.
   it('仮のガードではなく、ライブと同じガード(supportGrowthAvatarLoad)と代替顔(avatarFallbackFromUrl)を使う', () => {
     const src = readFileSync(join(ROOT, 'src/extension/viewerBehaviorLiveLayout.js'), 'utf8');
     expect(src).toContain('createSupportAvatarLoadGuard(');
-    expect(src).toContain('identiconFallbackForAvatarUrl(');
+    expect(src).toContain('fallbackSrcFor: avatarFallbackFaceForUrl'); // v0.1.2248: ライブと同じ1関数
     expect(src).not.toContain('noteRemoteAttempt: () => {}');
   });
 });
