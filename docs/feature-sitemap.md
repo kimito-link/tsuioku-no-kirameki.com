@@ -129,7 +129,7 @@
   - `src/lib/monotonicCommentCount.js`
 - **storage キー定義** — chrome.storage のキー名の正本(nls_comments_<lv> 等)
   - `src/lib/storageKeys.js`
-<details><summary>🗂 このカテゴリの全担当ファイル(自動分類) 78</summary>
+<details><summary>🗂 このカテゴリの全担当ファイル(自動分類) 79</summary>
 
 - `extension-youtube/sidepanel.js` — ニコ生版 popup-entry.js(本物)+ YouTube の記録を読む入口のバンドル
 - `extension-youtube/src/pfEmoteStore.js` — Twitch/Kick の視聴ページ(content)で見た絵文字の「名前 → 画像」を storage に覚える。
@@ -180,6 +180,7 @@
 - `src/lib/prunableStorageKeys.js` — v0.1.419: storage.local の「定期 prune 対象キー」だけを prefix で絞り込む純関数。
 - `src/lib/rankedRoomsOrder.js` — 応援ランキング(ユーザー別の記録内件数の多い順)の並びを安定させる純関数(2026-10-20)。
 - `src/lib/readAllCommentsForLive.js` — 放送の全コメントを「IndexedDB(SW集約書きの正本) → chrome.storage チャンク → テール」の
+- `src/lib/recordBreakdownInStep.js` — v0.1.2242: 「記録」の下の「内訳: 通常 N …」を、記録の数字と同じ歩幅で動かす(純関数・状態は呼び出し側が1つ持つ)。
 - `src/lib/recordingStallWatchdog.js` — 記録停止ウォッチドッグの純粋判定ロジック。
 - `src/lib/recordRate.js` — 取得スピード(records/sec)の算出と健康スコア化(純ロジック)。
 - `src/lib/roomHeatMirrorKey.js` — 室温(ルーム熱度・5分増減)鏡の storage キー正本
@@ -1248,7 +1249,7 @@
   - `src/extension/live-ranking-entry.js`
   - `tsuioku-no-kirameki/live/index.html`
   - `.github/workflows/live-ranking.yml`
-<details><summary>🗂 このカテゴリの全担当ファイル(自動分類) 367</summary>
+<details><summary>🗂 このカテゴリの全担当ファイル(自動分類) 370</summary>
 
 - `app/app.js` — スマホ閲覧用 status Web 版。
 - `app/live-view-block.js` — iPhone アプリの「🚩 見たくない人を隠す・報告する」(App Store の審査 1.2: ほかの人の書き込みを見せるアプリの決まり)。
@@ -1410,6 +1411,7 @@
 - `src/lib/devReloadSignal.js` — 開発用ホットリロードのシグナル判定（純関数）。
 - `src/lib/domTreeCensus.js` — 【層】L0 判定層(純粋関数・I/O禁止)
 - `src/lib/domWriteIfChanged.js` — 「値が同じなら DOM に書かない」小さな書き込み部品(純粋寄り・DOM 要素を引数で受け取る)。v0.1.1688
+- `src/lib/elementValuesMemo.js` — 要素ごとに「前回書いたときの値の並び」を控え、全部同じなら書かずに済ませるための小さな台帳。
 - `src/lib/embeddedDataExtract.js` — ニコ生 watch ページの `#embedded-data[data-props]` から初期メタ情報を抽出する純関数。
 - `src/lib/eventParticipationProgramsApi.js` — ニコ生「企画イベント参加番組一覧」公式 JSON API の URL 組立 & 正規化（純関数）。
 - `src/lib/executeScriptWithTimeout.js` — v0.1.441: `chrome.scripting.executeScript` を timeout 付きで実行する純関数ラッパ。
@@ -1532,6 +1534,7 @@
 - `src/lib/refreshDutyGate.js` — 定期の描き直し(3秒ごとの見回り)が、画面を描き直しだけで埋めないようにする門(純関数)。
 - `src/lib/refreshStageClock.js` — 描き直し1回(refresh)が「いまどの段にいるか・各段に何ミリ秒かかったか」を残す計器(純関数)。
 - `src/lib/refreshTaskGuard.js` — v0.1.437: popup の `refresh()` で chrome API が永久 pending になっても全カード「—」固定にしない
+- `src/lib/replayClassAnimation.js` — v0.1.2223: CSS の一発アニメ(クラスを付けると1回動く)を、レイアウトを強制せずに鳴らす。
 - `src/lib/resolveKiramekiReturningAndFirstTimeUserKeys.js` — 「きらめきの賞」のかよい / はじまり判定用 userKey 分類（純関数）。
 - `src/lib/resolveOfficialPoints.js` — 【層】L0 判定層(純粋関数・I/O禁止)
 - `src/lib/roomHeatMirror.js` — 室温(ルーム熱度・5分増減)の「鏡」スナップショット純関数
@@ -1611,6 +1614,7 @@
 - `tests/e2e/global-setup.js` — ローカル（CI 以外）でモック watch 用の静的サーバが未起動のとき、
 - `tests/e2e/global-teardown.js` — global-setup が起動した serve の PID を片付ける（ローカル専用）。
 - `tests/e2e/readStreamSummary.js` — 配信のまとめは配信ごとの小さい鍵(ytm:sum:v1:)に書く。
+- `tests/e2e/supportEvidence.js` — SPC_EVIDENCE_DIR があるときだけ、横の欄の応援のチップ・ギフト欄の「投げN件」・画面を残す(v0.1.2227)。
 - `tools/audit-lp-overflow.mjs` — One-off LP overflow audit (run: node tools/audit-lp-overflow.mjs)
 - `tools/mcp-nicolive/server.mjs` — NicoLive Local MCP Bridge Phase1a (PoC) — stdio JSON-RPC server.
 - `tools/mcp-nicolive/store.mjs` — NicoLive Local MCP Bridge - Snapshot Store.
@@ -1624,18 +1628,20 @@
 
 > changelog 全 20 版を「バグ系統」で束ねた枝。同系統をまた触るとき、過去の修正と「なぜ毎回触るか」を辿る(再発防止)。新しい順。
 
-### 💾 記録件数 (6版)
+### 💾 記録件数 (5版)
+- `v0.1.2227` 2026-11-25 — 応援の演出と数字をそろえ、配信者の受取（推定）を追加
 - `v0.1.2221` 2026-11-25 — コメントが届くたびの画面の描き直しを小さく
 - `v0.1.2208` 2026-11-24 — 応援の数字を全サービスで先頭に表示
 - `v0.1.2206` 2026-11-24 — 推定（視聴者の消費）の対象をTikTok LIVEへ拡大
 - `v0.1.2205` 2026-11-24 — 推定（視聴者の消費）の対象をミクチャへ拡大
-- `v0.1.2203` 2026-11-24 — 推定購入額・消費をKick/Twitch/ツイキャスへ拡大
-- `v0.1.2202` 2026-11-24 — ニコ生会場の推定同時接続と記録件数の表示ずれを修正
 
 ### 📥 コメント取得 (1版)
 - `v0.1.2210` 2026-11-24 — 配信者にゆっくり顔を出さない
 
-### 🏟 会場・席 (13版)
+### 🏟 会場・席 (14版)
+- `v0.1.2242` 2026-11-26 — 記録の「内訳」が途中で止まらないように
+- `v0.1.2228` 2026-11-25 — 遅いPCでも横の欄がコメントで詰まりにくく
+- `v0.1.2227` 2026-11-25 — 応援の演出と数字をそろえ、配信者の受取（推定）を追加
 - `v0.1.2226` 2026-11-25 — 紹介ページの最初を、配信する人向けの説明にしました
 - `v0.1.2224` 2026-11-25 — 別窓の会場でも、声と吹き出しが同時に
 - `v0.1.2218` 2026-11-25 — コメントが速いときは画面の描き直しをまとめて、固まりにくく
@@ -1647,19 +1653,16 @@
 - `v0.1.2208` 2026-11-24 — 応援の数字を全サービスで先頭に表示
 - `v0.1.2206` 2026-11-24 — 推定（視聴者の消費）の対象をTikTok LIVEへ拡大
 - `v0.1.2205` 2026-11-24 — 推定（視聴者の消費）の対象をミクチャへ拡大
-- `v0.1.2203` 2026-11-24 — 推定購入額・消費をKick/Twitch/ツイキャスへ拡大
-- `v0.1.2202` 2026-11-24 — ニコ生会場の推定同時接続と記録件数の表示ずれを修正
 
 ### 🎈 吹き出し (2版)
 - `v0.1.2224` 2026-11-25 — 別窓の会場でも、声と吹き出しが同時に
 - `v0.1.2217` 2026-11-25 — コメントが多い配信でも会場が軽く動くように
 
-### 🎁 ギフト (5版)
+### 🎁 ギフト (4版)
+- `v0.1.2227` 2026-11-25 — 応援の演出と数字をそろえ、配信者の受取（推定）を追加
 - `v0.1.2208` 2026-11-24 — 応援の数字を全サービスで先頭に表示
 - `v0.1.2206` 2026-11-24 — 推定（視聴者の消費）の対象をTikTok LIVEへ拡大
 - `v0.1.2205` 2026-11-24 — 推定（視聴者の消費）の対象をミクチャへ拡大
-- `v0.1.2204` 2026-11-24 — ツイキャスのチケット基準円推定とTwitch出典裏取りを追加
-- `v0.1.2203` 2026-11-24 — 推定購入額・消費をKick/Twitch/ツイキャスへ拡大
 
 ### 🔊 読み上げ (5版)
 - `v0.1.2224` 2026-11-25 — 別窓の会場でも、声と吹き出しが同時に
@@ -1668,7 +1671,8 @@
 - `v0.1.2213` 2026-11-25 — 読み上げが混んでいるあいだは声を休ませる
 - `v0.1.2212` 2026-11-25 — 会場を開いていても軽く動くように
 
-### 🪟 応援レーン・タイル (1版)
+### 🪟 応援レーン・タイル (2版)
+- `v0.1.2228` 2026-11-25 — 遅いPCでも横の欄がコメントで詰まりにくく
 - `v0.1.2218` 2026-11-25 — コメントが速いときは画面の描き直しをまとめて、固まりにくく
 
 ### ⚡ 描画・性能 (1版)

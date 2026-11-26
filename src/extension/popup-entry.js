@@ -832,6 +832,10 @@ import {
   formatCommentRecordBreakdownLine
 } from '../lib/commentRecordBreakdown.js';
 import {
+  createRecordBreakdownInStepState,
+  resolveRecordBreakdownInStep
+} from '../lib/recordBreakdownInStep.js';
+import {
   createMonotonicCommentCountState,
   resolveMonotonicCommentCount
 } from '../lib/monotonicCommentCount.js';
@@ -1268,6 +1272,9 @@ let _prevSupportCount = /** @type {number|null} */ (null);
 //   4 経路(panel即時 / panel軽量 / 公式統計 / メイン全件)が別タイミングの生値で
 //   setCountDisplay を呼び合うため数値がズレ・前後していた。最大値=正本で収束させる。
 const _monotonicCommentCountState = createMonotonicCommentCountState();
+// v0.1.2242: 「内訳」を記録と同じ数字を土台に動かす覚え(lib/recordBreakdownInStep.js)。記録の単調ゲートと同じ lv で切り替わる。
+//   まとめ読み込み中に内訳だけ止まる・同じ配信の途中で内訳が減る、を防ぐ。
+const _recordBreakdownInStepState = createRecordBreakdownInStepState();
 
 // 2026-07-14: STORY_AVATAR_DIAG_STATE の total/withUid/selfSaved を同一 lv 内で単調化するゲート。
 const _storyDiagMonotonicState = createStoryDiagMonotonicState();
@@ -2889,8 +2896,11 @@ function syncLiveStatThreeCardsCharLoadingOverlays() {
  * @param {import('../lib/commentRecordBreakdown.js').CommentRecordBreakdown|null|undefined} [breakdown]
  *   記録の内訳(通常/興味来場/システム)。undefined=前回表示を保持(引数なし呼び出しの DOM 消し副作用回避)・
  *   null=行を非表示。
+ * @param {{ breakdownFollowsRecord?: boolean }} [countOpts]
+ *   v0.1.2242: breakdownFollowsRecord=true(軽い見回り・行を読まない経路)は、内訳を渡さなくても、
+ *   同じ配信で前に数えた分類と今の記録の数字から内訳を出し直す(内訳が記録に置いていかれない)。
  */
-function setCountDisplay(value, watchSnapshot = null, breakdown = undefined) {
+function setCountDisplay(value, watchSnapshot = null, breakdown = undefined, countOpts = undefined) {
   /** @type {number|null} */
   let recordedNum = null;
   let text = '';
@@ -2974,11 +2984,20 @@ function setCountDisplay(value, watchSnapshot = null, breakdown = undefined) {
   }
 
   // v0.1.627/628/685: 記録の内訳 sub 行。undefined=DOM 触らない(前回値保持)・_broadcasterCount で「配信者 N」。
-  if (breakdown !== undefined) {
+  // v0.1.2242: 内訳は記録(上の単調ゲート後の recordedNum)と同じ数字を土台にする(lib/recordBreakdownInStep.js)。
+  //   通常 = 記録 − 通常以外の分類。同じ配信の中では減らさない。軽い見回りは breakdownFollowsRecord で記録に合わせる。
+  const breakdownToPaint = resolveRecordBreakdownInStep(
+    _recordBreakdownInStepState,
+    watchPopupLastPaintedLiveId,
+    recordedNum,
+    breakdown,
+    { followRecord: !!(countOpts && countOpts.breakdownFollowsRecord) }
+  );
+  if (breakdownToPaint !== undefined) {
     const breakdownEl = /** @type {HTMLElement|null} */ ($('liveStatCommentsBreakdown'));
     if (breakdownEl) {
-      const bc = breakdown ? /** @type {any} */ (breakdown)._broadcasterCount : undefined;
-      const line = breakdown ? formatCommentRecordBreakdownLine(breakdown, { broadcasterCount: bc }) : '';
+      const bc = breakdownToPaint ? /** @type {any} */ (breakdownToPaint)._broadcasterCount : undefined;
+      const line = breakdownToPaint ? formatCommentRecordBreakdownLine(breakdownToPaint, { broadcasterCount: bc }) : '';
       if (line) {
         breakdownEl.hidden = false;
         breakdownEl.textContent = line;
@@ -9694,7 +9713,7 @@ function applyPanelMetricsFromContent(summary, lv) {
   } else {
     watchMetaCache.snapshot = snapForCards;
   }
-  setCountDisplay(recorded, snapForCards);
+  setCountDisplay(recorded, snapForCards, undefined, { breakdownFollowsRecord: true });
   const arrForMeta =
     watchMetaCache.lastCommentsArr &&
     watchMetaCache.lastCommentsArr.lv === lv &&
@@ -9732,7 +9751,7 @@ async function applyLightweightPanelSummaryCards(resolvedLid = '') {
     watchMetaCache.snapshot,
     raw
   );
-  setCountDisplay(recorded, snapForCards);
+  setCountDisplay(recorded, snapForCards, undefined, { breakdownFollowsRecord: true });
   const arrForMeta =
     watchMetaCache.lastCommentsArr &&
     watchMetaCache.lastCommentsArr.lv === lid &&
@@ -10428,7 +10447,7 @@ function repaintOfficialComparisonFromCurrentCount() {
   if (!/^\d+$/.test(normalized)) return;
   const recorded = Number(normalized);
   if (!Number.isFinite(recorded)) return;
-  setCountDisplay(recorded, watchMetaCache.snapshot);
+  setCountDisplay(recorded, watchMetaCache.snapshot, undefined, { breakdownFollowsRecord: true });
 }
 
 /** v0.1.463: caught_up(記録>=公式95%)到達後の再リトライ/再描画ちらちら抑止。配信切替でリセット。 */
