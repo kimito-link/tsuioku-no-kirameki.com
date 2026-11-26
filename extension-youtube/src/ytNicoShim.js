@@ -496,11 +496,19 @@ function ytTrustedStartedAt(sum, videoId, all) {
  */
 export function ytSummaryToNicoSnapshot(sum, videoId, tabTitle, all) {
   const lv = pseudoLvForVideoId(videoId);
+  const plat = platformOfStreamKey(videoId);
   // null を Number() すると 0 になり「0人」と出てしまうので、数のときだけ使う
-  const mayShowConcurrent = ytWatchMayShowConcurrentViewers({
-    contentKind: sum?.contentKind,
-    isLive: sum?.isLive,
-  }) && !concurrentViewersIsViewCountLeak(sum?.concurrentViewers, sum?.slotViewCount);
+  // YouTube の通常動画では同時視聴の欄に再生回数が入ることがあるので隠す。
+  // Twitch など他サービスの配信キーは isLive が無くても同時接続を出す。
+  const mayShowConcurrent = (
+    plat
+      ? true
+      : ytWatchMayShowConcurrentViewers({
+          contentKind: sum?.contentKind,
+          isLive: sum?.isLive,
+          hasLiveChat: sum?.hasLiveChat,
+        })
+  ) && !concurrentViewersIsViewCountLeak(sum?.concurrentViewers, sum?.slotViewCount);
   const viewers = mayShowConcurrent && typeof sum?.concurrentViewers === 'number' ? sum.concurrentViewers : NaN;
   // 配信の本当の開始時刻(ページの「ライブ配信開始日」)。記録を始めた時刻で代わりにすると、
   // 長い配信を開いた直後に「経過 0分」になる。分からないあいだは出さない。
@@ -515,7 +523,6 @@ export function ytSummaryToNicoSnapshot(sum, videoId, tabTitle, all) {
   const bKey = chId || (handle ? `handle:${handle}` : '');
   const bUid = bKey ? numericUidForYtKey(bKey) : '';
   const pendingHandle = ytHandleOfPendingKey(videoId);
-  const plat = platformOfStreamKey(videoId);
   if (plat && chId.startsWith(plat.personHead) && handle) loginByPersonKey.set(chId, handle.replace(/^@/, ''));
   // 配信者のアイコンがまとめに無いときは、配信者がチャットに書いた記録のアイコンを使う
   let bIcon = String(sum?.broadcasterIconUrl || '') || ytIconForNumericUid(bUid);

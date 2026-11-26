@@ -79,22 +79,21 @@ describe('スーパーサンクスの推定', () => {
 });
 
 describe('視聴者の行動を最初に出す', () => {
-  it('カードの先頭は視聴者の行動で、なじみと初めてが分かる', () => {
-    const html = ytVideoWatchCardInnerHtml(
-      buildYtVideoWatchCardModel({
-        videoId: 'abcdefghijk',
-        viewCount: 10,
-        recorded: { streamCount: 2, itemCount: 8 },
-        videoAuthors: [
-          { channelId: A, name: '花子', amount: null, currency: '', handle: '' },
-          { channelId: 'UCdddddddddddddddddddddd', name: '新しい人', amount: null, currency: '', handle: '' },
-        ],
-        livePeople: { [A]: { n: '花子', c: 4, t: 1, f: 1, lv: 2, seenLive: true } },
-      }),
-    );
-    expect(html.indexOf('視聴者の行動')).toBeGreaterThanOrEqual(0);
-    expect(html.indexOf('nlsb-viewer-behavior')).toBeLessThan(html.indexOf('nlsb-video-watch-card__title'));
-    expect(html).toContain('なじみ');
-    expect(html).toContain('初めて');
+  it('カードの先頭はコメントした人の列で、なじみと初めてはモデルに残る（要約板は常時出さない）', () => {
+    const model = buildYtVideoWatchCardModel({
+      videoId: 'abcdefghijk',
+      viewCount: 10,
+      recorded: { streamCount: 2, itemCount: 8 },
+      videoAuthors: [
+        { channelId: A, name: '花子', amount: null, currency: '', handle: '' },
+        { channelId: 'UCdddddddddddddddddddddd', name: '新しい人', amount: null, currency: '', handle: '' },
+      ],
+      livePeople: { [A]: { n: '花子', c: 4, t: 1, f: 1, lv: 2, seenLive: true } },
+    });
+    const html = ytVideoWatchCardInnerHtml(model);
+    expect(html).not.toContain('視聴者の行動');
+    expect(html.indexOf('data-live-lane-host')).toBeLessThan(html.indexOf('nlsb-video-watch-card__title'));
+    expect(model.behavior.rows.some((r) => r.name === '花子' && r.relationLabel === 'なじみ')).toBe(true);
+    expect(model.behavior.rows.some((r) => r.name === '新しい人' && r.relationLabel === '初めて')).toBe(true);
   });
 });

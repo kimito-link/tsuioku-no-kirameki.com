@@ -454,6 +454,81 @@ function takeCommentEntityAuthor(entity, out, seen, nowMs) {
   });
 }
 
+
+/**
+ * YouTube の公開コメント ID は、返信だと「親ID.続き」。
+ * @param {unknown} commentId
+ * @returns {string}
+ */
+export function parentYtCommentId(commentId) {
+  const s = String(commentId || '').trim();
+  const i = s.lastIndexOf('.');
+  return i > 0 ? s.slice(0, i) : '';
+}
+
+/**
+ * innertube 木から、投稿者だけでなく返信（replyLevel / isCreator / parentId）も含めて集める。
+ * 本文は返さない。
+ * @param {any} data
+ * @param {{ nowMs?: number, limit?: number }} [opts]
+ * @returns {{ commentId: string, parentId: string, channelId: string, name: string, handle: string, avatarUrl: string, isCreator: boolean, replyLevel: number, postedAtMs: number | null }[]}
+ */
+export function ytVideoCommentsFromInnertube(data, opts = {}) {
+  const limit = Number.isFinite(Number(opts.limit)) ? Math.max(1, Math.floor(Number(opts.limit))) : 200;
+  const nowMs = Number.isFinite(Number(opts.nowMs)) ? Number(opts.nowMs) : Date.now();
+  /** @type {any[]} */
+  const out = [];
+  /** @type {{ n: number }} */
+  const budget = { n: 0 };
+  walkCommentRecords(data, out, budget, 0, limit, nowMs);
+  return out;
+}
+
+/**
+ * @param {any} node
+ * @param {any[]} out
+ * @param {{ n: number }} budget
+ * @param {number} depth
+ * @param {number} limit
+ * @param {number} nowMs
+ */
+function walkCommentRecords(node, out, budget, depth, limit, nowMs) {
+  if (!node || typeof node !== 'object' || depth > 40 || budget.n > MAX_NODES || out.length >= limit) return;
+  budget.n += 1;
+  if (node.commentEntityPayload && typeof node.commentEntityPayload === 'object') {
+    const rec = commentRecordFromEntity(node.commentEntityPayload, nowMs);
+    if (rec && rec.commentId) out.push(rec);
+  }
+  const vals = Array.isArray(node) ? node : Object.values(node);
+  for (const v of vals) {
+    if (!v || typeof v !== 'object') continue;
+    walkCommentRecords(v, out, budget, depth + 1, limit, nowMs);
+    if (out.length >= limit) return;
+  }
+}
+
+/** @param {any} entity @param {number} nowMs */
+function commentRecordFromEntity(entity, nowMs) {
+  const author = entity && typeof entity === 'object' ? entity.author || {} : {};
+  const props = entity && typeof entity === 'object' ? entity.properties || {} : {};
+  const commentId = String(props.commentId || '').trim();
+  const display = String(author.displayName || '').replace(/\s+/g, ' ').trim().slice(0, 80);
+  const fromUrl = String(author.channelCommand?.innertubeCommand?.browseEndpoint?.canonicalBaseUrl || '').replace(/^\//, '');
+  const handle = display.startsWith('@') ? display : (fromUrl.startsWith('@') ? fromUrl : '');
+  const replyLevel = Number(props.replyLevel);
+  return {
+    commentId,
+    parentId: parentYtCommentId(commentId),
+    channelId: isYtChannelId(author.channelId) ? String(author.channelId) : '',
+    name: display,
+    handle: handle.startsWith('@') ? handle : '',
+    avatarUrl: String(author.avatarThumbnailUrl || '').trim(),
+    isCreator: author.isCreator === true,
+    replyLevel: Number.isFinite(replyLevel) && replyLevel > 0 ? Math.floor(replyLevel) : (parentYtCommentId(commentId) ? 1 : 0),
+    postedAtMs: parseYtCommentPublishedAtMs(props.publishedTime, nowMs),
+  };
+}
+
 /**
  * 画面に見えているコメント欄から投稿者を読む。新しい Observer は使わず、呼んだ瞬間の DOM だけ。
  * @param {ParentNode | null | undefined} root

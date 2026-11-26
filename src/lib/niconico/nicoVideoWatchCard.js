@@ -6,7 +6,7 @@
  * 【正本宣言】ニコ動の通常動画カードに出す言葉はこのファイル（視聴者の行動は viewerBehavior.js）
  */
 
-import { buildViewerBehaviorBoard, viewerBehaviorBoardInnerHtml } from '../viewerBehavior.js';
+import { attachRepliesToPeople, buildViewerBehaviorBoard, viewerBehaviorBoardInnerHtml } from '../viewerBehavior.js';
 import { isNicoNumericUserId } from './nicoVideoWatchMeta.js';
 
 export const NICO_VIDEO_WATCH_CARD_TITLE = 'この動画のデータ';
@@ -39,7 +39,7 @@ export function buildNicoVideoWatchCardModel(input) {
   const histCount = rawHist instanceof Map ? rawHist.size : rawHist && typeof rawHist === 'object' ? Object.keys(rawHist).length : 0;
   const historyReady = src.historyReady != null ? !!src.historyReady : streamCount > 0 || histCount > 0;
   const behavior = buildViewerBehaviorBoard({
-    visiblePeople: authors.map((a) => ({
+    visiblePeople: attachRepliesToPeople(authors.map((a) => ({
       id: String(a?.userId || '').trim(),
       name: String(a?.name || '').trim(),
       avatarUrl: String(a?.avatarUrl || '').trim(),
@@ -49,7 +49,10 @@ export function buildNicoVideoWatchCardModel(input) {
       at: a?.postedAtMs,
       pending: a?.pending,
       commentAnchor: String(a?.commentAnchor || a?.commentId || '').trim(),
-    })),
+      creatorReplies: a?.creatorReplies,
+      viewerReplies: a?.viewerReplies,
+      replies: a?.replies,
+    })), src.videoComments),
     historyById: rawHist || {},
     historyReady,
     nowMs: src.nowMs,

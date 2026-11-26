@@ -409,6 +409,8 @@ export function buildViewerBehaviorBoard(input) {
         pending,
         avatarUrl: String(p?.avatarUrl || '').trim(),
         commentAnchor: String(p?.commentAnchor || '').trim(),
+        creatorReplies: listRepliesOf(p).creatorReplies,
+        viewerReplies: listRepliesOf(p).viewerReplies,
       });
       continue;
     }
@@ -420,6 +422,9 @@ export function buildViewerBehaviorBoard(input) {
     if (!prev.avatarUrl && p?.avatarUrl) prev.avatarUrl = String(p.avatarUrl).trim();
     if (!prev.commentAnchor && p?.commentAnchor) prev.commentAnchor = String(p.commentAnchor).trim();
     if (pending === true) prev.pending = true;
+    const extra = listRepliesOf(p);
+    prev.creatorReplies = mergeReplyLists(prev.creatorReplies, extra.creatorReplies);
+    prev.viewerReplies = mergeReplyLists(prev.viewerReplies, extra.viewerReplies);
   }
   const rows = [];
   for (const person of byId.values()) {
@@ -432,6 +437,8 @@ export function buildViewerBehaviorBoard(input) {
     row.isAnonymous = false;
     row.anonymousCount = 0;
     row.pageAt = Number(person.at) > 0 ? Math.floor(Number(person.at)) : 0;
+    row.creatorReplies = Array.isArray(person.creatorReplies) ? person.creatorReplies : [];
+    row.viewerReplies = Array.isArray(person.viewerReplies) ? person.viewerReplies : [];
     rows.push(row);
   }
   if (anonAcc.people > 0) {
@@ -562,6 +569,16 @@ export function viewerBehaviorBoardInnerHtml(board) {
     : '';
   const scope = `<p class="nlsb-viewer-behavior__scope">いまページに読み込まれているコメントだけを見ています。</p>`;
   // タイル本体は描画層が配信モードの paintStoryUserLaneDomFilled で足す。ここは器だけ。
+  // 通常動画では「視聴者の行動」の要約板を常時出さない。サムネイル列と、タップ後の詳細だけ。
+  if (board.contentKind === 'video') {
+    return (
+      `<section class="nlsb-viewer-behavior nlsb-viewer-behavior--video" data-content-kind="video" aria-label="コメントした人">` +
+      pendingBtn +
+      `<div data-live-lane-host></div>` +
+      `<div class="nlsb-viewer-behavior__detail" hidden></div>` +
+      `</section>`
+    );
+  }
   return (
     `<section class="nlsb-viewer-behavior" data-collapsed="0" aria-label="${esc(VIEWER_BEHAVIOR_TITLE)}">` +
     `<h2 class="nlsb-viewer-behavior__title">${esc(board.title || VIEWER_BEHAVIOR_TITLE)}</h2>` +
@@ -576,5 +593,212 @@ export function viewerBehaviorBoardInnerHtml(board) {
     scope +
     `</div>` +
     `</section>`
+  );
+}
+
+/**
+ * 返信を、投稿者の返信と視聴者の返信に分ける。replyLevel が 1 以上、または parentId / isReply があるものだけを返信とする。
+ * isCreator が真、または kind が creator なら投稿者の返信。
+ * @param {readonly any[] | null | undefined} items
+ * @returns {{ creatorReplies: ViewerBehaviorReply[], viewerReplies: ViewerBehaviorReply[] }}
+ */
+export function splitCreatorViewerReplies(items) {
+  const list = Array.isArray(items) ? items : [];
+  /** @type {ViewerBehaviorReply[]} */
+  const creatorReplies = [];
+  /** @type {ViewerBehaviorReply[]} */
+  const viewerReplies = [];
+  for (const raw of list) {
+    if (!raw || typeof raw !== 'object') continue;
+    const level = Number(raw.replyLevel);
+    const parentId = String(raw.parentId || '').trim();
+    const isReply = raw.isReply === true || (Number.isFinite(level) && level > 0) || !!parentId;
+    if (!isReply) continue;
+    const row = normalizeReply(raw);
+    if (!row.name && !row.id) continue;
+    if (row.kind === 'creator') creatorReplies.push(row);
+    else viewerReplies.push(row);
+  }
+  return { creatorReplies, viewerReplies };
+}
+
+/**
+ * @typedef {{ id: string, name: string, kind: 'creator' | 'viewer', at: number | null }} ViewerBehaviorReply
+ */
+
+/** @param {any} raw @returns {ViewerBehaviorReply} */
+function normalizeReply(raw) {
+  const isCreator = raw.isCreator === true || raw.kind === 'creator';
+  const atNum = Number(raw.at || raw.postedAtMs);
+  return {
+    id: String(raw.id || raw.channelId || raw.userId || '').trim(),
+    name: String(raw.name || raw.displayName || '').replace(/\s+/g, ' ').trim(),
+    kind: isCreator ? 'creator' : 'viewer',
+    at: Number.isFinite(atNum) && atNum > 0 ? Math.floor(atNum) : null,
+  };
+}
+
+/** @param {any} person */
+function listRepliesOf(person) {
+  if (Array.isArray(person?.creatorReplies) || Array.isArray(person?.viewerReplies)) {
+    return {
+      creatorReplies: Array.isArray(person.creatorReplies) ? person.creatorReplies.map(normalizeReply) : [],
+      viewerReplies: Array.isArray(person.viewerReplies) ? person.viewerReplies.map(normalizeReply) : [],
+    };
+  }
+  return splitCreatorViewerReplies(person?.replies || person?.replyItems || []);
+}
+
+/** @param {ViewerBehaviorReply[] | null | undefined} a @param {ViewerBehaviorReply[] | null | undefined} b */
+function mergeReplyLists(a, b) {
+  const seen = new Set();
+  /** @type {ViewerBehaviorReply[]} */
+  const out = [];
+  for (const r of [...(Array.isArray(a) ? a : []), ...(Array.isArray(b) ? b : [])]) {
+    const row = normalizeReply(r);
+    const key = `${row.kind}:${row.id}:${row.name}:${row.at || ''}`;
+    if (seen.has(key)) continue;
+    seen.add(key);
+    out.push(row);
+  }
+  return out;
+}
+
+/**
+ * 親コメントの投稿者ごとに、付いた返信を creator / viewer に分けて載せる。
+ * comments は { id|channelId|userId, name, commentId, parentId, isCreator, replyLevel, at|postedAtMs }。
+ * @param {readonly any[]} people
+ * @param {readonly any[] | null | undefined} comments
+ * @returns {any[]}
+ */
+export function attachRepliesToPeople(people, comments) {
+  const list = Array.isArray(people) ? people : [];
+  const comm = Array.isArray(comments) ? comments : [];
+  if (!comm.length) return list;
+  /** @type {Map<string, any[]>} */
+  const byParent = new Map();
+  const topByAuthor = new Map();
+  for (const c of comm) {
+    if (!c || typeof c !== 'object') continue;
+    const commentId = String(c.commentId || c.id || '').trim();
+    const parentId = String(c.parentId || '').trim();
+    const level = Number(c.replyLevel);
+    const authorKey = String(c.channelId || c.userId || c.authorId || c.id || '').trim();
+    if ((Number.isFinite(level) && level > 0) || parentId) {
+      const pid = parentId || (commentId.includes('.') ? commentId.slice(0, commentId.lastIndexOf('.')) : '');
+      if (!pid) continue;
+      if (!byParent.has(pid)) byParent.set(pid, []);
+      byParent.get(pid).push(c);
+      continue;
+    }
+    if (authorKey && commentId) {
+      if (!topByAuthor.has(authorKey)) topByAuthor.set(authorKey, []);
+      topByAuthor.get(authorKey).push(commentId);
+    }
+  }
+  return list.map((person) => {
+    const key = String(person?.id || person?.channelId || person?.userId || '').trim();
+    const myTops = topByAuthor.get(key) || [];
+    const replies = myTops.flatMap((id) => byParent.get(id) || []);
+    const split = splitCreatorViewerReplies(replies);
+    return {
+      ...person,
+      creatorReplies: mergeReplyLists(person?.creatorReplies, split.creatorReplies),
+      viewerReplies: mergeReplyLists(person?.viewerReplies, split.viewerReplies),
+    };
+  });
+}
+
+/**
+ * サムネイルを押したときに横の欄へ出す、1人分の行動。ライブ配信のタイルには使わない。
+ * @param {any} row
+ * @returns {{
+ *   id: string,
+ *   name: string,
+ *   relationLabel: string,
+ *   visitsText: string,
+ *   firstSeenText: string,
+ *   lastSeenText: string,
+ *   commentText: string,
+ *   giftText: string,
+ *   creatorReplies: ViewerBehaviorReply[],
+ *   viewerReplies: ViewerBehaviorReply[],
+ *   pending: boolean,
+ *   canOpenComeview: boolean,
+ * }}
+ */
+export function buildViewerBehaviorPersonDetail(row) {
+  const src = row && typeof row === 'object' ? row : {};
+  const id = String(src.id || '').trim();
+  const visits = [];
+  if (src.liveVisits != null && Number(src.liveVisits) > 0) visits.push(`配信 ${Number(src.liveVisits).toLocaleString('ja-JP')} 回`);
+  else if (src.seenLive) visits.push('配信に来たことがある');
+  if (src.videoVisits != null && Number(src.videoVisits) > 0) visits.push(`動画 ${Number(src.videoVisits).toLocaleString('ja-JP')} 回`);
+  else if (src.seenVideo) visits.push('動画に来たことがある');
+  const commentCount = src.commentCount != null ? Number(src.commentCount) : null;
+  const giftCount = src.giftCount != null ? Number(src.giftCount) : null;
+  const yen = src.knownAmountJpy != null ? Number(src.knownAmountJpy) : null;
+  let giftText = 'ギフト なし';
+  if (giftCount != null && giftCount > 0) {
+    giftText = yen != null && yen > 0
+      ? `ギフト ${giftCount.toLocaleString('ja-JP')} 件 約¥${yen.toLocaleString('ja-JP')}`
+      : `ギフト ${giftCount.toLocaleString('ja-JP')} 件`;
+  } else if (yen != null && yen > 0) {
+    giftText = `ギフト 約¥${yen.toLocaleString('ja-JP')}`;
+  }
+  return {
+    id,
+    name: String(src.name || '').replace(/\s+/g, ' ').trim() || id,
+    relationLabel: String(src.relationLabel || viewerRelationLabel(src.relation) || '').trim(),
+    visitsText: visits.length ? `来訪：${visits.join(' ・ ')}` : '来訪：記録がまだない',
+    firstSeenText: src.firstSeenText ? `最初 ${src.firstSeenText}` : '最初：—',
+    lastSeenText: src.lastSeenText ? `いちばん新しい ${src.lastSeenText}` : 'いちばん新しい：—',
+    commentText: commentCount != null && Number.isFinite(commentCount)
+      ? `コメント ${commentCount.toLocaleString('ja-JP')}`
+      : 'コメント —',
+    giftText,
+    creatorReplies: Array.isArray(src.creatorReplies) ? src.creatorReplies : [],
+    viewerReplies: Array.isArray(src.viewerReplies) ? src.viewerReplies : [],
+    pending: src.pending === true,
+    canOpenComeview: !!id && id !== VIEWER_BEHAVIOR_ANON_ID && !src.isAnonymous,
+  };
+}
+
+/**
+ * @param {ReturnType<typeof buildViewerBehaviorPersonDetail> | null | undefined} detail
+ * @returns {string}
+ */
+export function viewerBehaviorPersonDetailInnerHtml(detail) {
+  if (!detail || typeof detail !== 'object') return '';
+  const esc = escapeViewerBehaviorHtml;
+  const replyList = (title, rows) => {
+    if (!rows.length) {
+      return `<div class="nlsb-person-detail__replies"><p class="nlsb-person-detail__label">${esc(title)}</p><p>なし</p></div>`;
+    }
+    const items = rows.map((r) => {
+      const who = r.name || r.id || '名前なし';
+      const kind = r.kind === 'creator' ? '投稿者の返信' : '視聴者の返信';
+      return `<li data-reply-kind="${esc(r.kind)}"><span class="nlsb-person-detail__who">${esc(who)}</span>（${esc(kind)}）</li>`;
+    }).join('');
+    return `<div class="nlsb-person-detail__replies"><p class="nlsb-person-detail__label">${esc(title)}</p><ul>${items}</ul></div>`;
+  };
+  const open = detail.canOpenComeview
+    ? `<button type="button" class="nlsb-person-detail__comeview" data-open-comeview="1" data-user-id="${esc(detail.id)}" data-user-name="${esc(detail.name)}">発言一覧を開く</button>`
+    : '';
+  const pending = detail.pending ? '<p class="nlsb-person-detail__pending">未対応</p>' : '';
+  return (
+    `<div class="nlsb-person-detail" data-user-id="${esc(detail.id)}">` +
+    `<p class="nlsb-person-detail__name">${esc(detail.name)}</p>` +
+    `<p class="nlsb-person-detail__relation">${esc(detail.relationLabel)}</p>` +
+    `<p>${esc(detail.visitsText)}</p>` +
+    `<p>${esc(detail.firstSeenText)}</p>` +
+    `<p>${esc(detail.lastSeenText)}</p>` +
+    `<p>${esc(detail.commentText)}</p>` +
+    `<p>${esc(detail.giftText)}</p>` +
+    replyList('投稿者の返信', detail.creatorReplies) +
+    replyList('視聴者の返信', detail.viewerReplies) +
+    pending +
+    open +
+    `</div>`
   );
 }

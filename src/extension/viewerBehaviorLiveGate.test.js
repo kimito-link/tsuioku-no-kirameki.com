@@ -59,4 +59,11 @@ describe('ライブ配信には視聴者の行動ボードを出さない (0.1.2
     expect(onLive.hide).toBe(true);
     expect(onLive.html).toBe('');
   });
+
+  it('YouTube のライブ取り込みは、視聴者の行動ボードを storage に書かない', () => {
+    const bg = readFileSync(new URL('../../extension-youtube/src/background-entry.js', import.meta.url), 'utf8');
+    expect(bg).not.toContain('[KEY_VIEWER_BEHAVIOR_BOARD]');
+    expect(bg).toContain('ライブ配信では視聴者の行動ボードを storage に書かない');
+  });
+
 });

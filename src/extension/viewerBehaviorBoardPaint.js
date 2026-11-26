@@ -4,7 +4,7 @@
  */
 import { KEY_VIEWER_BEHAVIOR_BOARD, KEY_YT_VIDEO_WATCH_CARD, KEY_NICO_VIDEO_WATCH_CARD, KEY_LAST_WATCH_URL } from '../lib/storageKeys.js';
 import { hydrateViewerBehaviorLiveLayout } from './viewerBehaviorLiveLayout.js';
-import { wireLaneUserDetailOpen } from './popup/wireLaneUserDetailOpen.js';
+import { wireVideoLanePersonDetail } from './wireVideoLanePersonDetail.js';
 import { viewerBehaviorWrapMatchesUrl } from '../lib/viewerBehaviorMatch.js';
 import { ytVideoWatchCardInnerHtml } from '../lib/youtube/ytVideoWatchCard.js';
 import { nicoVideoWatchCardInnerHtml } from '../lib/niconico/nicoVideoWatchCard.js';
@@ -42,6 +42,13 @@ export function viewerBehaviorBoardStyleText(rootSel, placement = 'overlay') {
     rootSel + ' .nlsb-viewer-behavior__anon-badge{font-size:14px;}' +
     rootSel + ' .nlsb-viewer-behavior__pending-toggle{margin:0 0 6px;padding:2px 8px;font:inherit;font-size:12px;}' +
     rootSel + ' .nlsb-viewer-behavior__detail{margin:6px 0 0;padding:6px 0 0;border-top:1px solid rgba(80,60,20,.12);font-size:12px;}' +
+    rootSel + ' .nlsb-person-detail{margin:0;}' +
+    rootSel + ' .nlsb-person-detail p{margin:0 0 4px;}' +
+    rootSel + ' .nlsb-person-detail__name{font-weight:700;}' +
+    rootSel + ' .nlsb-person-detail__replies{margin:6px 0;}' +
+    rootSel + ' .nlsb-person-detail__replies ul{margin:0;padding-left:1.2em;}' +
+    rootSel + ' .nlsb-person-detail__comeview{margin:6px 0 0;padding:4px 8px;font:inherit;font-size:12px;cursor:pointer;}' +
+    rootSel + ' .nlsb-viewer-behavior--video .nlsb-viewer-behavior__pending-toggle{margin:0 0 6px;}' +
     rootSel + ' .nlsb-viewer-behavior__scope{font-size:11px;color:#5a4a32;}' +
     rootSel + ' .nlsb-viewer-behavior--pending-only .nlsb-viewer-behavior__tile:not([data-pending="1"]){display:none;}' +
     rootSel + ' .nlsb-viewer-behavior__totals{font-size:12px;}' +
@@ -148,13 +155,14 @@ export function paintViewerBehaviorBoardEl(opts = {}) {
   }
   const afterPaint = (el) => {
     bindViewerBehaviorBoardEvents(el);
-    try { wireLaneUserDetailOpen(doc); } catch { /* 既存の発言一覧の配線がすでにあればそれで足りる */ }
+    // 動画のタイルは詳細を横の欄に出す。ライブの発言一覧クリックは popup-entry の既存配線のまま。
     if (opts.board) {
       try {
         el.__nlsbBoard = opts.board;
         hydrateViewerBehaviorLiveLayout(el, opts.board, { document: doc });
       } catch { /* 帯とレーンが出せなくても要約は残す */ }
     }
+    try { wireVideoLanePersonDetail(el, { board: opts.board, document: doc }); } catch { /* 詳細が出なくてもカードは残す */ }
     if (opts.collapsed === true) {
       const section = el.querySelector('.nlsb-viewer-behavior');
       const body = el.querySelector('.nlsb-viewer-behavior__body');

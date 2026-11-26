@@ -24,6 +24,14 @@
 /** @type {ChangelogEntry[]} */
 const ARCHIVE_ENTRIES = [
   Object.freeze({
+    version: '0.1.2213',
+    date: '2026-11-25',
+    summary: '読み上げが混んでいるあいだは声を休ませる',
+    items: Object.freeze([
+      'VOICEVOX の読み上げが追いつかず、いったん PC の声で読んでいるあいだは、新しいコメントを VOICEVOX に送り続けません。空回りが減るので、声が戻りやすく、会場や横の欄も軽くなりやすくなります。落ち着いたら自動で VOICEVOX の声に戻ります。PC の声を使わない設定のときは、これまでどおり VOICEVOX だけで読みます。',
+    ])
+  }),
+  Object.freeze({
     version: '0.1.2212',
     date: '2026-11-25',
     summary: '会場を開いていても軽く動くように',

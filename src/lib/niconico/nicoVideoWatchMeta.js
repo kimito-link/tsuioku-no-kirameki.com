@@ -124,13 +124,38 @@ export function parseNicoVideoWatchMeta(root, jsonLd) {
   const owner = data?.metadata?.jsonLd?.owner || data?.owner || {};
   const ownerId = isNicoNumericUserId(owner?.id) ? String(owner.id).trim() : '';
   const ownerName = String(owner?.name || '').replace(/\s+/g, ' ').trim();
-  const viewCount = viewCountFromNicoWatchData(root) ?? viewCountFromNicoJsonLd(jsonLd);
+  const fromLd = metaFromNicoJsonLd(jsonLd);
+  const viewCount = viewCountFromNicoWatchData(root) ?? fromLd.viewCount;
   return {
-    videoId: /^(?:sm|nm|so)\d+$/i.test(videoId) ? videoId : '',
-    title,
+    videoId: /^(?:sm|nm|so)\d+$/i.test(videoId) ? videoId : fromLd.videoId,
+    title: title || fromLd.title,
     viewCount,
+    ownerId: ownerId || fromLd.ownerId,
+    ownerName: ownerName || fromLd.ownerName,
+  };
+}
+
+/**
+ * schema.org の VideoObject（視聴ページの JSON-LD）から、動画の題名・再生数・投稿者を取る。
+ * 実ページの outerHTML に $watchV4 が無いとき（sm9 の公開キャプチャなど）の控え。
+ * @param {any} ld
+ * @returns {{ videoId: string, title: string, viewCount: number | null, ownerId: string, ownerName: string }}
+ */
+export function metaFromNicoJsonLd(ld) {
+  const list = Array.isArray(ld) ? ld : ld && typeof ld === 'object' ? [ld] : [];
+  const item = list.find((x) => x && (x['@type'] === 'VideoObject' || x['@id'] || x.url)) || null;
+  if (!item) return { videoId: '', title: '', viewCount: viewCountFromNicoJsonLd(ld), ownerId: '', ownerName: '' };
+  const videoId = nicoVideoIdFromUrl(String(item['@id'] || item.url || ''));
+  const author = item.author && typeof item.author === 'object' ? item.author : (item.creator || {});
+  const ownerUrl = String(author.url || author['@id'] || '');
+  const om = ownerUrl.match(/\/user\/(\d+)/);
+  const ownerId = om && isNicoNumericUserId(om[1]) ? om[1] : '';
+  return {
+    videoId,
+    title: String(item.name || '').replace(/\s+/g, ' ').trim(),
+    viewCount: viewCountFromNicoJsonLd(ld),
     ownerId,
-    ownerName,
+    ownerName: String(author.name || '').replace(/\s+/g, ' ').trim(),
   };
 }
 

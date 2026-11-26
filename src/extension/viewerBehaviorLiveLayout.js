@@ -187,10 +187,12 @@ export function hydrateViewerBehaviorLiveLayout(host, board, opts = {}) {
   if (!host || !doc || !board) return;
   let stripHost = host.querySelector('[data-stat-strip-host]');
   let laneHost = host.querySelector('[data-live-lane-host]');
-  if (!stripHost || !laneHost) return;
-  const strip = createVenueStatStrip(doc, { platform: board.platform || 'youtube' });
-  stripHost.replaceChildren(strip.el);
-  strip.paint(viewerBehaviorStatStripModel(board));
+  if (!laneHost) return;
+  if (stripHost) {
+    const strip = createVenueStatStrip(doc, { platform: board.platform || 'youtube' });
+    stripHost.replaceChildren(strip.el);
+    strip.paint(viewerBehaviorStatStripModel(board));
+  }
   const els = createViewerBehaviorLiveLaneEls(doc);
   laneHost.replaceChildren(els.stack);
   const buckets = viewerBehaviorRowsToLaneBuckets(board, { pendingOnly: opts.pendingOnly === true });

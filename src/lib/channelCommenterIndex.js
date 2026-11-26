@@ -6,6 +6,8 @@
  * 【正本宣言】配信と動画で共通の「このPCで見かけた人」索引の形はこのファイル
  */
 
+import { toEpochMs } from './timeAuthority.js';
+
 export const CHANNEL_COMMENTER_INDEX_CAP = 5000;
 
 /**
@@ -85,7 +87,7 @@ export function applyCommentsToChannelIndex(prev, ownerId, comments, nowMs = 0, 
     const id = String(idFromRow(row) || '').trim();
     if (!isPersonId(id) || id === owner) continue;
     const name = String(row.name || row.nickname || row.authorName || '').replace(/\s+/g, ' ').trim().slice(0, 40);
-    const at = Number(row.postedAtMs || row.recordedAt || row.capturedAt || nowMs || 0) || 0;
+    const at = toEpochMs(row.postedAtMs || row.recordedAt || row.capturedAt || nowMs);
     const gift = rowLooksLikeGift(row);
     const amt = rowKnownAmountJpy(row);
     const cur = people[id];
@@ -134,7 +136,7 @@ export function applyCommentsToChannelIndex(prev, ownerId, comments, nowMs = 0, 
     for (let i = 0; i < drop; i += 1) delete people[ids[i]];
   }
   index[owner] = {
-    updatedAt: Number(nowMs) || Number(prevBucket.updatedAt) || 0,
+    updatedAt: toEpochMs(nowMs) || toEpochMs(prevBucket.updatedAt) || 0,
     streamCount: Number(prevBucket.streamCount) || 0,
     people,
   };

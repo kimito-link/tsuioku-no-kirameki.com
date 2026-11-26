@@ -27,7 +27,7 @@ import {
   formatEstimatedViewerSpendDisplay,
   formatStreamerTakeHomeDisplay,
 } from '../../src/lib/estimatedViewerSpend.js';
-import { KEY_YT_CHANNEL_COMMENTERS, KEY_YT_VIDEO_WATCH_CARD, KEY_VIEWER_BEHAVIOR_BOARD } from '../../src/lib/storageKeys.js';
+import { KEY_YT_CHANNEL_COMMENTERS, KEY_YT_VIDEO_WATCH_CARD } from '../../src/lib/storageKeys.js';
 import { YT_CHAT_STORAGE_FLUSH_MS } from '../../src/lib/youtube/ytLiveRowOrder.js';
 import {
   appendYtStreamCommentsIdb,
@@ -142,62 +142,15 @@ function rememberChannelCommenters(channelId, rows, opts = {}) {
   })();
 }
 
-/** @type {Map<string, Map<string, { id: string, name: string, commentCount: number, giftCount: number | null, knownAmountJpy: number | null, at: number }>>} */
-const liveVisiblePeopleByVideo = new Map();
-
 /**
- * 配信でページから届いたコメントの投稿者を覚え、視聴者の行動ボードを書く。保存結果は変えない。
- * @param {string} videoId
- * @param {string} channelId
- * @param {readonly any[]} rows
+ * ライブ配信では視聴者の行動ボードを storage に書かない。
+ * 0.1.2235 でコメントのたびに書いて横の欄の内訳がちらついたため、呼び出しは外し、本体も空にする。
+ * @param {string} [_videoId]
+ * @param {string} [_channelId]
+ * @param {readonly any[]} [_rows]
  */
-function noteLiveVisiblePeople(videoId, channelId, rows) {
-  const vid = String(videoId || '').trim();
-  const list = Array.isArray(rows) ? rows : [];
-  if (!vid || !list.length) return;
-  let map = liveVisiblePeopleByVideo.get(vid);
-  if (!map) {
-    map = new Map();
-    liveVisiblePeopleByVideo.set(vid, map);
-  }
-  for (const row of list) {
-    const id = String(row?.channelId || row?.ytChannelId || row?.userId || '').trim();
-    if (!id) continue;
-    const name = String(row?.name || row?.nickname || row?.authorName || '').replace(/\s+/g, ' ').trim();
-    const at = Number(row?.postedAtMs || row?.recordedAt || 0) || 0;
-    const gift = row?.isGift === true || row?.gift != null || ['gift', 'superchat', 'superthanks'].includes(String(row?.kind || '').toLowerCase()) || Number(row?.amount) > 0;
-    const amt = String(row?.currency || '').toUpperCase() === 'JPY' && Number(row?.amount) > 0 ? Math.floor(Number(row.amount)) : null;
-    const prev = map.get(id) || { id, name: '', commentCount: 0, giftCount: null, knownAmountJpy: null, at: 0 };
-    prev.commentCount += 1;
-    if (name && name.length >= String(prev.name || '').length) prev.name = name;
-    if (at > (prev.at || 0)) prev.at = at;
-    if (gift) prev.giftCount = (prev.giftCount || 0) + 1;
-    if (amt != null) prev.knownAmountJpy = (prev.knownAmountJpy || 0) + amt;
-    map.set(id, prev);
-  }
-  if (map.size > 200) {
-    const ids = [...map.values()].sort((a, b) => (a.at || 0) - (b.at || 0));
-    for (let i = 0; i < ids.length - 200; i += 1) map.delete(ids[i].id);
-  }
-  const ch = String(channelId || '').trim();
-  if (!ch) return;
-  void (async () => {
-    try {
-      const bag = await chrome.storage.local.get(KEY_YT_CHANNEL_COMMENTERS);
-      const historyById = peopleInChannelCommenterIndex(bag?.[KEY_YT_CHANNEL_COMMENTERS], ch);
-      const board = buildViewerBehaviorBoard({
-        visiblePeople: [...map.values()],
-        historyById,
-        historyReady: Object.keys(historyById).length > 0,
-        nowMs: Date.now(),
-      });
-      await chrome.storage.local.set({
-        [KEY_VIEWER_BEHAVIOR_BOARD]: { pageKey: vid, kind: 'live', at: Date.now(), board },
-      });
-    } catch {
-      /* ボードは記録の正本ではない */
-    }
-  })();
+function noteLiveVisiblePeople(_videoId, _channelId, _rows) {
+  return;
 }
 
 /**

@@ -12,7 +12,7 @@ import {
   formatEstimatedViewerSpendDisplay,
   formatStreamerTakeHomeDisplay,
 } from '../estimatedViewerSpend.js';
-import { buildViewerBehaviorBoard, viewerBehaviorBoardInnerHtml } from '../viewerBehavior.js';
+import { attachRepliesToPeople, buildViewerBehaviorBoard, viewerBehaviorBoardInnerHtml } from '../viewerBehavior.js';
 import { matchVideoCommentersToLive, tallyVisibleSuperThanks } from './ytVideoWatchMeta.js';
 
 /** カードの見出し */
@@ -86,8 +86,7 @@ export function buildYtVideoWatchCardModel(input) {
   const authors = Array.isArray(src.videoAuthors) ? src.videoAuthors : [];
   const livePeople = src.livePeople || {};
   const histCount = livePeople instanceof Map ? livePeople.size : Object.keys(livePeople || {}).length;
-  const behavior = buildViewerBehaviorBoard({
-    visiblePeople: authors.map((a) => ({
+  const visiblePeople = attachRepliesToPeople(authors.map((a) => ({
       id: String(a?.channelId || a?.id || '').trim(),
       name: String(a?.name || '').trim(),
       avatarUrl: String(a?.avatarUrl || '').trim(),
@@ -97,7 +96,12 @@ export function buildYtVideoWatchCardModel(input) {
       at: Number(a?.postedAtMs || a?.at) > 0 ? Math.floor(Number(a.postedAtMs || a.at)) : 0,
       pending: a?.pending === true,
       commentAnchor: String(a?.commentId || '').trim(),
-    })),
+      creatorReplies: a?.creatorReplies,
+      viewerReplies: a?.viewerReplies,
+      replies: a?.replies,
+    })), src.videoComments);
+  const behavior = buildViewerBehaviorBoard({
+    visiblePeople,
     historyById: livePeople,
     historyReady: streamCount > 0 || histCount > 0,
     nowMs: src.nowMs,
