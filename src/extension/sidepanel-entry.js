@@ -15,6 +15,7 @@ import {
   summarizeZeroAreaWindow
 } from '../lib/sidepanelSelfDiag.js';
 import { summarizeCloakDuration, summarizeContentBlindTime } from '../lib/sidepanelCloakDuration.js';
+import { createShadeBlindState, observeShade, shadeBlindMs, formatShadeReloadNote } from '../lib/shadeBlindTracker.js';
 import { summarizeEventLoopStall } from '../lib/eventLoopStallSummary.js';
 import { buildCommentWriteModeDiagLine } from '../lib/commentWriteModeDiag.js';
 import { KEY_COMMENT_WRITE_MODE_DIAG } from '../lib/commentWriteModeDiagKey.js';
@@ -348,10 +349,8 @@ let _commentWriteModeDiag = null;
  * @type {{ t: number, cloak: string }[]}
  */
 const _cloakSeries = [];
-/** ★v0.1.1364: 初回シェードが覆っていた最後の時刻[ms](-1=一度も覆っていない)。 */
-let _shadeCoveringLastT = -1;
-/** ★v0.1.1364: シェードが覆っている状態を観測した回数。 */
-let _shadeCoveringSamples = 0;
+/** シェードが覆っていた長さを中の文書ごとに数える(読み直しを「開いてからずっと」と数えない)。 */
+let _shadeBlind = createShadeBlindState();
 /** パネルが開いた時刻(系列の t=0 基準)。 */
 const _bootAt = Date.now();
 
@@ -545,6 +544,15 @@ function collectAndPublish(phase, schedMs = null) {
         ? {
             ...innerLayer,
             bodyKids: innerDoc && innerDoc.body ? innerDoc.body.children.length : 0,
+            // 中の文書の読み込み開始(親の起点からのms)。読み直しを見分ける。読めなければ null。
+            docStartMs: (() => {
+              try {
+                const w = innerDoc && innerDoc.defaultView;
+                return w ? Math.round(w.performance.timeOrigin - _bootAt) : null;
+              } catch {
+                return null;
+              }
+            })(),
             cloak:
               innerDoc && innerDoc.documentElement
                 ? innerDoc.documentElement.getAttribute('data-nl-popup-primary-cloak') || ''
@@ -631,11 +639,12 @@ function collectAndPublish(phase, schedMs = null) {
         t: Math.max(0, Date.now() - _bootAt),
         cloak: String(sample.inner.cloak || '')
       });
-      // ★v0.1.1364: シェードが覆っていた最後の時刻を残す(幕より長く中身を隠す)。
-      if (String(sample.inner.shade || '') === 'covering') {
-        _shadeCoveringLastT = Math.max(0, Date.now() - _bootAt);
-        _shadeCoveringSamples += 1;
-      }
+      // ★v0.1.1364: シェードが覆っていた長さを残す(幕より長く中身を隠す)。
+      _shadeBlind = observeShade(_shadeBlind, {
+        t: Math.max(0, Date.now() - _bootAt),
+        shade: String(sample.inner.shade || ''),
+        docStartMs: sample.inner.docStartMs
+      });
     }
     const cloakDuration = summarizeCloakDuration(_cloakSeries);
     /*
@@ -701,16 +710,17 @@ function collectAndPublish(phase, schedMs = null) {
      *   覆い続ける。「パネルは開いているのに中身が出ない」の主因になりうるのに、
      *   これまで速報に1文字も出ていなかった=計器の無い欠落は永久に出ない。
      */
-    const shadeNote = _shadeCoveringLastT >= 0
-      ? ` / 初回シェード t+${_shadeCoveringLastT}ms まで中身を覆っていた(観測${_shadeCoveringSamples}点)`
-      : '';
+    const _shadeCoveringLastT = _shadeBlind.firstLastCoveringT;
+    const shadeNote = (_shadeCoveringLastT >= 0
+      ? ` / 初回シェード t+${_shadeCoveringLastT}ms まで中身を覆っていた(観測${_shadeBlind.firstCoveringSamples}点)`
+      : '') + formatShadeReloadNote(_shadeBlind);
     /*
      * ★v0.1.1370: 幕とシェードを【合算】して体感を1つの数字で言う。
      *   旧実装は両者を別々に計算して連結するだけで、誰も足し合わせていなかった。
      *   その結果「黒く見えていた=601ms」と出しながら、実際に中身が出ないのは
      *   シェード込みで 1204ms だった=計器が過小申告し、私を cloak 追跡へ誤誘導した。
      */
-    const blind = summarizeContentBlindTime(cloakDuration.visibleBlackMs, _shadeCoveringLastT);
+    const blind = summarizeContentBlindTime(cloakDuration.visibleBlackMs, shadeBlindMs(_shadeBlind));
     const blindNote = blind.line ? ` / ${blind.line}` : '';
     const lateNote = _lateBlack
       ? ` / ★あとから黒くなった(起動${Math.round(_lateBlack.sinceBootMs / 1000)}秒後の${_lateBlack.phase}で検知・${_lateBlack.count}回・原因=${_lateBlack.verdict.cause || '不明'})`
@@ -857,7 +867,9 @@ function collectAndPublish(phase, schedMs = null) {
         lateBlack: _lateBlack,
         // ★v0.1.1364: 初回シェードが中身を覆っていた最後の時刻(-1=覆っていない)。
         shadeCoveringLastT: _shadeCoveringLastT,
-        shadeCoveringSamples: _shadeCoveringSamples,
+        shadeCoveringSamples: _shadeBlind.firstCoveringSamples,
+        shadeReloadCount: _shadeBlind.reloadCount,
+        shadeReloadLongestMs: _shadeBlind.reloadLongestMs,
         // 黒かった瞬間の生値を残す(原因の裏取り用)。無ければ今の値。
         sample: flashed ? worst.sample : sample,
         nowSample: sample

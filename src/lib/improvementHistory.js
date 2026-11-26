@@ -5209,5 +5209,19 @@ export const IMPROVEMENT_HISTORY = Object.freeze([
     version: '0.1.2139', metric: 'cross-checked-claims', value: 5,
     source: '[auto] 直近30日のコミット本文で「別の手段でも確かめた」と書かれた回数',
     note: 'コミット本文の言い回しを直近30日で数える値(0.1.2120 の注記と同じ理由)で性能は表さない。この版の不具合は PC の実配信(Twitch・Kick)で吹き出しの発言者と本文を記録と照合して見つけた'
+  }),
+  Object.freeze({
+    version: '0.1.2243', metric: 'bundle-kb', value: 1568,
+    source: '[auto] extension/dist/popup.js のファイルサイズ',
+    note: '直前の master(0.1.2229)と比べて popup.js は 1,605,667 → 1,605,464 バイトで増えていない。この版の変更はサイドパネルの自己診断(sidepanel.js)だけ。過去最良 1360KB との差はこの版より前のもの'
+  }),
+  Object.freeze({
+    version: '0.1.2243', metric: 'gate-selftest', value: 5,
+    source: '[auto] npm run audit:gates（--selftest を持つ検査の本数）'
+  }),
+  Object.freeze({
+    version: '0.1.2243', metric: 'cross-checked-claims', value: 22,
+    source: '[auto] 直近30日のコミット本文で「別の手段でも確かめた」と書かれた回数',
+    note: 'コミット本文の言い回しを直近30日で数える値(0.1.2120 の注記と同じ理由)で性能は表さない。この版の不具合は実機の状態速報の中で、別の計器(起動の年表・起動回数)と照合して見つけた'
   })
 ]);

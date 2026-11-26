@@ -6926,6 +6926,16 @@
       ]
     },
     {
+      "file": "src/lib/elementValuesMemo.js",
+      "featureCount": 1,
+      "features": [
+        "popup"
+      ],
+      "labels": [
+        "ポップアップ(応援レーン)"
+      ]
+    },
+    {
       "file": "src/lib/enrichmentAvatarFallback.js",
       "featureCount": 1,
       "features": [
@@ -9637,6 +9647,16 @@
     },
     {
       "file": "src/lib/rememberedAvatarIndex.js",
+      "featureCount": 1,
+      "features": [
+        "popup"
+      ],
+      "labels": [
+        "ポップアップ(応援レーン)"
+      ]
+    },
+    {
+      "file": "src/lib/replayClassAnimation.js",
       "featureCount": 1,
       "features": [
         "popup"

@@ -145,6 +145,9 @@ const DOM_ATTR_DISCONNECT_BASELINE = new Set([
 ]);
 
 const STORAGE_DISCONNECT_BASELINE = new Set([
+  // 0.1.2243: 書き手も読み手も src/lib/platform/followerSampleStore.js にある(writeSample の set({ [key]: next }) と
+  //   readStoredFollowerSamples / marketing-export-entry.js の get)。計算した鍵なので走査が書き手を拾えない
+  'fn:followerSamplesStorageKey',
   // 0.1.2057: 書き手は background-entry.js の set({ nls_stall_summary_v1: ... })(連想配列の鍵なので走査が拾えない)・読み手は status-entry.js
   'nls_stall_summary_v1',
   'KEY_ANONYMOUS_IDENTICON_ENABLED', 'KEY_AUTOPATROL_ENABLED', 'KEY_AUTOPATROL_STATE',

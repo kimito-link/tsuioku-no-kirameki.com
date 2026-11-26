@@ -759,6 +759,7 @@
 | `src/lib/domTreeCensus.js` | 1 | ポップアップ(応援レーン) |
 | `src/lib/domWriteIfChanged.js` | 1 | ポップアップ(応援レーン) |
 | `src/lib/effectDetailCells.js` | 1 | 状態速報ページ |
+| `src/lib/elementValuesMemo.js` | 1 | ポップアップ(応援レーン) |
 | `src/lib/enrichmentAvatarFallback.js` | 1 | 記録エンジン(watchページ常駐) |
 | `src/lib/errorAutoDiagnosis.js` | 1 | ポップアップ(応援レーン) |
 | `src/lib/eventLiveBoardHtml.js` | 1 | ポップアップ(応援レーン) |
@@ -1031,6 +1032,7 @@
 | `src/lib/refreshStageClock.js` | 1 | ポップアップ(応援レーン) |
 | `src/lib/refreshTaskGuard.js` | 1 | ポップアップ(応援レーン) |
 | `src/lib/rememberedAvatarIndex.js` | 1 | ポップアップ(応援レーン) |
+| `src/lib/replayClassAnimation.js` | 1 | ポップアップ(応援レーン) |
 | `src/lib/reportCommentsCsv.js` | 1 | ポップアップ(応援レーン) |
 | `src/lib/reportCommentsTableSection.js` | 1 | ポップアップ(応援レーン) |
 | `src/lib/reportCompleteVoice.js` | 1 | ポップアップ(応援レーン) |
