@@ -496,7 +496,9 @@ function ytTrustedStartedAt(sum, videoId, all) {
 export function ytSummaryToNicoSnapshot(sum, videoId, tabTitle, all) {
   const lv = pseudoLvForVideoId(videoId);
   // null を Number() すると 0 になり「0人」と出てしまうので、数のときだけ使う
-  const viewers = typeof sum?.concurrentViewers === 'number' ? sum.concurrentViewers : NaN;
+  const viewers = sum?.contentKind === 'video'
+    ? NaN
+    : typeof sum?.concurrentViewers === 'number' ? sum.concurrentViewers : NaN;
   // 配信の本当の開始時刻(ページの「ライブ配信開始日」)。記録を始めた時刻で代わりにすると、
   // 長い配信を開いた直後に「経過 0分」になる。分からないあいだは出さない。
   const trustedStart = ytTrustedStartedAt(sum, videoId, all);

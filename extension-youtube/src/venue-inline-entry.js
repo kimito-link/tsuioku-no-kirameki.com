@@ -119,35 +119,9 @@ function ensureBehaviorBoardStyle() {
 }
 
 /** @param {string} pageKey */
-function paintViewerBehaviorBoard(pageKey) {
-  try {
-    const existing = document.getElementById(BEHAVIOR_BOARD_ID);
-    if (!pageKey || document.getElementById(VIDEO_WATCH_CARD_ID)) {
-      existing?.remove();
-      return;
-    }
-    void chrome.storage.local.get(KEY_VIEWER_BEHAVIOR_BOARD).then((bag) => {
-      const wrap = bag?.[KEY_VIEWER_BEHAVIOR_BOARD];
-      const html = wrap && wrap.kind === 'live' && (wrap.pageKey === pageKey || viewerBehaviorWrapMatchesUrl(wrap, String(location.href || ''))) ? viewerBehaviorBoardInnerHtml(wrap.board) : '';
-      const el = document.getElementById(BEHAVIOR_BOARD_ID);
-      if (!html || document.getElementById(VIDEO_WATCH_CARD_ID)) {
-        el?.remove();
-        return;
-      }
-      ensureBehaviorBoardStyle();
-      if (el) {
-        if (el.innerHTML === html) return;
-        el.innerHTML = html;
-        return;
-      }
-      const box = document.createElement('div');
-      box.id = BEHAVIOR_BOARD_ID;
-      box.innerHTML = html;
-      (document.body || document.documentElement).appendChild(box);
-    }).catch(() => {});
-  } catch {
-    /* ボードが出せなくても会場の数字は出す */
-  }
+function paintViewerBehaviorBoard(_pageKey) {
+  // ページのコメント欄や映像の上には浮かせない。横の欄と会場の自分の欄だけに出す。
+  try { document.getElementById(BEHAVIOR_BOARD_ID)?.remove(); } catch { /* 会場の数字は出す */ }
 }
 
 
@@ -177,35 +151,9 @@ function ensureVideoWatchCardStyle() {
 }
 
 /** @param {string} vid */
-function paintVideoWatchCard(vid) {
-  try {
-    const existing = document.getElementById(VIDEO_WATCH_CARD_ID);
-    if (!vid) {
-      existing?.remove();
-      return;
-    }
-    void chrome.storage.local.get(KEY_YT_VIDEO_WATCH_CARD).then((bag) => {
-      const wrap = bag?.[KEY_YT_VIDEO_WATCH_CARD];
-      const html = wrap && wrap.videoId === vid ? ytVideoWatchCardInnerHtml(wrap.card) : '';
-      const el = document.getElementById(VIDEO_WATCH_CARD_ID);
-      if (!html) {
-        el?.remove();
-        return;
-      }
-      ensureVideoWatchCardStyle();
-      if (el) {
-        if (el.innerHTML === html) return;
-        el.innerHTML = html;
-        return;
-      }
-      const box = document.createElement('div');
-      box.id = VIDEO_WATCH_CARD_ID;
-      box.innerHTML = html;
-      (document.body || document.documentElement).appendChild(box);
-    }).catch(() => {});
-  } catch {
-    /* カードが出せなくても会場は出す */
-  }
+function paintVideoWatchCard(_vid) {
+  // ページのコメント欄や映像の上には浮かせない。横の欄にだけ出す。
+  try { document.getElementById(VIDEO_WATCH_CARD_ID)?.remove(); } catch { /* 会場は出す */ }
 }
 
 function sync() {

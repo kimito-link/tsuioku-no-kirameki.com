@@ -107,6 +107,23 @@ export function concurrentViewersInInnertube(data, wantId) {
  * @param {number} depth
  * @returns {number | null}
  */
+function videoIdOfNode(node, inherited) {
+  if (!node || typeof node !== 'object') return inherited;
+  if (isVideoId(node.videoId)) return node.videoId;
+  const candidates = [
+    node.watchEndpoint?.videoId,
+    node.navigationEndpoint?.watchEndpoint?.videoId,
+    node.onTap?.innertubeCommand?.watchEndpoint?.videoId,
+    node.command?.watchEndpoint?.videoId,
+    node.currentVideoEndpoint?.watchEndpoint?.videoId,
+    node.endpoint?.watchEndpoint?.videoId,
+  ];
+  for (const c of candidates) {
+    if (isVideoId(c)) return c;
+  }
+  return inherited;
+}
+
 function walkCount(node, videoId, want, budget, depth) {
   if (!node || typeof node !== 'object' || depth > 40 || budget.n > MAX_NODES) return null;
   budget.n += 1;
@@ -117,7 +134,7 @@ function walkCount(node, videoId, want, budget, depth) {
     }
     return null;
   }
-  const vid = isVideoId(node.videoId) ? node.videoId : videoId;
+  const vid = videoIdOfNode(node, videoId);
   const renderer = node.videoViewCountRenderer;
   if (renderer && typeof renderer === 'object') {
     const count = concurrentFromVideoViewCountRenderer(renderer);

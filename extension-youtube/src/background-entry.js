@@ -1533,6 +1533,8 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
             typeof payload.concurrentViewers === 'number' ? payload.concurrentViewers : undefined,
           slotViewCount: typeof payload.slotViewCount === 'number' ? payload.slotViewCount : undefined,
           slotCommentCount: typeof payload.slotCommentCount === 'number' ? payload.slotCommentCount : undefined,
+          isLive: payload.isLive === true ? true : payload.isLive === false ? false : undefined,
+          isLiveContent: payload.isLiveContent === true ? true : payload.isLiveContent === false ? false : undefined,
           // そのサービス特有の公式の数字(イベント順位など)。付いていないときは前のまま(src/lib/platform/platformStats.js)
           ...(Object.prototype.hasOwnProperty.call(payload, 'platformStats') ? { platformStats: payload.platformStats ?? null } : {}),
           viewersRead: payload.viewersRead === false ? false : undefined,
@@ -1550,9 +1552,9 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
             ? classifyYtWatchContentKind({
                 url: payload.sourceUrl ? String(payload.sourceUrl) : '',
                 concurrentViewers: typeof payload.concurrentViewers === 'number' ? payload.concurrentViewers : null,
-                isLive: payload.contentKind === 'live' ? true : payload.contentKind === 'video' ? false : null,
+                isLive: payload.isLive === true ? true : payload.isLive === false ? false : payload.contentKind === 'live' ? true : payload.contentKind === 'video' ? false : null,
                 isLiveContent:
-                  payload.contentKind === 'live_replay' ? true : payload.contentKind === 'video' ? false : null,
+                  payload.isLiveContent === true ? true : payload.isLiveContent === false ? false : payload.contentKind === 'live_replay' ? true : payload.contentKind === 'video' ? false : null,
                 hasLiveChat: payload.contentKind === 'live',
                 hasLiveChatReplay: payload.contentKind === 'live_replay',
                 existingItemCount: summaries[videoId]?.itemCount,

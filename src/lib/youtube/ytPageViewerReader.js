@@ -73,6 +73,10 @@ export function startYtPageViewerReader() {
     const pageId = pageVideoId();
     if (pageId && pageId !== videoId) return;
     root.setAttribute('data-nl-yt-video-id', videoId);
+    if (root.getAttribute('data-nl-yt-is-live') === '0') {
+      root.removeAttribute('data-nl-yt-viewers');
+      return;
+    }
     root.setAttribute('data-nl-yt-viewers', String(Math.floor(count)));
   };
 
@@ -149,6 +153,7 @@ export function startYtPageViewerReader() {
     else if (isLive === false) root.setAttribute('data-nl-yt-is-live', '0');
     if (isLiveContent === true) root.setAttribute('data-nl-yt-is-live-content', '1');
     else if (isLiveContent === false) root.setAttribute('data-nl-yt-is-live-content', '0');
+    if (isLive === false) root.removeAttribute('data-nl-yt-viewers');
     const viewersAttr = root.getAttribute('data-nl-yt-viewers');
     const viewersN = viewersAttr && /^\d+$/.test(viewersAttr) ? Number(viewersAttr) : null;
     const kind = classifyYtWatchContentKind({

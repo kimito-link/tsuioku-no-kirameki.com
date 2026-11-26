@@ -2817,7 +2817,10 @@ export function mountVenueBarButton(options = {}) {
       tanu: resolveVenueAssetUrl(VENUE_STAT_STRIP_FACE_PATHS.tanu)
     }
   });
-  header.append(title, ...(composeBox ? [composeBox] : []), headerRight, statStrip.el); // v0.1.1868 発言欄は中央
+  const behaviorSlot = document.createElement('div');
+  behaviorSlot.id = 'nlsb-viewer-behavior-slot';
+  header.append(title, ...(composeBox ? [composeBox] : []), headerRight, statStrip.el, behaviorSlot); // v0.1.1868 発言欄は中央
+
 
   // 2026-07-01 会議(venue-role-separation フェーズ2 = 可視性回復): ひな壇の【上】に固定高の
   //   「応援者トップN」バー。868人の密集会場でも上位が必ず大きく見える(席の🥇🥈🥉が小さすぎる
@@ -7051,6 +7054,7 @@ export function mountVenueBarButton(options = {}) {
           historyById,
           historyReady: Object.keys(historyById).length > 0,
           nowMs: Date.now(),
+          platform: 'niconico',
         });
         if (typeof chrome !== 'undefined' && chrome.storage?.local) {
           await chrome.storage.local.set({
@@ -7636,8 +7640,10 @@ export function mountVenueBarButton(options = {}) {
           if (lv && !/nicovideo\.jp\/watch\//i.test(href)) return `https://live.nicovideo.jp/watch/${lv}`;
           return href;
         },
-        placement: 'overlay',
+        placement: 'flow',
         sources: 'live',
+        collapsed: true,
+        mountParent: document.getElementById('nlsb-viewer-behavior-slot'),
         skipIfVideoCardId: 'nlsb-video-watch-card',
       });
     }

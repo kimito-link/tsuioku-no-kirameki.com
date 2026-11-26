@@ -8,7 +8,26 @@
 
 export const VIEWER_BEHAVIOR_TITLE = '視聴者の行動';
 export const VIEWER_BEHAVIOR_ROW_CAP = 20;
+export const VIEWER_BEHAVIOR_GRID_CAP = 80;
 export const VIEWER_BEHAVIOR_TIME_ZONE = 'Asia/Tokyo';
+export const VIEWER_BEHAVIOR_ANON_ID = '__anon__';
+export const VIEWER_BEHAVIOR_FALLBACK_AVATAR = 'https://secure-dcdn.cdn.nimg.jp/nicoaccount/usericon/defaults/blank.jpg';
+
+/**
+ * ニコ生の 184 / a: / 「匿名」「匿名938」など、一人ずつ並べない匿名か。
+ * YouTube の UC や @名前は匿名にしない。
+ * @param {unknown} id
+ * @param {unknown} [name]
+ */
+export function isAnonymousViewer(id, name) {
+  const i = String(id == null ? '' : id).trim();
+  const n = String(name == null ? '' : name).replace(/\s+/g, ' ').trim();
+  if (!i || i === VIEWER_BEHAVIOR_ANON_ID) return true;
+  if (/^(__anon_|anon:|a:)/i.test(i)) return true;
+  if (/^184$/.test(i)) return true;
+  if (/^匿名\d*$/.test(n) || n === '184' || n === '匿名さん') return true;
+  return false;
+}
 
 /**
  * @typedef {{
@@ -284,8 +303,16 @@ export function buildViewerBehaviorRow(person, history, opts = {}) {
  * @returns {number}
  */
 function compareBehaviorRows(a, b) {
-  const rank = (r) => (r.relation === 'regular' ? 0 : r.relation === 'new' ? 1 : 2);
-  if (rank(a) !== rank(b)) return rank(a) - rank(b);
+  // なじみ → ギフトを贈った人 → ほか → 匿名の1枚
+  const anonA = a.isAnonymous ? 1 : 0;
+  const anonB = b.isAnonymous ? 1 : 0;
+  if (anonA !== anonB) return anonA - anonB;
+  const regularA = a.relation === 'regular' ? 0 : 1;
+  const regularB = b.relation === 'regular' ? 0 : 1;
+  if (regularA !== regularB) return regularA - regularB;
+  const giftedA = (a.giftCount || 0) > 0 || (a.knownAmountJpy || 0) > 0 ? 0 : 1;
+  const giftedB = (b.giftCount || 0) > 0 || (b.knownAmountJpy || 0) > 0 ? 0 : 1;
+  if (giftedA !== giftedB) return giftedA - giftedB;
   const giftA = a.knownAmountJpy || 0;
   const giftB = b.knownAmountJpy || 0;
   if (giftA !== giftB) return giftB - giftA;
@@ -327,55 +354,129 @@ export function buildViewerBehaviorBoard(input) {
   const historyReady = src.historyReady != null ? !!src.historyReady : historyCount > 0;
   const cap = Number.isFinite(Number(src.cap)) && Number(src.cap) > 0
     ? Math.floor(Number(src.cap))
-    : VIEWER_BEHAVIOR_ROW_CAP;
-  /** @type {Map<string, ViewerBehaviorVisiblePerson>} */
+    : VIEWER_BEHAVIOR_GRID_CAP;
+  /** @type {Map<string, ViewerBehaviorVisiblePerson & { pending?: boolean | null, avatarUrl?: string, commentAnchor?: string, anonymousCount?: number }>} */
   const byId = new Map();
+  /** @type {{ commentCount: number, giftCount: number, knownAmountJpy: number, at: number, pendingCount: number, people: number }} */
+  const anonAcc = { commentCount: 0, giftCount: 0, knownAmountJpy: 0, at: 0, pendingCount: 0, people: 0 };
+  let pendingKnown = false;
+  let pendingTotal = 0;
   for (const p of visible) {
-    const id = cleanId(p?.id);
-    if (!id) continue;
-    const prev = byId.get(id);
+    const rawId = cleanId(p?.id);
+    const name = String(p?.name || '').replace(/\s+/g, ' ').trim();
+    const commentCount = nonNegIntOrNull(p?.commentCount) ?? 1;
+    const giftCount = nonNegIntOrNull(p?.giftCount);
+    const knownAmountJpy = nonNegIntOrNull(p?.knownAmountJpy);
+    const at = positiveMsOrNull(p?.at);
+    const pending = p?.pending === true ? true : p?.pending === false ? false : null;
+    if (pending != null) pendingKnown = true;
+    if (isAnonymousViewer(rawId, name)) {
+      anonAcc.people += 1;
+      anonAcc.commentCount += commentCount;
+      if (giftCount != null) anonAcc.giftCount += giftCount;
+      if (knownAmountJpy != null) anonAcc.knownAmountJpy += knownAmountJpy;
+      if (at != null && at > anonAcc.at) anonAcc.at = at;
+      if (pending === true) anonAcc.pendingCount += 1;
+      if (pending === true) pendingTotal += 1;
+      continue;
+    }
+    if (!rawId) continue;
+    if (pending === true) pendingTotal += 1;
+    const prev = byId.get(rawId);
     if (!prev) {
-      byId.set(id, {
-        id,
-        name: String(p?.name || '').replace(/\s+/g, ' ').trim(),
-        commentCount: nonNegIntOrNull(p?.commentCount) ?? 1,
-        giftCount: nonNegIntOrNull(p?.giftCount),
-        knownAmountJpy: nonNegIntOrNull(p?.knownAmountJpy),
-        at: positiveMsOrNull(p?.at),
+      byId.set(rawId, {
+        id: rawId,
+        name,
+        commentCount,
+        giftCount,
+        knownAmountJpy,
+        at,
+        pending,
+        avatarUrl: String(p?.avatarUrl || '').trim(),
+        commentAnchor: String(p?.commentAnchor || '').trim(),
       });
       continue;
     }
-    prev.commentCount = (prev.commentCount || 0) + (nonNegIntOrNull(p?.commentCount) ?? 1);
-    const g = nonNegIntOrNull(p?.giftCount);
-    if (g != null) prev.giftCount = (prev.giftCount || 0) + g;
-    const amt = nonNegIntOrNull(p?.knownAmountJpy);
-    if (amt != null) prev.knownAmountJpy = (prev.knownAmountJpy || 0) + amt;
-    const at = positiveMsOrNull(p?.at);
+    prev.commentCount = (prev.commentCount || 0) + commentCount;
+    if (giftCount != null) prev.giftCount = (prev.giftCount || 0) + giftCount;
+    if (knownAmountJpy != null) prev.knownAmountJpy = (prev.knownAmountJpy || 0) + knownAmountJpy;
     if (at != null && (prev.at == null || at > prev.at)) prev.at = at;
-    const name = String(p?.name || '').replace(/\s+/g, ' ').trim();
     if (name && name.length > String(prev.name || '').length) prev.name = name;
+    if (!prev.avatarUrl && p?.avatarUrl) prev.avatarUrl = String(p.avatarUrl).trim();
+    if (!prev.commentAnchor && p?.commentAnchor) prev.commentAnchor = String(p.commentAnchor).trim();
+    if (pending === true) prev.pending = true;
   }
   const rows = [];
   for (const person of byId.values()) {
     const raw = histOf(person.id);
     const history = raw ? historyFromCommenterIndexEntry(raw) : null;
-    rows.push(buildViewerBehaviorRow(person, history, { historyReady, nowMs: src.nowMs }));
+    const row = buildViewerBehaviorRow(person, history, { historyReady, nowMs: src.nowMs });
+    row.avatarUrl = String(person.avatarUrl || '').trim();
+    row.commentAnchor = String(person.commentAnchor || '').trim();
+    row.pending = person.pending === true;
+    row.isAnonymous = false;
+    row.anonymousCount = 0;
+    rows.push(row);
+  }
+  if (anonAcc.people > 0) {
+    const row = buildViewerBehaviorRow(
+      {
+        id: VIEWER_BEHAVIOR_ANON_ID,
+        name: '匿名',
+        commentCount: anonAcc.commentCount,
+        giftCount: anonAcc.giftCount || null,
+        knownAmountJpy: anonAcc.knownAmountJpy || null,
+        at: anonAcc.at || null,
+      },
+      null,
+      { historyReady: false, nowMs: src.nowMs },
+    );
+    row.name = `匿名 ${anonAcc.people.toLocaleString('ja-JP')}人`;
+    row.relation = 'unknown';
+    row.relationLabel = '匿名';
+    row.isAnonymous = true;
+    row.anonymousCount = anonAcc.people;
+    row.pending = anonAcc.pendingCount > 0;
+    row.avatarUrl = '';
+    row.commentAnchor = '';
+    row.factLine = [
+      `いま見えている匿名 ${anonAcc.people.toLocaleString('ja-JP')} 人をまとめています`,
+      `コメント ${anonAcc.commentCount.toLocaleString('ja-JP')}`,
+      anonAcc.giftCount > 0
+        ? (anonAcc.knownAmountJpy > 0
+          ? `ギフト ${anonAcc.giftCount.toLocaleString('ja-JP')} 件 約¥${anonAcc.knownAmountJpy.toLocaleString('ja-JP')}`
+          : `ギフト ${anonAcc.giftCount.toLocaleString('ja-JP')} 件`)
+        : '',
+    ].filter(Boolean).join(' ・ ');
+    rows.push(row);
   }
   rows.sort(compareBehaviorRows);
-  const regularCount = rows.filter((r) => r.relation === 'regular').length;
-  const newCount = rows.filter((r) => r.relation === 'new').length;
-  const unknownCount = rows.filter((r) => r.relation === 'unknown').length;
-  const visibleCount = rows.length;
-  const truncated = visibleCount > cap;
-  const shown = rows.slice(0, cap);
-  let summary = 'いま見えているコメントの投稿者がまだいません。';
-  if (visibleCount > 0 && !historyReady) {
-    summary = `いま見えている人は ${visibleCount.toLocaleString('ja-JP')} 人です。このチャンネルの配信や動画を、このPCで記録すると、なじみか初めてかを見分けられます。`;
-  } else if (visibleCount > 0) {
-    summary = `なじみ ${regularCount.toLocaleString('ja-JP')} 人 / 初めて ${newCount.toLocaleString('ja-JP')} 人（いま見えている ${visibleCount.toLocaleString('ja-JP')} 人・このPCの記録）`;
-  } else if (historyReady) {
-    summary = 'いま見えている範囲に、照合できるコメントの投稿者はまだいません。コメントが読み込まれると更新します。';
+  const named = rows.filter((r) => !r.isAnonymous);
+  const regularCount = named.filter((r) => r.relation === 'regular').length;
+  const newCount = named.filter((r) => r.relation === 'new').length;
+  const unknownCount = named.filter((r) => r.relation === 'unknown').length;
+  const anonymousCount = anonAcc.people;
+  const visibleCount = named.length + anonymousCount;
+  const truncated = named.length > cap;
+  const shown = [...named.slice(0, cap), ...rows.filter((r) => r.isAnonymous)];
+  const pendingCount = pendingKnown ? pendingTotal : null;
+  const parts = [];
+  if (historyReady) {
+    parts.push(`なじみ ${regularCount.toLocaleString('ja-JP')}人`);
+    parts.push(`初めて ${newCount.toLocaleString('ja-JP')}人`);
+  } else if (named.length > 0) {
+    parts.push(`いま見えている人 ${named.length.toLocaleString('ja-JP')}人`);
   }
+  if (anonymousCount > 0) parts.push(`匿名 ${anonymousCount.toLocaleString('ja-JP')}人`);
+  if (pendingCount != null) parts.push(`未対応 ${pendingCount.toLocaleString('ja-JP')}件`);
+  let summary = parts.length ? parts.join(' / ') : 'いま見えているコメントの投稿者がまだいません。';
+  if (visibleCount > 0 && !historyReady && named.length > 0) {
+    summary = `${summary}。このチャンネルの配信や動画を、このPCで記録すると、なじみか初めてかを見分けられます。`;
+  }
+  // 合計は、いま見えているコメント・ギフトだけ（過去の配信の累計は行の説明に残す）
+  const commentsTotal = [...byId.values()].reduce((n, p) => n + (Number(p.commentCount) || 0), 0) + anonAcc.commentCount;
+  const giftCountTotal = [...byId.values()].reduce((n, p) => n + (Number(p.giftCount) || 0), 0) + anonAcc.giftCount;
+  const knownAmountTotal = [...byId.values()].reduce((n, p) => n + (Number(p.knownAmountJpy) || 0), 0) + anonAcc.knownAmountJpy;
   return {
     title: VIEWER_BEHAVIOR_TITLE,
     historyReady,
@@ -383,7 +484,17 @@ export function buildViewerBehaviorBoard(input) {
     regularCount,
     newCount,
     unknownCount,
+    anonymousCount,
+    pendingCount,
+    pendingKnown,
     summary,
+    commentsTotal,
+    giftCountTotal,
+    knownAmountTotal,
+    spend: src.spend || null,
+    takeHome: src.takeHome || null,
+    viewCount: Number.isFinite(Number(src.viewCount)) && Number(src.viewCount) >= 0 ? Math.floor(Number(src.viewCount)) : null,
+    platform: String(src.platform || '').trim() || '',
     rows: shown,
     truncated,
   };
@@ -408,30 +519,44 @@ export function viewerBehaviorBoardInnerHtml(board) {
   if (!board || typeof board !== 'object') return '';
   const esc = escapeViewerBehaviorHtml;
   const items = Array.isArray(board.rows) ? board.rows : [];
-  const lis = items
-    .map((row) => {
-      const facts = row.factLine
-        ? `<span class="nlsb-viewer-behavior__facts">${esc(row.factLine)}</span>`
-        : '';
-      return (
-        `<li class="nlsb-viewer-behavior__row" data-relation="${esc(row.relation)}">` +
-        `<span class="nlsb-viewer-behavior__name">${esc(row.name)}</span>` +
-        `<span class="nlsb-viewer-behavior__rel">${esc(row.relationLabel)}</span>` +
-        facts +
-        `</li>`
-      );
-    })
-    .join('');
+  const pendingKnown = board.pendingKnown === true;
+  const pendingCount = pendingKnown && board.pendingCount != null ? Number(board.pendingCount) : null;
+  const summary = String(board.summary || '').trim();
   const more = board.truncated
-    ? `<p class="nlsb-viewer-behavior__more">ほかの人は、いま見えている範囲の先頭 ${esc(String(items.length))} 人まで出しています。</p>`
+    ? `<p class="nlsb-viewer-behavior__more">ほかの人は、いま見えている範囲の先頭 ${esc(String(items.filter((r) => !r.isAnonymous).length))} 人まで出しています。</p>`
     : '';
-  const list = lis ? `<ul class="nlsb-viewer-behavior__list">${lis}</ul>` : '';
+  const totals = [];
+  if (board.commentsTotal > 0) totals.push(`コメント ${Number(board.commentsTotal).toLocaleString('ja-JP')} 件`);
+  if (board.giftCountTotal > 0) {
+    totals.push(
+      board.knownAmountTotal > 0
+        ? `ギフト ${Number(board.giftCountTotal).toLocaleString('ja-JP')} 件 約¥${Number(board.knownAmountTotal).toLocaleString('ja-JP')}`
+        : `ギフト ${Number(board.giftCountTotal).toLocaleString('ja-JP')} 件`,
+    );
+  }
+  if (board.spend && board.spend.text) totals.push(`${board.spend.label || '推定（視聴者の購入額）'} ${board.spend.text}`);
+  if (board.takeHome && board.takeHome.text) totals.push(`${board.takeHome.label || '推定（配信者の受取）'} ${board.takeHome.text}`);
+  const totalLine = totals.length
+    ? `<p class="nlsb-viewer-behavior__totals">${esc(totals.join(' / '))}</p>`
+    : '';
+  const pendingBtn = pendingCount != null
+    ? `<button type="button" class="nlsb-viewer-behavior__pending-toggle" data-pending-toggle="1" aria-pressed="false">未対応だけ見る</button>`
+    : '';
+  const scope = `<p class="nlsb-viewer-behavior__scope">いまページに読み込まれているコメントだけを見ています。</p>`;
+  // タイル本体は描画層が配信モードの paintStoryUserLaneDomFilled で足す。ここは器だけ。
   return (
-    `<section class="nlsb-viewer-behavior" aria-label="${esc(VIEWER_BEHAVIOR_TITLE)}">` +
+    `<section class="nlsb-viewer-behavior" data-collapsed="0" aria-label="${esc(VIEWER_BEHAVIOR_TITLE)}">` +
     `<h2 class="nlsb-viewer-behavior__title">${esc(board.title || VIEWER_BEHAVIOR_TITLE)}</h2>` +
-    `<p class="nlsb-viewer-behavior__summary">${esc(board.summary)}</p>` +
-    list +
+    `<button type="button" class="nlsb-viewer-behavior__summary-btn" data-summary-toggle="1" aria-expanded="true">${esc(summary)}</button>` +
+    `<div class="nlsb-viewer-behavior__body">` +
+    totalLine +
+    pendingBtn +
+    `<div data-stat-strip-host></div>` +
+    `<div data-live-lane-host></div>` +
+    `<div class="nlsb-viewer-behavior__detail" hidden></div>` +
     more +
+    scope +
+    `</div>` +
     `</section>`
   );
 }

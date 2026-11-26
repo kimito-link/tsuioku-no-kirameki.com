@@ -1115,6 +1115,19 @@ export function panelExtraChips(platformId, facts) {
       title: OFFICIAL,
     });
   }
+  if (id === 'youtube' && facts?.contentKind === 'video') {
+    const n = num(facts?.commentCount ?? facts?.slotCommentCount);
+    if (n != null) {
+      chips.unshift({
+        key: 'comments',
+        label: 'コメント',
+        text: formatInt(n),
+        unit: '件',
+        placeholder: false,
+        title: 'いまページに出ているコメントの件数です（このPCの記録ではありません）。',
+      });
+    }
+  }
   return chips;
 }
 

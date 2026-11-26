@@ -218,9 +218,15 @@ export function ytLiveFlagsFromPlayerOrInitial(data) {
 export function classifyYtWatchContentKind(signals) {
   const s = signals && typeof signals === 'object' ? signals : {};
   if (s.hasLiveChatReplay === true) return 'live_replay';
-  if (s.hasLiveChat === true) return 'live';
   if (s.isLive === true) return 'live';
-  if (typeof s.concurrentViewers === 'number' && Number.isFinite(s.concurrentViewers) && s.concurrentViewers >= 0) {
+  // 公式が「いまは配信ではない」と出しているときは、取り違えた同時視聴の数や残ったチャット枠で live にしない
+  if (s.hasLiveChat === true && s.isLive !== false) return 'live';
+  if (
+    s.isLive !== false &&
+    typeof s.concurrentViewers === 'number' &&
+    Number.isFinite(s.concurrentViewers) &&
+    s.concurrentViewers >= 0
+  ) {
     return 'live';
   }
   const items = Number(s.existingItemCount);
@@ -243,7 +249,7 @@ export function classifyYtWatchContentKind(signals) {
 }
 
 /**
- * @typedef {{ channelId: string, handle: string, name: string, amount: number | null, currency: string }} YtVideoCommentAuthor
+ * @typedef {{ channelId: string, handle: string, name: string, amount: number | null, currency: string, avatarUrl?: string, commentId?: string, commentCount?: number, creatorHeart?: boolean, creatorReply?: boolean, pending?: boolean, postedAtMs?: number | null }} YtVideoCommentAuthor
  */
 
 /**
@@ -363,28 +369,39 @@ function walkComments(node, out, seen, budget, depth, limit) {
 export function ytVideoCommentAuthorsFromDom(root, opts = {}) {
   const limit = Number.isFinite(Number(opts.limit)) ? Math.max(1, Math.floor(Number(opts.limit))) : 80;
   if (!root || typeof root.querySelectorAll !== 'function') return [];
-  /** @type {YtVideoCommentAuthor[]} */
-  const out = [];
-  const seen = new Set();
+  /** @type {Map<string, YtVideoCommentAuthor>} */
+  const byKey = new Map();
   const threads = root.querySelectorAll(
     'ytd-comment-thread-renderer, ytd-comment-view-model, ytd-comment-renderer, yt-comment-view-model',
   );
-  for (let i = 0; i < threads.length && out.length < limit; i += 1) {
+  for (let i = 0; i < threads.length; i += 1) {
     const el = threads[i];
     if (!el || typeof el.querySelector !== 'function') continue;
+    // スレッド器の中の個々のコメントを、親スレッドと二重に数えない
+    if (el.tagName && /^YTD-COMMENT-THREAD-RENDERER$/i.test(el.tagName)) {
+      // スレッド自体は投稿者リンクを持つが、内側の view-model を正とする
+      continue;
+    }
     let channelId = '';
     let handle = '';
+    let commentId = String(el.getAttribute?.('comment-id') || el.getAttribute?.('data-comment-id') || '').trim();
     const links = el.querySelectorAll('a[href]');
-    for (let j = 0; j < links.length && !channelId; j += 1) {
+    for (let j = 0; j < links.length; j += 1) {
       const href = String(links[j].getAttribute?.('href') || '');
-      const uc = href.match(/\/channel\/(UC[A-Za-z0-9_-]{22})/);
-      if (uc) channelId = uc[1];
-      const h = href.match(/\/(@[^/?#]+)/);
-      if (h && !handle) {
-        try {
-          handle = decodeURIComponent(h[1]);
-        } catch {
-          handle = h[1];
+      if (!channelId) {
+        const uc = href.match(/\/channel\/(UC[A-Za-z0-9_-]{22})/);
+        if (uc) channelId = uc[1];
+      }
+      if (!handle) {
+        const h = href.match(/\/(@[^/?#]+)/);
+        if (h) {
+          try { handle = decodeURIComponent(h[1]); } catch { handle = h[1]; }
+        }
+      }
+      if (!commentId) {
+        const lc = href.match(/[?&]lc=([^&]+)/);
+        if (lc) {
+          try { commentId = decodeURIComponent(lc[1]); } catch { commentId = lc[1]; }
         }
       }
     }
@@ -392,18 +409,75 @@ export function ytVideoCommentAuthorsFromDom(root, opts = {}) {
     const name = String(nameEl?.textContent || '').replace(/\s+/g, ' ').trim().slice(0, 80);
     const paidEl = el.querySelector('[id*="super-thanks"], [class*="super-thanks"], [class*="superThanks"], #paid-comment-chip, .paid-comment-chip');
     const paid = parseYtPaidCommentAmount({ amount: String(paidEl?.textContent || '').trim() });
+    const img = el.querySelector('#author-thumbnail img, yt-img-shadow img, img#img, #author-photo img');
+    const avatarUrl = String(
+      (img && typeof img.getAttribute === 'function' && (img.getAttribute('src') || img.getAttribute('data-src')))
+      || (img && img.src)
+      || '',
+    ).trim();
+    const creatorHeart = Boolean(el.querySelector('#creator-heart, ytd-creator-heart-renderer, [id*="creator-heart"], [class*="creator-heart"]'));
+    const creatorReply = Boolean(el.querySelector('ytd-author-comment-badge-renderer, #author-comment-badge, [class*="author-comment-badge"]'));
+    const pending = !creatorHeart && !creatorReply;
     const key = channelId || handle || (name ? `name:${name}` : '');
-    if (!key || seen.has(key)) continue;
-    seen.add(key);
-    out.push({
-      channelId,
-      handle,
-      name,
-      amount: paid ? paid.amount : null,
-      currency: paid ? paid.currency : '',
-    });
+    if (!key) continue;
+    const prev = byKey.get(key);
+    if (!prev) {
+      byKey.set(key, {
+        channelId,
+        handle,
+        name,
+        amount: paid ? paid.amount : null,
+        currency: paid ? paid.currency : '',
+        avatarUrl,
+        commentId: pending ? commentId : (commentId || ''),
+        commentCount: 1,
+        creatorHeart,
+        creatorReply,
+        pending,
+      });
+    } else {
+      prev.commentCount = (Number(prev.commentCount) || 1) + 1;
+      if (paid && (!prev.amount || paid.amount > prev.amount)) {
+        prev.amount = paid.amount;
+        prev.currency = paid.currency;
+      }
+      if (avatarUrl && !prev.avatarUrl) prev.avatarUrl = avatarUrl;
+      prev.creatorHeart = prev.creatorHeart || creatorHeart;
+      prev.creatorReply = prev.creatorReply || creatorReply;
+      if (pending && !prev.pending) {
+        prev.pending = true;
+        if (commentId) prev.commentId = commentId;
+      } else if (pending) {
+        prev.pending = true;
+        if (commentId && !prev.commentId) prev.commentId = commentId;
+      }
+      if (!pending && !prev.pending && commentId && !prev.commentId) prev.commentId = commentId;
+    }
+    if (byKey.size >= limit && !prev) break;
   }
-  return out;
+  return [...byKey.values()];
+}
+
+/**
+ * 画面の「N 件のコメント」から数を取る。読み込まれた範囲の見出しであり、記録の件数ではない。
+ * @param {ParentNode | null | undefined} root
+ * @returns {number | null}
+ */
+export function ytCommentCountFromDom(root) {
+  if (!root || typeof root.querySelector !== 'function') return null;
+  const els = root.querySelectorAll
+    ? root.querySelectorAll(
+        'ytd-comments-header-renderer #count, ytd-comments-header-renderer #title, ytd-comments-header-renderer, #comments #count, #comments #title, #leading-section',
+      )
+    : [];
+  for (let i = 0; i < els.length; i += 1) {
+    const text = String(els[i]?.textContent || '').replace(/\s+/g, ' ').trim();
+    const m = text.match(/([0-9][0-9,]*)\s*件のコメント/) || text.match(/([0-9][0-9,]*)\s*Comments/i);
+    if (!m) continue;
+    const n = Number(String(m[1]).replace(/,/g, ''));
+    if (Number.isFinite(n) && n >= 0 && n <= 50_000_000) return Math.floor(n);
+  }
+  return null;
 }
 
 /**
@@ -415,16 +489,22 @@ export function ytViewCountFromDom(root) {
   if (!root || typeof root.querySelector !== 'function') return null;
   const els = root.querySelectorAll
     ? root.querySelectorAll(
-        '#info-container yt-formatted-string, ytd-watch-info-text #tooltip, ytd-watch-info-text yt-formatted-string, span.view-count, #count .view-count, yt-formatted-string#info',
+        [
+          'ytd-watch-info-text #tooltip',
+          'ytd-watch-info-text yt-formatted-string',
+          'ytd-watch-info-text yt-attributed-string',
+          'ytd-watch-info-text #info',
+          'ytd-watch-info-text',
+          '#info-container yt-formatted-string',
+          '#info-container yt-attributed-string',
+          'yt-formatted-string#info',
+          'span.view-count',
+          '#count .view-count',
+        ].join(', '),
       )
     : [];
   for (let i = 0; i < els.length; i += 1) {
     const n = parseYtViewCountFromText(els[i]?.textContent);
-    if (n != null) return n;
-  }
-  if (typeof root.querySelector === 'function') {
-    const tooltip = root.querySelector('tp-yt-paper-tooltip, #tooltip');
-    const n = parseYtViewCountFromText(tooltip?.textContent);
     if (n != null) return n;
   }
   return null;

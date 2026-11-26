@@ -42,12 +42,21 @@ export function buildNicoVideoWatchCardModel(input) {
     visiblePeople: authors.map((a) => ({
       id: String(a?.userId || '').trim(),
       name: String(a?.name || '').trim(),
+      avatarUrl: String(a?.avatarUrl || '').trim(),
       commentCount: a?.commentCount,
+      giftCount: a?.giftCount,
+      knownAmountJpy: a?.knownAmountJpy,
       at: a?.postedAtMs,
+      pending: a?.pending,
+      commentAnchor: String(a?.commentAnchor || a?.commentId || '').trim(),
     })),
     historyById: rawHist || {},
     historyReady,
     nowMs: src.nowMs,
+    viewCount,
+    spend: src.spend || null,
+    takeHome: src.takeHome || null,
+    platform: 'niconico',
   });
   let recordedSummary = 'この投稿者の配信を、このPCではまだ記録していません。配信を開いて記録すると、動画のコメント欄と照合できます。';
   if (streamCount > 0) {

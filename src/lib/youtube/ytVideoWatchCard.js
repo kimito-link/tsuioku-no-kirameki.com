@@ -6,7 +6,12 @@
  * 【正本宣言】動画モードのカードに出す言葉はこのファイル
  */
 
-import { formatEstimatedViewerSpendDisplay, formatStreamerTakeHomeDisplay } from '../estimatedViewerSpend.js';
+import {
+  estimateYoutubeSupportSpendJpy,
+  estimateStreamerTakeHomeJpy,
+  formatEstimatedViewerSpendDisplay,
+  formatStreamerTakeHomeDisplay,
+} from '../estimatedViewerSpend.js';
 import { buildViewerBehaviorBoard, viewerBehaviorBoardInnerHtml } from '../viewerBehavior.js';
 import { matchVideoCommentersToLive, tallyVisibleSuperThanks } from './ytVideoWatchMeta.js';
 
@@ -56,6 +61,8 @@ export function buildYtVideoWatchCardModel(input) {
   const itemCount = Math.max(0, Math.floor(Number(recorded.itemCount) || 0));
   const overlap = matchVideoCommentersToLive(src.videoAuthors || [], src.livePeople || {});
   const thanks = tallyVisibleSuperThanks(src.videoAuthors || []);
+  const spend = src.spend || formatEstimatedViewerSpendDisplay(estimateYoutubeSupportSpendJpy(thanks.amounts));
+  const takeHome = src.takeHome || formatStreamerTakeHomeDisplay('youtube', estimateStreamerTakeHomeJpy('youtube', { amounts: thanks.amounts }));
   let recordedSummary = 'このチャンネルの配信を、このPCではまだ記録していません。配信を開いて記録すると、動画のコメント欄と照合できます。';
   if (streamCount > 0) {
     recordedSummary = `このチャンネルの配信を、このPCで ${streamCount.toLocaleString('ja-JP')} 本記録しています（コメント合計 ${itemCount.toLocaleString('ja-JP')} 件）。`;
@@ -83,14 +90,21 @@ export function buildYtVideoWatchCardModel(input) {
     visiblePeople: authors.map((a) => ({
       id: String(a?.channelId || a?.id || '').trim(),
       name: String(a?.name || '').trim(),
-      commentCount: 1,
+      avatarUrl: String(a?.avatarUrl || '').trim(),
+      commentCount: Number(a?.commentCount) > 0 ? Math.floor(Number(a.commentCount)) : 1,
       giftCount: Number(a?.amount) > 0 ? 1 : null,
       knownAmountJpy: String(a?.currency || '').toUpperCase() === 'JPY' && Number(a?.amount) > 0 ? Math.floor(Number(a.amount)) : null,
       at: a?.postedAtMs,
+      pending: a?.pending === true,
+      commentAnchor: String(a?.commentId || '').trim(),
     })),
     historyById: livePeople,
     historyReady: streamCount > 0 || histCount > 0,
     nowMs: src.nowMs,
+    viewCount,
+    spend,
+    takeHome,
+    platform: 'youtube',
   });
 
   return {
@@ -107,8 +121,8 @@ export function buildYtVideoWatchCardModel(input) {
     matchSummary,
     matchedNames,
     superThanksCount: thanks.count,
-    spend: src.spend || null,
-    takeHome: src.takeHome || null,
+    spend,
+    takeHome,
     behavior,
   };
 }

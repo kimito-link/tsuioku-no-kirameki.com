@@ -85,12 +85,15 @@ export function mergeYtStreamSummary(existing, patch, nowMs = Date.now()) {
   // 50,000,000 を超える数は読み違い(2026-11-03 実機で桁が連なった数が入った)。古い記録に残っていても捨てる。
   const plausible = (/** @type {unknown} */ v) =>
     typeof v === 'number' && Number.isFinite(v) && v >= 0 && v <= 50_000_000;
+  const officialVideo = patch?.isLive === false && patch?.isLiveContent === false;
   const gotCount = plausible(patch?.concurrentViewers);
-  const concurrentViewers = gotCount
-    ? Math.floor(/** @type {number} */ (patch.concurrentViewers))
-    : plausible(prev.concurrentViewers)
-      ? Math.floor(prev.concurrentViewers)
-      : null;
+  const concurrentViewers = officialVideo
+    ? null
+    : gotCount
+      ? Math.floor(/** @type {number} */ (patch.concurrentViewers))
+      : plausible(prev.concurrentViewers)
+        ? Math.floor(prev.concurrentViewers)
+        : null;
   // 読めた時刻は、数が取れたときだけ進める。コメント件数だけの更新では古くしない。
   // viewersRead:false は「今の読みは失敗」。前の数は残し、画面は「N分前」と出す。
   const readFailed = patch?.viewersRead === false && !gotCount;
@@ -179,13 +182,16 @@ export function mergeYtStreamSummary(existing, patch, nowMs = Date.now()) {
   };
   const patchKind = kindOf(patch?.contentKind);
   const prevKind = kindOf(prev.contentKind);
-  // 配信・アーカイブと分かったあとに、通常動画へ落とさない（開始直後の取り違え防止）
+  // 配信・アーカイブと分かったあとに、通常動画へ落とさない（開始直後の取り違え防止）。
+  // ただし公式が isLive/isLiveContent とも false なら、取り違えた live を通常動画へ直す。
   const contentKind =
-    patchKind === 'live' || patchKind === 'live_replay'
-      ? patchKind
-      : prevKind === 'live' || prevKind === 'live_replay'
-        ? prevKind
-        : patchKind || prevKind;
+    officialVideo
+      ? 'video'
+      : patchKind === 'live' || patchKind === 'live_replay'
+        ? patchKind
+        : prevKind === 'live' || prevKind === 'live_replay'
+          ? prevKind
+          : patchKind || prevKind;
 
   return {
     videoId,
