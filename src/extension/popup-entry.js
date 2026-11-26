@@ -4430,7 +4430,7 @@ function maybeFlushVerifiedAvatars() {
 const storyAvatarLoadGuard = createSupportAvatarLoadGuard({
   fallbackSrc: STORY_REMOTE_FAILED_PLACEHOLDER_IMG,
   // 2026-10-13: 失敗(アイコン未設定の404等)の代替顔は会場と共通(白丸でなく、その人ごとのゆっくり顔)。正本=avatarFallbackFromUrl.js
-  fallbackSrcFor: avatarFallbackFaceForUrl, // v0.1.2248: Twitch 等の失敗も白丸でなくゆっくり顔
+  fallbackSrcFor: avatarFallbackFaceForUrl, sharedMemory: true, // v0.1.2248: Twitch 等の失敗も白丸でなくゆっくり顔 / v0.1.2251: 動画の顔の列と覚えを共有
   onFallbackApplied: applyStoryAvatarTvFallbackClass,
   onRemoteSuccess: (img) => {
     removeStoryAvatarTvFallbackClass(img);

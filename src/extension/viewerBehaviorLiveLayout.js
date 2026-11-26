@@ -18,6 +18,7 @@ import { anonymousIdenticonDataUrl } from '../lib/anonymousIdenticon.js';
 const laneAvatarGuard = createSupportAvatarLoadGuard({
   fallbackSrc: VIEWER_BEHAVIOR_FALLBACK_AVATAR,
   fallbackSrcFor: avatarFallbackFaceForUrl,
+  sharedMemory: true, // v0.1.2251: 横の欄(POP)と同じ覚え=同じ URL を2回確かめない
 });
 
 /**

@@ -464,7 +464,7 @@ const VENUE_FALLBACK_GIFT_EMPTY_HTML = buildVenueFallbackGiftEmptyNoteHtml();
 const venueAvatarFallbackFor = avatarFallbackFaceForUrl; // v0.1.2248: POP と同じ(Twitch 等の失敗も白丸にしない)
 const venueAvatarLoadGuard = createSupportAvatarLoadGuard({
   fallbackSrc: NICONICO_OFFICIAL_DEFAULT_USERICON_HTTPS,
-  fallbackSrcFor: venueAvatarFallbackFor,
+  fallbackSrcFor: venueAvatarFallbackFor, sharedMemory: true, // v0.1.2251: 共有の覚え(会場のページでは会場だけが使う)
   onFallbackApplied: applyStoryAvatarTvFallbackClass,
   onRemoteSuccess: removeStoryAvatarTvFallbackClass,
   retryPolicy: {}

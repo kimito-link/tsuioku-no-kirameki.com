@@ -509,7 +509,7 @@ let _lastActionSig = ' init';
  *   ここで status 専用に1つ作る(状態=成功/失敗 URL セットは status の鏡描画ぶんだけ保持)。
  */
 const _laneMirrorAvatarLoadGuard = createSupportAvatarLoadGuard({
-  fallbackSrc: NICONICO_OFFICIAL_DEFAULT_USERICON_HTTPS, fallbackSrcFor: avatarFallbackFaceForUrl, // v0.1.2248: POP・会場と同じ代替顔
+  fallbackSrc: NICONICO_OFFICIAL_DEFAULT_USERICON_HTTPS, fallbackSrcFor: avatarFallbackFaceForUrl, sharedMemory: true, // v0.1.2248: POP・会場と同じ代替顔 / v0.1.2251: 共有の覚え
   onFallbackApplied: applyStoryAvatarTvFallbackClass,
   onRemoteSuccess: removeStoryAvatarTvFallbackClass
 });
