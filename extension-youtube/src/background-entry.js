@@ -1675,10 +1675,7 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
       //   (それまでは入口の確認が無く、同じコメントが2つの配信に残っていた・2026-11-07 実データ83件)。
       const res = await appendYtStreamCommentsIdb(videoId, items, { claimFromOthers: true });
       rememberYtCommentOwners(videoId, { newlyAdded: res.newlyAdded });
-      if (res.newlyAdded.length) {
-        const sum = (await ensureSummaryMem())[videoId];
-        rememberChannelCommenters(sum?.broadcasterChannelId, res.newlyAdded, { streamId: videoId, contentKind: 'live' });
-      }
+      // ライブ／取り込み中に索引や行動ボードを storage へ書くと、横の欄の全体更新が走って内訳がちらつく。ライブでは書かない。
       const reclaimed = Array.isArray(res.reclaimed) ? res.reclaimed : [];
       for (const r of reclaimed) noteYtCommentOwner(r.id, videoId);
       /** @type {Record<string, number>} */
@@ -1865,10 +1862,7 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
         }
       }
       rememberYtCommentOwners(videoId, idbResult);
-      if (idbResult?.newlyAdded?.length) {
-        rememberChannelCommenters(prevSummary?.broadcasterChannelId, idbResult.newlyAdded, { streamId: videoId, contentKind: 'live' });
-      }
-      noteLiveVisiblePeople(videoId, prevSummary?.broadcasterChannelId, incoming);
+      // ライブでは視聴者の行動ボード／投稿者索引を storage に書かない（横の欄のちらつき防止）。
       if (Date.now() - lastIngestDiagAt > 30000) {
         lastIngestDiagAt = Date.now();
         void chrome.storage.local.set({

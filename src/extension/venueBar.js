@@ -69,10 +69,6 @@ import {
   unusedSeatNeedsCleanup,
 } from '../lib/venuePaintSchedule.js';
 import { REMEMBERED_EMOTE_KEYS, rememberedEmoteChanges, rememberedEmoteDict } from '../lib/platform/streamEmotes.js';
-import { KEY_NICO_CHANNEL_COMMENTERS, KEY_VIEWER_BEHAVIOR_BOARD } from '../lib/storageKeys.js';
-import { buildViewerBehaviorBoard, resolveViewerBehaviorAvatarUrl } from '../lib/viewerBehavior.js';
-import { applyNicoCommentsToChannelIndex, peopleInNicoChannelCommenterIndex } from '../lib/niconico/nicoChannelCommenterIndex.js';
-import { installViewerBehaviorBoardFromStorage } from './viewerBehaviorBoardPaint.js';
 
 /**
  * 会場の参加者ソース切替。
@@ -2817,10 +2813,7 @@ export function mountVenueBarButton(options = {}) {
       tanu: resolveVenueAssetUrl(VENUE_STAT_STRIP_FACE_PATHS.tanu)
     }
   });
-  const behaviorSlot = document.createElement('div');
-  behaviorSlot.id = 'nlsb-viewer-behavior-slot';
-  header.append(title, ...(composeBox ? [composeBox] : []), headerRight, statStrip.el, behaviorSlot); // v0.1.1868 発言欄は中央
-
+  header.append(title, ...(composeBox ? [composeBox] : []), headerRight, statStrip.el); // v0.1.1868 発言欄は中央
 
   // 2026-07-01 会議(venue-role-separation フェーズ2 = 可視性回復): ひな壇の【上】に固定高の
   //   「応援者トップN」バー。868人の密集会場でも上位が必ず大きく見える(席の🥇🥈🥉が小さすぎる
@@ -6986,91 +6979,7 @@ export function mountVenueBarButton(options = {}) {
    * @param {ReadonlyArray<Record<string, unknown>>} rows
    * @param {string} [source] 計器用: 取り込み元(persistCommentRows の source)
    */
-  /** @type {Map<string, Map<string, { id: string, name: string, commentCount: number, giftCount: number | null, knownAmountJpy: number | null, at: number }>>} */
-  const nicoVisibleByLive = new Map();
-  /** @type {Set<string>} */
-  const nicoIndexedRowKeys = new Set();
-
-  /**
-   * ニコ生の会場に届いた新着から、視聴者の行動ボードを書く。記録の保存結果は変えない。
-   * @param {string} incomingLiveId
-   * @param {ReadonlyArray<Record<string, unknown>>} rows
-   */
-  const noteNicoViewerBehavior = (incomingLiveId, rows) => {
-    const lid = String(incomingLiveId || '').trim();
-    const list = Array.isArray(rows) ? rows : [];
-    const owner = String(_lastBroadcasterUid || '').trim();
-    if (!lid || !list.length) return;
-    let map = nicoVisibleByLive.get(lid);
-    if (!map) {
-      map = new Map();
-      nicoVisibleByLive.set(lid, map);
-    }
-    /** @type {any[]} */
-    const freshForIndex = [];
-    for (const row of list) {
-      const id = String(row?.userId || '').trim();
-      if (!id) continue;
-      const dedupe = `${lid}:${String(row?.dkey || row?.commentNo || '')}:${id}:${Number(row?.capturedAt || 0)}`;
-      const name = String(row?.nickname || row?.name || '').replace(/\s+/g, ' ').trim();
-      const at = Number(row?.capturedAt || row?.postedAtMs || 0) || 0;
-      const gift = row?.isGift === true || row?.gift != null || String(row?.kind || '') === 'gift';
-      const pt = Number(row?.amount ?? row?.point ?? row?.giftPoint ?? (row?.gift && typeof row.gift === 'object' ? row.gift.point : 0));
-      const amt = Number.isFinite(pt) && pt > 0 ? Math.floor(pt) : null;
-      const avatarRaw = String(row?.avatarUrl || row?.avatar || row?.iconUrl || row?.userIconUrl || '').trim();
-      const prev = map.get(id) || { id, name: '', commentCount: 0, giftCount: null, knownAmountJpy: null, at: 0, avatarUrl: '' };
-      prev.commentCount += 1;
-      if (name && name.length >= String(prev.name || '').length) prev.name = name;
-      if (at > (prev.at || 0)) prev.at = at;
-      if (gift) prev.giftCount = (prev.giftCount || 0) + 1;
-      if (amt != null) prev.knownAmountJpy = (prev.knownAmountJpy || 0) + amt;
-      prev.avatarUrl = resolveViewerBehaviorAvatarUrl(id, avatarRaw || prev.avatarUrl);
-      map.set(id, prev);
-      if (!nicoIndexedRowKeys.has(dedupe)) {
-        nicoIndexedRowKeys.add(dedupe);
-        freshForIndex.push(row);
-      }
-    }
-    if (map.size > 200) {
-      const ids = [...map.values()].sort((a, b) => (a.at || 0) - (b.at || 0));
-      for (let i = 0; i < ids.length - 200; i += 1) map.delete(ids[i].id);
-    }
-    if (nicoIndexedRowKeys.size > 8000) nicoIndexedRowKeys.clear();
-    void (async () => {
-      try {
-        let historyById = {};
-        if (owner && freshForIndex.length && typeof chrome !== 'undefined' && chrome.storage?.local) {
-          const bag = await chrome.storage.local.get(KEY_NICO_CHANNEL_COMMENTERS);
-          const next = applyNicoCommentsToChannelIndex(bag?.[KEY_NICO_CHANNEL_COMMENTERS], owner, freshForIndex, Date.now(), {
-            streamId: lid,
-            contentKind: 'live',
-          });
-          await chrome.storage.local.set({ [KEY_NICO_CHANNEL_COMMENTERS]: next });
-          historyById = peopleInNicoChannelCommenterIndex(next, owner);
-        } else if (owner && typeof chrome !== 'undefined' && chrome.storage?.local) {
-          const bag = await chrome.storage.local.get(KEY_NICO_CHANNEL_COMMENTERS);
-          historyById = peopleInNicoChannelCommenterIndex(bag?.[KEY_NICO_CHANNEL_COMMENTERS], owner);
-        }
-        const board = buildViewerBehaviorBoard({
-          visiblePeople: [...map.values()],
-          historyById,
-          historyReady: Object.keys(historyById).length > 0,
-          nowMs: Date.now(),
-          platform: 'niconico',
-          contentKind: 'live',
-        });
-        if (typeof chrome !== 'undefined' && chrome.storage?.local) {
-          await chrome.storage.local.set({
-            [KEY_VIEWER_BEHAVIOR_BOARD]: { pageKey: lid, kind: 'live', platform: 'niconico', at: Date.now(), board },
-          });
-        }
-      } catch {
-        /* ボードは記録の正本ではない */
-      }
-    })();
-  };
-
-  const routeOnLiveComments = createVenueLiveCommentHandler({
+  const onLiveComments = createVenueLiveCommentHandler({
     currentLiveId: liveIdFromPathname,
     speechLiveId: () => speechLiveId,
     resetSpeechTracking,
@@ -7082,10 +6991,6 @@ export function mountVenueBarButton(options = {}) {
     touchRoster: (/** @type {Record<string, any>} */ row, /** @type {number} */ now) => touchRoster(liveRoster, row, now),
     scheduleRosterCommit
   });
-  const onLiveComments = (/** @type {string} */ incomingLiveId, /** @type {ReadonlyArray<Record<string, unknown>>} */ rows, source = '') => {
-    routeOnLiveComments(incomingLiveId, rows, source);
-    try { noteNicoViewerBehavior(incomingLiveId, rows); } catch { /* ボードは記録の正本ではない */ }
-  };
 
   const pollSpeech = async () => {
     if (!open || speechInFlight) return;
@@ -7631,28 +7536,6 @@ export function mountVenueBarButton(options = {}) {
   // v0.1.752: 録画側(content-entry.js)が新着コメントを in-memory で即流すための API を返す。
   //   watch タブの content script は同一コンテキストなので storage 往復を待たず吹き出せる。
   //   別コンテキストの standalone venue.html は呼ばれず、従来どおり pollSpeech のみで動く(無害)。
-  try {
-    if (typeof chrome !== 'undefined' && chrome.storage && !/** @type {any} */ (globalThis).__nlsbViewerBehaviorBoardInstalled) {
-      /** @type {any} */ (globalThis).__nlsbViewerBehaviorBoardInstalled = true;
-      installViewerBehaviorBoardFromStorage({
-        document,
-        storage: chrome.storage,
-        getUrl: () => {
-          const href = String((typeof location !== 'undefined' && location.href) || '');
-          const lv = liveIdFromPathname();
-          if (lv && !/nicovideo\.jp\/watch\//i.test(href)) return `https://live.nicovideo.jp/watch/${lv}`;
-          return href;
-        },
-        placement: 'flow',
-        sources: 'live',
-        collapsed: true,
-        mountParent: document.getElementById('nlsb-viewer-behavior-slot'),
-        skipIfVideoCardId: 'nlsb-video-watch-card',
-      });
-    }
-  } catch {
-    /* ボードが出せなくても会場は出す */
-  }
   return { onLiveComments };
 }
 

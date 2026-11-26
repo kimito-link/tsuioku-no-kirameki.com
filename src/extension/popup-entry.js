@@ -21893,22 +21893,27 @@ if (typeof window !== 'undefined') {
   }, 400);
 }
 
+// ライブ配信（全サービス）には視聴者の行動ボードを出さない。
+//   2235 ではコメントのたびに storage へ書き、横の欄の全体更新が走って内訳がちらつき、会場の上にも板が重なった。
+//   通常動画のサイドパネルだけ出す（ツールバーの POPUP とライブは master と同じ）。
 try {
-  installViewerBehaviorBoardFromStorage({
-    document,
-    storage: typeof chrome !== 'undefined' ? chrome.storage : undefined,
-    getUrl: () => {
-      if (typeof INLINE_OWN_WATCH_URL === 'string' && INLINE_OWN_WATCH_URL) return INLINE_OWN_WATCH_URL;
-      try {
-        const fromState = String((typeof COMMENT_POST_UI_STATE !== 'undefined' && COMMENT_POST_UI_STATE && COMMENT_POST_UI_STATE.watchUrl) || '').trim();
-        if (fromState) return fromState;
-      } catch { /* 横の欄の URL がまだでも storage の最後の視聴 URL を使う */ }
-      return '';
-    },
-    placement: 'flow',
-    sources: 'all',
-    mountParent: document.getElementById('nlPopupPrimary'),
-  });
+  if (INLINE_SIDE_PANEL) {
+    installViewerBehaviorBoardFromStorage({
+      document,
+      storage: typeof chrome !== 'undefined' ? chrome.storage : undefined,
+      getUrl: () => {
+        if (typeof INLINE_OWN_WATCH_URL === 'string' && INLINE_OWN_WATCH_URL) return INLINE_OWN_WATCH_URL;
+        try {
+          const fromState = String((typeof COMMENT_POST_UI_STATE !== 'undefined' && COMMENT_POST_UI_STATE && COMMENT_POST_UI_STATE.watchUrl) || '').trim();
+          if (fromState) return fromState;
+        } catch { /* 横の欄の URL がまだでも storage の最後の視聴 URL を使う */ }
+        return '';
+      },
+      placement: 'flow',
+      sources: 'video',
+      mountParent: document.getElementById('nlPopupPrimary'),
+    });
+  }
 } catch {
   /* ボードが出せなくても横の欄の数字は出す */
 }

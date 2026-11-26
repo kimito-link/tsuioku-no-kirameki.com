@@ -3,7 +3,6 @@
  * 新しいタイマー・Observer・通信は使わない。会場の数字は触らない。
  */
 import { KEY_VIEWER_BEHAVIOR_BOARD, KEY_YT_VIDEO_WATCH_CARD, KEY_NICO_VIDEO_WATCH_CARD, KEY_LAST_WATCH_URL } from '../lib/storageKeys.js';
-import { viewerBehaviorBoardInnerHtml } from '../lib/viewerBehavior.js';
 import { hydrateViewerBehaviorLiveLayout } from './viewerBehaviorLiveLayout.js';
 import { wireLaneUserDetailOpen } from './popup/wireLaneUserDetailOpen.js';
 import { viewerBehaviorWrapMatchesUrl } from '../lib/viewerBehaviorMatch.js';
@@ -208,6 +207,26 @@ function videoCardHtmlIfMatches(wrap, url) {
  *   skipIfVideoCardId?: string,
  * }} opts
  */
+
+/**
+ * ライブの板は出さない。通常動画のカードだけを、その URL のときだけ塗る。
+ * @param {{ url?: string, sources?: string, nicoCard?: any, ytCard?: any, liveWrap?: any }} input
+ */
+export function planViewerBehaviorBoardPaint(input) {
+  const src = input && typeof input === 'object' ? input : {};
+  const url = String(src.url || '');
+  const sources = src.sources === 'live' ? 'live' : 'video';
+  const nico = sources !== 'live' ? videoCardHtmlIfMatches(src.nicoCard, url) : '';
+  const yt = sources !== 'live' ? videoCardHtmlIfMatches(src.ytCard, url) : '';
+  // ライブ配信の「視聴者の行動」は出さない（コメントごとに書いて横の欄をちらつかせない）。
+  return {
+    html: nico || yt || '',
+    board: (nico && src.nicoCard?.card?.behavior) || (yt && src.ytCard?.card?.behavior) || null,
+    hide: !(nico || yt),
+    source: nico ? 'niconico-video' : yt ? 'youtube-video' : 'none',
+  };
+}
+
 export function installViewerBehaviorBoardFromStorage(opts) {
   const doc = opts.document || (typeof document !== 'undefined' ? document : null);
   const storage = opts.storage;
@@ -226,18 +245,15 @@ export function installViewerBehaviorBoardFromStorage(opts) {
             return;
           }
           const url = String(opts.getUrl ? opts.getUrl() : '') || String(bag?.[KEY_LAST_WATCH_URL] || '');
-          const sources = opts.sources === 'live' ? 'live' : 'all';
-          const nico = sources === 'all' ? videoCardHtmlIfMatches(bag?.[KEY_NICO_VIDEO_WATCH_CARD], url) : '';
-          const yt = sources === 'all' ? videoCardHtmlIfMatches(bag?.[KEY_YT_VIDEO_WATCH_CARD], url) : '';
-          const liveWrap = bag?.[KEY_VIEWER_BEHAVIOR_BOARD];
-          const live = liveWrap && viewerBehaviorWrapMatchesUrl(liveWrap, url)
-            ? viewerBehaviorBoardInnerHtml(liveWrap.board)
-            : '';
-          const html = nico || yt || live || '';
-          const board = (nico && bag?.[KEY_NICO_VIDEO_WATCH_CARD]?.card?.behavior)
-            || (yt && bag?.[KEY_YT_VIDEO_WATCH_CARD]?.card?.behavior)
-            || (live && liveWrap?.board)
-            || null;
+          const planned = planViewerBehaviorBoardPaint({
+            url,
+            sources: opts.sources,
+            nicoCard: bag?.[KEY_NICO_VIDEO_WATCH_CARD],
+            ytCard: bag?.[KEY_YT_VIDEO_WATCH_CARD],
+            liveWrap: bag?.[KEY_VIEWER_BEHAVIOR_BOARD],
+          });
+          const html = planned.html;
+          const board = planned.board;
           paintViewerBehaviorBoardEl({
             document: doc,
             html,
