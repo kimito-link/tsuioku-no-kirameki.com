@@ -29,7 +29,7 @@ describe('sidepanel 幕(cloak)計器の配線', () => {
    */
   it('★幕とシェードの合算を計算し、速報の行に混ぜている', () => {
     expect(entrySrc).toMatch(
-      /const blind = summarizeContentBlindTime\(cloakDuration\.visibleBlackMs, _shadeCoveringLastT\);/
+      /const blind = summarizeContentBlindTime\(cloakDuration\.visibleBlackMs, shadeBlindMs\(_shadeBlind\)\);/
     );
     // 行テンプレートの両方(黒を観測した側/していない側)に blindNote が入っていること。
     const noteUses = entrySrc.match(/\$\{blindNote\}/g) || [];
