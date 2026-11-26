@@ -444,6 +444,8 @@ export function weightOf(label) {
     if (n.includes("nemotron-3.5")) return 3;
     // ★2026-11-11: DiffusionGemma（NVIDIA 経由の新顔）も予備(3)から。label が "nvidia/..." なので下の "nvidia"→2 より前に置く。
     if (n.includes("diffusiongemma")) return 3;
+    // ★2026-11-26: MiniMax M3.1 Flash（NVIDIA 経由の新顔）も予備(3)から。下の "nvidia"→2 より前に置く。
+    if (n.includes("minimax")) return 3;
     if (n.includes("nvidia") || n.includes("qwen3.5-122b")) return 2;
     // 2026-07-03/07-04 設計: 予備クラウド専用の reserve 層。同役割に安定勢(weight1)が
     // いる限り絶対に選ばれない（weight昇順ソートのため）。安定勢が不在/全滅した時だけ浮上する。

@@ -424,6 +424,14 @@ export const LINEUP = [
   //  昇格条件: 7日以上空けた実会議2回で FAILED ゼロ。
   // ★2026-11-26 撤去: NVIDIA 側で 2026-11-12 に提供終了（410 "has reached its end of life"・council-trial 実測）。実会議の出番は0回のまま終わった。
   //  旧: { label: 'nvidia/diffusiongemma-26b', rawId/apiModel: 'google/diffusiongemma-26b-a4b-it', timeoutMs: 90000 }（2026-11-11採用）
+  // ★2026-11-26 追加（generalist の予備 weight3・diffusiongemma の後の席）: MiniMax M3.1 Flash（NVIDIA の無料エンドポイント）。
+  //  MiniMax は名簿のどの系譜とも違う（NVIDIA/Google/Qwen/OpenAI-oss/DeepSeek/Zhipu/Moonshot/Llama のどれでもない）。
+  //  実測（りんくのPC・11/26・新しい NVIDIA_API_KEY で。scripts/council-trial.mjs = max_tokens 1600 / temperature 0.6・3回ずつ）:
+  //   - 既定（推論あり）: 0/3（120秒切れ・推論だけで本文0・503 "content safety screening is temporarily unavailable"）。
+  //   - chat_template_kwargs.enable_thinking=false: 3/3 OK・32.1/50.6/62.3秒・本文802/734/967字。→ これで採用。
+  //  遅いので timeoutMs 90000。weightOf に "minimax"→3 を足した（足さないと "nvidia"→2 に落ちる）。
+  //  昇格条件: 7日以上空けた実会議2回で FAILED ゼロ。撤去条件: 404/410・402/403（課金の要求）。
+  { label: 'nvidia/minimax-m3.1-flash', provider: 'nvidia', rawId: 'minimaxai/minimax-m3.1-flash', apiModel: 'minimaxai/minimax-m3.1-flash', opts: { chat_template_kwargs: { enable_thinking: false } }, timeoutMs: 90000, requires: ['N'], liveProbe: true },
   // ★2026-11-11 試して見送った新顔・据え置き（council-trial 実測・りんくのPC。生データは同PCの council-trial-2026-11-11-*.json）:
   //  - nvidia/nemotron-3.5-bolt-e4b: 3/3 OK・5〜6秒だが内容は無難。generalist の nemotron が既に3体居るので見送り（足すなら diffusiongemma の次）。
   //  - nvidia/nemotron-3-nano-omni-30b-a3b-reasoning（推論オフ必須で3/3）・poolside/laguna-xs-2.1（3/3・12秒）: 同じ理由で見送り。
@@ -920,6 +928,11 @@ export const LINEUP = [
   //  採用: cloudflare/qwen3.8-27b（diverge 予備・推論オフ 3/3）・sakura/kimi-k2.7-code（implement 予備・max_tokens 6000 で 3/3）。
   //  撤去: cloudflare/nemotron-120b・cloudflare/qwen3-30b-a3b（11/20 廃止・410）・nvidia/diffusiongemma-26b（11/12 EOL・410）・
   //        mistral/codestral（402＝Mistral の無料枠が無くなった）。統合の3番手も nemotron-120b → cloudflare/deepseek-v4.1-flash（meeting.mjs）。
+  //  ★同日の続き（鍵を作り直した後）: りんくが新しい NVIDIA_API_KEY を発行し、ユーザー環境変数と .env を差し替えた。
+  //   名簿の3体は本番条件3回で復帰を確認: nemotron-3-ultra 3/3（13〜48秒）・3.5-super 3/3（18〜26秒）・3.5-lightning 2/3＋途中切れ1（本文2064字で上限）。
+  //   NVIDIA の新顔: minimax-m3.1-flash を採用（上の行）。glm-5.3-flash・step-5-preview は推論オフでも本文0か120秒切れ（0/6）。
+  //   moonshotai/kimi-k3.1-pro・mistralai/mistral-large-4-1t-a52b は 6/6・3/3 とも120秒切れ（呼べるが答えが返らない）。いずれも見送り。
+  //  （以下は鍵を作り直す前の記録）
   //  ★NVIDIA は全モデルが 403 "Authorization failed"（/v1/models の一覧は取れる・chat だけ403）。実会議の記録では 11/15 23:15 から。
   //   モデルの問題ではなくキー（NVIDIA_API_KEY）の失効なので名簿からは外さない。build.nvidia.com でキーを作り直せば戻る（本人のログインが要る）。
   //   その間 nvidia の3体（nemotron-3-ultra・3.5-super・3.5-lightning）は会議で必ず落ちる。lead は openrouter/nemotron-3-ultra（3/3相当・23秒）と
