@@ -352,8 +352,11 @@ export function buildSystem({ baseSystem = "", modelName, taskText = "", addForm
  */
 export const CATEGORIES = {
   code:    { want: ["implement", "diverge", "fast"],   hint: "コード生成・実装・デバッグ・リファクタ" },
-  design:  { want: ["lead", "diverge", "fast"],        hint: "設計判断・アーキテクチャ・技術選定・トレードオフ" },
-  fact:    { want: ["generalist", "fast", "lead"],     hint: "事実調査・比較・最新情報・用語の意味" },
+  // ★2026-11-26: 「Codex・Ollama 等の使用実績と振り分けの費用対効果」を議論するお題（実績の数字入り）が fact と判定され、
+  //  統括・発散役のいない5体で回った（コスパ運用会議・routed-fact）。fact の「比較」に、数字を比べて方針を決めるお題が吸われていた。
+  //  fact は「答えが1つに決まる事実の確認」だけにし、比べて決める・費用対効果・運用の決め方は design に寄せる。
+  design:  { want: ["lead", "diverge", "fast"],        hint: "設計判断・アーキテクチャ・技術選定・トレードオフ・方針や運用の決め方・費用対効果（調べた数字を元に決めるお題もここ）" },
+  fact:    { want: ["generalist", "fast", "lead"],     hint: "答えが1つに決まる事実の確認（仕様・最新情報・用語の意味）。何かを決めるお題は含めない" },
   writing: { want: ["lead", "diverge", "generalist"],  hint: "文章・コピー・要約・説明・命名" },
   // 2026-07-03 設計: diverge-alt を3番手に追加。従来は CATEGORIES のどの want にも
   // diverge-alt が登場せず、ローカル唯一の別系統発散(gpt-oss:20b)が死に役割だった。
@@ -504,7 +507,9 @@ export function classifyPrompt(taskText) {
     .join("\n");
   return (
     "次のお題を、下のカテゴリのどれか1つに分類してください。\n" +
-    "説明は不要。JSONで {\"category\":\"<キー>\"} だけを出力すること。\n\n" +
+    "説明は不要。JSONで {\"category\":\"<キー>\"} だけを出力すること。\n" +
+    // 2026-11-26: 調べる部分を含んでも、最後に「どうするか」を決めるお題は design（上の CATEGORIES の注記）。
+    "迷ったら: 何かを決める・選ぶ・どう運用するかを問うお題は、調査や数字を含んでも design にする。\n\n" +
     "【カテゴリ】\n" + cats + "\n\n" +
     "【お題】\n" + String(taskText).slice(0, 1200)
   );

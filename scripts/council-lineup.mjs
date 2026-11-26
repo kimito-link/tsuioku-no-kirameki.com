@@ -913,8 +913,11 @@ export const LINEUP = [
   //   1600=本文737字で途中切れ / 3200=推論7,266字・本文0 / reasoning_effort low+3200=推論8,900字・本文0 /
   //   thinking disabled=推論4,310字・本文0（効かない） / chat_template_kwargs.enable_thinking=false=英語の独白が本文に漏れる。
   //   続けて叩くと 429（rate limit exceeded・月の上限ではない）が2回出た。再試験は別の日に max_tokens 6000 前後で。
-  { label: 'sakura/deepseek-v4.1-flash', provider: 'sakura', rawId: 'preview/DeepSeek-V4.1-Flash-1017', apiModel: 'preview/DeepSeek-V4.1-Flash-1017', opts: {}, requires: ['SK'], liveProbe: true },
-  { label: 'sakura/glm-5.3-flash', provider: 'sakura', rawId: 'preview/GLM-5.3-Flash', apiModel: 'preview/GLM-5.3-Flash', opts: { max_tokens: 3200 }, requires: ['SK'], liveProbe: true },
+  // ★2026-11-26 実会議（COUNCIL_FULL・問い2,150字）で2席とも本文0字: deepseek=推論5,541字・glm=推論11,259字で finish=length。
+  //  11/18 の試験は400〜800字の問いで、長い問いほど推論が伸びて上限（既定1600・3200）を食い切った。同じさくらの kimi-k2.7-code は
+  //  max_tokens 6000 で同じ会議を 1,652字・60.8秒で通っている → 2席も 6000・timeoutMs 90000 にそろえる（月3,000回の数は変わらない）。
+  { label: 'sakura/deepseek-v4.1-flash', provider: 'sakura', rawId: 'preview/DeepSeek-V4.1-Flash-1017', apiModel: 'preview/DeepSeek-V4.1-Flash-1017', opts: { max_tokens: 6000 }, timeoutMs: 90000, requires: ['SK'], liveProbe: true },
+  { label: 'sakura/glm-5.3-flash', provider: 'sakura', rawId: 'preview/GLM-5.3-Flash', apiModel: 'preview/GLM-5.3-Flash', opts: { max_tokens: 6000 }, timeoutMs: 90000, requires: ['SK'], liveProbe: true },
   // ★2026-11-26 追加（implement の予備 weight3＝weightOf の "sakura/"→3）: さくらの preview/Kimi-K2.7-Code。11/18 に見送った候補の再試験。
   //  mistral/codestral が 402 で抜け、implement は cloudflare/qwen2.5-coder-32b（w4）の単騎になったため、別プロバイダの席を足す。
   //  実測（りんくのPC・11/26・本番と同じ問い・temperature 0.6・30秒間隔で3回）: max_tokens 6000 で 3/3 OK・12.0/15.0/13.4秒・
