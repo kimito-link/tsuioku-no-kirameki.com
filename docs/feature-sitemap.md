@@ -1256,7 +1256,7 @@
   - `src/extension/live-ranking-entry.js`
   - `tsuioku-no-kirameki/live/index.html`
   - `.github/workflows/live-ranking.yml`
-<details><summary>🗂 このカテゴリの全担当ファイル(自動分類) 383</summary>
+<details><summary>🗂 このカテゴリの全担当ファイル(自動分類) 384</summary>
 
 - `app/app.js` — スマホ閲覧用 status Web 版。
 - `app/live-view-block.js` — iPhone アプリの「🚩 見たくない人を隠す・報告する」(App Store の審査 1.2: ほかの人の書き込みを見せるアプリの決まり)。
@@ -1591,6 +1591,7 @@
 - `src/lib/unknownVsAbsent.js` — 【層】L0 判定層(純粋関数・I/O禁止)
 - `src/lib/versionMismatch.js` — 「本体とページで版がズレている」を検知する純関数(2026-07-06)。
 - `src/lib/videoCapture.js` — watch ページの video から PNG を取るためのユーティリティ。
+- `src/lib/videoWatch/twVodLiveIcons.js` — v0.1.2253: Twitch の録画チャットには顔の画像が無い(実測 DOM)。ライブの Twitch でこの PC が覚えた顔
 - `src/lib/videoWatch/videoPanelRoute.js` — 横の欄の外枠(sidepanel-iframe-boot-entry.js)が、録画・通常動画のページで中身を付け替えるかを決める純関数。v0.1.2244
 - `src/lib/videoWatch/videoWatchCard.js` — 【層】L0 判定層(純粋関数・I/O禁止)
 - `src/lib/videoWatch/vodCommentsFromDom.js` — 【層】L0 判定層(純粋関数・I/O禁止)
@@ -1682,9 +1683,8 @@
 - `v0.1.2233` 2026-11-26 — 視聴者の行動を、対応している配信サービスでも同じ見方で出す
 - `v0.1.2232` 2026-11-26 — 視聴者の行動を、動画でも配信でも最初に見られる
 
-### 🔊 読み上げ (2版)
+### 🔊 読み上げ (1版)
 - `v0.1.2236` 2026-11-26 — ライブ配信を乱さず、記録の数を保存件数とそろえる
-- `v0.1.2230` 2026-11-26 — 「記録」の数が、保存したコメントより多く出たままになるのを直しました
 
 ### 🪟 応援レーン・タイル (1版)
 - `v0.1.2234` 2026-11-26 — 動画でも配信モードと同じサムネイル列と数字の帯で、視聴者の行動を見る
@@ -1693,7 +1693,8 @@
 - `v0.1.2235` 2026-11-26 — 通常動画では同時視聴者数を出さず、顔とクリックを直す
 - `v0.1.2234` 2026-11-26 — 動画でも配信モードと同じサムネイル列と数字の帯で、視聴者の行動を見る
 
-### その他 (8版)
+### その他 (9版)
+- `v0.1.2253` 2026-11-27 — Twitch の録画でも、ライブで覚えた顔を出す
 - `v0.1.2252` 2026-11-27 — YouTube の動画で、コメントした人をページのデータから読む
 - `v0.1.2250` 2026-11-27 — ライブの顔が白い丸にならない(Twitch・Kick・YouTube)
 - `v0.1.2249` 2026-11-27 — YouTube の動画で、コメント欄の読み直しを軽くした

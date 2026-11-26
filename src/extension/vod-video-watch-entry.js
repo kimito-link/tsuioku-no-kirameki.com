@@ -8,6 +8,7 @@ import { isVodVideoWatchUrl, vodWatchPageFromUrl } from '../lib/videoWatch/vodWa
 import { readVodWatchDom } from '../lib/videoWatch/vodCommentsFromDom.js';
 import { buildVodVideoWatchCardModel } from '../lib/videoWatch/videoWatchCard.js';
 import { videoIdentityFromUrl } from '../lib/videoWatch/videoIdentity.js';
+import { TW_LIVE_ICONS_KEY, fillTwitchVodAvatarsFromLiveIcons } from '../lib/videoWatch/twVodLiveIcons.js';
 
 /** 横の欄(viewerBehaviorBoardPaint.js)が既存の見回りで送る「読み直して」の合図 */
 const VIDEO_WATCH_REREAD_MESSAGE = 'NLS_VIDEO_WATCH_REREAD';
@@ -31,6 +32,9 @@ function hideVenueModeForVideoPage(hide) {
 }
 
 let lastSig = '';
+/** v0.1.2253: ライブの Twitch で覚えた顔(login → URL)。Twitch のページでだけ1回読み、変わったら差し替える */
+/** @type {Record<string, unknown> | null} */
+let twLiveIcons = null;
 
 function refresh() {
   const href = String(location.href || '');
@@ -45,6 +49,8 @@ function refresh() {
   const identity = videoIdentityFromUrl(href);
   const key = identity ? identity.key : page.pageKey;
   const read = readVodWatchDom(document, page);
+  const tw = page.platform === 'twitch' ? fillTwitchVodAvatarsFromLiveIcons(read.authors, twLiveIcons) : null;
+  if (tw) read.authors = tw.authors;
   const card = buildVodVideoWatchCardModel({
     platform: page.platform,
     videoId: page.videoId,
@@ -56,7 +62,7 @@ function refresh() {
     videoAuthors: read.authors,
     nowMs: Date.now(),
   });
-  const sig = `${key}:${card ? (card.videoAuthorCount || 0) : 0}:${card?.title || ''}:${card?.viewCountText || ''}`;
+  const sig = `${key}:${card ? (card.videoAuthorCount || 0) : 0}:${card?.title || ''}:${card?.viewCountText || ''}:${tw ? tw.filled : 0}`;
   if (sig === lastSig) return;
   lastSig = sig;
   try {
@@ -77,6 +83,16 @@ function refresh() {
 {
   if (isVodVideoWatchUrl(String(location.href || ''))) hideVenueModeForVideoPage(true);
   refresh();
+  if (/(^|\.)twitch\.tv$/.test(String(location.hostname || ''))) {
+    try {
+      // v0.1.2253: ライブの Twitch で覚えた顔を1回だけ読む(この PC の storage・通信なし)。読めたら録画の顔に使う
+      void Promise.resolve(chrome.storage.local.get(TW_LIVE_ICONS_KEY)).then((bag) => {
+        const v = bag?.[TW_LIVE_ICONS_KEY];
+        twLiveIcons = v && typeof v === 'object' ? /** @type {Record<string, unknown>} */ (v) : {};
+        if (isVodVideoWatchUrl(String(location.href || ''))) refresh();
+      }, () => { /* 読めなければ今までどおり */ });
+    } catch { /* 同上 */ }
+  }
   try {
     document.addEventListener('visibilitychange', () => {
       if (document.visibilityState === 'visible') refresh();
@@ -100,6 +116,11 @@ function refresh() {
   }
   try {
     chrome.storage.onChanged.addListener((changes, area) => {
+      if (area === 'local' && changes?.[TW_LIVE_ICONS_KEY] && twLiveIcons) {
+        const v = changes[TW_LIVE_ICONS_KEY].newValue;
+        twLiveIcons = v && typeof v === 'object' ? /** @type {Record<string, unknown>} */ (v) : null;
+        if (isVodVideoWatchUrl(String(location.href || ''))) refresh();
+      }
       if (area !== 'local' || !changes?.[KEY_VOD_VIDEO_WATCH_CARD]) return;
       // 別のタブの録画カードが書かれても、このページがライブなら会場は隠さない
       if (!isVodVideoWatchUrl(String(location.href || ''))) return;
