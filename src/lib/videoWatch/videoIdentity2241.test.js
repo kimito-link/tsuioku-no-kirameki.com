@@ -247,11 +247,17 @@ describe('ライブのページは何も変わらない(回帰)', () => {
 
   it('動画からライブへ移ると、印を外してライブの数字の枠を戻す', async () => {
     const doc = freshDoc();
-    const s = fakeStorage({});
+    // v0.1.2244: 印は「いまのページ用の動画カードを塗れた」ときだけ付く(カードが無ければ付かない)
+    const twitch = vodWatchPageFromUrl('https://www.twitch.tv/videos/2940252213');
+    const s = fakeStorage({ [KEY_VOD_VIDEO_WATCH_CARD]: { videoId: twitch.pageKey, at: 1, card: sampleVodCard(twitch) } });
     const h = installViewerBehaviorBoardFromStorage({ document: doc, storage: s.storage, getUrl: () => '', placement: 'flow', sources: 'video' });
     h.notePageTab({ id: 1, url: 'https://www.twitch.tv/videos/2940252213' });
+    await flush();
+    await flush();
     expect(doc.documentElement.getAttribute(VIDEO_WATCH_ROOT_ATTR)).toBe('1');
     h.notePageTab({ id: 1, url: 'https://www.twitch.tv/minto_vtuber' });
+    await flush();
+    await flush();
     expect(doc.documentElement.hasAttribute(VIDEO_WATCH_ROOT_ATTR)).toBe(false);
   });
 });

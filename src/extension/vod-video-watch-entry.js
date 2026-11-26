@@ -67,8 +67,14 @@ function refresh() {
   }
 }
 
-if (isVodVideoWatchUrl(String(location.href || ''))) {
-  hideVenueModeForVideoPage(true);
+/*
+ * v0.1.2244: 入口はサービスのどのページにも載る(manifest の matches をサービス全体に広げた)。
+ *   Twitch・Kick・TikTok などはサイトの中のリンクで録画へ移っても文書を読み直さない(SPA)ので、録画の URL のときだけ載せる形では
+ *   入口がいないまま横の欄の「読み直して」が空振りしていた。ライブ・トップのページでは refresh() が URL を見て何もしない
+ *   (会場を隠すのは録画の URL のときだけ・ライブへ戻れば自分が隠した会場だけ戻す)。
+ */
+{
+  if (isVodVideoWatchUrl(String(location.href || ''))) hideVenueModeForVideoPage(true);
   refresh();
   try {
     document.addEventListener('visibilitychange', () => {
@@ -94,6 +100,8 @@ if (isVodVideoWatchUrl(String(location.href || ''))) {
   try {
     chrome.storage.onChanged.addListener((changes, area) => {
       if (area !== 'local' || !changes?.[KEY_VOD_VIDEO_WATCH_CARD]) return;
+      // 別のタブの録画カードが書かれても、このページがライブなら会場は隠さない
+      if (!isVodVideoWatchUrl(String(location.href || ''))) return;
       hideVenueModeForVideoPage(true);
     });
   } catch {

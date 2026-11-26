@@ -290,7 +290,7 @@ export const VIDEO_WATCH_REREAD_MESSAGE = 'NLS_VIDEO_WATCH_REREAD';
 export function installViewerBehaviorBoardFromStorage(opts) {
   const doc = opts.document || (typeof document !== 'undefined' ? document : null);
   const storage = opts.storage;
-  const noop = { refresh: () => {}, notePageTab: () => {} };
+  const noop = { refresh: () => {}, notePageTab: () => {}, askPageToReread: () => {} };
   if (!doc || !storage?.local?.get) return noop;
 
   /**
@@ -299,6 +299,8 @@ export function installViewerBehaviorBoardFromStorage(opts) {
    */
   let pageTabUrl = '';
   let pageTabKey = '';
+  /** @type {number|null} */
+  let pageTabId = null;
 
   const refresh = () => {
     try {
@@ -323,6 +325,10 @@ export function installViewerBehaviorBoardFromStorage(opts) {
           });
           const html = planned.html;
           const board = planned.board;
+          // v0.1.2244: 「動画を見ている」印は、いまのページ用の動画カードを実際に塗れたときだけ付ける。
+          //   YouTube のライブも /watch?v= なので URL だけでは決められない(0.1.2241 はライブでも同時視聴者数を隠していた)。
+          //   動画カードは、ページ側が「動画」と判定したときにしか書かれない(ライブでは消される)。
+          applyVideoWatchRootMark(doc, !!html && !!pageTabKey);
           paintViewerBehaviorBoardEl({
             document: doc,
             html,
@@ -355,23 +361,63 @@ export function installViewerBehaviorBoardFromStorage(opts) {
       const identity = videoIdentityFromUrl(url);
       const key = identity ? identity.key : '';
       if (!key && !pageTabKey) return;
-      applyVideoWatchRootMark(doc, !!key);
       const changed = key !== pageTabKey;
       pageTabKey = key;
       pageTabUrl = key ? url : '';
-      if (changed) refresh();
-      if (key && tab && typeof tab.id === 'number' && typeof opts.sendToTab === 'function') {
-        try {
-          const p = opts.sendToTab(tab.id, { type: VIDEO_WATCH_REREAD_MESSAGE, key });
-          if (p && typeof p.catch === 'function') p.catch(() => {});
-        } catch {
-          /* 入口がまだ無いタブでも塗りは続く */
-        }
-      }
+      pageTabId = key && tab && typeof tab.id === 'number' ? tab.id : null;
+      if (!changed) return;
+      refresh();
+      askPageToReread(); // 移った直後に1回。その後は既存の見回りの合図(pulseVideoPageTabForSidePanel)だけ
     } catch {
       /* 前面タブが読めなくても、今までの照合で塗る */
     }
   };
+
+  /** 動画ページの入口に「いまの DOM を読み直して」と頼む(動画ページのときだけ・変化が無ければページ側は書かない) */
+  const askPageToReread = () => {
+    if (!pageTabKey || pageTabId == null || typeof opts.sendToTab !== 'function') return;
+    try {
+      const p = opts.sendToTab(pageTabId, { type: VIDEO_WATCH_REREAD_MESSAGE, key: pageTabKey });
+      if (p && typeof p.catch === 'function') p.catch(() => {});
+    } catch {
+      /* 入口がまだ無いタブでも塗りは続く */
+    }
+  };
+
+  /*
+   * v0.1.2244: 前面タブは、タブの切り替え・ページの移動の知らせ(chrome.tabs の既存イベント)で受け取る。
+   *   0.1.2241 は横の欄の refresh() にだけ頼っていたが、実機の横の欄では定期の見回りが refresh() まで進まないことが多く
+   *   (描き直しの間引き・取得中の見送り)、同じタブでページを移っても動画カードが塗られなかった。
+   *   外枠(sidepanel-iframe-boot-entry.js)と同じ仕組み・同じ条件(このウィンドウの前面タブだけ)。タイマー・Observer・通信は足さない。
+   */
+  const tabsApi = opts.tabs;
+  if (tabsApi && typeof tabsApi.query === 'function') {
+    try {
+      /** @type {number|null} */
+      let ownWindowId = null;
+      try {
+        void Promise.resolve(opts.windows?.getCurrent?.()).then((w) => { ownWindowId = w && w.id != null ? w.id : null; }, () => {});
+      } catch { /* ウィンドウが分からなくても前面タブで照合する */ }
+      /** @param {any} tab */
+      const take = (tab) => {
+        if (!tab || tab.active === false) return;
+        if (ownWindowId != null && tab.windowId != null && tab.windowId !== ownWindowId) return;
+        notePageTab(tab);
+      };
+      tabsApi.onActivated?.addListener?.((/** @type {any} */ info) => {
+        try {
+          void Promise.resolve(tabsApi.get(info.tabId)).then(take, () => {});
+        } catch { /* 次の知らせで追う */ }
+      });
+      tabsApi.onUpdated?.addListener?.((/** @type {any} */ _id, /** @type {any} */ changeInfo, /** @type {any} */ tab) => {
+        if (changeInfo && (changeInfo.url || changeInfo.status === 'complete')) take(tab);
+      });
+      // 開いた瞬間の前面タブ(1回だけ)
+      void Promise.resolve(tabsApi.query({ active: true, currentWindow: true })).then((ts) => take(Array.isArray(ts) ? ts[0] : null), () => {});
+    } catch {
+      /* 知らせが取れなくても refresh() からの受け取りで照合する */
+    }
+  }
 
   try {
     storage.onChanged?.addListener?.((changes, area) => {
@@ -383,12 +429,25 @@ export function installViewerBehaviorBoardFromStorage(opts) {
     /* 監視できなくても初回の塗で足りる */
   }
   refresh();
-  lastInstalledBoard = { refresh, notePageTab };
+  lastInstalledBoard = { refresh, notePageTab, askPageToReread };
   return lastInstalledBoard;
 }
 
-/** @type {{ refresh: () => void, notePageTab: (tab: any) => void } | null} */
+/** @type {{ refresh: () => void, notePageTab: (tab: any) => void, askPageToReread: () => void } | null} */
 let lastInstalledBoard = null;
+
+/**
+ * v0.1.2244: 横の欄の既存の定期の見回り(3秒・隠れているときは止まる)の先頭から呼ぶ。
+ *   動画ページを前に出しているときだけ、ページの入口に読み直しを頼む(Twitch の録画チャットのように後から増えるコメント用)。
+ *   ライブ・知らないページでは何もしない。新しいタイマーではない。
+ */
+export function pulseVideoPageTabForSidePanel() {
+  try {
+    lastInstalledBoard?.askPageToReread();
+  } catch {
+    /* 頼めなくても塗りは続く */
+  }
+}
 
 /**
  * v0.1.2241: 横の欄の refresh() が既に問い合わせた前面タブを、動画カードの照合へ渡す(問い合わせは増やさない)。

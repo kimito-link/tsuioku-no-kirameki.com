@@ -10,7 +10,7 @@ import '../lib/flickerMeterBoot.js';
 // v0.1.1687: 黒い幕の年表(サイドパネルの popup だけ・子の節目/長い処理/段階を親の起点に直して並べるための控え)。
 import '../lib/bootTimelineBoot.js';
 import { extractLiveIdFromUrl, isNicoLiveWatchUrl, watchPageUrlsMatchForSnapshot } from '../lib/broadcastUrl.js';
-import { installViewerBehaviorBoardFromStorage, noteVideoPageTabForSidePanel } from './viewerBehaviorBoardPaint.js';
+import { installViewerBehaviorBoardFromStorage, noteVideoPageTabForSidePanel, pulseVideoPageTabForSidePanel } from './viewerBehaviorBoardPaint.js';
 import { shouldSkipMirrorForLiveId } from '../lib/passiveMirrorLiveIdGuard.js';
 import { resolveOfficialPoints } from '../lib/resolveOfficialPoints.js';
 // v0.1.1057: HTMLレポート組み立てクラスタを popup/report/ へ切り出し(max-linesラチェット対応・挙動不変)。
@@ -21540,6 +21540,7 @@ async function initPopup() {
           return;
         }
         if (_panelHidden()) return;
+        if (INLINE_SIDE_PANEL) pulseVideoPageTabForSidePanel(); // v0.1.2244: 動画ページだけ読み直しを頼む(下の間引きで refresh() まで進まないことが多いため)
         // v0.1.392: 短間隔 polling で fetch が重ならないよう、前回の取得がまだ
         //   進行中なら今回の tick は見送る（その fetch がじき新しい値を届ける）。
         if (watchMetaCache.snapshotFetchActive) {
@@ -21913,8 +21914,8 @@ try {
       placement: 'flow',
       sources: 'video',
       mountParent: document.getElementById('nlPopupPrimary'),
-      // 動画ページの入口に「DOM を読み直して」と頼む(既存の refresh() の見回りに乗せる。新しいタイマーは無い)
-      sendToTab: (tabId, msg) => chrome.tabs.sendMessage(tabId, msg),
+      // 動画ページの入口に「DOM を読み直して」と頼む(既存の見回りに乗せる)・前面タブは chrome.tabs の既存の知らせで受け取る(v0.1.2244)
+      sendToTab: (tabId, msg) => chrome.tabs.sendMessage(tabId, msg), tabs: chrome.tabs, windows: chrome.windows,
     });
   }
 } catch {
