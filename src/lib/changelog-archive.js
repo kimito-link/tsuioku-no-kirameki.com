@@ -24,6 +24,14 @@
 /** @type {ChangelogEntry[]} */
 const ARCHIVE_ENTRIES = [
   Object.freeze({
+    version: '0.1.2210',
+    date: '2026-11-24',
+    summary: '配信者にゆっくり顔を出さない',
+    items: Object.freeze([
+      'イベント順位の上位10名と「配信者」カードで、本人のアイコンがまだ届いていないときや読み込みに失敗したときに、ゆっくり顔を出さず、直前まで出ていた本人のアイコンか、中立な「未取得」の印を出すようにしました。',
+    ])
+  }),
+  Object.freeze({
 
     version: '0.1.2208',
     date: '2026-11-24',

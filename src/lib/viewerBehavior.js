@@ -1,3 +1,4 @@
+import { pickAvatarUrlForUid } from './deriveAvatarUrlFromUid.js';
 /**
  * 【層】L0 判定層(純粋関数・I/O禁止)
  * 【この箱に入るもの】いま見えている視聴者について、このPCの記録から「行動」を組むことと、その文言・HTML
@@ -27,6 +28,20 @@ export function isAnonymousViewer(id, name) {
   if (/^184$/.test(i)) return true;
   if (/^匿名\d*$/.test(n) || n === '184' || n === '匿名さん') return true;
   return false;
+}
+
+/**
+ * 配信モードの応援アイコン列と同じ解決。既にある URL を優先し、無ければ数値 ID から公開アイコン URL を作る。
+ * @param {unknown} id
+ * @param {unknown} [avatarUrl]
+ * @returns {string}
+ */
+export function resolveViewerBehaviorAvatarUrl(id, avatarUrl) {
+  const given = String(avatarUrl || '').trim();
+  const derived = pickAvatarUrlForUid(id, null);
+  if (given && /^https?:/i.test(given) && !/usericon\/defaults\/blank\.jpg/i.test(given)) return given;
+  if (derived) return derived;
+  return given || VIEWER_BEHAVIOR_FALLBACK_AVATAR;
 }
 
 /**
@@ -411,11 +426,12 @@ export function buildViewerBehaviorBoard(input) {
     const raw = histOf(person.id);
     const history = raw ? historyFromCommenterIndexEntry(raw) : null;
     const row = buildViewerBehaviorRow(person, history, { historyReady, nowMs: src.nowMs });
-    row.avatarUrl = String(person.avatarUrl || '').trim();
+    row.avatarUrl = resolveViewerBehaviorAvatarUrl(person.id, person.avatarUrl);
     row.commentAnchor = String(person.commentAnchor || '').trim();
     row.pending = person.pending === true;
     row.isAnonymous = false;
     row.anonymousCount = 0;
+    row.pageAt = Number(person.at) > 0 ? Math.floor(Number(person.at)) : 0;
     rows.push(row);
   }
   if (anonAcc.people > 0) {
@@ -437,8 +453,9 @@ export function buildViewerBehaviorBoard(input) {
     row.isAnonymous = true;
     row.anonymousCount = anonAcc.people;
     row.pending = anonAcc.pendingCount > 0;
-    row.avatarUrl = '';
+    row.avatarUrl = resolveViewerBehaviorAvatarUrl('', '') ;
     row.commentAnchor = '';
+    row.pageAt = anonAcc.at || 0;
     row.factLine = [
       `いま見えている匿名 ${anonAcc.people.toLocaleString('ja-JP')} 人をまとめています`,
       `コメント ${anonAcc.commentCount.toLocaleString('ja-JP')}`,
@@ -495,6 +512,7 @@ export function buildViewerBehaviorBoard(input) {
     takeHome: src.takeHome || null,
     viewCount: Number.isFinite(Number(src.viewCount)) && Number(src.viewCount) >= 0 ? Math.floor(Number(src.viewCount)) : null,
     platform: String(src.platform || '').trim() || '',
+    contentKind: src.contentKind === 'video' ? 'video' : 'live',
     rows: shown,
     truncated,
   };

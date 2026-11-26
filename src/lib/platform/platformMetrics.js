@@ -1152,7 +1152,13 @@ export function venueItemsForPlatform(platformId, bag) {
   const cap = platformCapability(id);
   // 視聴数のサービスは、同時接続(viewers)で視聴数の欄を埋めない。
   // YouTube の通常動画だけ、同じ欄を「再生」にして総再生を出す（ライブの同時視聴者数は変えない）。
-  const youtubeVideo = id === 'youtube' && facts.contentKind === 'video';
+  const viewLeak = id === 'youtube' && num(facts.viewers) != null && num(facts.viewCount) != null && num(facts.viewers) === num(facts.viewCount);
+  const youtubeVideo = id === 'youtube' && (
+    facts.contentKind === 'video' ||
+    facts.contentKind === 'live_replay' ||
+    facts.isLive === false ||
+    viewLeak
+  );
   const pageViews = ('headlineCount' in cap && cap.headlineCount === 'views') || youtubeVideo;
   const fromFacts = pageViews ? num(facts.viewCount) : num(facts.viewers);
   const concText = String(bag?.concurrent?.text || '').trim();

@@ -57,6 +57,7 @@ export function buildNicoVideoWatchCardModel(input) {
     spend: src.spend || null,
     takeHome: src.takeHome || null,
     platform: 'niconico',
+    contentKind: 'video',
   });
   let recordedSummary = 'この投稿者の配信を、このPCではまだ記録していません。配信を開いて記録すると、動画のコメント欄と照合できます。';
   if (streamCount > 0) {

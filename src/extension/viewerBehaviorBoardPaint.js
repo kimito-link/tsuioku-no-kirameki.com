@@ -5,6 +5,7 @@
 import { KEY_VIEWER_BEHAVIOR_BOARD, KEY_YT_VIDEO_WATCH_CARD, KEY_NICO_VIDEO_WATCH_CARD, KEY_LAST_WATCH_URL } from '../lib/storageKeys.js';
 import { viewerBehaviorBoardInnerHtml } from '../lib/viewerBehavior.js';
 import { hydrateViewerBehaviorLiveLayout } from './viewerBehaviorLiveLayout.js';
+import { wireLaneUserDetailOpen } from './popup/wireLaneUserDetailOpen.js';
 import { viewerBehaviorWrapMatchesUrl } from '../lib/viewerBehaviorMatch.js';
 import { ytVideoWatchCardInnerHtml } from '../lib/youtube/ytVideoWatchCard.js';
 import { nicoVideoWatchCardInnerHtml } from '../lib/niconico/nicoVideoWatchCard.js';
@@ -128,34 +129,6 @@ export function bindViewerBehaviorBoardEvents(box) {
       }
       return;
     }
-    const tile = t.closest('.nl-story-userlane-cell');
-    if (tile && box.contains(tile)) {
-      ev.preventDefault();
-      const detail = box.querySelector('.nlsb-viewer-behavior__detail');
-      const board = box.__nlsbBoard;
-      if (!detail || !board) return;
-      const uid = String(tile.getAttribute('data-user-key') || tile.dataset.userKey || '').replace(/^u:/, '');
-      const name = String(tile.querySelector('.nl-story-userlane-meta__name')?.textContent || tile.getAttribute('title') || '').trim();
-      const row = (board.rows || []).find((r) => r.id === uid || r.name === name) || (board.rows || []).find((r) => r.isAnonymous);
-      if (!row) return;
-      const jumpId = String(row.commentAnchor || '');
-      detail.textContent = '';
-      const strong = box.ownerDocument.createElement('strong');
-      strong.textContent = [row.name, row.relationLabel].filter(Boolean).join(' · ');
-      detail.appendChild(strong);
-      const span = box.ownerDocument.createElement('span');
-      span.textContent = row.factLine ? ` ${row.factLine}` : '';
-      detail.appendChild(span);
-      if (jumpId) {
-        const jump = box.ownerDocument.createElement('button');
-        jump.type = 'button';
-        jump.className = 'nlsb-viewer-behavior__jump';
-        jump.setAttribute('data-comment-jump', jumpId);
-        jump.textContent = 'このコメントへ';
-        detail.appendChild(jump);
-      }
-      detail.removeAttribute('hidden');
-    }
   });
 }
 
@@ -176,6 +149,7 @@ export function paintViewerBehaviorBoardEl(opts = {}) {
   }
   const afterPaint = (el) => {
     bindViewerBehaviorBoardEvents(el);
+    try { wireLaneUserDetailOpen(doc); } catch { /* 既存の発言一覧の配線がすでにあればそれで足りる */ }
     if (opts.board) {
       try {
         el.__nlsbBoard = opts.board;

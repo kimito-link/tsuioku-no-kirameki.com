@@ -4,7 +4,7 @@
  */
 import { paintStoryUserLaneDomFilled } from './story/renderStoryUserLaneDom.js';
 import { createVenueStatStrip } from '../lib/venueStatStrip.js';
-import { VIEWER_BEHAVIOR_FALLBACK_AVATAR } from '../lib/viewerBehavior.js';
+import { VIEWER_BEHAVIOR_FALLBACK_AVATAR, resolveViewerBehaviorAvatarUrl } from '../lib/viewerBehavior.js';
 
 const LANE_IO = {
   storyAvatarLoadGuard: { pickDisplaySrc: (s) => s || VIEWER_BEHAVIOR_FALLBACK_AVATAR, noteRemoteAttempt: () => {} },
@@ -23,22 +23,40 @@ export function viewerBehaviorRowsToLaneBuckets(board, opts = {}) {
   const rows = Array.isArray(board?.rows) ? board.rows : [];
   /** @type {{ link: any[], gift: any[], ad: any[], konta: any[], tanu: any[] }} */
   const buckets = { link: [], gift: [], ad: [], konta: [], tanu: [] };
+  const videoOrder = board && (board.contentKind === 'video' || board.kind === 'video');
+  /** @type {any[]} */
+  const videoItems = [];
   for (const row of rows) {
     if (opts.pendingOnly && !row.pending && !row.isAnonymous) continue;
     if (opts.pendingOnly && row.isAnonymous && !row.pending) continue;
+    const badges = [];
+    if (row.relation === 'regular' && row.relationLabel) badges.push(row.relationLabel);
+    else if (row.relationLabel && row.relationLabel !== '初めて' && row.relationLabel !== 'なじみ') badges.push(row.relationLabel);
+    if ((row.giftCount || 0) > 0 || (row.knownAmountJpy || 0) > 0) badges.push('ギフト');
+    if (row.relation === 'regular' && !badges.includes(row.relationLabel || 'なじみ')) badges.unshift(row.relationLabel || 'なじみ');
+    const idLine = videoOrder
+      ? (badges.length ? badges.join('・') : String(row.relationLabel || ''))
+      : String(row.relationLabel || '');
+    const src = resolveViewerBehaviorAvatarUrl(row.isAnonymous ? '' : row.id, row.avatarUrl);
     const item = {
-      displaySrc: String(row.avatarUrl || '').trim() || VIEWER_BEHAVIOR_FALLBACK_AVATAR,
+      displaySrc: src || VIEWER_BEHAVIOR_FALLBACK_AVATAR,
       title: String(row.name || ''),
-      meta: { idLine: String(row.relationLabel || ''), nameLine: String(row.name || '') },
-      entry: { userId: row.isAnonymous ? '' : String(row.id || ''), nickname: String(row.name || ''), avatarUrl: String(row.avatarUrl || '') },
+      meta: { idLine, nameLine: String(row.name || '') },
+      entry: { userId: row.isAnonymous ? '' : String(row.id || ''), nickname: String(row.name || ''), avatarUrl: src },
       commentCount: Number(row.commentCount) || 0,
       pending: row.pending === true,
       factLine: String(row.factLine || ''),
       commentAnchor: String(row.commentAnchor || ''),
+      pageAt: Number(row.pageAt) > 0 ? Math.floor(Number(row.pageAt)) : 0,
     };
-    if (row.relation === 'regular') buckets.link.push(item);
+    if (videoOrder) videoItems.push(item);
+    else if (row.relation === 'regular') buckets.link.push(item);
     else if ((row.giftCount || 0) > 0 || (row.knownAmountJpy || 0) > 0) buckets.gift.push(item);
     else buckets.tanu.push(item);
+  }
+  if (videoOrder) {
+    videoItems.sort((a, b) => (b.pageAt || 0) - (a.pageAt || 0));
+    buckets.tanu.push(...videoItems);
   }
   return buckets;
 }

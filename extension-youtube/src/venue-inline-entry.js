@@ -26,6 +26,7 @@ import { installLastStreamUrlRemember } from './pfLastStreamUrl.js';
 import { venueRootVisibilityAction } from '../../src/lib/venueWatchPageVisibility.js';
 import { KEY_YT_VIDEO_WATCH_CARD, KEY_VIEWER_BEHAVIOR_BOARD } from '../../src/lib/storageKeys.js';
 import { ytVideoWatchCardInnerHtml } from '../../src/lib/youtube/ytVideoWatchCard.js';
+import { ytPageShouldHideVenueMode } from '../../src/lib/youtube/ytVideoWatchMeta.js';
 import { viewerBehaviorBoardInnerHtml } from '../../src/lib/viewerBehavior.js';
 import { viewerBehaviorWrapMatchesUrl } from '../../src/lib/viewerBehaviorMatch.js';
 
@@ -156,6 +157,45 @@ function paintVideoWatchCard(_vid) {
   try { document.getElementById(VIDEO_WATCH_CARD_ID)?.remove(); } catch { /* 会場は出す */ }
 }
 
+
+
+function storedWatchLooksLikeVideo(changes, vid) {
+  const take = (key) => {
+    const v = changes?.[key]?.newValue;
+    if (!v || typeof v !== 'object') return '';
+    const row = v.contentKind ? v : (vid && v[vid]) || Object.values(v).find((x) => x && typeof x === 'object' && x.contentKind) || v;
+    return String(row?.contentKind || row?.kind || '');
+  };
+  return take(KEY_YT_VIDEO_WATCH_CARD) === 'video' || take(KEY_VIEWER_BEHAVIOR_BOARD) === 'video';
+}
+
+function pageIsYtOrdinaryVideo() {
+  try {
+    const root = document.documentElement;
+    const kind = root?.getAttribute('data-nl-yt-content-kind') || '';
+    const isLiveAttr = root?.getAttribute('data-nl-yt-is-live');
+    const isLive = isLiveAttr === '0' ? false : isLiveAttr === '1' ? true : undefined;
+    const isLiveContent = root?.getAttribute('data-nl-yt-is-live-content') === '1';
+    return ytPageShouldHideVenueMode({ contentKind: kind, isLive, isLiveContent });
+  } catch {
+    /* 属性が読めなくても会場ボタンはライブだけで出す */
+  }
+  return false;
+}
+
+function hideVenueModeForVideoPage(hide) {
+  const root = document.getElementById('nlsb-venue-root');
+  if (!root) return;
+  if (hide) {
+    root.hidden = true;
+    root.setAttribute('data-nl-video-hidden', '1');
+    try { document.documentElement.classList.remove('nlsb-venue-open'); } catch { /* 会場を閉じるだけ */ }
+  } else if (root.getAttribute('data-nl-video-hidden') === '1') {
+    root.hidden = false;
+    root.removeAttribute('data-nl-video-hidden');
+  }
+}
+
 function sync() {
   const vid = currentVideoId();
   if (vid) lastStreamRemember?.remember(false); // URL が変わったときだけ書く(同じ URL は書き直さない)
@@ -168,6 +208,12 @@ function sync() {
   setRootShown(true);
   paintVideoWatchCard(vid);
   paintViewerBehaviorBoard(vid);
+  const videoPage = pageIsYtOrdinaryVideo();
+  hideVenueModeForVideoPage(videoPage);
+  if (videoPage) {
+    mountedVid = vid;
+    return;
+  }
   if (vid === mountedVid) return;
   __ytSetVenueLiveId(pseudoLvForVideoId(vid));
   mountedVid = vid;
@@ -268,6 +314,10 @@ try {
     const vid = currentVideoId();
     if (changes?.[KEY_YT_VIDEO_WATCH_CARD]) paintVideoWatchCard(vid);
     if (changes?.[KEY_VIEWER_BEHAVIOR_BOARD]) paintViewerBehaviorBoard(vid);
+    // 最初の sync が属性より先でも、カードや板が来たときに会場モードを隠す（新しい定期確認は足さない）。
+    if (changes?.[KEY_YT_VIDEO_WATCH_CARD] || changes?.[KEY_VIEWER_BEHAVIOR_BOARD]) {
+      hideVenueModeForVideoPage(pageIsYtOrdinaryVideo() || storedWatchLooksLikeVideo(changes, vid));
+    }
   });
 } catch {
   /* 監視できなくても sync で塗る */

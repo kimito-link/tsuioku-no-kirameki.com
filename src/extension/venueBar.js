@@ -70,7 +70,7 @@ import {
 } from '../lib/venuePaintSchedule.js';
 import { REMEMBERED_EMOTE_KEYS, rememberedEmoteChanges, rememberedEmoteDict } from '../lib/platform/streamEmotes.js';
 import { KEY_NICO_CHANNEL_COMMENTERS, KEY_VIEWER_BEHAVIOR_BOARD } from '../lib/storageKeys.js';
-import { buildViewerBehaviorBoard } from '../lib/viewerBehavior.js';
+import { buildViewerBehaviorBoard, resolveViewerBehaviorAvatarUrl } from '../lib/viewerBehavior.js';
 import { applyNicoCommentsToChannelIndex, peopleInNicoChannelCommenterIndex } from '../lib/niconico/nicoChannelCommenterIndex.js';
 import { installViewerBehaviorBoardFromStorage } from './viewerBehaviorBoardPaint.js';
 
@@ -7017,12 +7017,14 @@ export function mountVenueBarButton(options = {}) {
       const gift = row?.isGift === true || row?.gift != null || String(row?.kind || '') === 'gift';
       const pt = Number(row?.amount ?? row?.point ?? row?.giftPoint ?? (row?.gift && typeof row.gift === 'object' ? row.gift.point : 0));
       const amt = Number.isFinite(pt) && pt > 0 ? Math.floor(pt) : null;
-      const prev = map.get(id) || { id, name: '', commentCount: 0, giftCount: null, knownAmountJpy: null, at: 0 };
+      const avatarRaw = String(row?.avatarUrl || row?.avatar || row?.iconUrl || row?.userIconUrl || '').trim();
+      const prev = map.get(id) || { id, name: '', commentCount: 0, giftCount: null, knownAmountJpy: null, at: 0, avatarUrl: '' };
       prev.commentCount += 1;
       if (name && name.length >= String(prev.name || '').length) prev.name = name;
       if (at > (prev.at || 0)) prev.at = at;
       if (gift) prev.giftCount = (prev.giftCount || 0) + 1;
       if (amt != null) prev.knownAmountJpy = (prev.knownAmountJpy || 0) + amt;
+      prev.avatarUrl = resolveViewerBehaviorAvatarUrl(id, avatarRaw || prev.avatarUrl);
       map.set(id, prev);
       if (!nicoIndexedRowKeys.has(dedupe)) {
         nicoIndexedRowKeys.add(dedupe);
@@ -7055,6 +7057,7 @@ export function mountVenueBarButton(options = {}) {
           historyReady: Object.keys(historyById).length > 0,
           nowMs: Date.now(),
           platform: 'niconico',
+          contentKind: 'live',
         });
         if (typeof chrome !== 'undefined' && chrome.storage?.local) {
           await chrome.storage.local.set({

@@ -66,14 +66,8 @@ function walkSubscriberText(node, depth, budget) {
 export function concurrentFromVideoViewCountRenderer(renderer) {
   if (!renderer || typeof renderer !== 'object') return null;
   const text = viewCountText(renderer.viewCount);
-  const fromText = extractYtWatchConcurrentViewersFromText(text);
-  if (fromText !== null) return fromText;
-  const live = renderer.isLive === true || /視聴中|watching/i.test(text);
-  if (!live) return null;
-  const raw = renderer.originalViewCount;
-  const n = typeof raw === 'number' ? raw : typeof raw === 'string' && /^\d+$/.test(raw) ? Number(raw) : NaN;
-  if (!Number.isFinite(n) || n < 0 || n > 50_000_000) return null;
-  return Math.floor(n);
+  // 総再生（回視聴 / views / originalViewCount）は同時視聴にしない。
+  return extractYtWatchConcurrentViewersFromText(text);
 }
 
 /**

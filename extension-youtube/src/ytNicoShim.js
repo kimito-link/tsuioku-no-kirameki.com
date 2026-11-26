@@ -27,6 +27,7 @@ import { buildGiftThrowLedgerTableSectionHtml, buildGiftThrowLedgerTableRowHtml 
 import { ytWording, ytWordingTopFanToSuperChatRank, ytWordingSuperChatRankToTopFan, ytWordingForPlatform, ytWordingPlatformFixed, ytWordingPlatformOfficial, ytGiftUnitWording } from '../../src/lib/youtube/ytWording.js';
 import { ytSuperChatTierColor, ytSuperChatFromRowText } from '../../src/lib/youtube/ytSuperChatTier.js';
 import { parseYtVideoIdFromUrl, isYtWatchLikeUrl, ytHandleLivePendingKey, ytHandleOfPendingKey, ytHandleLivePath, ytChannelUrlOfPendingKey } from '../../src/lib/youtube/ytPageMeta.js';
+import { ytWatchMayShowConcurrentViewers, concurrentViewersIsViewCountLeak } from '../../src/lib/youtube/ytVideoWatchMeta.js';
 import { platformOfStreamKey, platformOfPersonKey, platformChannelOfUrl, platformOfHostname, STREAM_PLATFORMS, placeholderStreamKeyForChannel, isPlaceholderStreamKey, streamKeysShareChannel, preferLiveStreamKey } from '../../src/lib/platform/streamPlatform.js';
 import { shouldAcceptYtLiveRows } from '../../src/lib/youtube/ytLiveRowsAccept.js';
 import { splitTextByEmotes, isEmoteName, isSafeEmoteUrl } from '../../src/lib/platform/streamEmotes.js';
@@ -496,9 +497,11 @@ function ytTrustedStartedAt(sum, videoId, all) {
 export function ytSummaryToNicoSnapshot(sum, videoId, tabTitle, all) {
   const lv = pseudoLvForVideoId(videoId);
   // null を Number() すると 0 になり「0人」と出てしまうので、数のときだけ使う
-  const viewers = sum?.contentKind === 'video'
-    ? NaN
-    : typeof sum?.concurrentViewers === 'number' ? sum.concurrentViewers : NaN;
+  const mayShowConcurrent = ytWatchMayShowConcurrentViewers({
+    contentKind: sum?.contentKind,
+    isLive: sum?.isLive,
+  }) && !concurrentViewersIsViewCountLeak(sum?.concurrentViewers, sum?.slotViewCount);
+  const viewers = mayShowConcurrent && typeof sum?.concurrentViewers === 'number' ? sum.concurrentViewers : NaN;
   // 配信の本当の開始時刻(ページの「ライブ配信開始日」)。記録を始めた時刻で代わりにすると、
   // 長い配信を開いた直後に「経過 0分」になる。分からないあいだは出さない。
   const trustedStart = ytTrustedStartedAt(sum, videoId, all);

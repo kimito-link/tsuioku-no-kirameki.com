@@ -86,8 +86,9 @@ export function mergeYtStreamSummary(existing, patch, nowMs = Date.now()) {
   const plausible = (/** @type {unknown} */ v) =>
     typeof v === 'number' && Number.isFinite(v) && v >= 0 && v <= 50_000_000;
   const officialVideo = patch?.isLive === false && patch?.isLiveContent === false;
+  const notLiveNow = patch?.isLive === false || officialVideo || patch?.contentKind === 'video';
   const gotCount = plausible(patch?.concurrentViewers);
-  const concurrentViewers = officialVideo
+  let concurrentViewers = notLiveNow
     ? null
     : gotCount
       ? Math.floor(/** @type {number} */ (patch.concurrentViewers))
@@ -184,14 +185,24 @@ export function mergeYtStreamSummary(existing, patch, nowMs = Date.now()) {
   const prevKind = kindOf(prev.contentKind);
   // 配信・アーカイブと分かったあとに、通常動画へ落とさない（開始直後の取り違え防止）。
   // ただし公式が isLive/isLiveContent とも false なら、取り違えた live を通常動画へ直す。
-  const contentKind =
+  let contentKind =
     officialVideo
       ? 'video'
-      : patchKind === 'live' || patchKind === 'live_replay'
-        ? patchKind
-        : prevKind === 'live' || prevKind === 'live_replay'
-          ? prevKind
-          : patchKind || prevKind;
+      : patch?.isLive === false && patch?.isLiveContent === true
+        ? 'live_replay'
+        : patchKind === 'live' || patchKind === 'live_replay'
+          ? patchKind
+          : prevKind === 'live' || prevKind === 'live_replay'
+            ? prevKind
+            : patchKind || prevKind;
+  if (officialVideo) contentKind = 'video';
+  if (contentKind === 'video' || contentKind === 'live_replay' || patch?.isLive === false) {
+    concurrentViewers = null;
+  }
+  if (slotViewCount != null && concurrentViewers === slotViewCount) {
+    concurrentViewers = null;
+    if (patch?.isLive !== true && patchKind !== 'live') contentKind = officialVideo || patch?.isLiveContent === true ? (patch?.isLiveContent === true ? 'live_replay' : 'video') : 'video';
+  }
 
   return {
     videoId,
@@ -219,6 +230,7 @@ export function mergeYtStreamSummary(existing, patch, nowMs = Date.now()) {
     updatedAt: nowMs,
   };
 }
+
 
 /**
  * 受信したコメント配列を、間引き（上限カット）なしで IndexedDB 保存用レコード配列へ正規化する。

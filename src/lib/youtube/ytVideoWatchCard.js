@@ -94,7 +94,7 @@ export function buildYtVideoWatchCardModel(input) {
       commentCount: Number(a?.commentCount) > 0 ? Math.floor(Number(a.commentCount)) : 1,
       giftCount: Number(a?.amount) > 0 ? 1 : null,
       knownAmountJpy: String(a?.currency || '').toUpperCase() === 'JPY' && Number(a?.amount) > 0 ? Math.floor(Number(a.amount)) : null,
-      at: a?.postedAtMs,
+      at: Number(a?.postedAtMs || a?.at) > 0 ? Math.floor(Number(a.postedAtMs || a.at)) : 0,
       pending: a?.pending === true,
       commentAnchor: String(a?.commentId || '').trim(),
     })),
@@ -105,6 +105,7 @@ export function buildYtVideoWatchCardModel(input) {
     spend,
     takeHome,
     platform: 'youtube',
+    contentKind: 'video',
   });
 
   return {

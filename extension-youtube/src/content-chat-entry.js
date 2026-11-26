@@ -686,9 +686,12 @@ function setupWatchPageMetaObserver() {
     } catch {
       /* フレームが読めなくても種別は他の印で決める */
     }
+    let viewersForKind = viewers;
+    if (viewCount != null && viewersForKind === viewCount) viewersForKind = null;
     const contentKind = classifyYtWatchContentKind({
       url: String(location.href || ''),
-      concurrentViewers: viewers,
+      concurrentViewers: viewersForKind,
+      viewCount,
       isLive: attrBool('data-nl-yt-is-live'),
       isLiveContent: attrBool('data-nl-yt-is-live-content'),
       hasLiveChat,
@@ -707,7 +710,7 @@ function setupWatchPageMetaObserver() {
         broadcasterChannelId,
         broadcasterHandle,
         broadcasterIconUrl: readBroadcasterIconUrl(),
-        concurrentViewers: contentKind === 'video' ? undefined : viewers,
+        concurrentViewers: contentKind === 'video' ? undefined : viewersForKind,
         ...(contentKind !== 'video' && viewers === null ? { viewersRead: false } : {}),
         sourceUrl: String(location.href || ''),
         ...startedAtFields(videoId, contentKind !== 'video' && viewers !== null),

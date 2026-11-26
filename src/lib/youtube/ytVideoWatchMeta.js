@@ -207,6 +207,7 @@ export function ytLiveFlagsFromPlayerOrInitial(data) {
  * @param {{
  *   url?: string,
  *   concurrentViewers?: number | null,
+ *   viewCount?: number | null,
  *   isLive?: boolean | null,
  *   isLiveContent?: boolean | null,
  *   hasLiveChat?: boolean,
@@ -215,14 +216,60 @@ export function ytLiveFlagsFromPlayerOrInitial(data) {
  * }} signals
  * @returns {'live' | 'live_replay' | 'video' | 'unknown'}
  */
+/**
+ * 通常動画・アーカイブでは、どの経路の数でも同時視聴者数を出さない。
+ * @param {{ isLive?: boolean | null, isLiveContent?: boolean | null, contentKind?: string | null, hasLiveChat?: boolean }} [signals]
+ * @returns {boolean}
+ */
+/**
+ * 通常の動画ページでは会場モードのボタンを出さない。
+ * @param {{ contentKind?: string|null, isLive?: boolean|null, isLiveContent?: boolean|null }} [meta]
+ */
+export function ytPageShouldHideVenueMode(meta) {
+  const kind = String(meta?.contentKind || '').trim();
+  if (kind === 'video') return true;
+  if (meta?.isLive === false && kind !== 'live' && kind !== 'live_replay') {
+    return meta?.isLiveContent !== true;
+  }
+  return false;
+}
+
+export function ytWatchMayShowConcurrentViewers(signals) {
+  const s = signals && typeof signals === 'object' ? signals : {};
+  if (s.isLive === false) return false;
+  if (s.contentKind === 'video' || s.contentKind === 'live_replay') return false;
+  if (s.isLive === true || s.contentKind === 'live' || s.hasLiveChat === true) return true;
+  return false;
+}
+
+/**
+ * 同時視聴の欄に入っている数が、再生回数と同じなら取り違え。
+ * @param {unknown} concurrent
+ * @param {unknown} viewCount
+ * @returns {boolean}
+ */
+export function concurrentViewersIsViewCountLeak(concurrent, viewCount) {
+  const a = Number(concurrent);
+  const b = Number(viewCount);
+  if (!Number.isFinite(a) || !Number.isFinite(b) || a < 0 || b < 0) return false;
+  return Math.floor(a) === Math.floor(b);
+}
+
 export function classifyYtWatchContentKind(signals) {
   const s = signals && typeof signals === 'object' ? signals : {};
   if (s.hasLiveChatReplay === true) return 'live_replay';
   if (s.isLive === true) return 'live';
   // 公式が「いまは配信ではない」と出しているときは、取り違えた同時視聴の数や残ったチャット枠で live にしない
   if (s.hasLiveChat === true && s.isLive !== false) return 'live';
+  const viewCount = typeof s.viewCount === 'number' && Number.isFinite(s.viewCount) ? s.viewCount : null;
+  const concurrentIsViewCount = viewCount != null && s.concurrentViewers === viewCount;
+  if (s.isLive !== true && viewCount != null && (s.concurrentViewers == null || concurrentIsViewCount) && s.hasLiveChatReplay !== true) {
+    if (s.isLiveContent === true) return 'live_replay';
+    return 'video';
+  }
   if (
     s.isLive !== false &&
+    !concurrentIsViewCount &&
     typeof s.concurrentViewers === 'number' &&
     Number.isFinite(s.concurrentViewers) &&
     s.concurrentViewers >= 0
@@ -366,22 +413,86 @@ function walkComments(node, out, seen, budget, depth, limit) {
  * @param {{ limit?: number }} [opts]
  * @returns {YtVideoCommentAuthor[]}
  */
+
+/** @param {ParentNode | Element | null | undefined} root @param {string} sel */
+function queryDeep(root, sel) {
+  if (!root || typeof root.querySelector !== 'function') return null;
+  try {
+    const hit = root.querySelector(sel);
+    if (hit) return hit;
+  } catch {
+    /* セレクタが古い環境でも他の場所を見る */
+  }
+  const sr = /** @type {any} */ (root).shadowRoot;
+  if (sr && typeof sr.querySelector === 'function') {
+    try {
+      const hit = sr.querySelector(sel);
+      if (hit) return hit;
+    } catch {
+      /* shadow が読めなくても外の DOM は使う */
+    }
+  }
+  return null;
+}
+
+/**
+ * スレッドの器は light DOM にあり、中の view-model や #author-thumbnail は shadow にあることがある。
+ * @param {ParentNode} root
+ * @returns {Element[]}
+ */
+function ytCommentHostElements(root) {
+  /** @type {Element[]} */
+  const hosts = [];
+  const threads = typeof root.querySelectorAll === 'function' ? root.querySelectorAll('ytd-comment-thread-renderer') : [];
+  for (let i = 0; i < threads.length; i += 1) {
+    const th = threads[i];
+    const vm = queryDeep(th, 'ytd-comment-view-model, ytd-comment-renderer, yt-comment-view-model');
+    hosts.push(/** @type {Element} */ (vm || th));
+  }
+  if (hosts.length) return hosts;
+  const loose = typeof root.querySelectorAll === 'function'
+    ? root.querySelectorAll('ytd-comment-view-model, ytd-comment-renderer, yt-comment-view-model')
+    : [];
+  for (let i = 0; i < loose.length; i += 1) hosts.push(loose[i]);
+  return hosts;
+}
+
+/**
+ * コメントの「3 時間前」「2 days ago」などから、おおよその投稿時刻を出す。並び用であり、記録の正式な時刻ではない。
+ * @param {unknown} text
+ * @param {number} [nowMs]
+ * @returns {number | null}
+ */
+export function parseYtCommentPublishedAtMs(text, nowMs = Date.now()) {
+  const s = String(text || '').replace(/\s+/g, ' ').trim();
+  const m = s.match(/(\d+)\s*(秒|seconds?|分|minutes?|時間|hours?|日|days?|週間|週|weeks?|か[ヶケ]月|months?|年|years?)\s*(前|ago)/i);
+  if (!m) return null;
+  const n = Number(m[1]);
+  if (!Number.isFinite(n) || n < 0) return null;
+  const unit = m[2].toLowerCase();
+  let ms = 0;
+  if (/秒|second/.test(unit)) ms = n * 1000;
+  else if (/分|minute/.test(unit)) ms = n * 60_000;
+  else if (/時間|hour/.test(unit)) ms = n * 3_600_000;
+  else if (/週|week/.test(unit)) ms = n * 7 * 86_400_000;
+  else if (/日|day/.test(unit)) ms = n * 86_400_000;
+  else if (/月|month/.test(unit)) ms = n * 30 * 86_400_000;
+  else if (/年|year/.test(unit)) ms = n * 365 * 86_400_000;
+  else return null;
+  const now = Number(nowMs);
+  const base = Number.isFinite(now) && now > 0 ? now : Date.now();
+  return Math.floor(base - ms);
+}
+
 export function ytVideoCommentAuthorsFromDom(root, opts = {}) {
   const limit = Number.isFinite(Number(opts.limit)) ? Math.max(1, Math.floor(Number(opts.limit))) : 80;
   if (!root || typeof root.querySelectorAll !== 'function') return [];
   /** @type {Map<string, YtVideoCommentAuthor>} */
   const byKey = new Map();
-  const threads = root.querySelectorAll(
-    'ytd-comment-thread-renderer, ytd-comment-view-model, ytd-comment-renderer, yt-comment-view-model',
-  );
+  const threads = ytCommentHostElements(root);
   for (let i = 0; i < threads.length; i += 1) {
     const el = threads[i];
-    if (!el || typeof el.querySelector !== 'function') continue;
-    // スレッド器の中の個々のコメントを、親スレッドと二重に数えない
-    if (el.tagName && /^YTD-COMMENT-THREAD-RENDERER$/i.test(el.tagName)) {
-      // スレッド自体は投稿者リンクを持つが、内側の view-model を正とする
-      continue;
-    }
+    if (!el) continue;
     let channelId = '';
     let handle = '';
     let commentId = String(el.getAttribute?.('comment-id') || el.getAttribute?.('data-comment-id') || '').trim();
@@ -405,19 +516,22 @@ export function ytVideoCommentAuthorsFromDom(root, opts = {}) {
         }
       }
     }
-    const nameEl = el.querySelector('#author-text, #author-text yt-formatted-string, a#author-text, #name, yt-attributed-string#name');
+    const nameEl = queryDeep(el, '#author-text, #author-text yt-formatted-string, a#author-text, #name, yt-attributed-string#name');
     const name = String(nameEl?.textContent || '').replace(/\s+/g, ' ').trim().slice(0, 80);
-    const paidEl = el.querySelector('[id*="super-thanks"], [class*="super-thanks"], [class*="superThanks"], #paid-comment-chip, .paid-comment-chip');
+    const paidEl = queryDeep(el, '[id*="super-thanks"], [class*="super-thanks"], [class*="superThanks"], #paid-comment-chip, .paid-comment-chip');
     const paid = parseYtPaidCommentAmount({ amount: String(paidEl?.textContent || '').trim() });
-    const img = el.querySelector('#author-thumbnail img, yt-img-shadow img, img#img, #author-photo img');
+    const img = queryDeep(el, '#author-thumbnail img, yt-img-shadow img, img#img, #author-photo img');
     const avatarUrl = String(
       (img && typeof img.getAttribute === 'function' && (img.getAttribute('src') || img.getAttribute('data-src')))
       || (img && img.src)
       || '',
     ).trim();
-    const creatorHeart = Boolean(el.querySelector('#creator-heart, ytd-creator-heart-renderer, [id*="creator-heart"], [class*="creator-heart"]'));
-    const creatorReply = Boolean(el.querySelector('ytd-author-comment-badge-renderer, #author-comment-badge, [class*="author-comment-badge"]'));
+    const creatorHeart = Boolean(queryDeep(el, '#creator-heart, ytd-creator-heart-renderer, [id*="creator-heart"], [class*="creator-heart"]'));
+    const creatorReply = Boolean(queryDeep(el, 'ytd-author-comment-badge-renderer, #author-comment-badge, [class*="author-comment-badge"]'));
     const pending = !creatorHeart && !creatorReply;
+    const publishedEl = queryDeep(el, '#published-time-text, #published-time-text a, .published-time-text, yt-formatted-string#published-time-text');
+    const publishedText = String(publishedEl?.getAttribute?.('aria-label') || publishedEl?.getAttribute?.('title') || publishedEl?.textContent || '').trim();
+    const postedAtMs = parseYtCommentPublishedAtMs(publishedText, opts.nowMs);
     const key = channelId || handle || (name ? `name:${name}` : '');
     if (!key) continue;
     const prev = byKey.get(key);
@@ -434,6 +548,7 @@ export function ytVideoCommentAuthorsFromDom(root, opts = {}) {
         creatorHeart,
         creatorReply,
         pending,
+        postedAtMs,
       });
     } else {
       prev.commentCount = (Number(prev.commentCount) || 1) + 1;
@@ -452,10 +567,13 @@ export function ytVideoCommentAuthorsFromDom(root, opts = {}) {
         if (commentId && !prev.commentId) prev.commentId = commentId;
       }
       if (!pending && !prev.pending && commentId && !prev.commentId) prev.commentId = commentId;
+      if (postedAtMs && (!prev.postedAtMs || postedAtMs > prev.postedAtMs)) prev.postedAtMs = postedAtMs;
     }
     if (byKey.size >= limit && !prev) break;
   }
-  return [...byKey.values()];
+  const rows = [...byKey.values()];
+  rows.sort((a, b) => (Number(b.postedAtMs) || 0) - (Number(a.postedAtMs) || 0));
+  return rows;
 }
 
 /**
