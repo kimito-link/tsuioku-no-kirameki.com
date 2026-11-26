@@ -310,6 +310,9 @@ export const KEY_NICO_CHANNEL_COMMENTERS = 'nls_nico_channel_commenters_v1';
 /** いま見ているニコニコ動画の通常動画カード（ライブのコメント正本ではない） */
 export const KEY_NICO_VIDEO_WATCH_CARD = 'nls_nico_video_watch_card_v1';
 
+/** いま見ている Twitch/Kick/ツイキャス/ABEMA/TikTok の通常動画カード（ライブのコメント正本ではない） */
+export const KEY_VOD_VIDEO_WATCH_CARD = 'nls_vod_video_watch_card_v1';
+
 /** いま見えている人の「視聴者の行動」ボード（動画・配信で共通。記録の正本ではない） */
 export const KEY_VIEWER_BEHAVIOR_BOARD = 'nls_viewer_behavior_board_v1';
 

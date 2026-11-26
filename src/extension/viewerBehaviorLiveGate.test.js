@@ -3,6 +3,7 @@ import { readFileSync } from 'node:fs';
 import { planViewerBehaviorBoardPaint } from './viewerBehaviorBoardPaint.js';
 import { buildViewerBehaviorBoard, viewerBehaviorBoardInnerHtml } from '../lib/viewerBehavior.js';
 import { buildYtVideoWatchCardModel, ytVideoWatchCardInnerHtml } from '../lib/youtube/ytVideoWatchCard.js';
+import { buildVodVideoWatchCardModel, vodVideoWatchCardInnerHtml } from '../lib/videoWatch/videoWatchCard.js';
 
 const LIVE_URL = 'https://live.nicovideo.jp/watch/lv123456789';
 const VIDEO_URL = 'https://www.youtube.com/watch?v=mlfY1WYFpEc';
@@ -65,5 +66,32 @@ describe('ライブ配信には視聴者の行動ボードを出さない (0.1.2
     expect(bg).not.toContain('[KEY_VIEWER_BEHAVIOR_BOARD]');
     expect(bg).toContain('ライブ配信では視聴者の行動ボードを storage に書かない');
   });
+
+
+  it('Twitch など他サービスの通常動画だけ、その URL のときカードを塗る。ライブ配信では隠す', () => {
+    const card = buildVodVideoWatchCardModel({
+      platform: 'twitch',
+      pageKey: 'twvod:2938022552',
+      videoId: '2938022552',
+      title: 'VOD',
+    });
+    const planned = planViewerBehaviorBoardPaint({
+      url: 'https://www.twitch.tv/videos/2938022552',
+      sources: 'video',
+      vodCard: { videoId: 'twvod:2938022552', card },
+    });
+    expect(planned.hide).toBe(false);
+    expect(planned.source).toBe('vod-video');
+    expect(planned.html).toBe(vodVideoWatchCardInnerHtml(card));
+    expect(planned.html).not.toContain('視聴者の行動');
+    const onLive = planViewerBehaviorBoardPaint({
+      url: 'https://www.twitch.tv/example_channel',
+      sources: 'video',
+      vodCard: { videoId: 'twvod:2938022552', card },
+    });
+    expect(onLive.hide).toBe(true);
+    expect(onLive.html).toBe('');
+  });
+
 
 });

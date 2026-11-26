@@ -10,6 +10,7 @@ import { extractLiveIdFromUrl } from './broadcastUrl.js';
 import { nicoVideoIdFromUrl } from './niconico/nicoVideoWatchMeta.js';
 import { isYtWatchLikeUrl, parseYtVideoIdFromUrl } from './youtube/ytPageMeta.js';
 import { platformChannelOfUrl, platformOfStreamKey } from './platform/streamPlatform.js';
+import { vodWatchPageFromUrl } from './videoWatch/vodWatchUrl.js';
 
 const PLATFORM_PERSON_ID_RE = /^(tw|kk|sr|mx|tt|ww|tc|ab):[^\s]{1,80}$/i;
 const YT_CHANNEL_ID_RE = /^UC[A-Za-z0-9_-]{22}$/;
@@ -33,6 +34,9 @@ export function isIndexedPersonId(id) {
  */
 export function pageKeysForWatchUrl(href) {
   const url = String(href || '');
+  const vod = vodWatchPageFromUrl(url);
+  // 通常動画の VOD はライブ配信の login と混ぜない（ABEMA の p- など）
+  if (vod) return [vod.pageKey];
   /** @type {string[]} */
   const keys = [];
   const add = (/** @type {string} */ k) => {

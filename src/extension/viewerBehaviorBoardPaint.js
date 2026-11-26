@@ -2,12 +2,13 @@
  * 視聴者の行動ボードを、既にある storage の変化だけを見て塗る。
  * 新しいタイマー・Observer・通信は使わない。会場の数字は触らない。
  */
-import { KEY_VIEWER_BEHAVIOR_BOARD, KEY_YT_VIDEO_WATCH_CARD, KEY_NICO_VIDEO_WATCH_CARD, KEY_LAST_WATCH_URL } from '../lib/storageKeys.js';
+import { KEY_VIEWER_BEHAVIOR_BOARD, KEY_YT_VIDEO_WATCH_CARD, KEY_NICO_VIDEO_WATCH_CARD, KEY_VOD_VIDEO_WATCH_CARD, KEY_LAST_WATCH_URL } from '../lib/storageKeys.js';
 import { hydrateViewerBehaviorLiveLayout } from './viewerBehaviorLiveLayout.js';
 import { wireVideoLanePersonDetail } from './wireVideoLanePersonDetail.js';
 import { viewerBehaviorWrapMatchesUrl } from '../lib/viewerBehaviorMatch.js';
 import { ytVideoWatchCardInnerHtml } from '../lib/youtube/ytVideoWatchCard.js';
 import { nicoVideoWatchCardInnerHtml } from '../lib/niconico/nicoVideoWatchCard.js';
+import { vodVideoWatchCardInnerHtml } from '../lib/videoWatch/videoWatchCard.js';
 import { VENUE_STAT_STRIP_CSS } from '../lib/venueStatStrip.js';
 
 export const VIEWER_BEHAVIOR_BOARD_EL_ID = 'nlsb-viewer-behavior-board';
@@ -204,6 +205,12 @@ function videoCardHtmlIfMatches(wrap, url) {
     : ytVideoWatchCardInnerHtml(wrap.card);
 }
 
+function vodCardHtmlIfMatches(wrap, url) {
+  if (!wrap || typeof wrap !== 'object') return '';
+  if (!viewerBehaviorWrapMatchesUrl({ pageKey: wrap.videoId }, url)) return '';
+  return vodVideoWatchCardInnerHtml(wrap.card);
+}
+
 /**
  * storage にあるカード／ボードを、いまのページ用だけ塗る。
  * @param {{
@@ -218,7 +225,7 @@ function videoCardHtmlIfMatches(wrap, url) {
 
 /**
  * ライブの板は出さない。通常動画のカードだけを、その URL のときだけ塗る。
- * @param {{ url?: string, sources?: string, nicoCard?: any, ytCard?: any, liveWrap?: any }} input
+ * @param {{ url?: string, sources?: string, nicoCard?: any, ytCard?: any, vodCard?: any, liveWrap?: any }} input
  */
 export function planViewerBehaviorBoardPaint(input) {
   const src = input && typeof input === 'object' ? input : {};
@@ -226,12 +233,13 @@ export function planViewerBehaviorBoardPaint(input) {
   const sources = src.sources === 'live' ? 'live' : 'video';
   const nico = sources !== 'live' ? videoCardHtmlIfMatches(src.nicoCard, url) : '';
   const yt = sources !== 'live' ? videoCardHtmlIfMatches(src.ytCard, url) : '';
+  const vod = sources !== 'live' && !nico && !yt ? vodCardHtmlIfMatches(src.vodCard, url) : '';
   // ライブ配信の「視聴者の行動」は出さない（コメントごとに書いて横の欄をちらつかせない）。
   return {
-    html: nico || yt || '',
-    board: (nico && src.nicoCard?.card?.behavior) || (yt && src.ytCard?.card?.behavior) || null,
-    hide: !(nico || yt),
-    source: nico ? 'niconico-video' : yt ? 'youtube-video' : 'none',
+    html: nico || yt || vod || '',
+    board: (nico && src.nicoCard?.card?.behavior) || (yt && src.ytCard?.card?.behavior) || (vod && src.vodCard?.card?.behavior) || null,
+    hide: !(nico || yt || vod),
+    source: nico ? 'niconico-video' : yt ? 'youtube-video' : vod ? 'vod-video' : 'none',
   };
 }
 
@@ -246,7 +254,7 @@ export function installViewerBehaviorBoardFromStorage(opts) {
         paintViewerBehaviorBoardEl({ document: doc, hide: true });
         return;
       }
-      void storage.local.get([KEY_VIEWER_BEHAVIOR_BOARD, KEY_YT_VIDEO_WATCH_CARD, KEY_NICO_VIDEO_WATCH_CARD, KEY_LAST_WATCH_URL]).then((bag) => {
+      void storage.local.get([KEY_VIEWER_BEHAVIOR_BOARD, KEY_YT_VIDEO_WATCH_CARD, KEY_NICO_VIDEO_WATCH_CARD, KEY_VOD_VIDEO_WATCH_CARD, KEY_LAST_WATCH_URL]).then((bag) => {
         try {
           if (opts.skipIfVideoCardId && doc.getElementById(opts.skipIfVideoCardId)) {
             paintViewerBehaviorBoardEl({ document: doc, hide: true });
@@ -258,6 +266,7 @@ export function installViewerBehaviorBoardFromStorage(opts) {
             sources: opts.sources,
             nicoCard: bag?.[KEY_NICO_VIDEO_WATCH_CARD],
             ytCard: bag?.[KEY_YT_VIDEO_WATCH_CARD],
+            vodCard: bag?.[KEY_VOD_VIDEO_WATCH_CARD],
             liveWrap: bag?.[KEY_VIEWER_BEHAVIOR_BOARD],
           });
           const html = planned.html;
@@ -283,7 +292,7 @@ export function installViewerBehaviorBoardFromStorage(opts) {
   try {
     storage.onChanged?.addListener?.((changes, area) => {
       if (area !== 'local') return;
-      if (!changes?.[KEY_VIEWER_BEHAVIOR_BOARD] && !changes?.[KEY_YT_VIDEO_WATCH_CARD] && !changes?.[KEY_NICO_VIDEO_WATCH_CARD]) return;
+      if (!changes?.[KEY_VIEWER_BEHAVIOR_BOARD] && !changes?.[KEY_YT_VIDEO_WATCH_CARD] && !changes?.[KEY_NICO_VIDEO_WATCH_CARD] && !changes?.[KEY_VOD_VIDEO_WATCH_CARD]) return;
       refresh();
     });
   } catch {

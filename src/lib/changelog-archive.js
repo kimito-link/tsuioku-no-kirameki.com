@@ -24,6 +24,14 @@
 /** @type {ChangelogEntry[]} */
 const ARCHIVE_ENTRIES = [
   Object.freeze({
+    version: '0.1.2214',
+    date: '2026-11-25',
+    summary: 'PCが忙しいときだけ客席の動きをゆるく',
+    items: Object.freeze([
+      '会場の客席の動きは、ふつうのノートPCではこれまでどおり滑らかです。読み上げや画面の処理が追いついていないときだけ、動きの細かさを自動で減らして軽くします。忙しさは拡張がもともと見ている値だけで判断します。',
+    ])
+  }),
+  Object.freeze({
     version: '0.1.2213',
     date: '2026-11-25',
     summary: '読み上げが混んでいるあいだは声を休ませる',

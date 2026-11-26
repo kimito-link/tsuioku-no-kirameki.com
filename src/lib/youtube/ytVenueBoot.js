@@ -10,6 +10,7 @@
  */
 
 import { parseAbLoginFromUrl } from '../abema/abParse.js';
+import { parseKickVodFromUrl, parseAbemaEpisodeFromUrl } from '../videoWatch/vodWatchUrl.js';
 
 /**
  * @param {string} href
@@ -35,14 +36,18 @@ export function needsYtVenue(href) {
   if (host === 'kick.com') {
     if (path === '/' || path === '') return false;
     if (/^\/(categories|following|search)(\/|$)/.test(path)) return false;
+    if (parseKickVodFromUrl(url.href)) return false;
     return /^\/[^/]+/.test(path);
   }
   if (host === 'whowatch.tv' || host.endsWith('.whowatch.tv')) return /\/viewer\//.test(path);
   if (host === 'www.showroom-live.com') return /\/r\//.test(path);
   if (host === 'mixch.tv') return /\/live/.test(path);
   if (host === 'www.tiktok.com' || host === 'tiktok.com') return /\/live(\/|$)/.test(path);
-  // ABEMA(#608): 放送中のチャンネル・ライブイベント・見逃しの番組の視聴ページだけ
-  if (host === 'abema.tv' || host === 'www.abema.tv') return !!parseAbLoginFromUrl(url.href);
+  // ABEMA(#608): 放送中のチャンネル・ライブイベントの視聴ページだけ。見逃し（/video/episode）は会場を載せない。
+  if (host === 'abema.tv' || host === 'www.abema.tv') {
+    if (parseAbemaEpisodeFromUrl(url.href)) return false;
+    return !!parseAbLoginFromUrl(url.href);
+  }
   return false;
 }
 
