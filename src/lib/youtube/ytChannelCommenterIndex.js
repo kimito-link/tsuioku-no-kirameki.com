@@ -7,6 +7,7 @@
  */
 
 import { isYtChannelId } from './ytVideoWatchMeta.js';
+import { isIndexedPersonId } from '../viewerBehaviorMatch.js';
 import {
   CHANNEL_COMMENTER_INDEX_CAP,
   applyCommentsToChannelIndex,
@@ -26,8 +27,8 @@ export const YT_CHANNEL_COMMENTER_INDEX_CAP = CHANNEL_COMMENTER_INDEX_CAP;
  */
 export function applyLiveCommentsToChannelIndex(prev, broadcasterChannelId, comments, nowMs = 0, opts = {}) {
   return applyCommentsToChannelIndex(prev, broadcasterChannelId, comments, nowMs, {
-    isOwnerId: isYtChannelId,
-    isPersonId: isYtChannelId,
+    isOwnerId: (id) => isYtChannelId(id) || isIndexedPersonId(id),
+    isPersonId: (id) => isYtChannelId(id) || isIndexedPersonId(id),
     idFromRow: (row) => String(row?.channelId || row?.ytChannelId || '').trim(),
     cap: YT_CHANNEL_COMMENTER_INDEX_CAP,
     streamId: opts.streamId,

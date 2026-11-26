@@ -53,4 +53,15 @@ describe('applyLiveCommentsToChannelIndex', () => {
     expect(people[A].c).toBe(3);
     expect(people[A].f).toBe(10);
   });
+  it('Twitch など他サービスの人の鍵も索引に載せる', () => {
+    const owner = 'tw:999';
+    const person = 'tw:123';
+    const idx = applyLiveCommentsToChannelIndex({}, owner, [
+      { channelId: person, name: '花子', postedAtMs: 10 },
+    ], 100, { streamId: 'tw.alice.1', contentKind: 'live' });
+    const people = peopleInChannelCommenterIndex(idx, owner);
+    expect(people[person].n).toBe('花子');
+    expect(people[person].lv).toBe(1);
+    expect(people[person].c).toBe(1);
+  });
 });

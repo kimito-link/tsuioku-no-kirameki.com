@@ -161,7 +161,7 @@ function noteLiveVisiblePeople(videoId, channelId, rows) {
     liveVisiblePeopleByVideo.set(vid, map);
   }
   for (const row of list) {
-    const id = String(row?.channelId || row?.ytChannelId || '').trim();
+    const id = String(row?.channelId || row?.ytChannelId || row?.userId || '').trim();
     if (!id) continue;
     const name = String(row?.name || row?.nickname || row?.authorName || '').replace(/\s+/g, ' ').trim();
     const at = Number(row?.postedAtMs || row?.recordedAt || 0) || 0;

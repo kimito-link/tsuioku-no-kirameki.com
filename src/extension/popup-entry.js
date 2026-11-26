@@ -10,6 +10,7 @@ import '../lib/flickerMeterBoot.js';
 // v0.1.1687: 黒い幕の年表(サイドパネルの popup だけ・子の節目/長い処理/段階を親の起点に直して並べるための控え)。
 import '../lib/bootTimelineBoot.js';
 import { extractLiveIdFromUrl, isNicoLiveWatchUrl, watchPageUrlsMatchForSnapshot } from '../lib/broadcastUrl.js';
+import { installViewerBehaviorBoardFromStorage } from './viewerBehaviorBoardPaint.js';
 import { shouldSkipMirrorForLiveId } from '../lib/passiveMirrorLiveIdGuard.js';
 import { resolveOfficialPoints } from '../lib/resolveOfficialPoints.js';
 // v0.1.1057: HTMLレポート組み立てクラスタを popup/report/ へ切り出し(max-linesラチェット対応・挙動不変)。
@@ -21890,4 +21891,24 @@ if (typeof window !== 'undefined') {
       // no-op
     }
   }, 400);
+}
+
+try {
+  installViewerBehaviorBoardFromStorage({
+    document,
+    storage: typeof chrome !== 'undefined' ? chrome.storage : undefined,
+    getUrl: () => {
+      if (typeof INLINE_OWN_WATCH_URL === 'string' && INLINE_OWN_WATCH_URL) return INLINE_OWN_WATCH_URL;
+      try {
+        const fromState = String((typeof COMMENT_POST_UI_STATE !== 'undefined' && COMMENT_POST_UI_STATE && COMMENT_POST_UI_STATE.watchUrl) || '').trim();
+        if (fromState) return fromState;
+      } catch { /* 横の欄の URL がまだでも storage の最後の視聴 URL を使う */ }
+      return '';
+    },
+    placement: 'flow',
+    sources: 'all',
+    mountParent: document.getElementById('nlPopupPrimary'),
+  });
+} catch {
+  /* ボードが出せなくても横の欄の数字は出す */
 }

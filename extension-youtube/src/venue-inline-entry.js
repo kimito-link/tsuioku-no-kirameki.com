@@ -27,6 +27,7 @@ import { venueRootVisibilityAction } from '../../src/lib/venueWatchPageVisibilit
 import { KEY_YT_VIDEO_WATCH_CARD, KEY_VIEWER_BEHAVIOR_BOARD } from '../../src/lib/storageKeys.js';
 import { ytVideoWatchCardInnerHtml } from '../../src/lib/youtube/ytVideoWatchCard.js';
 import { viewerBehaviorBoardInnerHtml } from '../../src/lib/viewerBehavior.js';
+import { viewerBehaviorWrapMatchesUrl } from '../../src/lib/viewerBehaviorMatch.js';
 
 /** Twitch/Kick の視聴ページで動いているか(council/twitch-support-PLAN.md・会場は YouTube と同じくニコ生版の venueBar をそのまま使う) */
 const PAGE_PLATFORM = platformOfHostname(location.hostname);
@@ -127,7 +128,7 @@ function paintViewerBehaviorBoard(pageKey) {
     }
     void chrome.storage.local.get(KEY_VIEWER_BEHAVIOR_BOARD).then((bag) => {
       const wrap = bag?.[KEY_VIEWER_BEHAVIOR_BOARD];
-      const html = wrap && wrap.pageKey === pageKey && wrap.kind === 'live' ? viewerBehaviorBoardInnerHtml(wrap.board) : '';
+      const html = wrap && wrap.kind === 'live' && (wrap.pageKey === pageKey || viewerBehaviorWrapMatchesUrl(wrap, String(location.href || ''))) ? viewerBehaviorBoardInnerHtml(wrap.board) : '';
       const el = document.getElementById(BEHAVIOR_BOARD_ID);
       if (!html || document.getElementById(VIDEO_WATCH_CARD_ID)) {
         el?.remove();
