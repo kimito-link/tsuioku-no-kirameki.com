@@ -22,19 +22,21 @@ test.describe('watch タブへの messaging（メインフレーム）', () => {
       const tabs = await chrome.tabs.query({ url: tabUrlPattern });
       const id = tabs[0]?.id;
       if (!id) return { ok: false, reason: 'no_tab' };
-      try {
-        return await chrome.tabs.sendMessage(
-          id,
-          { type: 'NLS_EXPORT_WATCH_SNAPSHOT' },
-          { frameId: 0 }
-        );
-      } catch (e) {
-        return {
-          ok: false,
-          reason:
-            e && typeof e === 'object' && 'message' in e ? String(e.message) : 'send_failed'
-        };
+      // content script の注入完了前は「Receiving end does not exist」になるため、受け手が現れるまで再試行する。
+      let last = { ok: false, reason: 'send_failed' };
+      for (let i = 0; i < 30; i++) {
+        try {
+          return await chrome.tabs.sendMessage(id, { type: 'NLS_EXPORT_WATCH_SNAPSHOT' }, { frameId: 0 });
+        } catch (e) {
+          last = {
+            ok: false,
+            reason:
+              e && typeof e === 'object' && 'message' in e ? String(e.message) : 'send_failed'
+          };
+          await new Promise((r) => setTimeout(r, 500));
+        }
       }
+      return last;
     }, E2E_MOCK_ORIGIN_PATTERN);
 
     expect(result, JSON.stringify(result)).toMatchObject({ ok: true });
@@ -55,19 +57,21 @@ test.describe('watch タブへの messaging（メインフレーム）', () => {
       const tabs = await chrome.tabs.query({ url: tabUrlPattern });
       const id = tabs[0]?.id;
       if (!id) return { ok: false, reason: 'no_tab' };
-      try {
-        return await chrome.tabs.sendMessage(
-          id,
-          { type: 'NLS_EXPORT_PANEL_METRICS' },
-          { frameId: 0 }
-        );
-      } catch (e) {
-        return {
-          ok: false,
-          reason:
-            e && typeof e === 'object' && 'message' in e ? String(e.message) : 'send_failed'
-        };
+      // content script の注入完了前は「Receiving end does not exist」になるため、受け手が現れるまで再試行する。
+      let last = { ok: false, reason: 'send_failed' };
+      for (let i = 0; i < 30; i++) {
+        try {
+          return await chrome.tabs.sendMessage(id, { type: 'NLS_EXPORT_PANEL_METRICS' }, { frameId: 0 });
+        } catch (e) {
+          last = {
+            ok: false,
+            reason:
+              e && typeof e === 'object' && 'message' in e ? String(e.message) : 'send_failed'
+          };
+          await new Promise((r) => setTimeout(r, 500));
+        }
       }
+      return last;
     }, E2E_MOCK_ORIGIN_PATTERN);
 
     expect(result, JSON.stringify(result)).toMatchObject({ ok: true });
