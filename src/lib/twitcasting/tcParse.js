@@ -9,7 +9,9 @@
 //       署名は約1時間で切れる → つなぎ直すたびに取り直す。ギフトはページと同じく &gift=1 を足したときだけ来る。
 //   - ソケット: 1通が JSON の配列。10秒何も無いと [] が来る(生きている印)。形は 2026-11-12 の PC 実測(本物・ログインなし)。
 //       comment: { type, id(数), message, createdAt(ms), author{ id, name, screenName, profileImage, grade }, isAnonymous?, numComments(累計) }
-//         匿名は author.id が c:tw1〜c:tw3 などで、大勢が同じ id を使う(人を見分けられない)→ 1つの席にまとめる。
+//         匿名の author.id は c:tw1〜c:tw3 など（大勢が同じ id を使う・人の識別子ではない）ので、c:tw* では分けない。
+//         表示名が公式の「匿名コメント#数字」（配信者の番号設定がONのとき）なら、その番号で席を分ける（tc:n:匿名#N）。
+//         番号が無い匿名は 1つの席（tc:n:匿名）。このキーは配信内だけ。配信をまたいだなじみ・来訪には使わない。
 //       gift:    { type, id(文字), message("言葉(+🍡90)"), plainMessage(言葉だけ), isPaidGift, item{ name, image, showsSenderInfo },
 //                  sender{ id, name, screenName, profileImage }, createdAt, score_items:[{ title:'🍡', text:'90' }] }
 //         ギフトの数はページに出ている 🍡(スコア)。有料ギフト(お茶爆100 等)は text が「✨」で数が出ない。匿名ギフトの sender.id は twitcastinguest。
@@ -18,6 +20,56 @@
 //   badges, ts:'', postedAtMs, channel(user), color, giftName?, giftImageUrl?, giftCount? }
 
 export const TC_ORIGIN = 'https://twitcasting.tv';
+
+/** 公式の匿名番号付き表示名（空白なし）。c:tw* とは別。 */
+export const TC_ANON_NUMBERED_NAME_RE = /^匿名コメント#(\d+)$/;
+/** ツイキャス匿名の席キー。番号あり・なしとも配信内だけの仮ID。 */
+export const TC_ANON_PERSON_KEY_RE = /^tc:n:匿名(?:#\d+)?$/;
+
+/**
+ * ツイキャス匿名の席キーか（`tc:n:匿名` / `tc:n:匿名#123`）。
+ * 配信をまたいだなじみ・来訪・常連の集計には使わない。
+ * @param {unknown} key
+ */
+export function isTcBroadcastScopedAnonPersonKey(key) {
+  return TC_ANON_PERSON_KEY_RE.test(String(key ?? '').trim());
+}
+
+/**
+ * 公式の匿名表示名か（`匿名コメント` / `匿名コメント#123`）。
+ * @param {unknown} name
+ */
+export function isTcBroadcastScopedAnonName(name) {
+  const n = String(name ?? '').trim();
+  return n === '匿名コメント' || TC_ANON_NUMBERED_NAME_RE.test(n);
+}
+
+/**
+ * 記録・コメント行がツイキャス匿名の仮IDか。channelId / ytChannelId / userId / 公式の表示名を見る。
+ * @param {unknown} row
+ */
+export function isTcBroadcastScopedAnonComment(row) {
+  if (!row || typeof row !== 'object') return false;
+  const r = /** @type {Record<string, unknown>} */ (row);
+  const keys = [r.channelId, r.ytChannelId, r.userId, r.login];
+  if (keys.some((k) => isTcBroadcastScopedAnonPersonKey(k))) return true;
+  const badges = r.badges;
+  const named = isTcBroadcastScopedAnonName(r.nickname ?? r.name);
+  if (!named) return false;
+  if (Array.isArray(badges) && badges.map(String).includes('anonymous')) return true;
+  if (r.isAnonymous === true) return true;
+  return isTcBroadcastScopedAnonName(r.nickname ?? r.name) && !String(r.login ?? '').trim();
+}
+
+/**
+ * 匿名コメントの席キー。番号付きの公式名だけ `#N` で分ける。c:tw* では分けない。
+ * @param {unknown} name
+ */
+export function tcAnonPersonKeyFromName(name) {
+  const n = String(name ?? '').trim();
+  const m = TC_ANON_NUMBERED_NAME_RE.exec(n);
+  return m ? `tc:n:匿名#${m[1]}` : 'tc:n:匿名';
+}
 /**
  * ツイキャスのギフトの数え方 = ページに出ている 🍡(スコア・score_items)。円やコインの値段は配信の口に出ない(2026-11-12 PC 実測)。
  *   画面では「90 🍡」。有料ギフトは 🍡 が「✨」で数が無いので 0(名前と個数は残す)。
@@ -236,14 +288,15 @@ export function parseTcEvent(raw, ctx) {
   if (type === 'comment') {
     const who = tcPerson(c.author ?? c.from_user ?? c.fromUser);
     if (!who) return null;
-    // 匿名は大勢が同じ id(c:tw1 等)を使うので、人として数えず1つの席にまとめる
+    // 匿名の c:tw1 等は大勢が共有するので席キーにしない。公式の「匿名コメント#N」があるときだけ番号で分ける。
     const anonC = c.isAnonymous === true || /^c:tw\d{1,3}$/.test(who.key);
     const text = str(c.message).replace(/\s+/g, ' ').slice(0, 500);
     if (!text) return null;
+    const displayName = anonC ? who.name || '匿名' : who.name;
     return {
       id: `tc-${id}`,
-      channelId: anonC ? 'tc:n:匿名' : `tc:${who.key}`,
-      name: anonC ? who.name || '匿名' : who.name,
+      channelId: anonC ? tcAnonPersonKeyFromName(displayName) : `tc:${who.key}`,
+      name: displayName,
       login: anonC ? '' : who.login,
       iconUrl: anonC ? '' : who.iconUrl,
       badges: anonC ? ['anonymous'] : /** @type {string[]} */ ([]),

@@ -10,8 +10,10 @@
  *   と同じ liveId は除外してから集計する。
  */
 
+import { isTcBroadcastScopedAnonComment } from './twitcasting/tcParse.js';
+
 /**
- * @typedef {{ userId?: string|null, nickname?: string|null }} HistoricalCommentInput
+ * @typedef {{ userId?: string|null, nickname?: string|null, name?: string|null, channelId?: string|null, ytChannelId?: string|null, login?: string|null, badges?: string[]|null, isAnonymous?: boolean }} HistoricalCommentInput
  */
 
 /**
@@ -28,6 +30,14 @@
 function cleanUid(v) {
   if (v == null) return '';
   return String(v).trim();
+}
+
+/** 配信をまたいだ人の集計から、ツイキャス匿名の仮IDを外す。 @param {unknown} c */
+function personUid(c) {
+  const uid = cleanUid(c?.userId);
+  if (!uid) return '';
+  if (isTcBroadcastScopedAnonComment(c)) return '';
+  return uid;
 }
 
 /**
@@ -55,7 +65,7 @@ export function indexPastUsers(pastBroadcasts, currentLiveId) {
     if (lid === currentLid) continue;
     const cs = Array.isArray(b.comments) ? b.comments : [];
     for (const c of cs) {
-      const uid = cleanUid(c?.userId);
+      const uid = personUid(c);
       if (!uid) continue;
       const nick = String(c?.nickname == null ? '' : c.nickname).trim();
       let row = map.get(uid);
@@ -106,7 +116,7 @@ export function classifyCommentersAgainstHistory(input) {
   /** @type {Set<string>} */
   const currentUsers = new Set();
   for (const c of currentComments) {
-    const uid = cleanUid(c?.userId);
+    const uid = personUid(c);
     if (!uid) continue;
     currentUsers.add(uid);
   }
@@ -162,7 +172,7 @@ export function findDepartedHeavyCommenters(input) {
   /** @type {Set<string>} */
   const currentUsers = new Set();
   for (const c of currentComments) {
-    const uid = cleanUid(c?.userId);
+    const uid = personUid(c);
     if (uid) currentUsers.add(uid);
   }
 
@@ -219,7 +229,7 @@ export function buildCommenterAttendanceMatrix(input) {
     const userCount = new Map();
     const cs = Array.isArray(b.comments) ? b.comments : [];
     for (const c of cs) {
-      const uid = cleanUid(c?.userId);
+      const uid = personUid(c);
       if (!uid) continue;
       userCount.set(uid, (userCount.get(uid) || 0) + 1);
       totals.set(uid, (totals.get(uid) || 0) + 1);

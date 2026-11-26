@@ -1,0 +1,192 @@
+{
+  "source": "Extracted from origin/chore/twitcasting-anon-research 86d0c67b6 real DOM HTML (no standalone result json was in that commit). Page: https://twitcasting.tv/c:yuucho311 on 2026-11-26 JST.",
+  "anonComments": [
+    {
+      "type": "comment",
+      "id": 34000000001,
+      "message": "マチアプしてる友達が今盛り上がってるって言ってた",
+      "createdAt": 1795660628000,
+      "author": {
+        "id": "c:tw3",
+        "name": "匿名コメント#1026",
+        "screenName": "c:tw3",
+        "profileImage": "https://s01.twitcasting.tv/img/twitcas_guest3_64.jpg",
+        "grade": 0
+      },
+      "isAnonymous": true,
+      "source": {
+        "href": "/c:tw3",
+        "extractedFrom": "anon-comments-5.html",
+        "commit": "86d0c67b6"
+      }
+    },
+    {
+      "type": "comment",
+      "id": 34000000002,
+      "message": "恋人とプロセスごっことか良くない？",
+      "createdAt": 1795660618000,
+      "author": {
+        "id": "c:tw2",
+        "name": "匿名コメント#1045",
+        "screenName": "c:tw2",
+        "profileImage": "https://s01.twitcasting.tv/img/twitcas_guest2_64.jpg",
+        "grade": 0
+      },
+      "isAnonymous": true,
+      "source": {
+        "href": "/c:tw2",
+        "extractedFrom": "anon-comments-5.html",
+        "commit": "86d0c67b6"
+      }
+    },
+    {
+      "type": "comment",
+      "id": 34000000003,
+      "message": "勝負はクリスマス前後の土日やな",
+      "createdAt": 1795660596000,
+      "author": {
+        "id": "c:tw3",
+        "name": "匿名コメント#1138",
+        "screenName": "c:tw3",
+        "profileImage": "https://s01.twitcasting.tv/img/twitcas_guest3_64.jpg",
+        "grade": 0
+      },
+      "isAnonymous": true,
+      "source": {
+        "href": "/c:tw3",
+        "extractedFrom": "anon-comments-5.html",
+        "commit": "86d0c67b6"
+      }
+    },
+    {
+      "type": "comment",
+      "id": 34000000004,
+      "message": "ヘラるな",
+      "createdAt": 1795660595000,
+      "author": {
+        "id": "c:tw1",
+        "name": "匿名コメント#1112",
+        "screenName": "c:tw1",
+        "profileImage": "https://s01.twitcasting.tv/img/twitcas_guest1_64.jpg",
+        "grade": 0
+      },
+      "isAnonymous": true,
+      "source": {
+        "href": "/c:tw1",
+        "extractedFrom": "anon-comments-5.html",
+        "commit": "86d0c67b6"
+      }
+    },
+    {
+      "type": "comment",
+      "id": 34000000005,
+      "message": "www",
+      "createdAt": 1795660568000,
+      "author": {
+        "id": "c:tw3",
+        "name": "匿名コメント#1104",
+        "screenName": "c:tw3",
+        "profileImage": "https://s01.twitcasting.tv/img/twitcas_guest3_64.jpg",
+        "grade": 0
+      },
+      "isAnonymous": true,
+      "source": {
+        "href": "/c:tw3",
+        "extractedFrom": "anon-comments-5.html",
+        "commit": "86d0c67b6"
+      }
+    }
+  ],
+  "namedComments": [
+    {
+      "type": "comment",
+      "id": 34000000001,
+      "message": "ほっぺにでかいのあったけどどんどんデカくなってうざくてぬきました",
+      "createdAt": 1795659587000,
+      "author": {
+        "id": "en01_on",
+        "name": "えン",
+        "screenName": "en01_on",
+        "profileImage": "https://imagegw02.twitcasting.tv/image3s/pbs.twimg.com/profile_images/2048716886335213568/OLzWVVJx_normal.jpg",
+        "grade": 0
+      },
+      "source": {
+        "href": "/en01_on",
+        "extractedFrom": "named-comments-5.html",
+        "commit": "86d0c67b6"
+      }
+    },
+    {
+      "type": "comment",
+      "id": 34000000002,
+      "message": "わこゆぅちょ！",
+      "createdAt": 1795659527000,
+      "author": {
+        "id": "17257VAVIVUVEVO",
+        "name": "稲葉",
+        "screenName": "17257VAVIVUVEVO",
+        "profileImage": "https://imagegw02.twitcasting.tv/image3s/pbs.twimg.com/profile_images/2092191165856747520/tsIxRNvg_normal.jpg",
+        "grade": 0
+      },
+      "source": {
+        "href": "/17257vavivuvevo",
+        "extractedFrom": "named-comments-5.html",
+        "commit": "86d0c67b6"
+      }
+    },
+    {
+      "type": "comment",
+      "id": 34000000003,
+      "message": "ホクロぬいた",
+      "createdAt": 1795659484000,
+      "author": {
+        "id": "en01_on",
+        "name": "えン",
+        "screenName": "en01_on",
+        "profileImage": "https://imagegw02.twitcasting.tv/image3s/pbs.twimg.com/profile_images/2048716886335213568/OLzWVVJx_normal.jpg",
+        "grade": 0
+      },
+      "source": {
+        "href": "/en01_on",
+        "extractedFrom": "named-comments-5.html",
+        "commit": "86d0c67b6"
+      }
+    },
+    {
+      "type": "comment",
+      "id": 34000000004,
+      "message": "経営を始める御方とかもいますよね🤔",
+      "createdAt": 1795659634000,
+      "author": {
+        "id": "17257VAVIVUVEVO",
+        "name": "稲葉",
+        "screenName": "17257VAVIVUVEVO",
+        "profileImage": "https://imagegw02.twitcasting.tv/image3s/pbs.twimg.com/profile_images/2092191165856747520/tsIxRNvg_normal.jpg",
+        "grade": 0
+      },
+      "source": {
+        "href": "/17257vavivuvevo",
+        "extractedFrom": "named-comments-5.html",
+        "commit": "86d0c67b6"
+      }
+    },
+    {
+      "type": "comment",
+      "id": 34000000005,
+      "message": "wwwww",
+      "createdAt": 1795659688000,
+      "author": {
+        "id": "en01_on",
+        "name": "えン",
+        "screenName": "en01_on",
+        "profileImage": "https://imagegw02.twitcasting.tv/image3s/pbs.twimg.com/profile_images/2048716886335213568/OLzWVVJx_normal.jpg",
+        "grade": 0
+      },
+      "source": {
+        "href": "/en01_on",
+        "extractedFrom": "named-comments-5.html",
+        "commit": "86d0c67b6"
+      }
+    }
+  ]
+}
