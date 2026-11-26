@@ -24,6 +24,14 @@
 /** @type {ChangelogEntry[]} */
 const ARCHIVE_ENTRIES = [
   Object.freeze({
+    version: '0.1.2215',
+    date: '2026-11-25',
+    summary: '記録の保存が使っていない画面を重くしにくい',
+    items: Object.freeze([
+      'コメントなどの記録が保存されるとき、その中身を使っていない4つの画面には、これまで全部を届けていました。届かないようにしたので、混んでいる配信でも記録や読み上げが詰まりにくくなります。',
+    ])
+  }),
+  Object.freeze({
     version: '0.1.2214',
     date: '2026-11-25',
     summary: 'PCが忙しいときだけ客席の動きをゆるく',

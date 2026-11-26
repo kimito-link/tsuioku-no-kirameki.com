@@ -76,3 +76,41 @@ describe('VOD ページの DOM から題とコメント投稿者を読む', () =
     expect(kick.authors).toEqual([]);
   });
 });
+
+import { readFileSync } from 'node:fs';
+import { dirname, join } from 'node:path';
+import { fileURLToPath } from 'node:url';
+
+const FIX = join(dirname(fileURLToPath(import.meta.url)), 'fixtures');
+describe('実測の録画 DOM（2026-11-26・未ログイン）から投稿者を読む (0.1.2239)', () => {
+  it('Twitch 録画の再生チャット .vod-message から投稿者を読む。顔画像は無い', () => {
+    const html = readFileSync(join(FIX, 'twitch-vod-2940252213-replay-chat.slim.html'), 'utf8');
+    const read = readVodWatchDom(docOf(html), { platform: 'twitch' });
+    expect(read.commentsFound).toBe(true);
+    expect(read.commentsVerified).toBe(true);
+    expect(read.authors).toHaveLength(1);
+    expect(read.authors[0].id).toBe('tw:minto_vtuber');
+    expect(read.authors[0].name).toContain('みんみんついっち');
+    expect(read.authors[0].commentCount).toBe(2);
+    expect(read.authors[0].avatarUrl).toBe('');
+  });
+
+  it('ツイキャス録画プレイヤーの .tw-comment-item から投稿者と顔と新しい順を読む', () => {
+    const html = readFileSync(join(FIX, 'twitcasting-movie-843232645-comment-items.slim.html'), 'utf8');
+    const read = readVodWatchDom(docOf(html), { platform: 'twitcasting', ownerId: 'c:yuucho311' });
+    expect(read.commentsFound).toBe(true);
+    expect(read.commentsVerified).toBe(true);
+    expect(read.authors.map((a) => a.id)).toEqual(['tc:aqua2207', 'tc:coke_x1', 'tc:c:tw3']);
+    expect(read.authors[0].name).toBe('Aqua');
+    expect(read.authors[0].postedAtMs).toBe(Date.parse('2026-11-22T10:07:38+09:00'));
+    expect(read.authors[0].avatarUrl).toMatch(/^https:\/\/imagegw02\.twitcasting\.tv\//);
+    expect(read.authors.find((a) => a.id === 'tc:c:tw3')?.name).toContain('匿名コメント');
+    expect(read.authors[0].postedAtMs).toBeGreaterThan(read.authors[1].postedAtMs);
+  });
+
+  it('Kick の録画 HTML にチャット投稿者が無ければ 0 人のまま', () => {
+    const read = readVodWatchDom(docOf('<title>SirGime VOD on KICK</title>'), { platform: 'kick' });
+    expect(read.authors).toEqual([]);
+    expect(read.commentsFound).toBe(false);
+  });
+});

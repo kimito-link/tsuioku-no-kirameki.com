@@ -699,6 +699,138 @@ export function ytVideoCommentAuthorsFromDom(root, opts = {}) {
 }
 
 /**
+ * 画面に既に描かれているコメントから、返信（replyLevel / isCreator / parentId）も含めて集める。
+ * 本文は返さない。新しい通信はしない。
+ * 投稿者の印は .channel-owner か、ytd-author-comment-badge-renderer の creator 属性。
+ * アーティストなどのバッジだけでは投稿者にしない。
+ * @param {ParentNode | null | undefined} root
+ * @param {{ nowMs?: number, limit?: number }} [opts]
+ * @returns {{ commentId: string, parentId: string, channelId: string, name: string, handle: string, avatarUrl: string, isCreator: boolean, replyLevel: number, postedAtMs: number | null }[]}
+ */
+export function ytVideoCommentsFromDom(root, opts = {}) {
+  const limit = Number.isFinite(Number(opts.limit)) ? Math.max(1, Math.floor(Number(opts.limit))) : 200;
+  const nowMs = Number.isFinite(Number(opts.nowMs)) ? Number(opts.nowMs) : Date.now();
+  if (!root || typeof root.querySelectorAll !== 'function') return [];
+  /** @type {{ commentId: string, parentId: string, channelId: string, name: string, handle: string, avatarUrl: string, isCreator: boolean, replyLevel: number, postedAtMs: number | null }[]} */
+  const out = [];
+  const threads = root.querySelectorAll('ytd-comment-thread-renderer');
+  const useThreads = threads.length > 0;
+  const hosts = useThreads ? threads : [];
+  if (!useThreads) {
+    const loose = root.querySelectorAll('ytd-comment-view-model, ytd-comment-renderer, yt-comment-view-model');
+    for (let i = 0; i < loose.length; i += 1) hosts.push(loose[i]);
+  }
+  for (let i = 0; i < hosts.length; i += 1) {
+    const th = hosts[i];
+    const rawVms = th.querySelectorAll
+      ? th.querySelectorAll('ytd-comment-view-model, ytd-comment-renderer, yt-comment-view-model')
+      : [];
+    /** 未閉じの返信ブロックで、後続スレッドまで巻き込まれないようにする */
+    const list = [];
+    const source = rawVms.length ? rawVms : [th];
+    for (let k = 0; k < source.length; k += 1) {
+      const vm = source[k];
+      if (!vm) continue;
+      if (typeof vm.closest === 'function') {
+        const owner = vm.closest('ytd-comment-thread-renderer');
+        if (owner && owner !== th) continue;
+      }
+      list.push(vm);
+    }
+    if (!list.length) list.push(th);
+    let topId = '';
+    for (let j = 0; j < list.length; j += 1) {
+      const el = list[j];
+      if (!el) continue;
+      const inReplies = typeof el.closest === 'function' && !!el.closest('ytd-comment-replies-renderer')
+        && (!el.closest('ytd-comment-thread-renderer') || el.closest('ytd-comment-thread-renderer') === th);
+      const rec = ytCommentRecordFromViewModel(el, { nowMs, replyLevel: inReplies ? 1 : 0, parentId: inReplies ? topId : '' });
+      if (!rec) continue;
+      if (!inReplies && rec.commentId) topId = rec.commentId;
+      if (inReplies && !rec.parentId && topId) rec.parentId = topId;
+      out.push(rec);
+      if (out.length >= limit) return out;
+    }
+  }
+  return out;
+}
+
+/**
+ * @param {Element} el
+ * @param {{ nowMs?: number, replyLevel?: number, parentId?: string }} [opts]
+ */
+function ytCommentRecordFromViewModel(el, opts = {}) {
+  let channelId = '';
+  let handle = '';
+  let commentId = String(el.getAttribute?.('comment-id') || el.getAttribute?.('data-comment-id') || '').trim();
+  if (!commentId) {
+    const pubLink = queryDeep(el, '#published-time-text a[href], a#published-time-text[href]');
+    const pubHref = String(pubLink?.getAttribute?.('href') || '');
+    const lc = pubHref.match(/[?&]lc=([^&]+)/);
+    if (lc) {
+      try { commentId = decodeURIComponent(lc[1]); } catch { commentId = lc[1]; }
+    }
+  }
+  const links = el.querySelectorAll ? el.querySelectorAll('a[href]') : [];
+  for (let j = 0; j < links.length; j += 1) {
+    const href = String(links[j].getAttribute?.('href') || '');
+    if (!channelId) {
+      const uc = href.match(/\/channel\/(UC[A-Za-z0-9_-]{22})/);
+      if (uc) channelId = uc[1];
+    }
+    if (!handle) {
+      const h = href.match(/\/(@[^/?#]+)/);
+      if (h) {
+        try { handle = decodeURIComponent(h[1]); } catch { handle = h[1]; }
+      }
+    }
+    if (!commentId) {
+      const lc = href.match(/[?&]lc=([^&]+)/);
+      if (lc) {
+        try { commentId = decodeURIComponent(lc[1]); } catch { commentId = lc[1]; }
+      }
+    }
+  }
+  const nameEl = queryDeep(el, '#author-text, #author-text yt-formatted-string, a#author-text, #name, yt-attributed-string#name, ytd-channel-name #text');
+  let name = String(nameEl?.textContent || '').replace(/\s+/g, ' ').trim().slice(0, 80);
+  if (!name || /^@/.test(name)) {
+    const aria = el.querySelector?.('#author-thumbnail-button')?.getAttribute?.('aria-label');
+    const fromAria = String(aria || '').replace(/\s+/g, ' ').trim();
+    if (fromAria) name = fromAria.replace(/^@/, '').slice(0, 80);
+  }
+  if (!name) name = (handle ? handle.replace(/^@/, '') : '').slice(0, 80);
+  const img = queryDeep(el, '#author-thumbnail img, yt-img-shadow img, img#img, #author-photo img');
+  const avatarUrl = String(
+    (img && typeof img.getAttribute === 'function' && (img.getAttribute('src') || img.getAttribute('data-src')))
+    || (img && img.src)
+    || '',
+  ).trim();
+  const isCreator = Boolean(
+    queryDeep(el, '.channel-owner, [class*="channel-owner"]')
+    || queryDeep(el, 'ytd-author-comment-badge-renderer[creator]'),
+  );
+  const publishedEl = queryDeep(el, '#published-time-text, #published-time-text a, .published-time-text, yt-formatted-string#published-time-text');
+  const publishedText = String(publishedEl?.getAttribute?.('aria-label') || publishedEl?.getAttribute?.('title') || publishedEl?.textContent || '').trim();
+  const postedAtMs = parseYtCommentPublishedAtMs(publishedText, opts.nowMs);
+  const replyLevel = Number(opts.replyLevel) > 0 ? 1 : 0;
+  let parentId = String(opts.parentId || '').trim();
+  if (replyLevel > 0 && !parentId) parentId = parentYtCommentId(commentId);
+  if (!commentId && !channelId && !handle && !name) return null;
+  return {
+    commentId,
+    parentId,
+    channelId,
+    id: channelId || handle || (name ? `name:${name}` : ''),
+    name,
+    handle,
+    avatarUrl,
+    isCreator,
+    replyLevel,
+    postedAtMs,
+  };
+}
+
+/**
  * 画面の「N 件のコメント」から数を取る。読み込まれた範囲の見出しであり、記録の件数ではない。
  * @param {ParentNode | null | undefined} root
  * @returns {number | null}

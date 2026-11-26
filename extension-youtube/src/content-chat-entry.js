@@ -16,6 +16,7 @@ import {
 import {
   classifyYtWatchContentKind,
   ytVideoCommentAuthorsFromDom,
+  ytVideoCommentsFromDom,
   ytViewCountFromDom, ytCommentCountFromDom,
 } from '../../src/lib/youtube/ytVideoWatchMeta.js';
 import { ytVideoIdFromChatFrameUrl } from '../../src/lib/youtube/ytChatContinuationVideoId.js';
@@ -698,6 +699,7 @@ function setupWatchPageMetaObserver() {
       hasLiveChatReplay,
     });
     const videoAuthors = contentKind === 'video' ? ytVideoCommentAuthorsFromDom(document) : [];
+    const videoComments = contentKind === 'video' ? ytVideoCommentsFromDom(document) : [];
     const commentCount = contentKind === 'video' ? ytCommentCountFromDom(document) : null;
     const isLiveFlag = attrBool('data-nl-yt-is-live');
     const isLiveContentFlag = attrBool('data-nl-yt-is-live-content');
@@ -721,7 +723,7 @@ function setupWatchPageMetaObserver() {
         isLiveContent: isLiveContentFlag,
         ...(contentKind === 'video' && viewCount != null ? { slotViewCount: viewCount } : {}),
         ...(contentKind === 'video' && commentCount != null ? { slotCommentCount: commentCount } : {}),
-        ...(contentKind === 'video' ? { videoAuthors } : {}),
+        ...(contentKind === 'video' ? { videoAuthors, videoComments } : {}),
       },
     });
     if (viewers === null) saveViewerProbe();

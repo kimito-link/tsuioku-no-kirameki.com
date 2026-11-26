@@ -4,13 +4,15 @@
  * 【この箱に入らないもの】fetch / 新しい通信 / Observer / タイマー / chrome.*
  * 【書けるstorageキー】なし
  *
- * セレクタの根拠:
- *   - ツイキャス: 既存の parseTcMovieCommentDoc / readTcPageInfo（コメント一覧の実測 HTML）。
- *     録画ページの初回 HTML（ログインなし curl、2026-11-26）では #comment-root は空で、
- *     コメントは後から描かれる。描かれたあとの DOM だけを読む。新しい通信はしない。
- *   - ABEMA: 公開エピソードの JSON-LD VideoObject（題）。コメント欄は初回 HTML に無い。
- *   - Twitch / Kick / TikTok: ログインなし curl の初回 HTML にコメント投稿者は無かった。
- *     ページに後から出たコメントを、明らかな印があれば拾うが、セレクタは未確認。
+ * セレクタの根拠（2026-11-26、拡張 v0.1.2229・未ログインの実キャプチャ）:
+ *   - ツイキャス録画: 既存の parseTcMovieCommentDoc（.tw-comment-history-item）に加え、
+ *     録画プレイヤーのコメント一覧 .tw-comment-item（movie-843232645 で 9 件確認）。
+ *     初回 curl では #comment-root が空のことがある。描かれた DOM だけを読む。新しい通信はしない。
+ *   - Twitch 録画: .vod-message と .chat-author__display-name
+ *     （videos/2940252213 で再生チャット 11 件確認）。顔画像は DOM に無い。
+ *   - Kick 録画: 実測 HTML（sirgime / 01a20e11-...）は年齢確認の壁で、チャット投稿者が無い。
+ *   - ABEMA: 公開エピソードの JSON-LD VideoObject（題）。コメント欄は実測 HTML に無い。
+ *   - TikTok: __UNIVERSAL_DATA_FOR_REHYDRATION__ の comment 配列は実測で空。コメントは後から描かれることがある。
  */
 
 import { parseTcMovieCommentDoc, readTcPageInfo } from '../twitcasting/tcPageInfo.js';
@@ -103,14 +105,90 @@ function mergeAuthors(rows) {
       if (row.commentId) cur.commentId = String(row.commentId);
     }
   }
-  return [...byId.values()];
+  const merged = [...byId.values()];
+  merged.sort((a, b) => (Number(b.postedAtMs) || 0) - (Number(a.postedAtMs) || 0));
+  return merged;
+}
+
+/**
+ * ツイキャス録画プレイヤーのコメント一覧（.tw-comment-item）。履歴ページ用の parseTcMovieCommentDoc とは別形。
+ * @param {Document | null | undefined} doc
+ */
+function parseTcPlayerCommentItems(doc) {
+  /** @type {{ id: string, author: { screenName: string, name: string, profileImage: string }, createdAt: number }[]} */
+  const rows = [];
+  if (!doc || typeof doc.querySelectorAll !== 'function') return rows;
+  const items = doc.querySelectorAll('.tw-comment-item');
+  for (let i = 0; i < items.length; i += 1) {
+    const el = items[i];
+    const nameA = el.querySelector('a.tw-comment-item-name');
+    const href = String(nameA?.getAttribute?.('href') || '').trim();
+    const screenText = text(el.querySelector('.tw-comment-item-screen-id')?.textContent);
+    const fromHref = href.replace(/^\//, '').trim();
+    const screen = (fromHref || screenText.replace(/^@/, '')).trim();
+    if (!screen) continue;
+    const timeEl = el.querySelector('time.tw-comment-item-date');
+    const createdAt = parseTcPlayerDatetime(timeEl?.getAttribute?.('datetime') || timeEl?.textContent || '');
+    const img = String(el.querySelector('.tw-comment-item-icon img')?.getAttribute?.('src') || '').trim();
+    rows.push({
+      id: String(el.getAttribute?.('data-comment-id') || ''),
+      author: {
+        screenName: screen,
+        name: text(nameA?.textContent) || screen,
+        profileImage: img,
+      },
+      createdAt,
+    });
+  }
+  return rows;
+}
+
+/** @param {unknown} s @returns {number} */
+function parseTcPlayerDatetime(s) {
+  const m = String(s || '').trim().match(/^(\d{4})[/-](\d{1,2})[/-](\d{1,2})[ T](\d{1,2}):(\d{2})(?::(\d{2}))?/);
+  if (!m) return 0;
+  const y = Number(m[1]);
+  const mo = Number(m[2]);
+  const d = Number(m[3]);
+  const hh = Number(m[4]);
+  const mm = Number(m[5]);
+  const ss = Number(m[6] || 0);
+  if (![y, mo, d, hh, mm, ss].every((n) => Number.isFinite(n))) return 0;
+  // 画面の日時は日本時間
+  return Date.UTC(y, mo - 1, d, hh - 9, mm, ss);
+}
+
+/**
+ * Twitch 録画の再生チャット。顔画像は実測 DOM に無く、バッジ画像だけがある。
+ * @param {Document | null | undefined} doc
+ */
+function readTwitchVodReplayChat(doc) {
+  /** @type {{ id: string, name: string, avatarUrl?: string, postedAtMs?: number, commentId?: string }[]} */
+  const rows = [];
+  if (!doc || typeof doc.querySelectorAll !== 'function') return mergeAuthors(rows);
+  const items = doc.querySelectorAll('.vod-message');
+  for (let i = 0; i < items.length; i += 1) {
+    const el = items[i];
+    const userEl = el.querySelector('.chat-author__display-name, [data-a-target="chat-message-username"]');
+    const login = String(userEl?.getAttribute?.('data-a-user') || '').trim();
+    const name = text(userEl?.textContent);
+    if (!login && !name) continue;
+    rows.push({
+      id: `tw:${login || name}`,
+      name: name || login,
+      avatarUrl: '',
+      postedAtMs: 0,
+    });
+  }
+  return mergeAuthors(rows);
 }
 
 /** @param {Document | null | undefined} doc @param {string} [user] */
 function readTwitcasting(doc, user) {
   const info = doc ? readTcPageInfo(doc, user || '') : { title: '', name: '', stats: {}, viewers: null };
   const parsed = doc ? parseTcMovieCommentDoc(doc) : { rows: [], empty: true };
-  const authors = mergeAuthors(parsed.rows.map((row) => {
+  const sourceRows = parsed.rows && parsed.rows.length ? parsed.rows : parseTcPlayerCommentItems(doc);
+  const authors = mergeAuthors(sourceRows.map((row) => {
     const screen = String(row?.author?.screenName || row?.author?.id || '').trim();
     return {
       id: screen ? `tc:${screen}` : '',
@@ -205,8 +283,11 @@ export function readVodWatchDom(doc, page) {
   let commentsVerified = false;
   if (platform === 'tiktok') {
     authors = readTiktokUnverified(doc);
+  } else if (platform === 'twitch') {
+    authors = readTwitchVodReplayChat(doc);
+    commentsVerified = true;
   }
-  // Twitch / Kick / ABEMA の公開 HTML（2026-11-26・ログインなし curl）にはコメント投稿者の印が無かった。
+  // Kick / ABEMA の実測 HTML（2026-11-26・未ログイン）にはコメント投稿者が無かった。
   return {
     title,
     ownerName,

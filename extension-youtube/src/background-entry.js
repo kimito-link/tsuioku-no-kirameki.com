@@ -155,7 +155,7 @@ function noteLiveVisiblePeople(_videoId, _channelId, _rows) {
 
 /**
  * 通常動画のカードを書いて会場へ渡す。ライブのコメント保存とは別経路。
- * @param {{ videoId: string, title?: string, viewCount?: number | null, channelId?: string, videoAuthors?: any[] }} parts
+ * @param {{ videoId: string, title?: string, viewCount?: number | null, channelId?: string, videoAuthors?: any[], videoComments?: any[] }} parts
  */
 function publishVideoWatchCard(parts) {
   const videoId = String(parts?.videoId || '').trim();
@@ -187,6 +187,7 @@ function publishVideoWatchCard(parts) {
         viewCount: parts.viewCount,
         recorded,
         videoAuthors: parts.videoAuthors || [],
+        videoComments: parts.videoComments || [],
         livePeople,
         spend: formatEstimatedViewerSpendDisplay(spendModel),
         takeHome: formatStreamerTakeHomeDisplay('youtube', estimateStreamerTakeHomeJpy('youtube', { amounts })),
@@ -1542,6 +1543,7 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
           viewCount: typeof payload.slotViewCount === 'number' ? payload.slotViewCount : summaries[videoId]?.slotViewCount,
           channelId: summaries[videoId]?.broadcasterChannelId || payload.broadcasterChannelId || '',
           videoAuthors: Array.isArray(payload.videoAuthors) ? payload.videoAuthors : [],
+          videoComments: Array.isArray(payload.videoComments) ? payload.videoComments : [],
         });
       } else if (kind === 'live' || kind === 'live_replay') {
         clearVideoWatchCardIfSame(videoId);
