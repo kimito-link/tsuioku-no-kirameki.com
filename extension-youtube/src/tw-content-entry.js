@@ -64,6 +64,7 @@ import { platformFetchTimeoutSignal } from '../../src/lib/platform/fetchTimeout.
 import { followerSampleFromDom } from '../../src/lib/platform/followerCountSample.js';
 import { createSlowFollowerFetch } from '../../src/lib/platform/slowFollowerFetch.js';
 import { withRevealedVenueOfficialComposer } from '../../src/lib/venueRevealOfficialComposer.js';
+import { rememberLiveIcon, mergeLiveIconStore } from '../../src/lib/platform/liveIconStore.js';
 
 const IRC_URL = 'wss://irc-ws.chat.twitch.tv:443';
 const META_EVERY_MS = 30_000;
@@ -181,33 +182,48 @@ const iconByLogin = new Map();
 const iconPending = new Set();
 // 400ms の待ちに間に合わず顔なしで記録した人。あとで顔が分かったら storage(yt_tw_icons)に置き、画面が描くときに埋める
 //   (記録は同じ id を2回入れられないので、記録そのものは書き直さない。2026-11-07 実配信 caedrel で顔ありの23人が顔なし)
+// v0.1.2254: 間に合った人の顔も同じ場所に置く(録画の顔 twVodLiveIcons.js が引く。今までは遅れた約6人/分だけで録画が全員ゆっくり顔)。
+//   遅れた人は今までどおり1.5秒で書く(ライブの横の欄が埋める)。間に合った人は記録に顔があるので急がず、30秒まとめて1回・
+//   タブを隠したとき・離れたときに書く。上限 3000 を超えたら古い順に捨てる(liveIconStore.js)。
 const TW_LATE_ICONS_KEY = 'yt_tw_icons';
 const TW_LATE_ICONS_MAX = 3000;
+const TW_LATE_SAVE_MS = 1500;
+const TW_KEEP_SAVE_MS = 30_000;
 /** @type {Set<string>} */
 const lateWanted = new Set();
-/** @type {Record<string, string>} */
+/** @type {Record<string, string>} このタブで分かった顔(新しい順) */
 let lateIcons = {};
-let lateLoaded = false;
+let lateDirty = false;
 let lateTimer = 0;
-function saveLateIconsSoon() {
-  if (lateTimer) return;
-  lateTimer = setTimeout(async () => {
+let lateDueAt = 0;
+async function writeLateIconsNow() {
+  if (lateTimer) clearTimeout(lateTimer);
+  lateTimer = 0;
+  lateDueAt = 0;
+  if (!lateDirty) return;
+  lateDirty = false;
+  try {
+    if (!isExtensionContextAlive()) return;
+    // ほかのタブ(別のチャンネル)が書いた分を消さないよう、書く直前に読んで合わせる
+    const old = (await chrome.storage.local.get(TW_LATE_ICONS_KEY))?.[TW_LATE_ICONS_KEY];
+    const merged = mergeLiveIconStore(old, lateIcons, TW_LATE_ICONS_MAX);
+    lateIcons = mergeLiveIconStore(null, lateIcons, TW_LATE_ICONS_MAX);
+    void chrome.storage.local.set({ [TW_LATE_ICONS_KEY]: merged });
+  } catch {
+    /* 拡張が入れ替わった直後 */
+  }
+}
+/** @param {number} [delayMs] */
+function saveLateIconsSoon(delayMs = TW_LATE_SAVE_MS) {
+  lateDirty = true;
+  const due = Date.now() + delayMs;
+  if (lateTimer && lateDueAt <= due) return;
+  if (lateTimer) clearTimeout(lateTimer);
+  lateDueAt = due;
+  lateTimer = setTimeout(() => {
     lateTimer = 0;
-    try {
-      if (!lateLoaded) {
-        const old = (await chrome.storage.local.get(TW_LATE_ICONS_KEY))?.[TW_LATE_ICONS_KEY];
-        if (old && typeof old === 'object') lateIcons = { ...old, ...lateIcons };
-        lateLoaded = true;
-      }
-      const keys = Object.keys(lateIcons);
-      if (keys.length > TW_LATE_ICONS_MAX) {
-        for (const k of keys.slice(0, keys.length - TW_LATE_ICONS_MAX)) delete lateIcons[k];
-      }
-      void chrome.storage.local.set({ [TW_LATE_ICONS_KEY]: lateIcons });
-    } catch {
-      /* 拡張が入れ替わった直後 */
-    }
-  }, 1500);
+    void writeLateIconsNow();
+  }, delayMs);
 }
 
 /** @param {string[]} logins */
@@ -224,12 +240,9 @@ async function lookupIcons(logins) {
       const url = found.get(l) || '';
       iconByLogin.set(l, url);
       if (url) diag.iconFound += 1;
-      if (lateWanted.delete(l) && url) {
-        delete lateIcons[l];
-        lateIcons[l] = url;
-        diag.iconLate += 1;
-        saveLateIconsSoon();
-      }
+      const late = lateWanted.delete(l) && !!url;
+      if (late) diag.iconLate += 1;
+      if (rememberLiveIcon(lateIcons, l, url)) saveLateIconsSoon(late ? TW_LATE_SAVE_MS : TW_KEEP_SAVE_MS);
     }
   } catch {
     diag.gqlFail += 1;
@@ -975,8 +988,10 @@ const resumeTwWatch = () => {
 };
 document.addEventListener('visibilitychange', () => {
   if (!isVenuePageHidden(document)) resumeTwWatch();
+  else void writeLateIconsNow(); // v0.1.2254: 隠す前に、まだ書いていない顔を置く(録画で使う)
 });
 window.addEventListener('pagehide', () => {
+  void writeLateIconsNow();
   twWatchSched.stop();
   current?.stop();
   current = null;

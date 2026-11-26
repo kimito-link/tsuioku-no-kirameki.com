@@ -1,6 +1,6 @@
 // content-boot.js — 記録エンジン(content.js・約1.5MB)を、配信の視聴フレームだけに載せる。
 // トップや広告の iframe で解析すると、低スペックの PC で Chrome が固まる。
-import { needsNicoEngineFrame, shouldPollNicoEngine } from '../lib/nicoEngineBoot.js';
+import { needsNicoEngineFrame, shouldPollNicoEngine, needsNicoVideoWatchFrame } from '../lib/nicoEngineBoot.js';
 import { startPageStallWatch } from '../lib/stallTrace.js';
 
 const root = /** @type {any} */ (typeof globalThis !== 'undefined' ? globalThis : window);
@@ -44,10 +44,28 @@ if (!root.__NLS_BOOT_ASKED__) {
       root.__NLS_BOOT_ASKED__ = false;
     }
   };
+  const askVideoWatch = () => {
+    if (root.__NLS_VIDEO_WATCH_ASKED__) return;
+    if (!needsNicoVideoWatchFrame(String(location.href || ''), isTop())) return;
+    root.__NLS_VIDEO_WATCH_ASKED__ = true;
+    try {
+      chrome.runtime.sendMessage({ type: 'NLS_BOOT_ENGINE', file: 'dist/nico-video-watch.js' }, (res) => {
+        if (!res || res.ok !== true) root.__NLS_VIDEO_WATCH_ASKED__ = false;
+      });
+    } catch {
+      root.__NLS_VIDEO_WATCH_ASKED__ = false;
+    }
+  };
+  const tickVideoWatch = () => {
+    try { document.dispatchEvent(new CustomEvent('nlsb-nico-video-tick')); } catch { /* 入口がまだでも落とさない */ }
+  };
   ask();
+  askVideoWatch();
   if (!root.__NLS_BOOT_ASKED__ && shouldPollNicoEngine(String(location.href || ''), isTop())) {
     const timer = setInterval(() => {
       ask();
+      askVideoWatch();
+      if (root.__NLS_VIDEO_WATCH_ASKED__) tickVideoWatch();
       if (root.__NLS_BOOT_ASKED__) clearInterval(timer);
     }, 1000);
     setTimeout(() => clearInterval(timer), 120000);

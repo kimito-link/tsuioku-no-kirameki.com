@@ -114,6 +114,9 @@ import {
   shouldCompactTail,
   countCommentNoLessRows,
   collectCommentNoKeys,
+  planMainWriteWithTailFold,
+  settleTailAfterMainWrite,
+  knownStoredFloor,
   BIG_MAIN_THRESHOLD,
   TAIL_MAX_ROWS,
   TAIL_BULK_BYPASS_MIN_ROWS,
@@ -11300,7 +11303,8 @@ async function seedTailFromMain(lid) {
     // v0.1.1011: 記録全件(main + テール)の uid/commentNo 集計を1回だけ作って running を seed する。
     //   以後の incrementalMode は accumulateSavedCommentsUidStats で added だけ加算=母数を全件に保つ
     //   (チャンクモードで totalSaved:0 と誤集計していたのを根治)。
-    _savedCommentsUidStatsRunning = aggregateSavedCommentsUidStats(main.concat(persistedTail));
+    // v0.1.2230: seed はメインだけ(テール行は畳み込みで added の時に加算。含めると二度数えて件数の床が膨らんだ)。
+    _savedCommentsUidStatsRunning = aggregateSavedCommentsUidStats(main);
     _lastSavedCommentsUidStats = { ..._savedCommentsUidStatsRunning };
   } else {
     // メイン件数は近似（content 側の interval 計算・ログ用途のみ。表示は popup の直読みが担う）。
@@ -11703,7 +11707,7 @@ async function compactTailIntoMain(opts = {}) {
   lastImplMainCount = -1;
   const result = await persistCommentRowsImpl(
     /** @type {ParsedCommentRow[]} */ (foldRows),
-    { source: opts.reason || 'compact', __isCompaction: true, __noRequeue: true }
+    { source: opts.reason || 'compact', __isCompaction: true, __noRequeue: true, __tailFoldCount: snapshotLen }
   );
   // liveId が畳み込み中に変わったらテール操作は中止（別放送のバッファを壊さない）。
   if (liveId !== lid) return;
@@ -11941,14 +11945,31 @@ async function flushBatchViaTail(batch) {
   //   数千行のバーストを通すとクランプで古い行が黙って消え、既知キーだけが残り再取得も
   //   門前払い=38〜43%で固定(実機 crawl42,078行/保存15,094行で確定)。直行はO(追加分)。
   //   timeout時はimpl内のrequeueが再投入する(__noRequeueを渡さない)。
+  // v0.1.2230: 直行でもテール⊥メインを保つ(今のテールを同じ書き込みに載せ、成功したら外し、直行行のキーを既知へ足す=「記録」二重計上の根治)。
   if (batch.length >= TAIL_BULK_BYPASS_MIN_ROWS) {
-    const result = await persistCommentRowsImpl(batch, {
-      source: 'bulk_bypass',
-      __isCompaction: true
-    });
+    const plan = planMainWriteWithTailFold(batch, tailRowsBuffer);
+    // 直行分のうちメイン∪テールに無かった行(=新着)。成功後の直近リングと軽量サマリ用。
+    const bulkFresh = selectNewTailRows(lid, enrichRowsWithInterceptedUserIds(batch), tailKnownCommentNoKeys).fresh;
+    const result = await persistCommentRowsImpl(/** @type {ParsedCommentRow[]} */ (plan.rows), { source: 'bulk_bypass', __isCompaction: true, __tailFoldCount: plan.foldLen });
     if (liveId === lid && result && result.ok === true && lastImplMainCount >= 0) {
       tailMainCount = lastImplMainCount;
-      observedRecordedCommentCount = tailMainCount + tailRowsBuffer.length;
+      const settled = settleTailAfterMainWrite(lid, { tail: tailRowsBuffer, foldLen: plan.foldLen, writtenRows: batch, knownKeys: tailKnownCommentNoKeys, mainCount: tailMainCount });
+      tailRowsBuffer = settled.tail;
+      tailKnownCommentNoKeys = settled.knownKeys;
+      observedRecordedCommentCount = settled.recordedCount;
+      if (plan.foldLen) lastTailCompactAt = Date.now();
+      // 件数が変わったので、テール追記と同じ軽量サマリ(nls_csummary)も書く(書かないと件数と直近コメントが直行前のまま残る)。
+      if (bulkFresh.length) recentCommentRing = recentCommentRing.concat(bulkFresh).slice(-SUMMARY_RECENT_ROWS_MAX);
+      const now = Date.now();
+      const official = officialCommentCount != null && Number.isFinite(officialCommentCount) ? officialCommentCount : null;
+      const summaryPayload = buildCommentSummary({ liveId: lid, recordedCount: recordedCountForDisplay(lid), officialCount: official, lastIngestAt: now, recentRows: recentCommentRing, nowMs: now });
+      const panelPayload = buildPanelSummaryPayloadForCurrentLive(now);
+      const writes = { [summaryStorageKey(lid)]: summaryPayload, ...(plan.foldLen ? { [tailStorageKey(lid)]: tailRowsBuffer } : {}), ...(panelPayload ? { [panelSummaryStorageKey(lid)]: panelPayload } : {}) };
+      try {
+        await runStorageOpWithTimeout(() => chrome.storage.local.set(writes), INGEST_TIMING.persistWriteTimeoutMs);
+      } catch (err) {
+        if (err !== STORAGE_OP_TIMED_OUT) throw err;
+      }
     }
     return;
   }
@@ -12422,7 +12443,7 @@ function requeuePersistAfterStorageStall(rows, opts = {}) {
 
 /**
  * @param {ParsedCommentRow[]|null|undefined} rows
- * @param {{ source?: string, retryCount?: number, scrollRetryCount?: number, __isCompaction?: boolean, __noRequeue?: boolean }} [opts]
+ * @param {{ source?: string, retryCount?: number, scrollRetryCount?: number, __isCompaction?: boolean, __noRequeue?: boolean, __tailFoldCount?: number }} [opts]
  * @returns {Promise<{ ok: boolean, wrote: boolean, count: number }>}
  *   ok=true なら「これらの rows はメインに反映済み（書き込み or 既存重複で no-op）」。
  *   テールバッファのコンパクションはこの ok を見て、畳み込んだ分をバッファから除去する。
@@ -12588,11 +12609,12 @@ async function persistCommentRowsImpl(rows, opts = {}) {
       ? (liveChunkIndex ? Math.max(0, Number(liveChunkIndex.total) || 0) : 0) +
         (incrementalAdded || []).length
       : next.length;
-    const knownStored = Math.max(
-      Number(_savedCommentsUidStatsRunning && _savedCommentsUidStatsRunning.totalSaved) || 0,
-      Number(_lastSavedCommentsUidStats && _lastSavedCommentsUidStats.totalSaved) || 0,
-      (Number(tailMainCount) || 0) + (Array.isArray(tailRowsBuffer) ? tailRowsBuffer.length : 0)
-    );
+    const knownStored = knownStoredFloor({
+      savedTotals: [_savedCommentsUidStatsRunning?.totalSaved, _lastSavedCommentsUidStats?.totalSaved],
+      tailMainCount,
+      tailLength: Array.isArray(tailRowsBuffer) ? tailRowsBuffer.length : 0,
+      tailFoldCount: opts?.__tailFoldCount
+    });
     const effectiveTotalCount = Math.max(incrementalTotal, knownStored);
     observedRecordedCommentCount = effectiveTotalCount;
     if (recordedCountForDisplay(liveId) !== _lastPanelSummaryRecordedWritten) {

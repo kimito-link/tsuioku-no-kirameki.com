@@ -106,6 +106,7 @@ export function slimSummaryForStorage(summary) {
   const scc = num(summary.slotCommentCount);
   if (scc != null) slim.slotCommentCount = scc;
   if (summary.platformStats && typeof summary.platformStats === 'object') slim.platformStats = summary.platformStats;
+  if (summary.contentKind === 'video' || summary.contentKind === 'live' || summary.contentKind === 'live_replay') slim.contentKind = summary.contentKind;
   if (storageJsonBytes(slim) > YT_STORAGE_WRITE_MAX_BYTES) return null;
   return slim;
 }

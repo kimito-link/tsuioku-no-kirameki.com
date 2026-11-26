@@ -1,0 +1,57 @@
+{
+  "currentVideoEndpoint": {
+    "clickTrackingParams": "CAAQg2ciEwjz6f3Yv6SYAxV9g-QGHeSENo3KAQTj514f",
+    "commandMetadata": {
+      "webCommandMetadata": {
+        "url": "/watch?v=mlfY1WYFpEc&list=RDmlfY1WYFpEc&index=1",
+        "webPageType": "WEB_PAGE_TYPE_WATCH",
+        "rootVe": 3832
+      }
+    },
+    "watchEndpoint": {
+      "videoId": "mlfY1WYFpEc",
+      "playlistId": "RDmlfY1WYFpEc",
+      "index": 0,
+      "playlistSetVideoId": "56B44F6D10557CC6",
+      "loggingContext": {
+        "vssLoggingContext": {
+          "serializedContextData": "Gg1SRG1sZlkxV1lGcEVj"
+        }
+      },
+      "watchEndpointSupportedOnesieConfig": {
+        "html5PlaybackOnesieConfig": {
+          "commonConfig": {
+            "url": "https://rr4---sn-ogul7n7k.googlevideo.com/initplayback?source=youtube&oeis=1&c=WEB&oad=3200&ovd=3200&oaad=11000&oavd=11000&ocs=700&oewis=1&oputc=1&epbp=1&msp=1&odepv=1&id=9a57d8d56605a447&ip=2a09%3Abac5%3A44c2%3A3296%3A0%3A0%3A50a%3A3e&initcwndbps=3636375&mt=1795656578&oweuc="
+          }
+        }
+      }
+    }
+  },
+  "videoId": "mlfY1WYFpEc",
+  "contents": {
+    "twoColumnWatchNextResults": {
+      "results": {
+        "results": {
+          "contents": [
+            {
+              "videoPrimaryInfoRenderer": {
+                "videoId": "mlfY1WYFpEc",
+                "viewCount": {
+                  "videoViewCountRenderer": {
+                    "viewCount": {
+                      "simpleText": "135,321回視聴"
+                    },
+                    "shortViewCount": {
+                      "simpleText": "13万回視聴"
+                    },
+                    "originalViewCount": "135321"
+                  }
+                }
+              }
+            }
+          ]
+        }
+      }
+    }
+  }
+}

@@ -46,12 +46,12 @@ describe('配線: POP も会場も同じ代替顔を使う(二重に決めない
   it('★POP の avatar guard が共通の代替解決器を持つ', () => {
     const i = pop.indexOf('const storyAvatarLoadGuard = createSupportAvatarLoadGuard({');
     expect(i).toBeGreaterThan(0);
-    expect(pop.slice(i, i + 700)).toMatch(/fallbackSrcFor: identiconFallbackForAvatarUrl,/);
-    expect(pop).toMatch(/import \{ identiconFallbackForAvatarUrl \} from '\.\.\/lib\/avatarFallbackFromUrl\.js';/);
+    expect(pop.slice(i, i + 700)).toMatch(/fallbackSrcFor: avatarFallbackFaceForUrl,/);
+    expect(pop).toMatch(/import \{ avatarFallbackFaceForUrl, identiconFallbackForAvatarUrl \} from '\.\.\/lib\/avatarFallbackFromUrl\.js';/);
   });
 
   it('★会場の avatar guard も同じ関数を使う(ローカルに別実装を持たない)', () => {
-    expect(venue).toMatch(/const venueAvatarFallbackFor = identiconFallbackForAvatarUrl;/);
+    expect(venue).toMatch(/const venueAvatarFallbackFor = avatarFallbackFaceForUrl;/);
     expect(venue).toMatch(/fallbackSrcFor: venueAvatarFallbackFor,/);
     expect(venue.includes('/usericon/(?:[sm]/)?')).toBe(false); // uid 抽出の正規表現を会場に持ち込み直していない
   });

@@ -36,7 +36,7 @@
  *
  * - ytGiftToNico.js の固定為替は使わない。
  * - 配信者の受取（推定）は、公式が率・単価を公開しているものだけ（STREAMER_TAKE_HOME_RATES・v0.1.2227・りんくさん承認 2026-11-25）。
- *   YouTube のスパチャ・ステッカー 70%／Kick のサブスク・ギフトサブ $4.75／Twitch の Bits 1 Bit=1セント。ほかは出さない（「推定 —」）。
+ *   YouTube のスパチャ・ステッカー・スーパーサンクス 70%／Kick のサブスク・ギフトサブ $4.75／Twitch の Bits 1 Bit=1セント。ほかは出さない（「推定 —」）。
  *   税・手数料・事務所の取り分は人によって違うので引かない（「手数料・税差引前の目安」と書く）。
  *
  * @module estimatedViewerSpend
@@ -1079,11 +1079,11 @@ export const STREAMER_TAKE_HOME_CAVEAT = '手数料・税差引前の目安で�
 export const STREAMER_TAKE_HOME_RATES = Object.freeze({
   youtubePaidChat: Object.freeze({
     share: 0.7,
-    asOf: '2026-11-25',
-    sourceName: 'YouTube ヘルプ（Super Chat の収益・課金型製品モジュール）',
+    asOf: '2026-11-26',
+    sourceName: 'YouTube ヘルプ（パートナーの収益の概要・課金型製品モジュール）',
     sourceUrl: 'https://support.google.com/youtube/answer/7288782?hl=ja',
     sourceUrl2: 'https://support.google.com/youtube/answer/72902?hl=ja',
-    note: 'スーパーチャット・スーパーステッカーの 70%（公式は地方消費税・iOS の手数料を引いた後の 70%）。',
+    note: 'スーパーチャット・スーパーステッカー・スーパーサンクスの純収益の 70%（公式は地方消費税・iOS の手数料を引いた後の 70%。確認日 2026-11-26、https://support.google.com/youtube/answer/72902?hl=ja ）。',
   }),
   kickSub: Object.freeze({
     usdPerSub: 4.75,
@@ -1161,7 +1161,7 @@ export function estimateStreamerTakeHomeFromComments(platformId, comments) {
     const kind = String(c.ytKind ?? c.kind ?? '').trim().toLowerCase();
     const amount = Number(c.ytAmount ?? c.amount);
     const cur = String(c.ytCurrency ?? c.currency ?? '').trim().toUpperCase();
-    if ((kind === 'superchat' || kind === 'sticker') && cur && Number.isFinite(amount) && amount > 0) amounts[cur] = (amounts[cur] || 0) + amount;
+    if ((kind === 'superchat' || kind === 'sticker' || kind === 'superthanks') && cur && Number.isFinite(amount) && amount > 0) amounts[cur] = (amounts[cur] || 0) + amount;
     else if (kind === 'membership') membershipCount += 1;
     else if (kind === 'membership_gift' && !c.giftPartOf) {
       const rawGc = c.ytGiftCount ?? c.giftCount;

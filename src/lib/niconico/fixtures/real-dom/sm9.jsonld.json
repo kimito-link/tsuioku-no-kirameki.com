@@ -1,0 +1,32 @@
+{
+  "@context": "https://schema.org",
+  "@type": "VideoObject",
+  "@id": "https://www.nicovideo.jp/watch/sm9",
+  "name": "新・豪血寺一族 -煩悩解放 - レッツゴー！陰陽師",
+  "url": "https://www.nicovideo.jp/watch/sm9",
+  "duration": "PT320S",
+  "uploadDate": "2007-03-06T00:33:00+09:00",
+  "commentCount": 5704936,
+  "author": {
+    "@type": "Person",
+    "name": "中の",
+    "url": "https://www.nicovideo.jp/user/4"
+  },
+  "interactionStatistic": [
+    {
+      "@type": "InteractionCounter",
+      "interactionType": "https://schema.org/WatchAction",
+      "userInteractionCount": 23142333
+    },
+    {
+      "@type": "InteractionCounter",
+      "interactionType": "https://schema.org/WantAction",
+      "userInteractionCount": 183280
+    }
+  ],
+  "source": {
+    "capturedAt": "2026-11-26T10:45:53+09:00",
+    "from": "_notes/real-dom/niconico/video-sm9/outer.html on chore/real-dom-capture-nico f47989e03",
+    "extensionAtCapture": "0.1.2229"
+  }
+}

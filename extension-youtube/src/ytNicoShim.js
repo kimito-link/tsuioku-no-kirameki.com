@@ -14,6 +14,7 @@
 //   4. YouTube 側の記録が増えたら(yt_stream_summaries の変化)、nls_comments_<疑似lv> が変わったと popup に知らせる。
 
 import { computePseudoLvForVideoId, isYtPseudoLvShape } from '../../src/lib/youtube/ytPseudoLv.js';
+import { setNicoUidAvatarGuessEnabled } from '../../src/lib/supportGrowthTileSrc.js';
 import { setYtLvMetaResolver } from '../../src/lib/youtube/ytLvKeyBridge.js';
 import { marketingViewFor } from '../../src/lib/platform/marketingPlatformPlan.js';
 import { makeYtDefaultIconJudge, YT_DEFAULT_ICON_STORE_KEY } from './ytDefaultIcon.js';
@@ -27,6 +28,7 @@ import { buildGiftThrowLedgerTableSectionHtml, buildGiftThrowLedgerTableRowHtml 
 import { ytWording, ytWordingTopFanToSuperChatRank, ytWordingSuperChatRankToTopFan, ytWordingForPlatform, ytWordingPlatformFixed, ytWordingPlatformOfficial, ytGiftUnitWording } from '../../src/lib/youtube/ytWording.js';
 import { ytSuperChatTierColor, ytSuperChatFromRowText } from '../../src/lib/youtube/ytSuperChatTier.js';
 import { parseYtVideoIdFromUrl, isYtWatchLikeUrl, ytHandleLivePendingKey, ytHandleOfPendingKey, ytHandleLivePath, ytChannelUrlOfPendingKey } from '../../src/lib/youtube/ytPageMeta.js';
+import { ytWatchMayShowConcurrentViewers, concurrentViewersIsViewCountLeak } from '../../src/lib/youtube/ytVideoWatchMeta.js';
 import { platformOfStreamKey, platformOfPersonKey, platformChannelOfUrl, platformOfHostname, STREAM_PLATFORMS, placeholderStreamKeyForChannel, isPlaceholderStreamKey, streamKeysShareChannel, preferLiveStreamKey } from '../../src/lib/platform/streamPlatform.js';
 import { shouldAcceptYtLiveRows } from '../../src/lib/youtube/ytLiveRowsAccept.js';
 import { splitTextByEmotes, isEmoteName, isSafeEmoteUrl } from '../../src/lib/platform/streamEmotes.js';
@@ -58,6 +60,8 @@ import { tallySupportItems } from '../../src/lib/platform/platformMetrics.js';
 import { watchPlatformMetricChrome } from '../../src/lib/platform/platformMetricChrome.js';
 import { createEventStandingController } from './ytEventStanding.js';
 import { SUB_BOARD_KEY_PREFIX, subBoardToNicoadApiValue, subBoardLaneWording, subBoardCelebrationWording } from '../../src/lib/platform/platformSubBoard.js';
+// v0.1.2250: ニコ生以外の画面では、数字の ID からニコの顔 URL を組まない(Twitch・Kick の数字 ID を 404 の白丸にしない)
+setNicoUidAvatarGuessEnabled(false);
 
 const KEY_YT_SUMMARIES = 'yt_stream_summaries';
 // 視聴ページの中(content script)で動いているか。ニコ生版の会場は視聴ページの中で動く(content-entry.js の mountVenueBarButton)。
@@ -495,8 +499,20 @@ function ytTrustedStartedAt(sum, videoId, all) {
  */
 export function ytSummaryToNicoSnapshot(sum, videoId, tabTitle, all) {
   const lv = pseudoLvForVideoId(videoId);
+  const plat = platformOfStreamKey(videoId);
   // null を Number() すると 0 になり「0人」と出てしまうので、数のときだけ使う
-  const viewers = typeof sum?.concurrentViewers === 'number' ? sum.concurrentViewers : NaN;
+  // YouTube の通常動画では同時視聴の欄に再生回数が入ることがあるので隠す。
+  // Twitch など他サービスの配信キーは isLive が無くても同時接続を出す。
+  const mayShowConcurrent = (
+    plat
+      ? true
+      : ytWatchMayShowConcurrentViewers({
+          contentKind: sum?.contentKind,
+          isLive: sum?.isLive,
+          hasLiveChat: sum?.hasLiveChat,
+        })
+  ) && !concurrentViewersIsViewCountLeak(sum?.concurrentViewers, sum?.slotViewCount);
+  const viewers = mayShowConcurrent && typeof sum?.concurrentViewers === 'number' ? sum.concurrentViewers : NaN;
   // 配信の本当の開始時刻(ページの「ライブ配信開始日」)。記録を始めた時刻で代わりにすると、
   // 長い配信を開いた直後に「経過 0分」になる。分からないあいだは出さない。
   const trustedStart = ytTrustedStartedAt(sum, videoId, all);
@@ -510,7 +526,6 @@ export function ytSummaryToNicoSnapshot(sum, videoId, tabTitle, all) {
   const bKey = chId || (handle ? `handle:${handle}` : '');
   const bUid = bKey ? numericUidForYtKey(bKey) : '';
   const pendingHandle = ytHandleOfPendingKey(videoId);
-  const plat = platformOfStreamKey(videoId);
   if (plat && chId.startsWith(plat.personHead) && handle) loginByPersonKey.set(chId, handle.replace(/^@/, ''));
   // 配信者のアイコンがまとめに無いときは、配信者がチャットに書いた記録のアイコンを使う
   let bIcon = String(sum?.broadcasterIconUrl || '') || ytIconForNumericUid(bUid);
@@ -583,6 +598,9 @@ export function ytSummaryToNicoSnapshot(sum, videoId, tabTitle, all) {
       // ABEMA は番組情報欄の「視聴数」「コメント数」(ページに出ている数そのもの・#608 がまとめに入れる)
       viewCount: typeof sum?.slotViewCount === 'number' && sum.slotViewCount >= 0 ? sum.slotViewCount : null,
       commentCount: typeof sum?.slotCommentCount === 'number' && sum.slotCommentCount >= 0 ? sum.slotCommentCount : null,
+      ...(sum?.contentKind === 'video' || sum?.contentKind === 'live' || sum?.contentKind === 'live_replay'
+        ? { contentKind: sum.contentKind }
+        : {}),
       // そのサービス特有の公式の数字(SHOWROOM のイベント順位・ミクチャのレベル等・src/lib/platform/platformStats.js)
       official: sum?.platformStats && typeof sum.platformStats === 'object' ? sum.platformStats : null,
     },

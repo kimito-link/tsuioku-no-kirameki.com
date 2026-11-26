@@ -49,7 +49,10 @@ export function buildYtCommentPrimaryKey(videoId, commentId) {
  *   startedAtApprox?: boolean,
  *   endedAt?: number | null,
  *   platformStats?: Record<string, any> | null,
- *   followerSample?: { at?: number, count?: number, rounded?: boolean, source?: string, noun?: string, raw?: string, force?: boolean } | null
+ *   followerSample?: { at?: number, count?: number, rounded?: boolean, source?: string, noun?: string, raw?: string, force?: boolean } | null,
+ *   isLive?: boolean | null,
+ *   isLiveContent?: boolean | null,
+ *   contentKind?: string,
  * }} patch
  * @param {number} [nowMs]
  * @returns {{
@@ -85,12 +88,16 @@ export function mergeYtStreamSummary(existing, patch, nowMs = Date.now()) {
   // 50,000,000 を超える数は読み違い(2026-11-03 実機で桁が連なった数が入った)。古い記録に残っていても捨てる。
   const plausible = (/** @type {unknown} */ v) =>
     typeof v === 'number' && Number.isFinite(v) && v >= 0 && v <= 50_000_000;
+  const officialVideo = patch?.isLive === false && patch?.isLiveContent === false;
+  const notLiveNow = patch?.isLive === false || officialVideo || patch?.contentKind === 'video';
   const gotCount = plausible(patch?.concurrentViewers);
-  const concurrentViewers = gotCount
-    ? Math.floor(/** @type {number} */ (patch.concurrentViewers))
-    : plausible(prev.concurrentViewers)
-      ? Math.floor(prev.concurrentViewers)
-      : null;
+  let concurrentViewers = notLiveNow
+    ? null
+    : gotCount
+      ? Math.floor(/** @type {number} */ (patch.concurrentViewers))
+      : plausible(prev.concurrentViewers)
+        ? Math.floor(prev.concurrentViewers)
+        : null;
   // 読めた時刻は、数が取れたときだけ進める。コメント件数だけの更新では古くしない。
   // viewersRead:false は「今の読みは失敗」。前の数は残し、画面は「N分前」と出す。
   const readFailed = patch?.viewersRead === false && !gotCount;
@@ -173,6 +180,33 @@ export function mergeYtStreamSummary(existing, patch, nowMs = Date.now()) {
   // ページがすでに出しているフォロワー数。空のときは欄を足さない（要約全体の一致テストを崩さない）。
   const followerSamples = appendFollowerSample(prev.followerSamples, patch?.followerSample, nowMs);
 
+  const kindOf = (/** @type {unknown} */ v) => {
+    const k = String(v || '').trim();
+    return k === 'video' || k === 'live' || k === 'live_replay' ? k : '';
+  };
+  const patchKind = kindOf(patch?.contentKind);
+  const prevKind = kindOf(prev.contentKind);
+  // 配信・アーカイブと分かったあとに、通常動画へ落とさない（開始直後の取り違え防止）。
+  // ただし公式が isLive/isLiveContent とも false なら、取り違えた live を通常動画へ直す。
+  let contentKind =
+    officialVideo
+      ? 'video'
+      : patch?.isLive === false && patch?.isLiveContent === true
+        ? 'live_replay'
+        : patchKind === 'live' || patchKind === 'live_replay'
+          ? patchKind
+          : prevKind === 'live' || prevKind === 'live_replay'
+            ? prevKind
+            : patchKind || prevKind;
+  if (officialVideo) contentKind = 'video';
+  if (contentKind === 'video' || contentKind === 'live_replay' || patch?.isLive === false) {
+    concurrentViewers = null;
+  }
+  if (slotViewCount != null && concurrentViewers === slotViewCount) {
+    concurrentViewers = null;
+    if (patch?.isLive !== true && patchKind !== 'live') contentKind = officialVideo || patch?.isLiveContent === true ? (patch?.isLiveContent === true ? 'live_replay' : 'video') : 'video';
+  }
+
   return {
     videoId,
     title,
@@ -194,10 +228,12 @@ export function mergeYtStreamSummary(existing, patch, nowMs = Date.now()) {
     ...(startedAtApprox ? { startedAtApprox: true } : {}),
     ...(endedAt ? { endedAt } : {}),
     ...(followerSamples.length ? { followerSamples } : {}),
+    ...(contentKind ? { contentKind } : {}),
     createdAt,
     updatedAt: nowMs,
   };
 }
+
 
 /**
  * 受信したコメント配列を、間引き（上限カット）なしで IndexedDB 保存用レコード配列へ正規化する。

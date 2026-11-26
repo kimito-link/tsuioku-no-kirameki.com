@@ -6,6 +6,7 @@
 //   読み上げと会場の PICK UP は、新しい端だけ（過去分は skipVoice）。
 //   配信キーは ab.<login>.<チャット>。チャットが変わったら前のキーを終わらせる。
 
+import { parseAbemaEpisodeFromUrl } from '../../src/lib/videoWatch/vodWatchUrl.js';
 import {
   parseAbLoginFromUrl,
   buildAbStreamKey,
@@ -570,7 +571,7 @@ function onBatch(body, sinceMs, untilMs, isBackfill = false) {
 }
 
 function syncPage() {
-  const login = parseAbLoginFromUrl(location.href);
+  const login = parseAbemaEpisodeFromUrl(location.href) ? '' : parseAbLoginFromUrl(location.href);
   if (login === pageLogin) {
     maybeNote();
     if (streamKey && (Date.now() - metaAt > 30_000 || (!sentIcon && abImageScanDue(imageScanAt, false, Date.now())))) sendMeta();

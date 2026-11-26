@@ -13,6 +13,17 @@ import {
   isYtWatchLikeUrl,
   pickYtBroadcasterIconUrl,
 } from '../../src/lib/youtube/ytPageMeta.js';
+import {
+  classifyYtWatchContentKind,
+  ytVideoCommentAuthorsFromDom,
+  ytVideoCommentAuthorsFromInnertube,
+  mergeYtVideoCommentAuthors,
+  ytVideoCommentsFromDom,
+  ytViewCountFromDom, ytCommentCountFromDom,
+  concurrentViewersIsViewCountLeak,
+} from '../../src/lib/youtube/ytVideoWatchMeta.js';
+import { askPageToTagYtCommentPhotos, readYtCommentEntities } from '../../src/lib/youtube/ytCommentPhotoTag.js';
+import { createYtCommentScanGate } from '../../src/lib/youtube/ytCommentScanGate.js';
 import { ytVideoIdFromChatFrameUrl } from '../../src/lib/youtube/ytChatContinuationVideoId.js';
 import { relativeStreamStartedAtMs, startMsFromTimestampBlob } from '../../src/lib/youtube/ytStreamStart.js';
 import { followerSampleFromDom } from '../../src/lib/platform/followerCountSample.js';
@@ -276,7 +287,7 @@ function visibleTextOf(root) {
 
 // 横の「関連動画」にも他の配信の「◯人が視聴中」が並ぶ。それを読まないよう、そこは見ない。
 const OTHER_VIDEOS_SEL =
-  '#secondary, #related, ytd-watch-next-secondary-results-renderer, ytd-compact-video-renderer, yt-lockup-view-model, ytd-rich-item-renderer, ytd-video-renderer, ytd-miniplayer';
+  '#secondary, #related, #playlist, ytd-playlist-panel-renderer, ytd-playlist-panel-video-renderer, ytd-watch-next-secondary-results-renderer, ytd-compact-video-renderer, yt-lockup-view-model, ytd-rich-item-renderer, ytd-video-renderer, ytd-miniplayer';
 /** @param {Node | null} n */
 function isInOtherVideos(n) {
   const el = n && n.nodeType === 1 ? /** @type {Element} */ (n) : n?.parentElement || null;
@@ -299,6 +310,7 @@ function isInSkippedText(n) {
 function readPublishedViewers() {
   try {
     const root = document.documentElement;
+    if (root?.getAttribute('data-nl-yt-is-live') === '0') return null;
     const id = String(root?.getAttribute('data-nl-yt-video-id') || '');
     const pageId = resolveCurrentVideoId();
     if (!/^[A-Za-z0-9_-]{11}$/.test(id) || (pageId && id !== pageId)) return null;
@@ -316,6 +328,11 @@ function readPublishedViewers() {
  * ytInitialData は開いた時のままなので、こちらを先にすると画面の数が 37→27 と動いても 32 のまま止まっていた(2026-11-11 PC 計測)。
  */
 function readConcurrentViewers() {
+  try {
+    if (document.documentElement?.getAttribute('data-nl-yt-is-live') === '0') return null;
+  } catch {
+    /* 属性が読めなくても、画面の「人が視聴中」は後で読む */
+  }
   const onScreen = readOnScreenViewers();
   if (onScreen !== null) return onScreen;
   return readPublishedViewers();
@@ -612,6 +629,8 @@ function startedAtFields(videoId, isLive = false) {
 }
 
 function setupWatchPageMetaObserver() {
+  /** @type {ReturnType<typeof createYtCommentScanGate<{ videoAuthors: any[], videoComments: any[] }>>} */
+  const ytCommentScanGate = createYtCommentScanGate();
   const sendMeta = () => {
     if (!isYtWatchLikeUrl(String(window.location.href || ''))) return;
     const videoId = resolveCurrentVideoId();
@@ -653,6 +672,56 @@ function setupWatchPageMetaObserver() {
     const viewers = readConcurrentViewers();
     const ended = endedAtFields(videoId);
     const sub = followerSampleFromDom(document, 'youtube');
+    const root = document.documentElement;
+    const attrBool = (/** @type {string} */ name) => {
+      const v = root?.getAttribute(name);
+      if (v === '1') return true;
+      if (v === '0') return false;
+      return null;
+    };
+    const attrCount = root?.getAttribute('data-nl-yt-view-count') || '';
+    const viewCountFromAttr = /^\d+$/.test(attrCount) ? Number(attrCount) : null;
+    const viewCount = viewCountFromAttr != null ? viewCountFromAttr : ytViewCountFromDom(document);
+    let hasLiveChat = false;
+    let hasLiveChatReplay = false;
+    try {
+      const iframes = document.querySelectorAll('iframe[src]');
+      for (let i = 0; i < iframes.length; i += 1) {
+        const src = String(iframes[i].getAttribute('src') || '');
+        if (src.includes('live_chat_replay')) hasLiveChatReplay = true;
+        else if (src.includes('/live_chat')) hasLiveChat = true;
+      }
+    } catch {
+      /* フレームが読めなくても種別は他の印で決める */
+    }
+    let viewersForKind = viewers;
+    // v0.1.2241: 丸めた再生回数(474万)と概要欄の再生回数(4,740,759)も同じ数とみなす(ytVideoWatchMeta.js)
+    if (viewCount != null && concurrentViewersIsViewCountLeak(viewersForKind, viewCount)) viewersForKind = null;
+    const contentKind = classifyYtWatchContentKind({
+      url: String(location.href || ''),
+      concurrentViewers: viewersForKind,
+      viewCount,
+      isLive: attrBool('data-nl-yt-is-live'),
+      isLiveContent: attrBool('data-nl-yt-is-live-content'),
+      hasLiveChat,
+      hasLiveChatReplay,
+    });
+    // v0.1.2247: 画面に出ていない投稿者の顔は img が空。ページの世界に1回合図して、本物の URL を属性に写してから読む
+    // v0.1.2249: 同じ動画で裏タブ、またはコメントの並びが前回と同じなら、前回の読み取りを使う(ytCommentScanGate.js)
+    const scan = contentKind === 'video'
+      ? ytCommentScanGate.read(document, videoId, () => {
+        askPageToTagYtCommentPhotos(document);
+        // v0.1.2252: ページのデータ(UC… ID・顔)を正に、DOM で補う(ytCommentPhotoTag.js が同じ合図で写す)
+        const fromPage = ytVideoCommentAuthorsFromInnertube(readYtCommentEntities(document) || []);
+        const videoAuthors = mergeYtVideoCommentAuthors(fromPage, ytVideoCommentAuthorsFromDom(document));
+        return { videoAuthors, videoComments: ytVideoCommentsFromDom(document) };
+      })
+      : null;
+    const videoAuthors = scan ? scan.videoAuthors : [];
+    const videoComments = scan ? scan.videoComments : [];
+    const commentCount = contentKind === 'video' ? ytCommentCountFromDom(document) : null;
+    const isLiveFlag = attrBool('data-nl-yt-is-live');
+    const isLiveContentFlag = attrBool('data-nl-yt-is-live-content');
     safeSendMessage({
       type: 'YT_STREAM_META',
       payload: {
@@ -662,12 +731,18 @@ function setupWatchPageMetaObserver() {
         broadcasterChannelId,
         broadcasterHandle,
         broadcasterIconUrl: readBroadcasterIconUrl(),
-        concurrentViewers: viewers,
-        ...(viewers === null ? { viewersRead: false } : {}),
+        concurrentViewers: contentKind === 'video' ? undefined : viewersForKind,
+        ...(contentKind !== 'video' && viewers === null ? { viewersRead: false } : {}),
         sourceUrl: String(location.href || ''),
-        ...startedAtFields(videoId, viewers !== null),
+        ...startedAtFields(videoId, contentKind !== 'video' && viewers !== null),
         ...ended,
         ...(sub ? { followerSample: { ...sub, at: Date.now(), ...(ended.endedAt ? { force: true } : {}) } } : {}),
+        contentKind,
+        isLive: isLiveFlag,
+        isLiveContent: isLiveContentFlag,
+        ...(contentKind === 'video' && viewCount != null ? { slotViewCount: viewCount } : {}),
+        ...(contentKind === 'video' && commentCount != null ? { slotCommentCount: commentCount } : {}),
+        ...(contentKind === 'video' ? { videoAuthors, videoComments } : {}),
       },
     });
     if (viewers === null) saveViewerProbe();
@@ -687,6 +762,28 @@ function setupWatchPageMetaObserver() {
     setTimeout(sendMeta, 800);
     setTimeout(sendMeta, 2500);
   });
+  try {
+    if (typeof chrome !== 'undefined' && chrome.runtime?.onMessage && !window.__NLS_SCROLL_TO_VIDEO_COMMENT__) {
+      window.__NLS_SCROLL_TO_VIDEO_COMMENT__ = true;
+      chrome.runtime.onMessage.addListener((msg) => {
+        if (!msg || msg.type !== 'NLS_SCROLL_TO_VIDEO_COMMENT') return;
+        const id = String(msg.commentId || msg.id || '').trim();
+        if (!id) return;
+        let el = null;
+        try {
+          const esc = typeof CSS !== 'undefined' && CSS.escape ? CSS.escape(id) : id;
+          el = document.querySelector(`[comment-id="${esc}"], [data-comment-id="${esc}"], a[href*="lc=${esc}"]`);
+        } catch {
+          el = document.querySelector(`[comment-id="${id}"], [data-comment-id="${id}"]`);
+        }
+        if (el && typeof el.scrollIntoView === 'function') {
+          try { el.scrollIntoView({ block: 'center', behavior: 'smooth' }); } catch { el.scrollIntoView(true); }
+        }
+      });
+    }
+  } catch {
+    /* ジャンプは取れなくても記録は止めない */
+  }
 }
 
 /**

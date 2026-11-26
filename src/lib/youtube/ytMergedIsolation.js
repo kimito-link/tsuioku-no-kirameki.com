@@ -16,6 +16,7 @@
 //      YouTube 版の裏方の名前(YT_OPEN_…)に変える。
 
 import { SUPPORTER_SHARED_KEY_PREFIX } from '../supporterAccess.js';
+import { KEY_NICO_VIDEO_WATCH_CARD, KEY_VOD_VIDEO_WATCH_CARD } from '../storageKeys.js';
 
 export const YT_MERGED_KEY_PREFIX = 'ytm:';
 export const YT_OWN_IDB_NAME = 'yt_kirameki_db';
@@ -54,9 +55,18 @@ export const YT_MERGED_RENAMED_MESSAGES = Object.freeze({
  */
 export const YT_MERGED_SHARED_KEY_PREFIXES = Object.freeze([SUPPORTER_SHARED_KEY_PREFIX]);
 
+/**
+ * ニコ生版の画面と YouTube 版の画面の両方が読む、通常動画のカードの置き場(v0.1.2241)。
+ *   書く側(視聴ページの入口)が仕切りの内か外かは、同じページに先に入った入口の順番で変わる
+ *   (0.1.2239 実機: Twitch 録画は最初が素のキー・後から「ytm:」付き、ツイキャス・ABEMA・TikTok は「ytm:」付き)。
+ *   読む側(横の欄)も popup.html は素のキー・yt-sidepanel.html は「ytm:」付きを読むので、どの組み合わせでもずれていた。
+ *   置き場を 1 つ(素のキー)に決めて、仕切りを素通しする。ライブの記録・設定のキーは今までどおり仕切る。
+ */
+export const YT_MERGED_SHARED_KEYS = Object.freeze([KEY_NICO_VIDEO_WATCH_CARD, KEY_VOD_VIDEO_WATCH_CARD]);
+
 /** @param {string} s */
 function isSharedKey(s) {
-  return YT_MERGED_SHARED_KEY_PREFIXES.some((p) => s.startsWith(p));
+  return YT_MERGED_SHARED_KEY_PREFIXES.some((p) => s.startsWith(p)) || YT_MERGED_SHARED_KEYS.includes(s);
 }
 
 /** @param {string} k */

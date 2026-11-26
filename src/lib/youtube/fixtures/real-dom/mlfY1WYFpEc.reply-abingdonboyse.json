@@ -1,0 +1,46 @@
+{
+  "source": {
+    "file": "next-follow-2.json",
+    "fetchedAt": "2026-11-26T10:37:00+09:00"
+  },
+  "frameworkUpdates": {
+    "entityBatchUpdate": {
+      "mutations": [
+        {
+          "payload": {
+            "commentEntityPayload": {
+              "key": "EjFVZ3p6bkp4ajhIX2xUMThjbV9ONEFhQUJBZy44WVFLTTRjT3UzZzhfNDJmSUQ2c21LICgoAQ%3D%3D",
+              "properties": {
+                "commentId": "UgzznJxj8H_lT18cm_N4AaABAg.8YQKM4cOu3g8_42fID6smK",
+                "content": {
+                  "content": "アナキンスカイウォーカー 2006年のアンダーカバーライブのアンコール映像だからです"
+                },
+                "publishedTime": "9 年前",
+                "replyLevel": 1
+              },
+              "author": {
+                "channelId": "UCxrc44s7ohq3r8QkCRw_NrA",
+                "displayName": "@abingdonboyse",
+                "avatarThumbnailUrl": "https://yt3.ggpht.com/ytc/AIdro_lJOMJNu2GxkJHeKLZkk_7Bgm6yWettiVvdp26au4qXcqHyy3vUy68uVTY_C4HFXp6QCA=s88-c-k-c0x00ffffff-no-rj",
+                "isVerified": false,
+                "isCreator": false,
+                "channelCommand": {
+                  "innertubeCommand": {
+                    "browseEndpoint": {
+                      "browseId": "UCxrc44s7ohq3r8QkCRw_NrA",
+                      "canonicalBaseUrl": "/@abingdonboyse"
+                    }
+                  }
+                }
+              },
+              "toolbar": {
+                "likeCountNotliked": "2",
+                "replyCount": ""
+              }
+            }
+          }
+        }
+      ]
+    }
+  }
+}

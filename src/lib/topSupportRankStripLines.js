@@ -2,7 +2,8 @@
 import {
   isHttpOrHttpsUrl,
   isAnonymousStyleNicoUserId,
-  pickSupportGrowthFallbackTileSrc
+  pickSupportGrowthFallbackTileSrc,
+  dropNicoUserIconOffNico
 } from './supportGrowthTileSrc.js';
 import {
   accentColorForSlot,
@@ -216,7 +217,8 @@ export function topSupportRankLineModels(stripRooms, opts) {
       placeNumber = knownRank;
     }
 
-    const rawAv = String(r?.avatarUrl || '').trim();
+    // v0.1.2250: ニコ生以外の画面では、記録に残ったニコの usericon URL(数字 ID から組んだもの)を使わない
+    const rawAv = String(dropNicoUserIconOffNico(r?.avatarUrl) || '').trim();
     const uidForThumb = isUnknown ? '' : userKey;
     const isOfficialRank = isOfficialDomRankUserKey(userKey);
     // 公式DOMランクで同一 http URL が複数行に重複 = scrape アーティファクト。

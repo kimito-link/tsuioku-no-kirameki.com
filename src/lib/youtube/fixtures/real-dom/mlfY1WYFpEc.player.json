@@ -1,0 +1,25 @@
+{
+  "videoDetails": {
+    "videoId": "mlfY1WYFpEc",
+    "title": "out of orbit - triple ZERO- undercover",
+    "lengthSeconds": "338",
+    "channelId": "UCXQjgZC0RBDK4GpON2E_F7w",
+    "author": "tomoki3",
+    "viewCount": "135321",
+    "isLiveContent": false,
+    "isLive": null,
+    "isPrivate": false
+  },
+  "microformat": {
+    "playerMicroformatRenderer": {
+      "viewCount": "135321",
+      "publishDate": "2007-07-30T15:46:20-07:00",
+      "uploadDate": "2007-07-30T15:46:20-07:00",
+      "liveBroadcastDetails": null,
+      "isFamilySafe": true
+    }
+  },
+  "playabilityStatus": {
+    "status": "OK"
+  }
+}
