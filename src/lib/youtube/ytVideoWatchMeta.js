@@ -234,6 +234,7 @@ export function ytPageShouldHideVenueMode(meta) {
   return false;
 }
 
+/** @param {any} signals */
 export function ytWatchMayShowConcurrentViewers(signals) {
   const s = signals && typeof signals === 'object' ? signals : {};
   if (s.isLive === false) return false;
@@ -270,6 +271,7 @@ export function concurrentViewersIsViewCountLeak(concurrent, viewCount) {
   return fa > fb && fa - fb < unit;
 }
 
+/** @param {any} signals */
 export function classifyYtWatchContentKind(signals) {
   const s = signals && typeof signals === 'object' ? signals : {};
   if (s.hasLiveChatReplay === true) return 'live_replay';
@@ -371,7 +373,7 @@ export function parseYtPaidCommentAmount(node) {
 /**
  * innertube 木から動画コメントの投稿者を集める（本文は返さない）。
  * @param {any} data
- * @param {{ limit?: number }} [opts]
+ * @param {{ limit?: number, nowMs?: number }} [opts]
  * @returns {YtVideoCommentAuthor[]}
  */
 export function ytVideoCommentAuthorsFromInnertube(data, opts = {}) {
@@ -583,6 +585,7 @@ function queryDeep(root, sel) {
 function ytCommentHostElements(root) {
   /** @type {Element[]} */
   const hosts = [];
+  /** @type {ArrayLike<Element>} */
   const threads = typeof root.querySelectorAll === 'function' ? root.querySelectorAll('ytd-comment-thread-renderer') : [];
   for (let i = 0; i < threads.length; i += 1) {
     const th = threads[i];
@@ -590,6 +593,7 @@ function ytCommentHostElements(root) {
     hosts.push(/** @type {Element} */ (vm || th));
   }
   if (hosts.length) return hosts;
+  /** @type {ArrayLike<Element>} */
   const loose = typeof root.querySelectorAll === 'function'
     ? root.querySelectorAll('ytd-comment-view-model, ytd-comment-renderer, yt-comment-view-model')
     : [];
@@ -624,6 +628,10 @@ export function parseYtCommentPublishedAtMs(text, nowMs = Date.now()) {
   return Math.floor(base - ms);
 }
 
+/**
+ * @param {any} root
+ * @param {{ limit?: number, nowMs?: number }} [opts]
+ */
 export function ytVideoCommentAuthorsFromDom(root, opts = {}) {
   const limit = Number.isFinite(Number(opts.limit)) ? Math.max(1, Math.floor(Number(opts.limit))) : 80;
   if (!root || typeof root.querySelectorAll !== 'function') return [];
@@ -733,6 +741,7 @@ export function ytVideoCommentsFromDom(root, opts = {}) {
   const out = [];
   const threads = root.querySelectorAll('ytd-comment-thread-renderer');
   const useThreads = threads.length > 0;
+  /** @type {any} */
   const hosts = useThreads ? threads : [];
   if (!useThreads) {
     const loose = root.querySelectorAll('ytd-comment-view-model, ytd-comment-renderer, yt-comment-view-model');
@@ -789,6 +798,7 @@ function ytCommentRecordFromViewModel(el, opts = {}) {
       try { commentId = decodeURIComponent(lc[1]); } catch { commentId = lc[1]; }
     }
   }
+  /** @type {ArrayLike<Element>} */
   const links = el.querySelectorAll ? el.querySelectorAll('a[href]') : [];
   for (let j = 0; j < links.length; j += 1) {
     const href = String(links[j].getAttribute?.('href') || '');
@@ -855,6 +865,7 @@ function ytCommentRecordFromViewModel(el, opts = {}) {
  */
 export function ytCommentCountFromDom(root) {
   if (!root || typeof root.querySelector !== 'function') return null;
+  /** @type {ArrayLike<Element>} */
   const els = root.querySelectorAll
     ? root.querySelectorAll(
         'ytd-comments-header-renderer #count, ytd-comments-header-renderer #title, ytd-comments-header-renderer, #comments #count, #comments #title, #leading-section',
@@ -877,6 +888,7 @@ export function ytCommentCountFromDom(root) {
  */
 export function ytViewCountFromDom(root) {
   if (!root || typeof root.querySelector !== 'function') return null;
+  /** @type {ArrayLike<Element>} */
   const els = root.querySelectorAll
     ? root.querySelectorAll(
         [

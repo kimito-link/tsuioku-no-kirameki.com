@@ -29,6 +29,7 @@ function currentVideoId() {
   return identity && identity.service === 'niconico' ? identity.key : '';
 }
 
+/** @param {unknown} raw */
 function unescapeMetaContent(raw) {
   return String(raw || '')
     .replace(/&quot;/g, '"')
@@ -67,6 +68,7 @@ function readJsonLd() {
   return out;
 }
 
+/** @param {string} videoId */
 function readPageMeta(videoId) {
   const server = readServerResponse();
   const jsonLd = readJsonLd();
@@ -80,6 +82,7 @@ function readPageMeta(videoId) {
 }
 
 function readVisibleCommenters() {
+  /** @type {any} */
   let fromAttr = [];
   try {
     fromAttr = unpackNicoVideoCommentersAttr(document.documentElement?.getAttribute('data-nlsb-nico-video-commenters') || '');
@@ -109,6 +112,11 @@ let rememberVideoId = '';
 /** @type {Set<string>} */
 const rememberedIds = new Set();
 
+/**
+ * @param {string} ownerId
+ * @param {string} videoId
+ * @param {any[]} authors
+ */
 function rememberVideoCommenters(ownerId, videoId, authors) {
   const owner = String(ownerId || '').trim();
   const vid = String(videoId || '').trim();
@@ -128,7 +136,7 @@ function rememberVideoCommenters(ownerId, videoId, authors) {
     try {
       const bag = await chrome.storage.local.get(KEY_NICO_CHANNEL_COMMENTERS);
       const next = applyNicoCommentsToChannelIndex(
-        bag?.[KEY_NICO_CHANNEL_COMMENTERS],
+        /** @type {any} */ (bag?.[KEY_NICO_CHANNEL_COMMENTERS]),
         owner,
         fresh,
         Date.now(),
@@ -155,6 +163,7 @@ function refresh() {
   void (async () => {
     try {
       const bag = await chrome.storage.local.get(KEY_NICO_CHANNEL_COMMENTERS);
+      /** @type {any} */
       const index = bag?.[KEY_NICO_CHANNEL_COMMENTERS];
       const livePeople = peopleInNicoChannelCommenterIndex(index, meta.ownerId);
       const histCount = Object.keys(livePeople).length;

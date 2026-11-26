@@ -1,10 +1,9 @@
 import { describe, it, expect } from 'vitest';
 import { Window } from 'happy-dom';
-import { concurrentFromVideoViewCountRenderer, concurrentViewersInInnertube } from './ytConcurrentViewers.js';
+import { concurrentFromVideoViewCountRenderer } from './ytConcurrentViewers.js';
 import { mergeYtStreamSummary } from './ytStreamStorePolicy.js';
 import {
   classifyYtWatchContentKind,
-  ytViewCountFromDom,
   ytCommentCountFromDom,
   ytVideoCommentAuthorsFromDom,
   ytWatchMayShowConcurrentViewers,

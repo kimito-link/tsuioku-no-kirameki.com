@@ -49,6 +49,7 @@ function jsonLdVideos(doc) {
   /** @type {any[]} */
   const out = [];
   try {
+    /** @type {ArrayLike<Element>} */
     const nodes = doc?.querySelectorAll('script[type="application/ld+json"]') || [];
     for (let i = 0; i < nodes.length; i += 1) {
       try {
@@ -185,6 +186,7 @@ function readTwitchVodReplayChat(doc) {
 
 /** @param {Document | null | undefined} doc @param {string} [user] */
 function readTwitcasting(doc, user) {
+  /** @type {any} */
   const info = doc ? readTcPageInfo(doc, user || '') : { title: '', name: '', stats: {}, viewers: null };
   const parsed = doc ? parseTcMovieCommentDoc(doc) : { rows: [], empty: true };
   const sourceRows = parsed.rows && parsed.rows.length ? parsed.rows : parseTcPlayerCommentItems(doc);
@@ -232,7 +234,7 @@ function readTiktokUnverified(doc) {
   }
   /** @type {{ id: string, name: string, avatarUrl?: string, postedAtMs?: number, commentId?: string }[]} */
   const rows = [];
-  const walk = (/** @type {any} */ node, depth) => {
+  const walk = (/** @type {any} */ node, /** @type {number} */ depth) => {
     if (!node || depth > 8) return;
     if (Array.isArray(node)) {
       for (const item of node) walk(item, depth + 1);
@@ -277,7 +279,7 @@ export function readVodWatchDom(doc, page) {
   const ld = jsonLdVideos(doc)[0];
   const title = titleFromDoc(doc);
   const ownerName = text(ld?.author?.name) || '';
-  let viewCount = ld ? viewCountFromLd(ld) : null;
+  const viewCount = ld ? viewCountFromLd(ld) : null;
   /** @type {VodDomRead['authors']} */
   let authors = [];
   let commentsVerified = false;

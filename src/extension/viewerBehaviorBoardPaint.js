@@ -16,10 +16,10 @@ export const VIEWER_BEHAVIOR_BOARD_STYLE_ID = 'nlsb-viewer-behavior-board-style'
 
 /**
  * @param {string} rootSel
- * @param {'overlay' | 'flow'} placement
+ * @param {'overlay' | 'flow'} [_placement] 配置(今はどの配置でも同じ流れの中に置く)
  * @returns {string}
  */
-export function viewerBehaviorBoardStyleText(rootSel, placement = 'overlay') {
+export function viewerBehaviorBoardStyleText(rootSel, _placement = 'overlay') {
   // ページのコメント欄や映像の上に浮かせない。どの配置でも自分の欄の中の流れにする。
   const box = 'position:relative;z-index:2;max-width:100%;margin:0 0 8px;max-height:none;';
   return (
@@ -74,7 +74,7 @@ export function viewerBehaviorBoardStyleText(rootSel, placement = 'overlay') {
  */
 
 /**
- * @param {HTMLElement} box
+ * @param {HTMLElement & { __nlsbBoard?: any }} box
  */
 export function bindViewerBehaviorBoardEvents(box) {
   if (!box || box.getAttribute('data-nlsb-bound') === '1') return;
@@ -139,6 +139,9 @@ export function bindViewerBehaviorBoardEvents(box) {
   });
 }
 
+/**
+ * @param {{ document?: Document | null, html?: string, hide?: boolean, placement?: 'overlay' | 'flow', board?: any, collapsed?: boolean, mountParent?: Element | null }} [opts]
+ */
 export function paintViewerBehaviorBoardEl(opts = {}) {
   const doc = opts.document || (typeof document !== 'undefined' ? document : null);
   if (!doc) return;
@@ -154,7 +157,7 @@ export function paintViewerBehaviorBoardEl(opts = {}) {
     st.textContent = viewerBehaviorBoardStyleText('#' + VIEWER_BEHAVIOR_BOARD_EL_ID, opts.placement || 'overlay');
     (doc.head || doc.documentElement).appendChild(st);
   }
-  const afterPaint = (el) => {
+  const afterPaint = (/** @type {any} */ el) => {
     bindViewerBehaviorBoardEvents(el);
     // 動画のタイルは詳細を横の欄に出す。ライブの発言一覧クリックは popup-entry の既存配線のまま。
     if (opts.board) {
@@ -287,6 +290,10 @@ export function planViewerBehaviorBoardPaint(input) {
 /** 視聴ページの入口(vod-video-watch / nico-video-watch)に「いまの DOM を読み直して」と頼む合図 */
 export const VIDEO_WATCH_REREAD_MESSAGE = 'NLS_VIDEO_WATCH_REREAD';
 
+/**
+ * storage にあるカード／ボードを、いまのページ用だけ塗る(横の欄)。
+ * @param {any} opts document / storage / getUrl / placement / sources / mountParent / sendToTab / tabs / windows
+ */
 export function installViewerBehaviorBoardFromStorage(opts) {
   const doc = opts.document || (typeof document !== 'undefined' ? document : null);
   const storage = opts.storage;
@@ -308,7 +315,7 @@ export function installViewerBehaviorBoardFromStorage(opts) {
         paintViewerBehaviorBoardEl({ document: doc, hide: true });
         return;
       }
-      void storage.local.get([KEY_VIEWER_BEHAVIOR_BOARD, KEY_YT_VIDEO_WATCH_CARD, KEY_NICO_VIDEO_WATCH_CARD, KEY_VOD_VIDEO_WATCH_CARD, KEY_LAST_WATCH_URL]).then((bag) => {
+      void storage.local.get([KEY_VIEWER_BEHAVIOR_BOARD, KEY_YT_VIDEO_WATCH_CARD, KEY_NICO_VIDEO_WATCH_CARD, KEY_VOD_VIDEO_WATCH_CARD, KEY_LAST_WATCH_URL]).then((/** @type {any} */ bag) => {
         try {
           if (opts.skipIfVideoCardId && doc.getElementById(opts.skipIfVideoCardId)) {
             paintViewerBehaviorBoardEl({ document: doc, hide: true });
@@ -420,7 +427,7 @@ export function installViewerBehaviorBoardFromStorage(opts) {
   }
 
   try {
-    storage.onChanged?.addListener?.((changes, area) => {
+    storage.onChanged?.addListener?.((/** @type {any} */ changes, /** @type {string} */ area) => {
       if (area !== 'local') return;
       if (!changes?.[KEY_VIEWER_BEHAVIOR_BOARD] && !changes?.[KEY_YT_VIDEO_WATCH_CARD] && !changes?.[KEY_NICO_VIDEO_WATCH_CARD] && !changes?.[KEY_VOD_VIDEO_WATCH_CARD]) return;
       refresh();

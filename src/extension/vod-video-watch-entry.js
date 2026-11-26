@@ -12,6 +12,7 @@ import { videoIdentityFromUrl } from '../lib/videoWatch/videoIdentity.js';
 /** 横の欄(viewerBehaviorBoardPaint.js)が既存の見回りで送る「読み直して」の合図 */
 const VIDEO_WATCH_REREAD_MESSAGE = 'NLS_VIDEO_WATCH_REREAD';
 
+/** @param {boolean} hide */
 function hideVenueModeForVideoPage(hide) {
   try {
     const root = document.getElementById('nlsb-venue-root');

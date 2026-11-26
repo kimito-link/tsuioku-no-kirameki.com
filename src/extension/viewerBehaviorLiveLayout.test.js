@@ -1,5 +1,5 @@
 /** @vitest-environment happy-dom */
-import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+import { describe, expect, it, vi } from 'vitest';
 import { buildViewerBehaviorBoard, resolveViewerBehaviorAvatarUrl, viewerBehaviorBoardInnerHtml } from '../lib/viewerBehavior.js';
 import { hydrateViewerBehaviorLiveLayout, viewerBehaviorRowsToLaneBuckets } from './viewerBehaviorLiveLayout.js';
 import { wireLaneUserDetailOpen } from './popup/wireLaneUserDetailOpen.js';

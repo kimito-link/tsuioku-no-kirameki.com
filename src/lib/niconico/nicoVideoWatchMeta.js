@@ -223,13 +223,13 @@ export function unpackNicoVideoCommentersAttr(raw) {
     const j = JSON.parse(s);
     const rows = Array.isArray(j?.p) ? j.p : [];
     return rows
-      .map((row) => {
+      .map((/** @type {any} */ row) => {
         const userId = String(Array.isArray(row) ? row[0] : row?.userId || '').trim();
         const postedAtMs = Number(Array.isArray(row) ? row[1] : row?.postedAtMs) || 0;
         const commentCount = Number(Array.isArray(row) ? row[2] : row?.commentCount) || 1;
         return { userId, name: '', postedAtMs, commentCount };
       })
-      .filter((p) => p.userId);
+      .filter((/** @type {{ userId: string }} */ p) => p.userId);
   } catch {
     return [];
   }
@@ -244,7 +244,7 @@ export function nicoVideoCommentersFromDomRoot(root) {
   if (!root || typeof root.querySelectorAll !== 'function') return [];
   /** @type {Map<string, { userId: string, name: string, postedAtMs: number, commentCount: number }>} */
   const byId = new Map();
-  const add = (id, name) => {
+  const add = (/** @type {unknown} */ id, /** @type {unknown} */ name) => {
     const userId = String(id || '').trim();
     if (!isNicoNumericUserId(userId)) return;
     const nick = String(name || '').replace(/\s+/g, ' ').trim().slice(0, 40);
@@ -283,7 +283,7 @@ export function nicoVideoCommentersFromDomRoot(root) {
 }
 
 /**
- * @param {readonly { userId?: string, name?: string, postedAtMs?: number, commentCount?: number }[]} groups
+ * @param {...ReadonlyArray<{ userId?: string, name?: string, postedAtMs?: number, commentCount?: number }>} groups
  * @returns {{ userId: string, name: string, postedAtMs: number, commentCount: number }[]}
  */
 export function mergeNicoVideoCommenters(...groups) {

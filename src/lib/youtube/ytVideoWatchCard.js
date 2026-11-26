@@ -35,6 +35,7 @@ export const YT_VIDEO_WATCH_CARD_TITLE = 'この動画のデータ';
  *   superThanksCount: number,
  *   spend: ReturnType<typeof formatEstimatedViewerSpendDisplay> | null,
  *   takeHome: ReturnType<typeof formatStreamerTakeHomeDisplay> | null,
+ *   behavior?: any,
  * }} YtVideoWatchCardModel
  */
 
@@ -46,8 +47,10 @@ export const YT_VIDEO_WATCH_CARD_TITLE = 'この動画のデータ';
  *   recorded?: { streamCount?: number, itemCount?: number },
  *   videoAuthors?: readonly any[],
  *   livePeople?: Map<string, any> | Record<string, any> | null,
- *   spend?: { jpy?: number, label?: string, text?: string, title?: string } | null,
- *   takeHome?: { key?: string, label?: string, text?: string, title?: string, placeholder?: boolean } | null,
+ *   spend?: any,
+ *   takeHome?: any,
+ *   videoComments?: readonly any[],
+ *   nowMs?: number,
  * }} input
  * @returns {YtVideoWatchCardModel}
  */

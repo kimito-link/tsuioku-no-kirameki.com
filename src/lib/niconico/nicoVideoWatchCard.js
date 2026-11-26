@@ -23,6 +23,9 @@ export const NICO_VIDEO_WATCH_CARD_TITLE = 'この動画のデータ';
  *   livePeople?: Record<string, any> | Map<string, any> | null,
  *   historyReady?: boolean,
  *   nowMs?: number,
+ *   videoComments?: readonly any[],
+ *   spend?: any,
+ *   takeHome?: any,
  * }} input
  */
 export function buildNicoVideoWatchCardModel(input) {

@@ -31,7 +31,7 @@ export const CHANNEL_COMMENTER_INDEX_CAP = 5000;
  * @returns {boolean}
  */
 function rowLooksLikeGift(row) {
-  const r = row && typeof row === 'object' ? row : {};
+  const r = row && typeof row === 'object' ? /** @type {any} */ (row) : {};
   const kind = String(r.kind || '').toLowerCase();
   return r.isGift === true || r.gift != null || kind === 'gift' || kind === 'superchat' || kind === 'superthanks';
 }
@@ -41,7 +41,7 @@ function rowLooksLikeGift(row) {
  * @returns {number | null}
  */
 function rowKnownAmountJpy(row) {
-  const r = row && typeof row === 'object' ? row : {};
+  const r = row && typeof row === 'object' ? /** @type {any} */ (row) : {};
   const jpy = Number(r.amountJpy);
   if (Number.isFinite(jpy) && jpy > 0) return Math.floor(jpy);
   const cur = String(r.currency || '').trim().toUpperCase();
@@ -73,7 +73,7 @@ export function applyCommentsToChannelIndex(prev, ownerId, comments, nowMs = 0, 
   const isPersonId = typeof opts.isPersonId === 'function' ? opts.isPersonId : isOwnerId;
   const idFromRow = typeof opts.idFromRow === 'function'
     ? opts.idFromRow
-    : (row) => String(row?.channelId || row?.ytChannelId || row?.userId || '').trim();
+    : (/** @type {any} */ row) => String(row?.channelId || row?.ytChannelId || row?.userId || '').trim();
   if (!isOwnerId(owner)) return index;
   const list = Array.isArray(comments) ? comments : [];
   const prevBucket = index[owner] && typeof index[owner] === 'object' ? index[owner] : { updatedAt: 0, people: {} };

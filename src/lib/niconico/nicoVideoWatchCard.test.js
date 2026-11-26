@@ -1,6 +1,6 @@
 import { describe, it, expect } from 'vitest';
 import { VIEWER_BEHAVIOR_TITLE } from '../viewerBehavior.js';
-import { buildNicoVideoWatchCardModel, nicoVideoWatchCardInnerHtml, NICO_VIDEO_WATCH_CARD_TITLE } from './nicoVideoWatchCard.js';
+import { buildNicoVideoWatchCardModel, nicoVideoWatchCardInnerHtml } from './nicoVideoWatchCard.js';
 
 describe('buildNicoVideoWatchCardModel', () => {
   it('視聴者の行動を先に出し、再生数と記録を取り違えない', () => {

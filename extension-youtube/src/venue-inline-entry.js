@@ -25,10 +25,7 @@ import { isVenuePageHidden } from '../../src/lib/venuePaintSchedule.js';
 import { installLastStreamUrlRemember } from './pfLastStreamUrl.js';
 import { venueRootVisibilityAction } from '../../src/lib/venueWatchPageVisibility.js';
 import { KEY_YT_VIDEO_WATCH_CARD, KEY_VIEWER_BEHAVIOR_BOARD } from '../../src/lib/storageKeys.js';
-import { ytVideoWatchCardInnerHtml } from '../../src/lib/youtube/ytVideoWatchCard.js';
 import { ytPageShouldHideVenueMode } from '../../src/lib/youtube/ytVideoWatchMeta.js';
-import { viewerBehaviorBoardInnerHtml } from '../../src/lib/viewerBehavior.js';
-import { viewerBehaviorWrapMatchesUrl } from '../../src/lib/viewerBehaviorMatch.js';
 
 /** Twitch/Kick の視聴ページで動いているか(council/twitch-support-PLAN.md・会場は YouTube と同じくニコ生版の venueBar をそのまま使う) */
 const PAGE_PLATFORM = platformOfHostname(location.hostname);
@@ -92,67 +89,15 @@ function setRootShown(/** @type {boolean} */ shown) {
 const lastStreamRemember =
   window.top === window ? installLastStreamUrlRemember({ getKey: (url) => streamKeyForWatchUrl(url), isAlive: () => isExtensionContextAlive() }) : null;
 const VIDEO_WATCH_CARD_ID = 'nlsb-video-watch-card';
-const VIDEO_WATCH_CARD_STYLE_ID = 'nlsb-video-watch-card-style';
 const BEHAVIOR_BOARD_ID = 'nlsb-viewer-behavior-board';
-const BEHAVIOR_BOARD_STYLE_ID = 'nlsb-viewer-behavior-board-style';
 
-function ensureBehaviorBoardStyle() {
-  if (document.getElementById(BEHAVIOR_BOARD_STYLE_ID)) return;
-  const st = document.createElement('style');
-  st.id = BEHAVIOR_BOARD_STYLE_ID;
-  st.textContent =
-    '#' + BEHAVIOR_BOARD_ID + '{' +
-      'position:fixed;z-index:2147483646;right:12px;bottom:72px;max-width:320px;max-height:70vh;overflow:auto;' +
-      'font:14px/1.55 system-ui,sans-serif;color:#1b1b1b;background:rgba(255,252,245,.96);' +
-      'border:1px solid rgba(80,60,20,.28);border-radius:10px;padding:10px 12px;' +
-      'box-shadow:0 4px 16px rgba(0,0,0,.14);pointer-events:auto;' +
-    '}' +
-    '#' + BEHAVIOR_BOARD_ID + ' .nlsb-viewer-behavior__title{margin:0 0 6px;font-size:13px;font-weight:700;}' +
-    '#' + BEHAVIOR_BOARD_ID + ' p{margin:0 0 6px;}' +
-    '#' + BEHAVIOR_BOARD_ID + ' p:last-child{margin-bottom:0;}' +
-    '#' + BEHAVIOR_BOARD_ID + ' .nlsb-viewer-behavior__list{margin:0;padding:0;list-style:none;}' +
-    '#' + BEHAVIOR_BOARD_ID + ' .nlsb-viewer-behavior__row{margin:0 0 6px;padding:0 0 6px;border-bottom:1px solid rgba(80,60,20,.12);}' +
-    '#' + BEHAVIOR_BOARD_ID + ' .nlsb-viewer-behavior__row:last-child{margin-bottom:0;padding-bottom:0;border-bottom:0;}' +
-    '#' + BEHAVIOR_BOARD_ID + ' .nlsb-viewer-behavior__name{font-weight:700;margin-right:6px;}' +
-    '#' + BEHAVIOR_BOARD_ID + ' .nlsb-viewer-behavior__rel{font-weight:600;margin-right:6px;}' +
-    '#' + BEHAVIOR_BOARD_ID + ' .nlsb-viewer-behavior__facts{display:block;font-size:12px;line-height:1.45;}';
-  (document.head || document.documentElement).appendChild(st);
-}
-
-/** @param {string} pageKey */
-function paintViewerBehaviorBoard(_pageKey) {
+function paintViewerBehaviorBoard() {
   // ページのコメント欄や映像の上には浮かせない。横の欄と会場の自分の欄だけに出す。
   try { document.getElementById(BEHAVIOR_BOARD_ID)?.remove(); } catch { /* 会場の数字は出す */ }
 }
 
 
-function ensureVideoWatchCardStyle() {
-  if (document.getElementById(VIDEO_WATCH_CARD_STYLE_ID)) return;
-  const st = document.createElement('style');
-  st.id = VIDEO_WATCH_CARD_STYLE_ID;
-  st.textContent =
-    '#' + VIDEO_WATCH_CARD_ID + '{' +
-      'position:fixed;z-index:2147483646;right:12px;bottom:72px;max-width:320px;' +
-      'font:14px/1.55 system-ui,sans-serif;color:#1b1b1b;background:rgba(255,252,245,.96);' +
-      'border:1px solid rgba(80,60,20,.28);border-radius:10px;padding:10px 12px;' +
-      'box-shadow:0 4px 16px rgba(0,0,0,.14);pointer-events:auto;' +
-    '}' +
-    '#' + VIDEO_WATCH_CARD_ID + ' .nlsb-video-watch-card__title{margin:0 0 6px;font-size:13px;font-weight:700;}' +
-    '#' + VIDEO_WATCH_CARD_ID + ' p{margin:0 0 6px;}' +
-    '#' + VIDEO_WATCH_CARD_ID + ' p:last-child{margin-bottom:0;}' +
-    '#' + VIDEO_WATCH_CARD_ID + ' .nlsb-video-watch-card__names{font-weight:600;}' +
-    '#' + VIDEO_WATCH_CARD_ID + ' .nlsb-viewer-behavior{margin-bottom:10px;}' +
-    '#' + VIDEO_WATCH_CARD_ID + ' .nlsb-viewer-behavior__list{margin:0;padding:0;list-style:none;}' +
-    '#' + VIDEO_WATCH_CARD_ID + ' .nlsb-viewer-behavior__row{margin:0 0 6px;padding:0 0 6px;border-bottom:1px solid rgba(80,60,20,.12);}' +
-    '#' + VIDEO_WATCH_CARD_ID + ' .nlsb-viewer-behavior__row:last-child{margin-bottom:0;padding-bottom:0;border-bottom:0;}' +
-    '#' + VIDEO_WATCH_CARD_ID + ' .nlsb-viewer-behavior__name{font-weight:700;margin-right:6px;}' +
-    '#' + VIDEO_WATCH_CARD_ID + ' .nlsb-viewer-behavior__rel{font-weight:600;margin-right:6px;}' +
-    '#' + VIDEO_WATCH_CARD_ID + ' .nlsb-viewer-behavior__facts{display:block;font-size:12px;line-height:1.45;}';
-  (document.head || document.documentElement).appendChild(st);
-}
-
-/** @param {string} vid */
-function paintVideoWatchCard(_vid) {
+function paintVideoWatchCard() {
   // ページのコメント欄や映像の上には浮かせない。横の欄にだけ出す。
   try { document.getElementById(VIDEO_WATCH_CARD_ID)?.remove(); } catch { /* 会場は出す */ }
 }

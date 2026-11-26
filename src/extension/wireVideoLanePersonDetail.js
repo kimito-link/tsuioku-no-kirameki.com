@@ -7,7 +7,7 @@ import { buildComeviewUserDetailPath, laneTileUserDetailTarget } from '../lib/co
 import { buildViewerBehaviorPersonDetail, viewerBehaviorPersonDetailInnerHtml } from '../lib/viewerBehavior.js';
 
 /**
- * @param {Element | null | undefined} box 動画カード（.nlsb-video-watch-card またはその器）
+ * @param {any} box 動画カード（.nlsb-video-watch-card またはその器）
  * @param {{ board?: any, document?: Document }} [opts]
  */
 export function wireVideoLanePersonDetail(box, opts = {}) {
@@ -17,7 +17,7 @@ export function wireVideoLanePersonDetail(box, opts = {}) {
   if (opts.board) box.__nlsbBoard = opts.board;
 
   // キャプチャ段階で止める。document の live 用リスナー（wireLaneUserDetailOpen）が窓を開かないようにする。
-  box.addEventListener('click', (ev) => {
+  box.addEventListener('click', (/** @type {any} */ ev) => {
     if (ev.button !== 0 || ev.ctrlKey || ev.metaKey || ev.shiftKey || ev.altKey) return;
     // instanceof Element は、happy-dom の Window と Node のグローバルが違うと外れる。closest の有無で見る。
     const t = ev.target && typeof ev.target.closest === 'function' ? ev.target : null;
@@ -44,7 +44,7 @@ export function wireVideoLanePersonDetail(box, opts = {}) {
       title: tile.getAttribute('title') || '',
     });
     const id = target?.uid || String(tile.getAttribute('data-user-key') || '').replace(/^u:/, '');
-    const row = Array.isArray(board?.rows) ? board.rows.find((r) => String(r.id) === id) : null;
+    const row = Array.isArray(board?.rows) ? board.rows.find((/** @type {any} */ r) => String(r.id) === id) : null;
     const detailEl = box.querySelector('.nlsb-viewer-behavior__detail');
     if (!detailEl) return;
     const detail = buildViewerBehaviorPersonDetail(row || { id, name: target?.uname || '' });

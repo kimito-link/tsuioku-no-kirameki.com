@@ -38,7 +38,7 @@ export function isAnonymousViewer(id, name) {
  */
 export function resolveViewerBehaviorAvatarUrl(id, avatarUrl) {
   const given = String(avatarUrl || '').trim();
-  const derived = pickAvatarUrlForUid(id, null);
+  const derived = pickAvatarUrlForUid(/** @type {string | number} */ (id), null);
   if (given && /^https?:/i.test(given) && !/usericon\/defaults\/blank\.jpg/i.test(given)) return given;
   if (derived) return derived;
   return given || VIEWER_BEHAVIOR_FALLBACK_AVATAR;
@@ -52,6 +52,8 @@ export function resolveViewerBehaviorAvatarUrl(id, avatarUrl) {
  *   giftCount?: number | null,
  *   knownAmountJpy?: number | null,
  *   at?: number | null,
+ *   creatorReplies?: ViewerBehaviorReply[],
+ *   viewerReplies?: ViewerBehaviorReply[],
  * }} ViewerBehaviorVisiblePerson
  *
  * @typedef {{
@@ -84,6 +86,14 @@ export function resolveViewerBehaviorAvatarUrl(id, avatarUrl) {
  *   firstSeenText: string,
  *   lastSeenText: string,
  *   factLine: string,
+ *   isAnonymous?: boolean,
+ *   anonymousCount?: number,
+ *   pending?: boolean,
+ *   pageAt?: number | null,
+ *   avatarUrl?: string,
+ *   commentAnchor?: string,
+ *   creatorReplies?: ViewerBehaviorReply[],
+ *   viewerReplies?: ViewerBehaviorReply[],
  * }} ViewerBehaviorRow
  *
  * @typedef {{
@@ -96,6 +106,17 @@ export function resolveViewerBehaviorAvatarUrl(id, avatarUrl) {
  *   summary: string,
  *   rows: ViewerBehaviorRow[],
  *   truncated: boolean,
+ *   anonymousCount?: number,
+ *   pendingCount?: number | null,
+ *   pendingKnown?: boolean,
+ *   commentsTotal?: number,
+ *   giftCountTotal?: number,
+ *   knownAmountTotal?: number,
+ *   spend?: any,
+ *   takeHome?: any,
+ *   viewCount?: number | null,
+ *   platform?: string,
+ *   contentKind?: 'video' | 'live',
  * }} ViewerBehaviorBoard
  */
 
@@ -350,6 +371,11 @@ function compareBehaviorRows(a, b) {
  *   historyReady?: boolean,
  *   nowMs?: number,
  *   cap?: number,
+ *   spend?: any,
+ *   takeHome?: any,
+ *   viewCount?: number | string | null,
+ *   platform?: string,
+ *   contentKind?: string,
  * }} input
  * @returns {ViewerBehaviorBoard}
  */
@@ -677,6 +703,7 @@ export function attachRepliesToPeople(people, comments) {
   if (!comm.length) return list;
   /** @type {Map<string, any[]>} */
   const byParent = new Map();
+  /** @type {Map<string, string[]>} */
   const topByAuthor = new Map();
   for (const c of comm) {
     if (!c || typeof c !== 'object') continue;
@@ -771,7 +798,7 @@ export function buildViewerBehaviorPersonDetail(row) {
 export function viewerBehaviorPersonDetailInnerHtml(detail) {
   if (!detail || typeof detail !== 'object') return '';
   const esc = escapeViewerBehaviorHtml;
-  const replyList = (title, rows) => {
+  const replyList = (/** @type {string} */ title, /** @type {any[]} */ rows) => {
     if (!rows.length) {
       return `<div class="nlsb-person-detail__replies"><p class="nlsb-person-detail__label">${esc(title)}</p><p>なし</p></div>`;
     }

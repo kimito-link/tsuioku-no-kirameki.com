@@ -95,11 +95,8 @@ export function concurrentViewersInInnertube(data, wantId) {
 
 /**
  * @param {any} node
- * @param {string} videoId
- * @param {string} want
- * @param {{ n: number }} budget
- * @param {number} depth
- * @returns {number | null}
+ * @param {any} inherited
+ * @returns {any}
  */
 function videoIdOfNode(node, inherited) {
   if (!node || typeof node !== 'object') return inherited;
@@ -118,6 +115,14 @@ function videoIdOfNode(node, inherited) {
   return inherited;
 }
 
+/**
+ * @param {any} node
+ * @param {string} videoId
+ * @param {string} want
+ * @param {{ n: number }} budget
+ * @param {number} depth
+ * @returns {number | null}
+ */
 function walkCount(node, videoId, want, budget, depth) {
   if (!node || typeof node !== 'object' || depth > 40 || budget.n > MAX_NODES) return null;
   budget.n += 1;

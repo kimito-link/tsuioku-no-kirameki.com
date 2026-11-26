@@ -18,8 +18,7 @@ import {
 } from '../../src/lib/youtube/ytVoiceQueue.js';
 import { mergeYtStreamSummary, prepareYtCommentsForIdb } from '../../src/lib/youtube/ytStreamStorePolicy.js';
 import { classifyYtWatchContentKind, summarizeChannelRecordedLives } from '../../src/lib/youtube/ytVideoWatchMeta.js';
-import { applyLiveCommentsToChannelIndex, peopleInChannelCommenterIndex } from '../../src/lib/youtube/ytChannelCommenterIndex.js';
-import { buildViewerBehaviorBoard } from '../../src/lib/viewerBehavior.js';
+import { peopleInChannelCommenterIndex } from '../../src/lib/youtube/ytChannelCommenterIndex.js';
 import { buildYtVideoWatchCardModel } from '../../src/lib/youtube/ytVideoWatchCard.js';
 import {
   estimateYoutubeSupportSpendJpy,
@@ -118,40 +117,6 @@ const YT_MERGED = typeof NL_YT_MERGED !== 'undefined' && NL_YT_MERGED === true;
 // パネルを閉じていても同接を1分ごとに記録する(マーケの同接推移カーブ・ytViewerSampler.js)
 const ytViewerSampler = createYtViewerSampler({ merged: YT_MERGED });
 
-
-/**
- * ライブ保存のあと、チャンネルの投稿者索引を待たずに更新する。失敗しても記録は止めない。
- * @param {string} channelId
- * @param {readonly any[]} rows
- */
-function rememberChannelCommenters(channelId, rows, opts = {}) {
-  const ch = String(channelId || '').trim();
-  const list = Array.isArray(rows) ? rows : [];
-  if (!ch || !list.length) return;
-  void (async () => {
-    try {
-      const bag = await chrome.storage.local.get(KEY_YT_CHANNEL_COMMENTERS);
-      const next = applyLiveCommentsToChannelIndex(bag?.[KEY_YT_CHANNEL_COMMENTERS], ch, list, Date.now(), {
-        streamId: opts.streamId,
-        contentKind: opts.contentKind || 'live',
-      });
-      await chrome.storage.local.set({ [KEY_YT_CHANNEL_COMMENTERS]: next });
-    } catch {
-      /* 索引は記録の正本ではない */
-    }
-  })();
-}
-
-/**
- * ライブ配信では視聴者の行動ボードを storage に書かない。
- * 0.1.2235 でコメントのたびに書いて横の欄の内訳がちらついたため、呼び出しは外し、本体も空にする。
- * @param {string} [_videoId]
- * @param {string} [_channelId]
- * @param {readonly any[]} [_rows]
- */
-function noteLiveVisiblePeople(_videoId, _channelId, _rows) {
-  return;
-}
 
 /**
  * 通常動画のカードを書いて会場へ渡す。ライブのコメント保存とは別経路。
@@ -1818,6 +1783,7 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
       }
       rememberYtCommentOwners(videoId, idbResult);
       // ライブでは視聴者の行動ボード／投稿者索引を storage に書かない（横の欄のちらつき防止）。
+      // ライブ配信では視聴者の行動ボードを storage に書かない（0.1.2235 のちらつき対策。書く関数は 0.1.2244 で外した）。
       if (Date.now() - lastIngestDiagAt > 30000) {
         lastIngestDiagAt = Date.now();
         void chrome.storage.local.set({

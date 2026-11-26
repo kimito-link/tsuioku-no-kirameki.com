@@ -49,7 +49,10 @@ export function buildYtCommentPrimaryKey(videoId, commentId) {
  *   startedAtApprox?: boolean,
  *   endedAt?: number | null,
  *   platformStats?: Record<string, any> | null,
- *   followerSample?: { at?: number, count?: number, rounded?: boolean, source?: string, noun?: string, raw?: string, force?: boolean } | null
+ *   followerSample?: { at?: number, count?: number, rounded?: boolean, source?: string, noun?: string, raw?: string, force?: boolean } | null,
+ *   isLive?: boolean | null,
+ *   isLiveContent?: boolean | null,
+ *   contentKind?: string,
  * }} patch
  * @param {number} [nowMs]
  * @returns {{

@@ -7,8 +7,8 @@ import { createVenueStatStrip } from '../lib/venueStatStrip.js';
 import { VIEWER_BEHAVIOR_FALLBACK_AVATAR, resolveViewerBehaviorAvatarUrl } from '../lib/viewerBehavior.js';
 
 const LANE_IO = {
-  storyAvatarLoadGuard: { pickDisplaySrc: (s) => s || VIEWER_BEHAVIOR_FALLBACK_AVATAR, noteRemoteAttempt: () => {} },
-  isHttpOrHttpsUrl: (u) => /^https?:/i.test(String(u || '')),
+  storyAvatarLoadGuard: { pickDisplaySrc: (/** @type {string} */ s) => s || VIEWER_BEHAVIOR_FALLBACK_AVATAR, noteRemoteAttempt: () => {} },
+  isHttpOrHttpsUrl: (/** @type {unknown} */ u) => /^https?:/i.test(String(u || '')),
   storyTileUsesYukkuriTvStyle: () => false,
   upgradeAnonymousAvatarImage: () => {},
 };
@@ -16,14 +16,14 @@ const LANE_IO = {
 const FACES = { faceLink: '', faceGift: '', faceKonta: '', faceTanu: '' };
 
 /**
- * @param {import('./viewerBehavior.js').ViewerBehaviorBoard | null | undefined} board
+ * @param {import('../lib/viewerBehavior.js').ViewerBehaviorBoard | null | undefined} board
  * @param {{ pendingOnly?: boolean }} [opts]
  */
 export function viewerBehaviorRowsToLaneBuckets(board, opts = {}) {
   const rows = Array.isArray(board?.rows) ? board.rows : [];
   /** @type {{ link: any[], gift: any[], ad: any[], konta: any[], tanu: any[] }} */
   const buckets = { link: [], gift: [], ad: [], konta: [], tanu: [] };
-  const videoOrder = board && (board.contentKind === 'video' || board.kind === 'video');
+  const videoOrder = board && (board.contentKind === 'video' || /** @type {any} */ (board).kind === 'video');
   /** @type {any[]} */
   const videoItems = [];
   for (const row of rows) {
@@ -62,10 +62,11 @@ export function viewerBehaviorRowsToLaneBuckets(board, opts = {}) {
 }
 
 /**
- * @param {import('./viewerBehavior.js').ViewerBehaviorBoard | null | undefined} board
- * @returns {import('./venueStatStrip.js').VenueStatStripModel}
+ * @param {import('../lib/viewerBehavior.js').ViewerBehaviorBoard | null | undefined} board
+ * @returns {import('../lib/venueStatStrip.js').VenueStatStripModel}
  */
 export function viewerBehaviorStatStripModel(board) {
+  /** @type {import('../lib/venueStatStrip.js').VenueStatItem[]} */
   const items = [];
   const viewCount = board && board.viewCount != null && Number.isFinite(Number(board.viewCount)) && Number(board.viewCount) >= 0 ? Math.floor(Number(board.viewCount)) : null;
   if (viewCount != null) {
@@ -107,7 +108,7 @@ export function viewerBehaviorStatStripModel(board) {
 export function createViewerBehaviorLiveLaneEls(doc) {
   const stack = doc.createElement('div');
   stack.className = 'nl-story-userlane-stack nlsb-viewer-behavior-lane-stack';
-  const makeLane = (name) => {
+  const makeLane = (/** @type {string} */ name) => {
     const lane = doc.createElement('div');
     lane.className = name === 'tanu' ? 'nl-story-userlane nl-story-userlane--tanu' : 'nl-story-userlane';
     lane.dataset.laneName = name;
@@ -179,14 +180,14 @@ export function createViewerBehaviorLiveLaneEls(doc) {
 
 /**
  * @param {ParentNode} host
- * @param {import('./viewerBehavior.js').ViewerBehaviorBoard | null | undefined} board
+ * @param {import('../lib/viewerBehavior.js').ViewerBehaviorBoard | null | undefined} board
  * @param {{ pendingOnly?: boolean, document?: Document }} [opts]
  */
 export function hydrateViewerBehaviorLiveLayout(host, board, opts = {}) {
   const doc = opts.document || (host && 'ownerDocument' in host ? host.ownerDocument : null) || (typeof document !== 'undefined' ? document : null);
   if (!host || !doc || !board) return;
-  let stripHost = host.querySelector('[data-stat-strip-host]');
-  let laneHost = host.querySelector('[data-live-lane-host]');
+  const stripHost = host.querySelector('[data-stat-strip-host]');
+  const laneHost = host.querySelector('[data-live-lane-host]');
   if (!laneHost) return;
   if (stripHost) {
     const strip = createVenueStatStrip(doc, { platform: board.platform || 'youtube' });

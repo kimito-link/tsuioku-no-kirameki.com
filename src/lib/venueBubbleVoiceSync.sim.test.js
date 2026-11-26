@@ -228,7 +228,6 @@ describe('吹き出しと声の同期(作り物の VOICEVOX で全サービス�
         expect(after.tempoP95, `${pc.name} ${plat.name} テンポ95%`).toBeLessThanOrEqual(20000);
       }
     }
-    // eslint-disable-next-line no-console
     if (rows.length) console.log(`\n${rows.join('\n')}\n`);
   }, 120000);
 
@@ -241,7 +240,6 @@ describe('吹き出しと声の同期(作り物の VOICEVOX で全サービス�
       vi.useFakeTimers({ now: 1_800_000_000_000 });
       const before = await runScenario(plat, pc, true, 3, false);
       vi.useRealTimers();
-      // eslint-disable-next-line no-console
       if (process.env.NLS_SYNC_SIM_PRINT) console.log(`${pc.name} 静か 前: 先出し${before.early}/${before.voiced} 最大${before.gapMax}ms → 後: 先出し${after.early}/${after.voiced} 最大${after.gapMax}ms テンポ95%${after.tempoP95}ms`);
       expect(before.early, `${pc.name} 直す前は先出しがあった`).toBeGreaterThan(0);
       // 開いた瞬間の3件(開く前のコメント)は読まない
