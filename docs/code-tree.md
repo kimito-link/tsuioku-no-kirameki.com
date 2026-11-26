@@ -27,7 +27,7 @@
 
 > 値が次の段へ届かない「断線」(broadcaster バグ型)は `npm run feature-map -- --check` が機械検知。
 
-## ⚠️ 役割コメントが無いソース 15 / 1391 件
+## ⚠️ 役割コメントが無いソース 15 / 1392 件
 - `docs/handoff/bench/bench-interval.mjs`
 - `docs/handoff/bench/bench-lane.mjs`
 - `extension-youtube/cloak-failsafe.js`
@@ -1203,7 +1203,7 @@
   - `gift-coin-hq.wav`
   - `gift-register-hq.wav`
   - `gift-register.mp3`
-- 📁 **src/** (2734)
+- 📁 **src/** (2736)
   - 📁 **data/** (7)
     - 📁 **acquirers/** (2)
       - `laneFromStorage.js` — 応援レーン acquirer: chrome.storage.local(nls_comments) → laneStore の橋渡し。
@@ -1562,7 +1562,7 @@
         - `logo_funlink_white_RGB_link_black.png`
         - `logo_funlink_white_RGB_maru_black.png`
     - `hero-connect-hub.svg`
-  - 📁 **lib/** (2400)
+  - 📁 **lib/** (2402)
     - 📁 **__snapshots__/** (4)
       - `marketing-abema-baseline.html`
       - `marketing-niconico.html`
@@ -1732,7 +1732,7 @@
     - 📁 **whowatch/** (2)
       - `wwParse.js` — ふわっち(whowatch.tv)の配信とコメントを、YouTube 版の記録と同じ形にする(純関数)
       - `wwParse.test.js`
-    - 📁 **youtube/** (124)
+    - 📁 **youtube/** (126)
       - 📁 **fixtures/** (9)
         - 📁 **real-dom/** (9)
           - `README.md`
@@ -1762,6 +1762,8 @@
       - `ytChunkedRead.test.js`
       - `ytCommentPhotoTag.js` — 【この箱の仕事】YouTube 動画のコメント欄で、まだ画面に出ていない投稿者の顔の URL を、ページの世界から属性に写す。
       - `ytCommentPhotoTag2247.test.js`
+      - `ytCommentScanGate.js` — v0.1.2249: YouTube 動画のコメント欄の読み直し(既存の 5 秒ごとの sendMeta)を、変わっていないときは省く。
+      - `ytCommentScanGate2249.test.js`
       - `ytCommentSendReason.js` — YouTube のチャットへ送れなかった理由コード(content-chat-entry が返す)を日本語にする。
       - `ytCommentSendReason.test.js`
       - `ytConcurrentViewers.js` — YouTube の同時視聴者数を、ページの埋め込みと updated_metadata から読む（純関数）

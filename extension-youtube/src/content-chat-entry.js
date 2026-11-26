@@ -21,6 +21,7 @@ import {
   concurrentViewersIsViewCountLeak,
 } from '../../src/lib/youtube/ytVideoWatchMeta.js';
 import { askPageToTagYtCommentPhotos } from '../../src/lib/youtube/ytCommentPhotoTag.js';
+import { createYtCommentScanGate } from '../../src/lib/youtube/ytCommentScanGate.js';
 import { ytVideoIdFromChatFrameUrl } from '../../src/lib/youtube/ytChatContinuationVideoId.js';
 import { relativeStreamStartedAtMs, startMsFromTimestampBlob } from '../../src/lib/youtube/ytStreamStart.js';
 import { followerSampleFromDom } from '../../src/lib/platform/followerCountSample.js';
@@ -626,6 +627,8 @@ function startedAtFields(videoId, isLive = false) {
 }
 
 function setupWatchPageMetaObserver() {
+  /** @type {ReturnType<typeof createYtCommentScanGate<{ videoAuthors: any[], videoComments: any[] }>>} */
+  const ytCommentScanGate = createYtCommentScanGate();
   const sendMeta = () => {
     if (!isYtWatchLikeUrl(String(window.location.href || ''))) return;
     const videoId = resolveCurrentVideoId();
@@ -702,9 +705,15 @@ function setupWatchPageMetaObserver() {
       hasLiveChatReplay,
     });
     // v0.1.2247: 画面に出ていない投稿者の顔は img が空。ページの世界に1回合図して、本物の URL を属性に写してから読む
-    if (contentKind === 'video') askPageToTagYtCommentPhotos(document);
-    const videoAuthors = contentKind === 'video' ? ytVideoCommentAuthorsFromDom(document) : [];
-    const videoComments = contentKind === 'video' ? ytVideoCommentsFromDom(document) : [];
+    // v0.1.2249: 同じ動画で裏タブ、またはコメントの並びが前回と同じなら、前回の読み取りを使う(ytCommentScanGate.js)
+    const scan = contentKind === 'video'
+      ? ytCommentScanGate.read(document, videoId, () => {
+        askPageToTagYtCommentPhotos(document);
+        return { videoAuthors: ytVideoCommentAuthorsFromDom(document), videoComments: ytVideoCommentsFromDom(document) };
+      })
+      : null;
+    const videoAuthors = scan ? scan.videoAuthors : [];
+    const videoComments = scan ? scan.videoComments : [];
     const commentCount = contentKind === 'video' ? ytCommentCountFromDom(document) : null;
     const isLiveFlag = attrBool('data-nl-yt-is-live');
     const isLiveContentFlag = attrBool('data-nl-yt-is-live-content');

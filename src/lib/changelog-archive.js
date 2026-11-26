@@ -24,6 +24,14 @@
 /** @type {ChangelogEntry[]} */
 const ARCHIVE_ENTRIES = [
   Object.freeze({
+    version: '0.1.2226',
+    date: '2026-11-25',
+    summary: '紹介ページの最初を、配信する人向けの説明にしました',
+    items: Object.freeze([
+      '紹介ページ（tsuioku-no-kirameki.com）のいちばん上に、配信する人向けのまとめを置きました。名前を呼んでお礼を言える・声でだれか分かる・会場になる・配信のあとに振り返れる、の4つを「いままで」と「これから」で並べ、始め方3つ・記録の行き先・よくある質問・Chrome ウェブストアへのボタンをまとめています。拡張の動きは変わりません。',
+    ])
+  }),
+  Object.freeze({
     version: '0.1.2224',
     date: '2026-11-25',
     summary: '別窓の会場でも、声と吹き出しが同時に',
