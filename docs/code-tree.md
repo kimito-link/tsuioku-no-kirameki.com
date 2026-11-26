@@ -1203,7 +1203,7 @@
   - `gift-coin-hq.wav`
   - `gift-register-hq.wav`
   - `gift-register.mp3`
-- 📁 **src/** (2729)
+- 📁 **src/** (2730)
   - 📁 **data/** (7)
     - 📁 **acquirers/** (2)
       - `laneFromStorage.js` — 応援レーン acquirer: chrome.storage.local(nls_comments) → laneStore の橋渡し。
@@ -1240,7 +1240,7 @@
       - `avatarResolver.test.js`
       - `identity.js` — ニコ生ユーザー ID の「匿名性」判定と関連アイデンティティ・ユーティリティ。
       - `nickname.js` — 表示名（ニックネーム）の「強弱」判定。
-  - 📁 **extension/** (135)
+  - 📁 **extension/** (136)
     - 📁 **popup/** (25)
       - 📁 **init/** (4)
         - `devMonitorExport.js` — devMonitorExport — 開発モニタの「エクスポート/ダウンロード/較正データ消去」一式。
@@ -1368,6 +1368,7 @@
     - `viewerBehaviorLiveGate.test.js`
     - `viewerBehaviorLiveLayout.js` — 視聴者の行動を、配信モードと同じ数字の帯と、同じ応援アイコン列で描く。
     - `viewerBehaviorLiveLayout.test.js`
+    - `viewerBehaviorRelationLabel2246.test.js`
     - `vod-video-watch-entry.js` — Twitch VOD・Kick VOD・ツイキャス録画・ABEMA エピソード・TikTok 通常動画向けの小さい入口。
     - `voice-native-guide-entry.js` — ⚠️ 役割コメント無し
     - `voiceQualitySetting.js` — 読み上げの声の音質の設定を、この画面の合成へ効かせる(2026-10-29)。

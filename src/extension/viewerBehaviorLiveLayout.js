@@ -4,7 +4,7 @@
  */
 import { paintStoryUserLaneDomFilled } from './story/renderStoryUserLaneDom.js';
 import { createVenueStatStrip } from '../lib/venueStatStrip.js';
-import { VIEWER_BEHAVIOR_FALLBACK_AVATAR, resolveViewerBehaviorAvatarUrl } from '../lib/viewerBehavior.js';
+import { VIEWER_BEHAVIOR_FALLBACK_AVATAR, resolveViewerBehaviorAvatarUrl, viewerRelationLabel } from '../lib/viewerBehavior.js';
 
 const LANE_IO = {
   storyAvatarLoadGuard: { pickDisplaySrc: (/** @type {string} */ s) => s || VIEWER_BEHAVIOR_FALLBACK_AVATAR, noteRemoteAttempt: () => {} },
@@ -29,13 +29,16 @@ export function viewerBehaviorRowsToLaneBuckets(board, opts = {}) {
   for (const row of rows) {
     if (opts.pendingOnly && !row.pending && !row.isAnonymous) continue;
     if (opts.pendingOnly && row.isAnonymous && !row.pending) continue;
+    // v0.1.2245→2246: 動画ページでは「記録がまだない」を顔ごとに出さない(全員に同じ札が並んで読みにくかった)。
+    //   なじみ／初めて・匿名・ギフトはそのまま。ライブ(videoOrder でない)は従来どおり。
+    const relLabel = videoOrder && row.relationLabel === viewerRelationLabel('unknown') ? '' : String(row.relationLabel || '');
     const badges = [];
-    if (row.relation === 'regular' && row.relationLabel) badges.push(row.relationLabel);
-    else if (row.relationLabel && row.relationLabel !== '初めて' && row.relationLabel !== 'なじみ') badges.push(row.relationLabel);
+    if (row.relation === 'regular' && relLabel) badges.push(relLabel);
+    else if (relLabel && relLabel !== '初めて' && relLabel !== 'なじみ') badges.push(relLabel);
     if ((row.giftCount || 0) > 0 || (row.knownAmountJpy || 0) > 0) badges.push('ギフト');
     if (row.relation === 'regular' && !badges.includes(row.relationLabel || 'なじみ')) badges.unshift(row.relationLabel || 'なじみ');
     const idLine = videoOrder
-      ? (badges.length ? badges.join('・') : String(row.relationLabel || ''))
+      ? (badges.length ? badges.join('・') : relLabel)
       : String(row.relationLabel || '');
     const src = resolveViewerBehaviorAvatarUrl(row.isAnonymous ? '' : row.id, row.avatarUrl);
     const item = {
