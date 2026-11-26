@@ -27,7 +27,7 @@
 
 > 値が次の段へ届かない「断線」(broadcaster バグ型)は `npm run feature-map -- --check` が機械検知。
 
-## ⚠️ 役割コメントが無いソース 15 / 1393 件
+## ⚠️ 役割コメントが無いソース 15 / 1394 件
 - `docs/handoff/bench/bench-interval.mjs`
 - `docs/handoff/bench/bench-lane.mjs`
 - `extension-youtube/cloak-failsafe.js`
@@ -1203,7 +1203,7 @@
   - `gift-coin-hq.wav`
   - `gift-register-hq.wav`
   - `gift-register.mp3`
-- 📁 **src/** (2741)
+- 📁 **src/** (2743)
   - 📁 **data/** (7)
     - 📁 **acquirers/** (2)
       - `laneFromStorage.js` — 応援レーン acquirer: chrome.storage.local(nls_comments) → laneStore の橋渡し。
@@ -1562,7 +1562,7 @@
         - `logo_funlink_white_RGB_link_black.png`
         - `logo_funlink_white_RGB_maru_black.png`
     - `hero-connect-hub.svg`
-  - 📁 **lib/** (2407)
+  - 📁 **lib/** (2409)
     - 📁 **__snapshots__/** (4)
       - `marketing-abema-baseline.html`
       - `marketing-niconico.html`
@@ -1635,7 +1635,7 @@
       - `nicoVideoWatchMeta.js` — 【層】L0 判定層(純粋関数・I/O禁止)
       - `nicoVideoWatchMeta.test.js`
       - `nicoVideoWatchSm9RealDom.test.js`
-    - 📁 **platform/** (48)
+    - 📁 **platform/** (50)
       - 📁 **__fixtures__/** (1)
         - `eventStanding.2026-11-21.json`
       - `diagTabShare.js` — 計器(yt_diag_*_chat)は1つの置き場を全タブで分け合う。
@@ -1657,6 +1657,8 @@
       - `historyBackfill.test.js`
       - `infoPollGate.js` — 配信の情報の口を何秒おきに読むかを決める小さな門(純関数)
       - `infoPollGate.test.js`
+      - `liveIconStore.js` — v0.1.2254: ライブで分かった顔(名前 → 顔の URL)を storage(yt_tw_icons など)に置くときの、純粋な部品。
+      - `liveIconStore2254.test.js`
       - `marketingExportBudget.test.js`
       - `marketingPlatformChapters.js` — ニコ生以外のマーケHTMLに足す章。見た目のクラスは既存の mkt-* を使う。
       - `marketingPlatformPlan.js` — 【層】L0 判定層(純粋関数・I/O禁止)
