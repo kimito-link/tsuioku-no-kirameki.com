@@ -16,11 +16,13 @@ import {
 import {
   classifyYtWatchContentKind,
   ytVideoCommentAuthorsFromDom,
+  ytVideoCommentAuthorsFromInnertube,
+  mergeYtVideoCommentAuthors,
   ytVideoCommentsFromDom,
   ytViewCountFromDom, ytCommentCountFromDom,
   concurrentViewersIsViewCountLeak,
 } from '../../src/lib/youtube/ytVideoWatchMeta.js';
-import { askPageToTagYtCommentPhotos } from '../../src/lib/youtube/ytCommentPhotoTag.js';
+import { askPageToTagYtCommentPhotos, readYtCommentEntities } from '../../src/lib/youtube/ytCommentPhotoTag.js';
 import { createYtCommentScanGate } from '../../src/lib/youtube/ytCommentScanGate.js';
 import { ytVideoIdFromChatFrameUrl } from '../../src/lib/youtube/ytChatContinuationVideoId.js';
 import { relativeStreamStartedAtMs, startMsFromTimestampBlob } from '../../src/lib/youtube/ytStreamStart.js';
@@ -709,7 +711,10 @@ function setupWatchPageMetaObserver() {
     const scan = contentKind === 'video'
       ? ytCommentScanGate.read(document, videoId, () => {
         askPageToTagYtCommentPhotos(document);
-        return { videoAuthors: ytVideoCommentAuthorsFromDom(document), videoComments: ytVideoCommentsFromDom(document) };
+        // v0.1.2252: ページのデータ(UC… ID・顔)を正に、DOM で補う(ytCommentPhotoTag.js が同じ合図で写す)
+        const fromPage = ytVideoCommentAuthorsFromInnertube(readYtCommentEntities(document) || []);
+        const videoAuthors = mergeYtVideoCommentAuthors(fromPage, ytVideoCommentAuthorsFromDom(document));
+        return { videoAuthors, videoComments: ytVideoCommentsFromDom(document) };
       })
       : null;
     const videoAuthors = scan ? scan.videoAuthors : [];

@@ -371,6 +371,45 @@ export function parseYtPaidCommentAmount(node) {
 }
 
 /**
+ * v0.1.2252: ページのデータ(innertube と同じ形)から読んだ投稿者を正にして、DOM で読んだ投稿者で補う。
+ *   同じ人(@ハンドル・名前・UC… が一致)は DOM の行に UC… と顔を足す(DOM の返信数・ハート等はそのまま)。
+ *   DOM にしかいない人・ページのデータにしかいない人はどちらも残す。
+ * @param {YtVideoCommentAuthor[]} fromPage
+ * @param {YtVideoCommentAuthor[]} fromDom
+ * @param {number} [limit]
+ * @returns {YtVideoCommentAuthor[]}
+ */
+export function mergeYtVideoCommentAuthors(fromPage, fromDom, limit = 80) {
+  const page = Array.isArray(fromPage) ? fromPage : [];
+  const dom = Array.isArray(fromDom) ? fromDom : [];
+  if (!page.length) return dom;
+  /** @param {YtVideoCommentAuthor} a */
+  const keys = (a) => [a.channelId, a.handle, a.name && `name:${a.name}`].filter(Boolean).map(String);
+  /** @type {Map<string, YtVideoCommentAuthor>} */
+  const pageBy = new Map();
+  for (const a of page) for (const k of keys(a)) if (!pageBy.has(k)) pageBy.set(k, a);
+  const used = new Set();
+  /** @type {YtVideoCommentAuthor[]} */
+  const out = [];
+  for (const d of dom) {
+    const hit = keys(d).map((k) => pageBy.get(k)).find(Boolean);
+    if (hit) {
+      used.add(hit);
+      out.push({
+        ...d,
+        channelId: d.channelId || hit.channelId,
+        handle: d.handle || hit.handle,
+        ...(d.avatarUrl || hit.avatarUrl ? { avatarUrl: d.avatarUrl || hit.avatarUrl } : {}),
+        ...(d.postedAtMs || hit.postedAtMs ? { postedAtMs: d.postedAtMs || hit.postedAtMs } : {}),
+      });
+    } else out.push(d);
+  }
+  for (const a of page) if (!used.has(a)) out.push(a);
+  out.sort((a, b) => (Number(b.postedAtMs) || 0) - (Number(a.postedAtMs) || 0));
+  return out.slice(0, Math.max(1, limit));
+}
+
+/**
  * innertube 木から動画コメントの投稿者を集める（本文は返さない）。
  * @param {any} data
  * @param {{ limit?: number, nowMs?: number }} [opts]

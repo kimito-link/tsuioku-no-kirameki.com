@@ -52,6 +52,72 @@ export function tagYtCommentPhotos(doc) {
   return n;
 }
 
+/** v0.1.2252: ページの世界が持っているコメントのデータ(投稿者の UC… ID・顔・投稿時刻)を写す属性(html 要素に1つ) */
+export const YT_COMMENT_ENTITIES_ATTR = 'data-nl-yt-comment-entities';
+const ENTITY_MAX = 200;
+
+/**
+ * 各コメント(ytd-comment-view-model)の polymerController.__data.commentEntity から、投稿者を読むのに要る分だけを
+ * innertube と同じ形({ commentEntityPayload })で JSON にして html に置く。本文は写さない。通信はしない。
+ * @param {Document | null | undefined} doc
+ * @returns {number} 写したコメント数
+ */
+export function tagYtCommentEntities(doc) {
+  if (!doc || typeof doc.querySelectorAll !== 'function') return 0;
+  try {
+    const list = doc.querySelectorAll('ytd-comment-view-model');
+    /** @type {any[]} */
+    const out = [];
+    for (let i = 0; i < list.length && out.length < ENTITY_MAX; i += 1) {
+      const el = /** @type {any} */ (list[i]);
+      const e = el?.polymerController?.__data?.commentEntity || el?.__data?.commentEntity || null;
+      const a = e?.author;
+      const p = e?.properties;
+      if (!a || typeof a !== 'object') continue;
+      out.push({
+        commentEntityPayload: {
+          author: {
+            channelId: String(a.channelId || ''),
+            displayName: String(a.displayName || ''),
+            avatarThumbnailUrl: String(a.avatarThumbnailUrl || ''),
+            isCreator: a.isCreator === true,
+          },
+          properties: {
+            commentId: String(p?.commentId || ''),
+            publishedTime: String(p?.publishedTime || ''),
+            replyLevel: Number(p?.replyLevel) || 0,
+          },
+        },
+      });
+    }
+    const root = doc.documentElement;
+    const json = out.length ? JSON.stringify(out) : '';
+    if (root && (root.getAttribute(YT_COMMENT_ENTITIES_ATTR) || '') !== json) {
+      if (json) root.setAttribute(YT_COMMENT_ENTITIES_ATTR, json);
+      else root.removeAttribute(YT_COMMENT_ENTITIES_ATTR);
+    }
+    return out.length;
+  } catch {
+    return 0; /* 読めないときは DOM だけで読む */
+  }
+}
+
+/**
+ * 隔離された世界側: 写されたデータを読む(無ければ null)。
+ * @param {Document | null | undefined} doc
+ * @returns {any[] | null}
+ */
+export function readYtCommentEntities(doc) {
+  try {
+    const raw = doc?.documentElement?.getAttribute(YT_COMMENT_ENTITIES_ATTR) || '';
+    if (!raw) return null;
+    const v = JSON.parse(raw);
+    return Array.isArray(v) && v.length ? v : null;
+  } catch {
+    return null;
+  }
+}
+
 /** @param {Window | null | undefined} win */
 export function installYtCommentPhotoTagger(win) {
   const doc = win?.document;
@@ -61,6 +127,7 @@ export function installYtCommentPhotoTagger(win) {
   w.__NLS_YT_COMMENT_PHOTO_TAGGER__ = true;
   doc.addEventListener(YT_COMMENT_PHOTO_EVENT, () => {
     tagYtCommentPhotos(doc);
+    tagYtCommentEntities(doc); // v0.1.2252: 同じ合図で、投稿者のデータも写す
   });
 }
 
