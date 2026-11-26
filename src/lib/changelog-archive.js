@@ -24,6 +24,14 @@
 /** @type {ChangelogEntry[]} */
 const ARCHIVE_ENTRIES = [
   Object.freeze({
+    version: '0.1.2211',
+    date: '2026-11-25',
+    summary: 'SHOWROOM のコメント送信が途中で止まることがあったのを直す',
+    items: Object.freeze([
+      'SHOWROOM の会場やサイドパネルからコメントを送ったとき、「送信ボタンを押しましたが、文字が入力欄に残っています」と出ることがありました。公式の欄に文字が入ったかを送る前に確かめ、欄が空になるのをニコ生と同じ待ち方で見るようにしました。',
+    ])
+  }),
+  Object.freeze({
     version: '0.1.2210',
     date: '2026-11-24',
     summary: '配信者にゆっくり顔を出さない',
