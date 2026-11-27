@@ -112,6 +112,16 @@ export function slimSummaryForStorage(summary) {
 }
 
 /**
+ * 間引いてはいけない変化(ページの再生数・コメント数・ページの種別)の印。これが変わった書き込みは1秒の間引きを越えて書く。
+ * @param {Record<string, unknown> | null | undefined} slim
+ * @returns {string}
+ */
+export function summaryFactsSignature(slim) {
+  const o = slim && typeof slim === 'object' ? slim : {};
+  return `${o.slotViewCount ?? ''}|${o.slotCommentCount ?? ''}|${o.contentKind ?? ''}`;
+}
+
+/**
  * 件数の知らせを chrome.storage に書いてよいか。1配信あたり最短1秒。
  * @param {number} lastAt
  * @param {number} now

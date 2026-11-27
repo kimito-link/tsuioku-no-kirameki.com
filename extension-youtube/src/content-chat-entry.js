@@ -673,7 +673,11 @@ function setupWatchPageMetaObserver() {
     const ended = endedAtFields(videoId);
     const sub = followerSampleFromDom(document, 'youtube');
     const root = document.documentElement;
+    // v0.1.2263: ページの世界が書いた「配信かどうか」の印は、いまの動画の印のときだけ使う(前の動画の印で取り違えない)
+    const kindVid = String(root?.getAttribute('data-nl-yt-kind-video-id') || '');
+    const kindIsStale = !!kindVid && kindVid !== videoId;
     const attrBool = (/** @type {string} */ name) => {
+      if (kindIsStale && (name === 'data-nl-yt-is-live' || name === 'data-nl-yt-is-live-content')) return null;
       const v = root?.getAttribute(name);
       if (v === '1') return true;
       if (v === '0') return false;
@@ -743,6 +747,13 @@ function setupWatchPageMetaObserver() {
         ...(contentKind === 'video' && viewCount != null ? { slotViewCount: viewCount } : {}),
         ...(contentKind === 'video' && commentCount != null ? { slotCommentCount: commentCount } : {}),
         ...(contentKind === 'video' ? { videoAuthors, videoComments } : {}),
+        // v0.1.2263: 動画の投稿日・長さ(ページの世界が player から写した値。いまの動画の印のときだけ)
+        ...(contentKind === 'video' && !kindIsStale && root?.getAttribute('data-nl-yt-publish-date')
+          ? { slotPublishDate: String(root.getAttribute('data-nl-yt-publish-date')) } : {}),
+        ...(contentKind === 'video' && !kindIsStale && /^\d+$/.test(String(root?.getAttribute('data-nl-yt-length-sec') || ''))
+          ? { slotLengthSec: Number(root?.getAttribute('data-nl-yt-length-sec')) } : {}),
+        ...(contentKind === 'video' && !kindIsStale && /^\d+$/.test(String(root?.getAttribute('data-nl-yt-like-count') || ''))
+          ? { slotLikeCount: Number(root?.getAttribute('data-nl-yt-like-count')) } : {}),
       },
     });
     if (viewers === null) saveViewerProbe();

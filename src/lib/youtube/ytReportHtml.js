@@ -12,6 +12,7 @@ import {
   buildLaughterDensityTimeline,
 } from '../commentVelocityTimeline.js';
 import { detectCommentSilenceZones } from '../commentSilenceZones.js';
+import { formatBucketMsJa, formatLongGapJa, maxOfList } from '../marketingTimeSpan.js';
 import { aggregateYtSupportRanking, buildYtChannelUrl } from './ytSupportRanking.js';
 
 /**
@@ -84,6 +85,8 @@ function formatClock(ms) {
 /** @param {number} ms */
 function formatDurationJa(ms) {
   if (!Number.isFinite(ms) || ms <= 0) return '0分';
+  // v0.1.2263: 7日を超える幅(動画のコメント)は「何万時間」にせず年・日で(marketingTimeSpan.js)
+  if (ms > 7 * 86_400_000) return formatLongGapJa(ms) || '';
   const min = Math.round(ms / 60000);
   if (min < 60) return `${min}分`;
   return `${Math.floor(min / 60)}時間${min % 60}分`;
@@ -199,13 +202,15 @@ function headerSection(summary, heading) {
 /**
  * 1分ごとのコメント数の棒グラフ（SVG）。
  * @param {{ count: number, rolling5: number, atStart: number }[]} buckets
+ * @param {string} [step] 点の幅(「1分」「1日」)
  */
-function velocitySvg(buckets) {
+function velocitySvg(buckets, step = '1分') {
   if (!buckets.length) return '<p class="note">まだグラフにできるほど記録がありません。</p>';
   const W = 940;
   const H = 180;
   const pad = 24;
-  const max = Math.max(1, ...buckets.map((b) => b.count));
+  // v0.1.2263: Math.max に列を広げて渡すと長い列で落ちる(marketingTimeSpan.js の maxOfList)
+  const max = maxOfList(buckets.map((b) => b.count));
   const bw = (W - pad * 2) / buckets.length;
   let bars = '';
   buckets.forEach((b, i) => {
@@ -222,13 +227,13 @@ function velocitySvg(buckets) {
   const first = formatClock(buckets[0].atStart).slice(0, 5);
   const last = formatClock(buckets[buckets.length - 1].atStart).slice(0, 5);
   return (
-    `<svg class="chart" viewBox="0 0 ${W} ${H}" role="img" aria-label="1分ごとのコメント数">` +
+    `<svg class="chart" viewBox="0 0 ${W} ${H}" role="img" aria-label="${escapeHtml(step)}ごとのコメント数">` +
     `<line x1="${pad}" y1="${H - pad}" x2="${W - pad}" y2="${H - pad}" stroke="#e3c9b5" />` +
     bars +
     `<path d="${line}" fill="none" stroke="#c8721c" stroke-width="2" />` +
     `<text x="${pad}" y="${H - 6}" font-size="11" fill="#7a6458">${escapeHtml(first)}</text>` +
     `<text x="${W - pad}" y="${H - 6}" font-size="11" fill="#7a6458" text-anchor="end">${escapeHtml(last)}</text>` +
-    `<text x="${pad}" y="14" font-size="11" fill="#7a6458">最大 ${max}件/分</text>` +
+    `<text x="${pad}" y="14" font-size="11" fill="#7a6458">最大 ${max}件/${escapeHtml(step)}</text>` +
     '</svg>'
   );
 }
@@ -246,6 +251,8 @@ export function buildYtMarketingReportHtml(input) {
   const comments = toYtAnalyticsComments(items);
   const velocity = buildCommentVelocityTimeline(comments, { bucketMs: 60_000, rollingWindowMin: 5 });
   const laughter = buildLaughterDensityTimeline(comments, { bucketMs: 60_000 });
+  // v0.1.2263: 1点の幅は集計側が決める(何年にもわたる動画のコメントは広がる)
+  const velocityStep = formatBucketMsJa(velocity.bucketMs || 60_000);
   const silences = detectCommentSilenceZones(comments, { thresholdMs: 60_000, quality: { windowMs: 30_000 } });
 
   const firstAt = comments.length ? comments[0].capturedAt : 0;
@@ -284,9 +291,9 @@ export function buildYtMarketingReportHtml(input) {
     .slice(0, 3)
     .filter((b) => b.count > 0);
   body +=
-    '<section><h2>コメントの勢い（1分ごと）</h2>' +
-    velocitySvg(velocity.buckets) +
-    '<p class="note">棒＝1分ごとの件数、線＝直近5分の平均。</p>' +
+    `<section><h2>コメントの勢い（${escapeHtml(velocityStep)}ごと）</h2>` +
+    velocitySvg(velocity.buckets, velocityStep) +
+    `<p class="note">棒＝${escapeHtml(velocityStep)}ごとの件数、線＝${velocityStep === '1分' ? '直近5分' : '直近5点'}の平均。</p>` +
     (peaks.length
       ? '<p class="note">盛り上がった時間: ' +
         peaks.map((b) => `<span class="pill">${escapeHtml(formatClock(b.atStart).slice(0, 5))} ${b.count}件</span>`).join(' ') +
@@ -381,7 +388,7 @@ export function buildYtMarketingReportHtml(input) {
 
   // 7. 次の配信への打ち手（数字から言えることだけ）
   const tips = [];
-  if (peaks.length) tips.push(`いちばん盛り上がったのは ${formatClock(peaks[0].atStart).slice(0, 5)} ごろ（${peaks[0].count}件/分）。その時の話題を次回の冒頭に持ってくると入りやすいです。`);
+  if (peaks.length) tips.push(`いちばん盛り上がったのは ${formatClock(peaks[0].atStart).slice(0, 5)} ごろ（${peaks[0].count}件/${velocityStep}）。その時の話題を次回の冒頭に持ってくると入りやすいです。`);
   if (longSilences.length && longSilences[0].durationMs >= 120_000) tips.push(`${formatClock(longSilences[0].startAt).slice(0, 5)} ごろに ${Math.round(longSilences[0].durationMs / 60000)}分ほどコメントが止まりました。質問や二択を挟むと戻りやすいです。`);
   if (commenters.length > 0) {
     const once = commenters.filter((c) => c.commentCount === 1).length;

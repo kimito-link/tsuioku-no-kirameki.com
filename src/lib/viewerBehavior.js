@@ -1,4 +1,5 @@
 import { pickAvatarUrlForUid } from './deriveAvatarUrlFromUid.js';
+import { mergeVideoCommentLists, videoCommentsDetailHtml } from './videoWatch/videoCommentDetail.js';
 /**
  * 【層】L0 判定層(純粋関数・I/O禁止)
  * 【この箱に入るもの】いま見えている視聴者について、このPCの記録から「行動」を組むことと、その文言・HTML
@@ -54,6 +55,10 @@ export function resolveViewerBehaviorAvatarUrl(id, avatarUrl) {
  *   at?: number | null,
  *   creatorReplies?: ViewerBehaviorReply[],
  *   viewerReplies?: ViewerBehaviorReply[],
+ *   comments?: any[],
+ *   handle?: string,
+ *   channelUrl?: string,
+ *   pageOrder?: number,
  * }} ViewerBehaviorVisiblePerson
  *
  * @typedef {{
@@ -94,6 +99,10 @@ export function resolveViewerBehaviorAvatarUrl(id, avatarUrl) {
  *   commentAnchor?: string,
  *   creatorReplies?: ViewerBehaviorReply[],
  *   viewerReplies?: ViewerBehaviorReply[],
+ *   comments?: any[],
+ *   handle?: string,
+ *   channelUrl?: string,
+ *   pageOrder?: number,
  * }} ViewerBehaviorRow
  *
  * @typedef {{
@@ -365,6 +374,22 @@ function compareBehaviorRows(a, b) {
 }
 
 /**
+ * 通常動画の並び: 新しいコメントの人が先・同じ時刻はページの順・匿名の1枚は最後。
+ * @param {any} a
+ * @param {any} b
+ * @returns {number}
+ */
+export function compareVideoRows(a, b) {
+  const anonA = a.isAnonymous ? 1 : 0;
+  const anonB = b.isAnonymous ? 1 : 0;
+  if (anonA !== anonB) return anonA - anonB;
+  const tA = Number(a.pageAt) || 0;
+  const tB = Number(b.pageAt) || 0;
+  if (tA !== tB) return tB - tA;
+  return (Number(a.pageOrder) || 0) - (Number(b.pageOrder) || 0);
+}
+
+/**
  * @param {{
  *   visiblePeople?: readonly ViewerBehaviorVisiblePerson[] | null,
  *   historyById?: Record<string, ViewerBehaviorHistory | any> | Map<string, any> | null,
@@ -437,9 +462,15 @@ export function buildViewerBehaviorBoard(input) {
         commentAnchor: String(p?.commentAnchor || '').trim(),
         creatorReplies: listRepliesOf(p).creatorReplies,
         viewerReplies: listRepliesOf(p).viewerReplies,
+        comments: Array.isArray(p?.comments) ? mergeVideoCommentLists(p.comments, []) : [],
+        handle: String(p?.handle || '').trim(),
+        channelUrl: String(p?.channelUrl || '').trim(),
+        pageOrder: byId.size,
       });
       continue;
     }
+    if (Array.isArray(p?.comments) && p.comments.length) prev.comments = mergeVideoCommentLists(prev.comments, p.comments);
+    if (!prev.handle && p?.handle) prev.handle = String(p.handle).trim();
     prev.commentCount = (prev.commentCount || 0) + commentCount;
     if (giftCount != null) prev.giftCount = (prev.giftCount || 0) + giftCount;
     if (knownAmountJpy != null) prev.knownAmountJpy = (prev.knownAmountJpy || 0) + knownAmountJpy;
@@ -465,6 +496,10 @@ export function buildViewerBehaviorBoard(input) {
     row.pageAt = Number(person.at) > 0 ? Math.floor(Number(person.at)) : 0;
     row.creatorReplies = Array.isArray(person.creatorReplies) ? person.creatorReplies : [];
     row.viewerReplies = Array.isArray(person.viewerReplies) ? person.viewerReplies : [];
+    row.pageOrder = Number(person.pageOrder) || 0;
+    if (Array.isArray(person.comments) && person.comments.length) row.comments = person.comments;
+    if (person.handle) row.handle = person.handle;
+    if (person.channelUrl) row.channelUrl = person.channelUrl;
     rows.push(row);
   }
   if (anonAcc.people > 0) {
@@ -500,7 +535,10 @@ export function buildViewerBehaviorBoard(input) {
     ].filter(Boolean).join(' ・ ');
     rows.push(row);
   }
-  rows.sort(compareBehaviorRows);
+  // v0.1.2263: 通常動画は「新しいコメント順」(りんく 2026-11-26 会議の結論・11-27「最新順にならんでいない」)。
+  //   ライブと同じ並び(なじみ→ギフト→コメント数→時刻→名前)だと、2件書いた人が先頭・同じ「2週間前」は名前順になっていた。
+  //   時刻が同じ(YouTube は「7か月前」のような丸めた時刻しか無い)・分からないときは、ページに出ている順のまま。上限で切るのも並べた後。
+  rows.sort(src.contentKind === 'video' ? compareVideoRows : compareBehaviorRows);
   const named = rows.filter((r) => !r.isAnonymous);
   const regularCount = named.filter((r) => r.relation === 'regular').length;
   const newCount = named.filter((r) => r.relation === 'new').length;
@@ -649,7 +687,7 @@ export function splitCreatorViewerReplies(items) {
 }
 
 /**
- * @typedef {{ id: string, name: string, kind: 'creator' | 'viewer', at: number | null }} ViewerBehaviorReply
+ * @typedef {{ id: string, name: string, kind: 'creator' | 'viewer', at: number | null, avatarUrl?: string }} ViewerBehaviorReply
  */
 
 /** @param {any} raw @returns {ViewerBehaviorReply} */
@@ -661,6 +699,8 @@ function normalizeReply(raw) {
     name: String(raw.name || raw.displayName || '').replace(/\s+/g, ' ').trim(),
     kind: isCreator ? 'creator' : 'viewer',
     at: Number.isFinite(atNum) && atNum > 0 ? Math.floor(atNum) : null,
+    // v0.1.2263: 返信した人の顔(ページにあるときだけ・https のみ)
+    ...(/^https:\/\//i.test(String(raw.avatarUrl || raw.iconUrl || '')) ? { avatarUrl: String(raw.avatarUrl || raw.iconUrl) } : {}),
   };
 }
 
@@ -752,6 +792,11 @@ export function attachRepliesToPeople(people, comments) {
  *   viewerReplies: ViewerBehaviorReply[],
  *   pending: boolean,
  *   canOpenComeview: boolean,
+ *   comments: any[],
+ *   handle: string,
+ *   channelUrl: string,
+ *   relationKnown: boolean,
+ *   hasHistory: boolean,
  * }}
  */
 export function buildViewerBehaviorPersonDetail(row) {
@@ -788,6 +833,11 @@ export function buildViewerBehaviorPersonDetail(row) {
     viewerReplies: Array.isArray(src.viewerReplies) ? src.viewerReplies : [],
     pending: src.pending === true,
     canOpenComeview: !!id && id !== VIEWER_BEHAVIOR_ANON_ID && !src.isAnonymous,
+    comments: Array.isArray(src.comments) ? src.comments : [],
+    handle: String(src.handle || (String(id).startsWith('@') ? id : '')).trim(),
+    channelUrl: String(src.channelUrl || '').trim(),
+    relationKnown: src.relation ? src.relation !== 'unknown' : !!src.relationLabel && src.relationLabel !== viewerRelationLabel('unknown'),
+    hasHistory: visits.length > 0 || !!src.firstSeenText,
   };
 }
 
@@ -800,6 +850,8 @@ export function viewerBehaviorPersonDetailInnerHtml(detail) {
   const esc = escapeViewerBehaviorHtml;
   const replyList = (/** @type {string} */ title, /** @type {any[]} */ rows) => {
     if (!rows.length) {
+      // v0.1.2263: 返信を読めないサービス(録画など)は「なし」と書かない(分からないことを「無い」にしない)
+      if (/** @type {any} */ (detail).repliesUnknown === true) return '';
       return `<div class="nlsb-person-detail__replies"><p class="nlsb-person-detail__label">${esc(title)}</p><p>なし</p></div>`;
     }
     const items = rows.map((r) => {
@@ -813,6 +865,34 @@ export function viewerBehaviorPersonDetailInnerHtml(detail) {
     ? `<button type="button" class="nlsb-person-detail__comeview" data-open-comeview="1" data-user-id="${esc(detail.id)}" data-user-name="${esc(detail.name)}">発言一覧を開く</button>`
     : '';
   const pending = detail.pending ? '<p class="nlsb-person-detail__pending">未対応</p>' : '';
+  // v0.1.2263: 動画で書いたことがあるときは、それを先に出す(返信・いいね・ハートは1件ごと)。
+  //   来訪や最初・いちばん新しいは「詳しく」の中へ(記録が無い「—」や「なし」の行を並べない)。
+  const wrote = videoCommentsDetailHtml(detail.comments);
+  if (wrote) {
+    const facts = [];
+    if (detail.hasHistory && !/記録がまだない/.test(detail.visitsText)) facts.push(detail.visitsText);
+    if (detail.firstSeenText && !/：—/.test(detail.firstSeenText)) facts.push(detail.firstSeenText);
+    if (detail.lastSeenText && !/：—/.test(detail.lastSeenText) && detail.lastSeenText.replace('いちばん新しい', '') !== detail.firstSeenText.replace('最初', '')) facts.push(detail.lastSeenText);
+    if (detail.giftText && detail.giftText !== 'ギフト なし') facts.push(detail.giftText);
+    if (detail.handle) facts.push(detail.handle);
+    const link = /^https:\/\//i.test(detail.channelUrl)
+      ? `<p><a class="nlsb-person-detail__channel" href="${esc(detail.channelUrl)}" target="_blank" rel="noopener noreferrer">チャンネルを開く</a></p>`
+      : '';
+    const more = facts.length || link
+      ? `<details class="nlsb-person-detail__more nlsb-person-detail__more--person"><summary>詳しく</summary>${facts.map((f) => `<p>${esc(f)}</p>`).join('')}${link}</details>`
+      : '';
+    return (
+      `<div class="nlsb-person-detail" data-user-id="${esc(detail.id)}">` +
+      `<p class="nlsb-person-detail__name">${esc(detail.name)}</p>` +
+      (detail.relationKnown ? `<p class="nlsb-person-detail__relation">${esc(detail.relationLabel)}</p>` : '') +
+      `<p>${esc(detail.commentText)}</p>` +
+      wrote +
+      more +
+      pending +
+      open +
+      `</div>`
+    );
+  }
   return (
     `<div class="nlsb-person-detail" data-user-id="${esc(detail.id)}">` +
     `<p class="nlsb-person-detail__name">${esc(detail.name)}</p>` +

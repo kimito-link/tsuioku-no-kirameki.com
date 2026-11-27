@@ -283,7 +283,7 @@ describe('原因3/6: 動画ページでは横の欄の同時視聴・来場・�
     expect(html).not.toMatch(/0 回/);
     expect(html).not.toMatch(/読み込み中/);
     expect(html).not.toMatch(/同時視聴/);
-    expect(html).toMatch(/いま読めるコメントの投稿者はまだありません/);
+    expect(html).toMatch(/コメント欄が読み込まれると、ここに書いた人が並びます/);
   });
 });
 
@@ -410,7 +410,8 @@ describe('原因4: Twitch 録画は document_idle に 0 人で書いたあと更
     const src = readFileSync(join(ROOT, 'src/extension/viewerBehaviorBoardPaint.js'), 'utf8').replace(/\/\*[\s\S]*?\*\//g, '').replace(/\/\/.*$/gm, '');
     expect(src).not.toMatch(/MutationObserver|setInterval|setTimeout|fetch\(|XMLHttpRequest/);
     const popup = readFileSync(join(ROOT, 'src/extension/popup-entry.js'), 'utf8');
-    expect(popup).toMatch(/if \(INLINE_SIDE_PANEL\) noteVideoPageTabForSidePanel\(tabs\[0\] \|\| null\)/);
+    // v0.1.2263: ツールバーのポップアップでも動画ページの照合をする(ページに埋め込んだ枠は除く)
+    expect(popup).toMatch(/if \(INLINE_SIDE_PANEL \|\| !INLINE_MODE\) noteVideoPageTabForSidePanel\(tabs\[0\] \|\| null\)/);
   });
 });
 

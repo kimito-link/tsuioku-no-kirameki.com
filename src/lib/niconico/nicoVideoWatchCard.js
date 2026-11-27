@@ -6,6 +6,7 @@
  * 【正本宣言】ニコ動の通常動画カードに出す言葉はこのファイル（視聴者の行動は viewerBehavior.js）
  */
 
+import { normalizeVideoFacts, videoFactsLineHtml } from '../videoWatch/videoFacts.js';
 import { attachRepliesToPeople, buildViewerBehaviorBoard, viewerBehaviorBoardInnerHtml } from '../viewerBehavior.js';
 import { isNicoNumericUserId } from './nicoVideoWatchMeta.js';
 
@@ -24,6 +25,7 @@ export const NICO_VIDEO_WATCH_CARD_TITLE = 'この動画のデータ';
  *   historyReady?: boolean,
  *   nowMs?: number,
  *   videoComments?: readonly any[],
+ *   facts?: { commentTotal?: unknown, publishDate?: unknown, length?: unknown },
  *   spend?: any,
  *   takeHome?: any,
  * }} input
@@ -66,7 +68,8 @@ export function buildNicoVideoWatchCardModel(input) {
     platform: 'niconico',
     contentKind: 'video',
   });
-  let recordedSummary = 'この投稿者の配信を、このPCではまだ記録していません。配信を開いて記録すると、動画のコメント欄と照合できます。';
+  // v0.1.2263: 記録が無いときに「まだ記録していません」と否定から入らない(何も出さない)
+  let recordedSummary = '';
   if (streamCount > 0) {
     recordedSummary = `この投稿者の配信を、このPCで ${streamCount.toLocaleString('ja-JP')} 本記録しています（コメント合計 ${itemCount.toLocaleString('ja-JP')} 件）。`;
   } else if (histCount > 0) {
@@ -89,6 +92,7 @@ export function buildNicoVideoWatchCardModel(input) {
     recordedStreams: streamCount,
     recordedComments: itemCount,
     recordedSummary,
+    facts: normalizeVideoFacts(src.facts),
     videoAuthorCount: authors.length,
     matchedCount: matched.length,
     behavior,
@@ -112,7 +116,8 @@ export function nicoVideoWatchCardInnerHtml(model) {
     viewerBehaviorBoardInnerHtml(model.behavior) +
     `<h2 class="nlsb-video-watch-card__title">${esc(NICO_VIDEO_WATCH_CARD_TITLE)}</h2>` +
     `<p class="nlsb-video-watch-card__views"><span class="nlsb-video-watch-card__label">再生</span> ${esc(model.viewCountText)}</p>` +
-    `<p class="nlsb-video-watch-card__recorded">${esc(model.recordedSummary)}</p>` +
+    videoFactsLineHtml(/** @type {any} */ (model).facts) +
+    (model.recordedSummary ? `<p class="nlsb-video-watch-card__recorded">${esc(model.recordedSummary)}</p>` : '') +
     `</section>`
   );
 }

@@ -47,6 +47,15 @@ export function startYtPageViewerReader() {
 
   /** @type {{ videoId: string, count: number } | null} */
   let pending = null;
+  /**
+   * v0.1.2263: ページを読み直さずに動画を移ったとき(関連動画・ミックス・検索結果から開く)、window.ytInitialData と
+   *   window.ytInitialPlayerResponse は最初に開いたページのまま。YouTube が移り終わりの知らせ(yt-navigate-finish)に付けて渡す
+   *   新しい動画の中身(detail.response.response / playerResponse)を控えて読む。新しい通信・Observer・タイマーは足さない。
+   *   これが無いと、移った先の動画で「配信かどうか」「再生数」が書かれず、横の欄がライブの形(同時視聴者数・応援 0)になり、
+   *   会場モードのボタンも動画用に切り替わらなかった。
+   * @type {{ data: any, player: any } | null}
+   */
+  let navResponse = null;
 
   const pageVideoId = () => {
     const fromUrl = parseYtVideoIdFromUrl(String(location.href || ''));
@@ -103,10 +112,25 @@ export function startYtPageViewerReader() {
     publish(pageId, count);
   };
 
+  /** @param {any} player @param {string} id */
+  const playerFor = (player, id) => {
+    const pid = player?.videoDetails?.videoId;
+    return player && typeof player === 'object' && (!isVid(pid) || !id || pid === id) ? player : null;
+  };
+
   const readInitial = () => {
     const pageId = pageVideoId();
     /** @type {any} */
     let data = /** @type {any} */ (window).ytInitialData;
+    /** @type {any} */
+    let player = /** @type {any} */ (window).ytInitialPlayerResponse;
+    if (navResponse && pageId) {
+      const navId = videoIdFromYtInitialData(navResponse.data) || String(navResponse.player?.videoDetails?.videoId || '');
+      if (navId === pageId) {
+        data = navResponse.data;
+        player = navResponse.player;
+      }
+    }
     if (!data || typeof data !== 'object') {
       const scripts = document.querySelectorAll('script');
       for (let i = 0; i < scripts.length; i += 1) {
@@ -131,7 +155,8 @@ export function startYtPageViewerReader() {
     if (subText) document.documentElement?.setAttribute('data-nl-yt-subscribers', subText);
     if (count != null) publish(id, count);
     else flushPending();
-    publishVodSignals(data, /** @type {any} */ (window).ytInitialPlayerResponse, id);
+    // 最初に開いた動画の player を、移った先の動画に使わない(配信かどうかを取り違える)
+    publishVodSignals(data, playerFor(player, id), id);
   };
 
   /**
@@ -145,6 +170,15 @@ export function startYtPageViewerReader() {
     if (!root || !id) return;
     const views = viewCountInInnertube(data, id) ?? viewCountInInnertube(player, id);
     if (views != null) root.setAttribute('data-nl-yt-view-count', String(views));
+    // v0.1.2263: 動画の投稿日と長さ(プレーヤーの応答に既にある値だけ)。この動画の player のときだけ(playerFor)
+    const micro = player?.microformat?.playerMicroformatRenderer;
+    const pub = String(micro?.publishDate || micro?.uploadDate || '');
+    if (/^\d{4}-\d{2}-\d{2}/.test(pub)) root.setAttribute('data-nl-yt-publish-date', pub.slice(0, 25));
+    // v0.1.2263: 動画そのもののいいね(player の microformat.likeCount・正確な整数の文字列)。ytInitialData は探さない
+    const likes = String(micro?.likeCount ?? '');
+    if (/^\d+$/.test(likes)) root.setAttribute('data-nl-yt-like-count', likes);
+    const len = String(player?.videoDetails?.lengthSeconds || '');
+    if (/^\d+$/.test(len) && len !== '0') root.setAttribute('data-nl-yt-length-sec', len);
     const fromPlayer = ytLiveFlagsFromPlayerOrInitial(player);
     const fromData = ytLiveFlagsFromPlayerOrInitial(data);
     const isLive = fromPlayer.isLive ?? fromData.isLive;
@@ -163,6 +197,9 @@ export function startYtPageViewerReader() {
       concurrentViewers: viewersN,
     });
     if (kind !== 'unknown') root.setAttribute('data-nl-yt-content-kind', kind);
+    // v0.1.2263: 印をどの動画のものかと一緒に書く。読む側(content-chat-entry.js)は、いまの動画と違う印を使わない
+    //   (移り終わりの知らせより先に 5 秒ごとの送信が走ると、前の動画の「ライブ」の印が新しい動画に付いていた)
+    if (isLive != null || isLiveContent != null) root.setAttribute('data-nl-yt-kind-video-id', id);
   };
 
   /** @type {MutationObserver | null} */
@@ -244,8 +281,16 @@ export function startYtPageViewerReader() {
   };
 
   arm();
-  window.addEventListener('yt-navigate-finish', () => {
+  window.addEventListener('yt-navigate-finish', (/** @type {any} */ ev) => {
     pending = null;
+    try {
+      const r = ev && ev.detail && ev.detail.response;
+      navResponse = r && typeof r === 'object' && (r.response || r.playerResponse)
+        ? { data: r.response || null, player: r.playerResponse || null }
+        : null;
+    } catch {
+      navResponse = null;
+    }
     const root = document.documentElement;
     root?.removeAttribute('data-nl-yt-viewers');
     root?.removeAttribute('data-nl-yt-video-id');
@@ -253,6 +298,10 @@ export function startYtPageViewerReader() {
     root?.removeAttribute('data-nl-yt-is-live');
     root?.removeAttribute('data-nl-yt-is-live-content');
     root?.removeAttribute('data-nl-yt-content-kind');
+    root?.removeAttribute('data-nl-yt-kind-video-id');
+    root?.removeAttribute('data-nl-yt-publish-date');
+    root?.removeAttribute('data-nl-yt-length-sec');
+    root?.removeAttribute('data-nl-yt-like-count');
     setTimeout(arm, 0);
   });
 }

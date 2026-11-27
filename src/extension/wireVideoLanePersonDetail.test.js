@@ -82,6 +82,41 @@ describe('通常動画のサムネイルは、横の欄の詳細を開き、発�
     }
   });
 
+  it('録画のチャット再生でカードが描き直されても、開いていた人の詳細は開いたまま', () => {
+    const ctx = setup('video');
+    try {
+      wireVideoLanePersonDetail(ctx.box, { board: ctx.board, document: ctx.doc });
+      const tile = ctx.doc.querySelector('.nl-story-userlane-cell[data-user-key="u:' + ID + '"]');
+      tile.dispatchEvent(new ctx.win.MouseEvent('click', { bubbles: true, cancelable: true, button: 0 }));
+      // 描き直し(innerHTML の入れ替え + レーンの組み直し)
+      ctx.box.innerHTML = viewerBehaviorBoardInnerHtml(ctx.board);
+      hydrateViewerBehaviorLiveLayout(ctx.box, ctx.board, { document: ctx.doc });
+      wireVideoLanePersonDetail(ctx.box, { board: ctx.board, document: ctx.doc });
+      const detail = ctx.box.querySelector('.nlsb-viewer-behavior__detail');
+      expect(detail.hidden).toBe(false);
+      expect(detail.innerHTML).toContain('花子');
+    } finally {
+      ctx.restore();
+    }
+  });
+
+  it('返信を読めないサービス(Twitch の録画など)では、「投稿者の返信 なし」を出さない', () => {
+    const ctx = setup('video');
+    try {
+      const board = { ...ctx.board, platform: 'twitch', rows: ctx.board.rows.map((r) => ({ ...r, creatorReplies: [], viewerReplies: [] })) };
+      wireVideoLanePersonDetail(ctx.box, { board, document: ctx.doc });
+      ctx.box.__nlsbBoard = board;
+      const tile = ctx.doc.querySelector('.nl-story-userlane-cell[data-user-key="u:' + ID + '"]');
+      tile.dispatchEvent(new ctx.win.MouseEvent('click', { bubbles: true, cancelable: true, button: 0 }));
+      const html = ctx.box.querySelector('.nlsb-viewer-behavior__detail').innerHTML;
+      expect(html).toContain('花子');
+      expect(html).not.toContain('投稿者の返信');
+      expect(html).not.toContain('なし</p>');
+    } finally {
+      ctx.restore();
+    }
+  });
+
   it('詳細の「発言一覧を開く」だけが、これまでと同じ comeview の窓を開く', () => {
     const ctx = setup('video');
     try {

@@ -15,7 +15,9 @@ import { lpChangelogUrl } from '../lib/lpChangelogLink.js';
 import {
   WHATS_NEW_SEEN_STORAGE_KEY,
   resolveWhatsNewState,
-  shouldSuppressWhatsNewSurface
+  shouldSuppressWhatsNewSurface,
+  whatsNewSiteOfLocation,
+  whatsNewSummaryForSite
 } from '../lib/whatsNewNotice.js';
 
 /**
@@ -45,7 +47,8 @@ export function applyLpChangelogLink(el, version) {
  * @param {{
  *   document?: Document,
  *   storage?: { get: Function, set: Function },
- *   surfaceFlags?: { embedWatch?: boolean, embedLiveView?: boolean, passive?: boolean }
+ *   surfaceFlags?: { embedWatch?: boolean, embedLiveView?: boolean, passive?: boolean },
+ *   site?: string
  * }} opts
  */
 export async function wireWhatsNewNotice(opts = {}) {
@@ -53,9 +56,14 @@ export async function wireWhatsNewNotice(opts = {}) {
   if (!root) return;
   const entry = getLatestChangelogEntry();
   const currentVersion = entry && entry.version ? String(entry.version) : '';
+  // v0.1.2263: 別のサービスだけの一言は、いまの画面ではサービス名を出さない一言に(whatsNewSummaryForSite)
+  const site = opts.site != null
+    ? String(opts.site)
+    : whatsNewSiteOfLocation(typeof location !== 'undefined' ? location : null);
+  const summaryText = whatsNewSummaryForSite(entry ? entry.summary : '', site, /** @type {any} */ (entry)?.platforms);
   const latestLabel = root.getElementById('changelogLatestLabel');
   if (latestLabel && currentVersion) {
-    const summary = asText(entry.summary);
+    const summary = asText(summaryText);
     latestLabel.textContent = summary
       ? `v${currentVersion} ${summary}`
       : `v${currentVersion}`;
@@ -132,7 +140,7 @@ export async function wireWhatsNewNotice(opts = {}) {
     versionEl.textContent = `v${currentVersion}`;
     applyLpChangelogLink(versionEl, currentVersion);
   }
-  if (summaryEl) summaryEl.textContent = asText(entry.summary);
+  if (summaryEl) summaryEl.textContent = asText(summaryText);
   applyLpChangelogLink(moreEl, currentVersion);
 
   const dismiss = async () => {

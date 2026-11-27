@@ -7,9 +7,17 @@
  *   （視聴者の行動は viewerBehavior.js。YouTube・ニコ動のカード関数は変えない）
  */
 
+import { normalizeVideoFacts, videoFactsLineHtml } from './videoFacts.js';
+import { videoCommentRowsForStore } from './videoCommentRows.js';
 import { attachRepliesToPeople, buildViewerBehaviorBoard, viewerBehaviorBoardInnerHtml } from '../viewerBehavior.js';
+import { videoPageWordFor } from '../platform/marketingPlatformPlan.js';
 
 export const VOD_VIDEO_WATCH_CARD_TITLE = 'この動画のデータ';
+
+/** @param {string} platform */
+export function vodVideoWatchCardTitle(platform) {
+  return `この${videoPageWordFor(platform)}のデータ`;
+}
 
 const PLATFORMS = new Set(['twitch', 'kick', 'twitcasting', 'abema', 'tiktok']);
 
@@ -24,6 +32,7 @@ const PLATFORMS = new Set(['twitch', 'kick', 'twitcasting', 'abema', 'tiktok']);
  *   ownerName?: string,
  *   videoAuthors?: readonly any[],
  *   videoComments?: readonly any[],
+ *   facts?: { commentTotal?: unknown, publishDate?: unknown, length?: unknown },
  *   nowMs?: number,
  * }} input
  */
@@ -50,6 +59,8 @@ export function buildVodVideoWatchCardModel(input) {
     creatorReplies: a?.creatorReplies,
     viewerReplies: a?.viewerReplies,
     replies: a?.replies,
+    // v0.1.2263: 再生チャットで読めた本文(タップで「何を書いたか」)。読めなければ無い
+    ...(Array.isArray(a?.comments) && a.comments.length ? { comments: a.comments } : {}),
   })), src.videoComments);
   const behavior = buildViewerBehaviorBoard({
     visiblePeople,
@@ -60,9 +71,10 @@ export function buildVodVideoWatchCardModel(input) {
     platform,
     contentKind: 'video',
   });
-  let recordedSummary = 'この配信者の配信を、このPCではまだ記録していません。配信を開いて記録すると、動画のコメント欄と照合できます。';
+  // v0.1.2263(りんく 11-27「…まだ記録していません。…」は動画ページで否定から入って読める): 否定の言い方をやめる
+  let recordedSummary = `いま見えているコメントの投稿者は ${authors.length.toLocaleString('ja-JP')} 人です。`;
   if (authors.length === 0) {
-    recordedSummary = 'このページの表示の中に、いま読めるコメントの投稿者はまだありません。コメント欄が読み込まれていれば、顔の列に出します。';
+    recordedSummary = 'コメント欄が読み込まれると、ここに書いた人が並びます。';
   }
   return {
     videoId: String(src.pageKey || src.videoId || '').trim(),
@@ -76,8 +88,45 @@ export function buildVodVideoWatchCardModel(input) {
     ownerName: String(src.ownerName || '').replace(/\s+/g, ' ').trim(),
     videoAuthorCount: authors.length,
     recordedSummary,
+    facts: normalizeVideoFacts(src.facts),
     behavior,
+    // v0.1.2263: 会場が読む行(YouTube の動画のカードと同じ形・videoCommentRows.js)。読めた本文だけ
+    videoRows: videoCommentRowsForStore(vodCommentsInPageOrder(authors), {
+      videoId: String(src.pageKey || src.videoId || '').trim(),
+      platform,
+      nowMs: src.nowMs,
+    }),
   };
+}
+
+/**
+ * 録画・動画の読み取り(人ごとに本文がまとまっている)を、会場の行のもと(新しい順の1コメントずつ)にする。
+ *   人の並びはページの新しい順(時刻→DOM の順)、同じ人の本文は新しい順のまま。本文の無い人は行にしない(作らない)。
+ * @param {readonly any[]} authors
+ * @returns {any[]}
+ */
+export function vodCommentsInPageOrder(authors) {
+  const list = Array.isArray(authors) ? authors.slice() : [];
+  list.sort((a, b) => (Number(b?.postedAtMs) || 0) - (Number(a?.postedAtMs) || 0) || (Number(b?.seq) || 0) - (Number(a?.seq) || 0));
+  /** @type {any[]} */
+  const out = [];
+  for (const a of list) {
+    const id = String(a?.id || a?.userId || '').trim();
+    if (!id || !Array.isArray(a?.comments)) continue;
+    for (const c of a.comments) {
+      const text = String(c?.text || '').trim();
+      if (!text) continue;
+      out.push({
+        commentId: String(c?.id || ''),
+        text,
+        channelId: id,
+        name: String(a?.name || '').trim(),
+        avatarUrl: String(a?.avatarUrl || '').trim(),
+        postedAtMs: Number(a?.postedAtMs) > 0 ? Math.floor(Number(a.postedAtMs)) : 0,
+      });
+    }
+  }
+  return out;
 }
 
 /**
@@ -95,11 +144,14 @@ export function vodVideoWatchCardInnerHtml(model) {
   const views = model.viewCountText
     ? `<p class="nlsb-video-watch-card__views"><span class="nlsb-video-watch-card__label">再生</span> ${esc(model.viewCountText)}</p>`
     : '';
+  // そのサービスの呼び方(ツイキャスは「この録画のデータ」・ABEMA は「この見逃し視聴のデータ」)
+  const title = vodVideoWatchCardTitle(model.platform);
   return (
-    `<section class="nlsb-video-watch-card" data-video-id="${esc(model.videoId)}" data-platform="${esc(model.platform)}" aria-label="${esc(VOD_VIDEO_WATCH_CARD_TITLE)}">` +
+    `<section class="nlsb-video-watch-card" data-video-id="${esc(model.videoId)}" data-platform="${esc(model.platform)}" aria-label="${esc(title)}">` +
     viewerBehaviorBoardInnerHtml(model.behavior) +
-    `<h2 class="nlsb-video-watch-card__title">${esc(VOD_VIDEO_WATCH_CARD_TITLE)}</h2>` +
+    `<h2 class="nlsb-video-watch-card__title">${esc(title)}</h2>` +
     views +
+    videoFactsLineHtml(model.facts) +
     `<p class="nlsb-video-watch-card__recorded">${esc(model.recordedSummary)}</p>` +
     `</section>`
   );

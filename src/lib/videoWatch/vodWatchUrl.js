@@ -135,3 +135,20 @@ export function vodWatchPageFromUrl(raw) {
 export function isVodVideoWatchUrl(raw) {
   return vodWatchPageFromUrl(raw) != null;
 }
+
+/**
+ * v0.1.2263(りんく 11-28「会場モードは全部のサービスで」): 録画・動画のページで会場を出すサービス。
+ *   会場はページの中の会場(yt-venue-inline.js)で、鍵は録画・動画の鍵(pageKey・チャンネルの鍵ではない)。
+ *   ABEMA の見逃しは、会場の入口(ytVenueBoot.js)が今も載せないので入れない(番組ページの会場は変えない)。
+ */
+export const VENUE_VIDEO_PLATFORMS = Object.freeze(/** @type {const} */ (['twitch', 'kick', 'twitcasting', 'tiktok']));
+
+/**
+ * 会場を出す録画・動画のページならその情報(鍵は pageKey)。ほかは null。
+ * @param {unknown} raw
+ * @returns {VodWatchPage | null}
+ */
+export function venueVideoPageFromUrl(raw) {
+  const p = vodWatchPageFromUrl(raw);
+  return p && /** @type {readonly string[]} */ (VENUE_VIDEO_PLATFORMS).includes(p.platform) ? p : null;
+}

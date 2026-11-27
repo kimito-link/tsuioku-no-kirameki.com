@@ -27,7 +27,7 @@
 
 > 値が次の段へ届かない「断線」(broadcaster バグ型)は `npm run feature-map -- --check` が機械検知。
 
-## ⚠️ 役割コメントが無いソース 15 / 1400 件
+## ⚠️ 役割コメントが無いソース 16 / 1404 件
 - `docs/handoff/bench/bench-interval.mjs`
 - `docs/handoff/bench/bench-lane.mjs`
 - `extension-youtube/cloak-failsafe.js`
@@ -38,6 +38,7 @@
 - `src/extension/voice-native-guide-entry.js`
 - `src/lib/laneDomSelfMeasure.js`
 - `src/lib/liveLaneBuckets.js`
+- `src/lib/marketingAggregate.js`
 - `src/lib/mediaKitExport.js`
 - `src/lib/reportPreviewPublish.js`
 - `src/lib/venueLaneBuckets.js`
@@ -1204,7 +1205,7 @@
   - `gift-coin-hq.wav`
   - `gift-register-hq.wav`
   - `gift-register.mp3`
-- 📁 **src/** (2760)
+- 📁 **src/** (2769)
   - 📁 **data/** (7)
     - 📁 **acquirers/** (2)
       - `laneFromStorage.js` — 応援レーン acquirer: chrome.storage.local(nls_comments) → laneStore の橋渡し。
@@ -1563,7 +1564,7 @@
         - `logo_funlink_white_RGB_link_black.png`
         - `logo_funlink_white_RGB_maru_black.png`
     - `hero-connect-hub.svg`
-  - 📁 **lib/** (2426)
+  - 📁 **lib/** (2435)
     - 📁 **__snapshots__/** (4)
       - `marketing-abema-baseline.html`
       - `marketing-niconico.html`
@@ -1636,7 +1637,7 @@
       - `nicoVideoWatchMeta.js` — 【層】L0 判定層(純粋関数・I/O禁止)
       - `nicoVideoWatchMeta.test.js`
       - `nicoVideoWatchSm9RealDom.test.js`
-    - 📁 **platform/** (50)
+    - 📁 **platform/** (51)
       - 📁 **__fixtures__/** (1)
         - `eventStanding.2026-11-21.json`
       - `diagTabShare.js` — 計器(yt_diag_*_chat)は1つの置き場を全タブで分け合う。
@@ -1661,6 +1662,7 @@
       - `liveIconStore.js` — v0.1.2254: ライブで分かった顔(名前 → 顔の URL)を storage(yt_tw_icons など)に置くときの、純粋な部品。
       - `liveIconStore2254.test.js`
       - `marketingExportBudget.test.js`
+      - `marketingExportLongSpan.test.js`
       - `marketingPlatformChapters.js` — ニコ生以外のマーケHTMLに足す章。見た目のクラスは既存の mkt-* を使う。
       - `marketingPlatformPlan.js` — 【層】L0 判定層(純粋関数・I/O禁止)
       - `marketingPlatformPlan.test.js`
@@ -1720,7 +1722,7 @@
       - `twIrcParse.test.js`
       - `twShim.test.js`
       - `twStreamKey.js` — Twitch の「配信キー」(YouTube 版の videoId の位置に入る文字列)の作り方と読み方(純関数)
-    - 📁 **videoWatch/** (17)
+    - 📁 **videoWatch/** (23)
       - 📁 **fixtures/** (2)
         - `twitcasting-movie-843232645-comment-items.slim.html`
         - `twitch-vod-2940252213-replay-chat.slim.html`
@@ -1728,8 +1730,14 @@
       - `kickVodReplay2247.test.js`
       - `twVodLiveIcons.js` — v0.1.2253: Twitch の録画チャットには顔の画像が無い(実測 DOM)。ライブの Twitch でこの PC が覚えた顔
       - `twVodLiveIcons2253.test.js`
+      - `venueVideoPages2263.test.js`
+      - `videoBoardContract2263.test.js`
+      - `videoCommentDetail.js` — 【層】L0 判定層(純粋関数・I/O禁止)
+      - `videoCommentRows.js` — 【層】L0 判定層(純粋関数・I/O禁止)
+      - `videoFacts.js` — 【層】L0 判定層(純粋関数・I/O禁止)
       - `videoIdentity.js` — 【層】L0 判定層(純粋関数・I/O禁止)
       - `videoIdentity2241.test.js`
+      - `videoMarketing2263.test.js`
       - `videoPanel2244.test.js`
       - `videoPanel2245.test.js`
       - `videoPanelRoute.js` — 横の欄の外枠(sidepanel-iframe-boot-entry.js)が、録画・通常動画のページで中身を付け替えるかを決める純関数。v0.1.2244
@@ -1742,7 +1750,7 @@
     - 📁 **whowatch/** (2)
       - `wwParse.js` — ふわっち(whowatch.tv)の配信とコメントを、YouTube 版の記録と同じ形にする(純関数)
       - `wwParse.test.js`
-    - 📁 **youtube/** (133)
+    - 📁 **youtube/** (134)
       - 📁 **fixtures/** (9)
         - 📁 **real-dom/** (9)
           - `README.md`
@@ -1853,6 +1861,7 @@
       - `ytUserLaneTiers.test.js`
       - `ytVenueBoot.js` — 【層】L0 判定層(純粋関数・I/O禁止)
       - `ytVenueBoot.test.js`
+      - `ytVenueStripPlayCount2263.test.js`
       - `ytVideoCommentThreadSnapshot.js` — YouTube 動画ページのコメント欄を、呼んだ瞬間の DOM だけから読む。
       - `ytVideoCommentThreadSnapshot.test.js`
       - `ytVideoWatch2234.test.js`
@@ -2860,7 +2869,7 @@
     - `mangaBroadcastSummary.test.js`
     - `manifestHostPermissions.test.js`
     - `manifestKnownKeys.test.js`
-    - `marketingAggregate.js` — userId: string,
+    - `marketingAggregate.js` — ⚠️ 役割コメント無し
     - `marketingAggregate.test.js`
     - `marketingChartsHtml.js` — マーケ集計(MarketingReport)から HTMLレポート用のグラフ/チャート HTML を組み立てる。
     - `marketingChartsHtml.snapshot.test.js`
@@ -2883,6 +2892,7 @@
     - `marketingReportEmbed.test.js`
     - `marketingSupportParticipationCounts.js` — マーケ分析・HTMLレポート先頭 KPI: ギフト投げ主・広告した人の人数。
     - `marketingSupportParticipationCounts.test.js`
+    - `marketingTimeSpan.js` — 【層】L0 判定層(純粋関数・I/O禁止)
     - `mcpDiagDumpServices.js` — ニコ生以外のサービス計器・タブを軽量ダンプするための純粋ロジック（L0）。
     - `mcpDiagDumpServices.test.js`
     - `mediaKitEmbed.js` — メディアキットを分析レポートの1章として埋め込むときの、CSS の囲い(id)。
@@ -4054,13 +4064,13 @@
     - `yozora-small-yell.mp3`
   - `build-globals.d.ts` — ビルド時に esbuild の `define` で注入される定数の型宣言。
   - `speech-recognition-globals.d.ts` — Web Speech API（Chrome は webkit 接頭辞のことがある）
-- 📁 **tests/** (103)
+- 📁 **tests/** (104)
   - 📁 **contract/** (4)
     - `contentEntryFunctionBudget.test.js`
     - `layer-dependency.test.js`
     - `popupEntryFunctionBudget.test.js`
     - `wiringTestSource.test.js`
-  - 📁 **e2e/** (96)
+  - 📁 **e2e/** (97)
     - 📁 **fixtures/** (2)
       - 📁 **watch/** (1)
         - 📁 **lv888888888/** (1)
@@ -4160,6 +4170,7 @@
     - `watch-messaging.spec.js`
     - `whowatch-recording.spec.js`
     - `youtube-concurrent-viewers.spec.js`
+    - `youtube-video-board-2263.spec.js`
   - 📁 **helpers/** (3)
     - `laneCssSource.js` — laneCssSource — 応援レーン(タイル)CSS を3ファイル(popup.html / venueBar.js / app/live-view.html)から
     - `laneImportContract.js` — 応援レーンの「輸入契約」(テスト専用の定数・実装コードは import しない)。

@@ -115,6 +115,7 @@ export function viewCountFromNicoWatchData(root) {
  *   viewCount: number | null,
  *   ownerId: string,
  *   ownerName: string,
+ *   facts?: { commentTotal?: unknown, publishDate?: unknown, length?: unknown },
  * }}
  */
 export function parseNicoVideoWatchMeta(root, jsonLd) {
@@ -132,6 +133,8 @@ export function parseNicoVideoWatchMeta(root, jsonLd) {
     viewCount,
     ownerId: ownerId || fromLd.ownerId,
     ownerName: ownerName || fromLd.ownerName,
+    // v0.1.2263: JSON-LD の VideoObject にある数だけ(コメント総数・投稿日・長さ)。無ければ出さない
+    ...(() => { const f = nicoVideoFactsFromJsonLd(jsonLd); return Object.keys(f).length ? { facts: f } : {}; })(),
   };
 }
 
@@ -141,6 +144,18 @@ export function parseNicoVideoWatchMeta(root, jsonLd) {
  * @param {any} ld
  * @returns {{ videoId: string, title: string, viewCount: number | null, ownerId: string, ownerName: string }}
  */
+/**
+ * @param {any} ld
+ * @returns {{ commentTotal?: unknown, publishDate?: unknown, length?: unknown }}
+ */
+export function nicoVideoFactsFromJsonLd(ld) {
+  const list = Array.isArray(ld) ? ld : ld && typeof ld === 'object' ? [ld] : [];
+  const item = list.find((x) => x && x['@type'] === 'VideoObject') || null;
+  if (!item) return {};
+  return { commentTotal: item.commentCount, publishDate: item.uploadDate, length: item.duration };
+}
+
+/** @param {any} ld */
 export function metaFromNicoJsonLd(ld) {
   const list = Array.isArray(ld) ? ld : ld && typeof ld === 'object' ? [ld] : [];
   const item = list.find((x) => x && (x['@type'] === 'VideoObject' || x['@id'] || x.url)) || null;

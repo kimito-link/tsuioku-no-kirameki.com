@@ -10,7 +10,7 @@
  */
 
 import { parseAbLoginFromUrl } from '../abema/abParse.js';
-import { parseKickVodFromUrl, parseAbemaEpisodeFromUrl } from '../videoWatch/vodWatchUrl.js';
+import { parseKickVodFromUrl, parseAbemaEpisodeFromUrl, venueVideoPageFromUrl } from '../videoWatch/vodWatchUrl.js';
 
 /**
  * @param {string} href
@@ -26,6 +26,8 @@ export function needsYtVenue(href) {
   const host = url.hostname.toLowerCase();
   const path = url.pathname || '';
   if (host === 'www.youtube.com') return /^\/(watch|live|shorts)(\/|$)/.test(path);
+  // v0.1.2263: Twitch・Kick・ツイキャスの録画、TikTok の動画のページにも会場を載せる(YouTube の動画と同じ会場)
+  if (venueVideoPageFromUrl(url.href)) return true;
   if (host === 'www.twitch.tv') {
     if (path === '/' || path === '') return false;
     if (/^\/(directory|search|downloads|settings|subscriptions|wallet|inventory|videos|clips|moderator|drops)(\/|$)/.test(path)) {

@@ -30,6 +30,7 @@ import { kickSlugOfName } from '../kick/kickChatParse.js';
  *   authors: { id: string, name: string, avatarUrl: string, postedAtMs: number, commentCount: number, commentId?: string }[],
  *   commentsFound: boolean,
  *   commentsVerified: boolean,
+ *   facts?: { commentTotal?: unknown, publishDate?: unknown, length?: unknown, likes?: unknown },
  * }} VodDomRead
  */
 
@@ -71,25 +72,43 @@ function jsonLdVideos(doc) {
   return out;
 }
 
-/** @param {any} video */
+/**
+ * JSON-LD の再生数。interactionStatistic は WatchAction の数だけ使う(いいね・コメントの数を再生数にしない・v0.1.2263)。
+ * @param {any} video
+ */
 function viewCountFromLd(video) {
-  const n = Number(video?.interactionStatistic?.userInteractionCount ?? video?.commentCount);
-  if (Number.isFinite(n) && n >= 0 && video?.interactionStatistic) return Math.floor(n);
+  const stats = video?.interactionStatistic;
+  if (stats) {
+    const list = Array.isArray(stats) ? stats : [stats];
+    for (const st of list) {
+      const type = String(st?.interactionType?.['@type'] || st?.interactionType || '');
+      if (!/WatchAction$/.test(type)) continue;
+      const n = Number(st?.userInteractionCount);
+      if (Number.isFinite(n) && n >= 0) return Math.floor(n);
+    }
+    return null;
+  }
   const views = Number(video?.interactionCount ?? video?.userInteractionCount);
   return Number.isFinite(views) && views >= 0 ? Math.floor(views) : null;
 }
 
 /**
- * @param {readonly { id: string, name: string, avatarUrl?: string, postedAtMs?: number, commentId?: string }[]} rows
+ * v0.1.2263: 再生チャット(Twitch・Kick)は時刻が DOM に無く postedAtMs が 0。並びは DOM の順(下ほど新しい)なので、
+ *   seq(DOM の何番目か)を持たせ、同じ時刻なら seq の大きい(新しい)人を先にする。本文が読めたら comments に載せる(作らない)。
+ * @param {readonly { id: string, name: string, avatarUrl?: string, postedAtMs?: number, commentId?: string, seq?: number, text?: string, timeText?: string }[]} rows
  */
 function mergeAuthors(rows) {
-  /** @type {Map<string, { id: string, name: string, avatarUrl: string, postedAtMs: number, commentCount: number, commentId?: string }>} */
+  /** @type {Map<string, { id: string, name: string, avatarUrl: string, postedAtMs: number, commentCount: number, commentId?: string, seq: number, off: number, comments?: { id: string, text: string, timeText: string }[] }>} */
   const byId = new Map();
   for (const row of rows) {
     const id = String(row.id || '').trim();
     if (!id) continue;
     const cur = byId.get(id);
     const at = Number(row.postedAtMs) > 0 ? Math.floor(Number(row.postedAtMs)) : 0;
+    const seq = Number.isFinite(Number(row.seq)) ? Number(row.seq) : -1;
+    const body = text(row.text).slice(0, 600);
+    const comment = body ? { id: `${id}#${seq}`, text: body, timeText: text(row.timeText).slice(0, 20) } : null;
+    const off = replayOffsetSec(row.timeText);
     if (!cur) {
       byId.set(id, {
         id,
@@ -98,10 +117,17 @@ function mergeAuthors(rows) {
         postedAtMs: at,
         commentCount: 1,
         commentId: row.commentId ? String(row.commentId) : undefined,
+        seq,
+        off,
+        ...(comment ? { comments: [comment] } : {}),
       });
       continue;
     }
     cur.commentCount += 1;
+    if (seq > cur.seq) cur.seq = seq;
+    if (off > cur.off) cur.off = off;
+    // 新しい順(DOM の下ほど新しいので先頭に足す)
+    if (comment) cur.comments = [comment, ...(cur.comments || [])].slice(0, 8);
     if (at >= cur.postedAtMs) {
       cur.postedAtMs = at;
       if (row.name) cur.name = text(row.name).slice(0, 80);
@@ -110,8 +136,73 @@ function mergeAuthors(rows) {
     }
   }
   const merged = [...byId.values()];
-  merged.sort((a, b) => (Number(b.postedAtMs) || 0) - (Number(a.postedAtMs) || 0));
-  return merged;
+  // 時刻が無い録画(Twitch・Kick)は、再生位置(00:19 など)の新しい順、同じなら DOM の下ほど新しい
+  merged.sort((a, b) => (Number(b.postedAtMs) || 0) - (Number(a.postedAtMs) || 0) || b.off - a.off || b.seq - a.seq);
+  return merged.map(({ off: _off, ...rest }) => rest);
+}
+
+/**
+ * 再生位置の文字(1:02:03 / 00:19)を秒にする。無ければ -1。
+ * @param {unknown} t
+ */
+export function replayOffsetSec(t) {
+  const m = String(t || '').trim().match(/^(?:(\d{1,2}):)?(\d{1,2}):(\d{2})$/);
+  if (!m) return -1;
+  return (Number(m[1] || 0) * 3600) + Number(m[2]) * 60 + Number(m[3]);
+}
+
+/**
+ * 再生チャットの1行の本文(名前・時刻を除いた文字と、絵文字の画像の代わりの文字)。読めなければ ''。
+ * 実測(2026-11-27): Twitch 録画 .video-chat__message の .text-fragment / img[alt]、Kick 録画 span.font-normal。
+ * @param {Element | null | undefined} el
+ */
+function chatLineText(el) {
+  if (!el) return '';
+  try {
+    const body = el.querySelector('.video-chat__message, [data-a-target="chat-line-message-body"]') ||
+      [...el.querySelectorAll('span')].reverse().find((x) => /(^|\s)font-normal(\s|$)/.test(String(x.getAttribute('class') || ''))) ||
+      el.querySelector('.chat-entry-content');
+    if (!body) return '';
+    let out = '';
+    const walk = (/** @type {Node} */ n) => {
+      for (const c of Array.from(n.childNodes || [])) {
+        if (c.nodeType === 3) out += c.textContent || '';
+        else if (c.nodeType === 1) {
+          const e = /** @type {Element} */ (c);
+          if (e.tagName === 'IMG') out += String(e.getAttribute('alt') || '');
+          else if (e.getAttribute('aria-hidden') === 'true') continue;
+          else walk(e);
+        }
+      }
+    };
+    walk(body);
+    return text(out.replace(/^\s*:\s*/, ''));
+  } catch {
+    return '';
+  }
+}
+
+/** Kick 録画の行の頭の時刻(実測 span.whitespace-nowrap「00:22」)。無ければ ''
+ * @param {Element | null | undefined} el */
+function kickLineTime(el) {
+  try {
+    const t = text(el?.querySelector('span.whitespace-nowrap')?.textContent);
+    return /^\d{1,2}:\d{2}(?::\d{2})?$/.test(t) ? t : '';
+  } catch {
+    return '';
+  }
+}
+
+/** Twitch 録画の行の頭にある再生位置(例 1:02:03)。無ければ ''
+ * @param {Element | null | undefined} el */
+function vodLineTime(el) {
+  try {
+    const t = text(el?.querySelector('.vod-message__header, [data-test-selector="vod-message-timestamp"]')?.textContent);
+    const m = t.match(/\b(\d{1,2}:\d{2}(?::\d{2})?)\b/);
+    return m ? m[1] : '';
+  } catch {
+    return '';
+  }
 }
 
 /**
@@ -167,7 +258,7 @@ function parseTcPlayerDatetime(s) {
  * @param {Document | null | undefined} doc
  */
 function readTwitchVodReplayChat(doc) {
-  /** @type {{ id: string, name: string, avatarUrl?: string, postedAtMs?: number, commentId?: string }[]} */
+  /** @type {{ id: string, name: string, avatarUrl?: string, postedAtMs?: number, commentId?: string, seq?: number, text?: string, timeText?: string }[]} */
   const rows = [];
   if (!doc || typeof doc.querySelectorAll !== 'function') return mergeAuthors(rows);
   const items = doc.querySelectorAll('.vod-message');
@@ -182,6 +273,9 @@ function readTwitchVodReplayChat(doc) {
       name: name || login,
       avatarUrl: '',
       postedAtMs: 0,
+      seq: i,
+      text: chatLineText(el),
+      timeText: vodLineTime(el),
     });
   }
   return mergeAuthors(rows);
@@ -192,7 +286,7 @@ function readTwitchVodReplayChat(doc) {
  * @param {Document | null | undefined} doc
  */
 function readKickVodReplayChat(doc) {
-  /** @type {{ id: string, name: string, avatarUrl?: string, postedAtMs?: number, commentId?: string }[]} */
+  /** @type {{ id: string, name: string, avatarUrl?: string, postedAtMs?: number, commentId?: string, seq?: number, text?: string, timeText?: string }[]} */
   const rows = [];
   if (!doc || typeof doc.querySelectorAll !== 'function') return mergeAuthors(rows);
   const items = doc.querySelectorAll('#chatroom-messages [data-index]');
@@ -201,7 +295,8 @@ function readKickVodReplayChat(doc) {
     const name = text(userEl?.getAttribute?.('title') || userEl?.textContent);
     if (!name) continue;
     const slug = kickSlugOfName(name);
-    rows.push({ id: slug ? `kk:@${slug}` : `kk:${name}`, name, avatarUrl: '', postedAtMs: 0 });
+    const idx = Number(items[i].getAttribute?.('data-index'));
+    rows.push({ id: slug ? `kk:@${slug}` : `kk:${name}`, name, avatarUrl: '', postedAtMs: 0, seq: Number.isFinite(idx) ? idx : i, text: chatLineText(items[i]), timeText: kickLineTime(items[i]) });
   }
   return mergeAuthors(rows);
 }
@@ -228,10 +323,37 @@ function readTwitcasting(doc, user) {
     title,
     ownerName: text(info.name),
     viewCount,
+    // v0.1.2263: ページに出ているコメント総数(#comment-count)。無ければ出さない
+    ...(info.stats && Number.isFinite(Number(info.stats.commentTotal)) ? { facts: { commentTotal: Number(info.stats.commentTotal) } } : {}),
     authors,
     commentsFound: authors.length > 0,
     commentsVerified: true,
   };
+}
+
+/**
+ * v0.1.2263: TikTok の動画そのもののいいね(ページが既に持つ __UNIVERSAL_DATA_FOR_REHYDRATION__ の
+ *   webapp.video-detail.itemInfo.itemStruct.stats.diggCount)。動画IDが合うときだけ。投稿者の合計(authorStats)は使わない。
+ * @param {Document | null | undefined} doc
+ * @param {string} videoId
+ * @returns {{ likes?: number, commentTotal?: number }}
+ */
+export function tiktokVideoStatsFromDoc(doc, videoId) {
+  try {
+    const el = doc?.querySelector('script#__UNIVERSAL_DATA_FOR_REHYDRATION__');
+    if (!el?.textContent) return {};
+    const data = JSON.parse(el.textContent);
+    const item = data?.__DEFAULT_SCOPE__?.['webapp.video-detail']?.itemInfo?.itemStruct;
+    if (!item || !videoId || String(item.id || '') !== String(videoId)) return {};
+    const out = {};
+    const likes = Number(item.stats?.diggCount);
+    if (Number.isFinite(likes) && likes >= 0) out.likes = Math.floor(likes);
+    const comments = Number(item.stats?.commentCount);
+    if (Number.isFinite(comments) && comments >= 0) out.commentTotal = Math.floor(comments);
+    return out;
+  } catch {
+    return {};
+  }
 }
 
 /** @param {Document | null | undefined} doc */
@@ -254,7 +376,7 @@ function readTiktokUnverified(doc) {
   } catch {
     data = null;
   }
-  /** @type {{ id: string, name: string, avatarUrl?: string, postedAtMs?: number, commentId?: string }[]} */
+  /** @type {{ id: string, name: string, avatarUrl?: string, postedAtMs?: number, commentId?: string, seq?: number, text?: string, timeText?: string }[]} */
   const rows = [];
   const walk = (/** @type {any} */ node, /** @type {number} */ depth) => {
     if (!node || depth > 8) return;
@@ -292,7 +414,7 @@ function readTiktokUnverified(doc) {
 
 /**
  * @param {Document | null | undefined} doc
- * @param {{ platform?: string, ownerId?: string }} page
+ * @param {{ platform?: string, ownerId?: string, videoId?: string }} page
  * @returns {VodDomRead}
  */
 export function readVodWatchDom(doc, page) {
@@ -305,8 +427,12 @@ export function readVodWatchDom(doc, page) {
   /** @type {VodDomRead['authors']} */
   let authors = [];
   let commentsVerified = false;
+  /** @type {VodDomRead['facts'] | undefined} */
+  let facts;
   if (platform === 'tiktok') {
     authors = readTiktokUnverified(doc);
+    const st = tiktokVideoStatsFromDoc(doc, String(page?.videoId || ''));
+    if (Object.keys(st).length) facts = st;
   } else if (platform === 'twitch') {
     authors = readTwitchVodReplayChat(doc);
     commentsVerified = true;
@@ -322,5 +448,6 @@ export function readVodWatchDom(doc, page) {
     authors,
     commentsFound: authors.length > 0,
     commentsVerified,
+    ...(facts ? { facts } : {}),
   };
 }
