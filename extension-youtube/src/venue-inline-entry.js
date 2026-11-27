@@ -56,11 +56,12 @@ let mountedVid = '';
 async function statCardsSource() {
   const vid = mountedVid;
   if (!vid) return null;
-  const bag = await chrome.storage.local.get('yt_stream_summaries');
+  // v0.1.2263: 再生数は動画のカード(横の欄と同じ正本)から。同じ1回の読みで一緒に取る(通常動画で帯に「再生」が出なかった)
+  const bag = await chrome.storage.local.get(['yt_stream_summaries', KEY_YT_VIDEO_WATCH_CARD]);
   const all = (bag && bag.yt_stream_summaries) || {};
   const sum = all[vid];
   if (!sum) return null;
-  return { snapshot: ytSummaryToNicoSnapshot(sum, vid, '', all) };
+  return { snapshot: ytSummaryToNicoSnapshot(sum, vid, '', all, bag?.[KEY_YT_VIDEO_WATCH_CARD]) };
 }
 /** 視聴キーが一瞬でも取れなくなった時刻。取れていれば 0 */
 let watchKeyMissingSince = 0;

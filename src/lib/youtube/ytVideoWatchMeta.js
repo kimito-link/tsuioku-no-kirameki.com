@@ -595,6 +595,8 @@ function commentRecordFromEntity(entity, nowMs) {
     isCreator: author.isCreator === true,
     replyLevel: Number.isFinite(replyLevel) && replyLevel > 0 ? Math.floor(replyLevel) : (parentYtCommentId(commentId) ? 1 : 0),
     postedAtMs: parseYtCommentPublishedAtMs(props.publishedTime, nowMs),
+    // v0.1.2263: 本文も同じ記録から(DOM から読む ytVideoCommentsFromDom と同じ形にそろえる)
+    text: String(props.content?.content || '').replace(/\s+/g, ' ').trim().slice(0, 600),
   };
 }
 

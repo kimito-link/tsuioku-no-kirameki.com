@@ -1205,7 +1205,7 @@
   - `gift-coin-hq.wav`
   - `gift-register-hq.wav`
   - `gift-register.mp3`
-- 📁 **src/** (2757)
+- 📁 **src/** (2758)
   - 📁 **data/** (7)
     - 📁 **acquirers/** (2)
       - `laneFromStorage.js` — 応援レーン acquirer: chrome.storage.local(nls_comments) → laneStore の橋渡し。
@@ -1564,7 +1564,7 @@
         - `logo_funlink_white_RGB_link_black.png`
         - `logo_funlink_white_RGB_maru_black.png`
     - `hero-connect-hub.svg`
-  - 📁 **lib/** (2423)
+  - 📁 **lib/** (2424)
     - 📁 **__snapshots__/** (4)
       - `marketing-abema-baseline.html`
       - `marketing-niconico.html`
@@ -1749,7 +1749,7 @@
     - 📁 **whowatch/** (2)
       - `wwParse.js` — ふわっち(whowatch.tv)の配信とコメントを、YouTube 版の記録と同じ形にする(純関数)
       - `wwParse.test.js`
-    - 📁 **youtube/** (127)
+    - 📁 **youtube/** (128)
       - 📁 **fixtures/** (9)
         - 📁 **real-dom/** (9)
           - `README.md`
@@ -1856,6 +1856,7 @@
       - `ytUserLaneTiers.test.js`
       - `ytVenueBoot.js` — 【層】L0 判定層(純粋関数・I/O禁止)
       - `ytVenueBoot.test.js`
+      - `ytVenueStripPlayCount2263.test.js`
       - `ytVideoWatch2234.test.js`
       - `ytVideoWatch2235.test.js`
       - `ytVideoWatchCard.js` — 【層】L0 判定層(純粋関数・I/O禁止)

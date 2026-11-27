@@ -207,3 +207,20 @@ export function ytVideoWatchCardInnerHtml(model) {
     `</section>`
   );
 }
+
+/**
+ * v0.1.2263: 動画のカード(yt_video_watch_card_v1・横の欄の「この動画のデータ」と同じ正本)の再生数。
+ *   会場の帯と横の欄の数字カードは、どちらもここから読む(通常動画で帯だけ「再生」が出なかった)。
+ *   別の動画のカードや、読めていない(null)ときは null。
+ * @param {any} wrap ストレージの値 { videoId, at, card }
+ * @param {string} videoId
+ * @returns {number | null}
+ */
+export function videoCardViewCount(wrap, videoId) {
+  const vid = String(videoId || '').trim();
+  if (!vid || !wrap || typeof wrap !== 'object' || String(wrap.videoId || '') !== vid) return null;
+  const v = wrap.card?.viewCount;
+  if (v == null || v === '') return null;
+  const n = Number(v);
+  return Number.isFinite(n) && n >= 0 ? Math.floor(n) : null;
+}

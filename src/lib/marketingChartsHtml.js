@@ -728,7 +728,8 @@ function sectionLaughterDensity(laugh) {
   /** @param {number} i */
   const xOf = (i) => pad + (innerW * i) / Math.max(1, n - 1);
   const barW = Math.max(1, Math.min(8, innerW / n - 1));
-  const shown = capSeriesPoints(laugh.buckets.filter((b) => b.total > 0));
+  // ライブ(30秒ごとのまま)は今までと同じ出力。広げた列だけ、コメントの無い棒を省く。
+  const shown = bucketMs === 30_000 ? laugh.buckets : capSeriesPoints(laugh.buckets.filter((b) => b.total > 0));
   const bars = shown
     .map((b) => {
       const x = xOf(b.minute);
@@ -3155,13 +3156,21 @@ export function buildMarketingDashboardHtml(r, opts = {}) {
   // velocity / silence / laughter は MarketingReport には乗っていないので、
   // r 経由で comments 全件は取れない。代わりに r.timeline の 1 分 bucket を流用するか、
   // opts.commentsForTimeline を別経路で受ける。今回は opts.commentsForAnalytics を採用。
-  // v0.1.2263: 時間の流れの部品には、上限の幅(7日)までのコメントだけを渡す(marketingTimeSpan.js)。
+  // v0.1.2263: 1分ごとに数える部品(沈黙・疲れなど)には、上限の幅(7日)までのコメントだけを渡す(marketingTimeSpan.js)。
   //   何年にもわたる動画のコメントで、1分ごとの列が数百万になり「Invalid string length」になった。
-  const timeSpan = boundCommentsToTimeWindow(Array.isArray(opts.commentsForAnalytics) ? opts.commentsForAnalytics : []);
+  //   速さ・笑い・気分の列は点の数を自分で上限まで収める(1点の幅を広げる)ので、コメント全部を使う。
+  //   幅が7日以内(ライブ)なら、どちらも同じ配列(コピーしない・今までと同じ出力)。
+  const allCommentsRaw = /** @type {any[]} */ (Array.isArray(opts.commentsForAnalytics) ? opts.commentsForAnalytics : []);
+  const timeSpan = boundCommentsToTimeWindow(allCommentsRaw);
   const commentsRaw = /** @type {any[]} */ (timeSpan.comments);
   // ニコ生は配列をコピーしない。他サービスで応援の行があるときだけ、発言だけを分析に渡す。
   const commentsForAnalytics = view ? speechCommentsForMarketing(commentsRaw) : commentsRaw;
-  const velocityTimeline = buildCommentVelocityTimeline(commentsForAnalytics, {
+  const commentsForSeries = timeSpan.windowed
+    ? view
+      ? speechCommentsForMarketing(allCommentsRaw)
+      : allCommentsRaw
+    : commentsForAnalytics;
+  const velocityTimeline = buildCommentVelocityTimeline(commentsForSeries, {
     bucketMs: 60_000,
     rollingWindowMin: 5
   });
@@ -3169,7 +3178,7 @@ export function buildMarketingDashboardHtml(r, opts = {}) {
     thresholdMs: 60_000,
     quality: { windowMs: 30_000 }
   });
-  const laughterDensity = buildLaughterDensityTimeline(commentsForAnalytics, {
+  const laughterDensity = buildLaughterDensityTimeline(commentsForSeries, {
     bucketMs: 30_000
   });
   const commentFatigue = computeCommentFatigue(commentsForAnalytics, {
@@ -3294,9 +3303,10 @@ export function buildMarketingDashboardHtml(r, opts = {}) {
   });
   const firstSecondLatency = buildCommenterFirstSecondLatency(currentCommentsForLayer);
   const talentPeaks = detectTalentPeakMoments(currentCommentsForLayer);
-  const sentimentCurve = scoreSentimentTimeline(currentCommentsForLayer, {
-    bucketMs: 60_000
-  });
+  const sentimentCurve = scoreSentimentTimeline(
+    timeSpan.windowed ? filterBroadcaster(commentsForSeries) : currentCommentsForLayer,
+    { bucketMs: 60_000 }
+  );
   // 自コメ抜粋: selfPosted=true のもの
   const selfComments = commentsForAnalytics.filter((c) =>
     Boolean(/** @type {{ selfPosted?: any }} */ (c)?.selfPosted)
@@ -3651,7 +3661,7 @@ ${buildSectionRevealBootScriptHtml()}
 <body>
 <header class="mkt-header">
 <h1 class="mkt-header__title">📊 配信マーケティング分析</h1>
-<p class="mkt-header__sub">${escapeHtml(r.liveId)} — ${new Date().toLocaleString('ja-JP')} 出力${escapeHtml(subSuffix)}${timeSpan.windowed ? ' · 時間の流れはコメントの新しい側7日分(件数・人数は全件)' : ''} · JSON埋め込み ${escapeHtml(exportedAtIso)}</p>
+<p class="mkt-header__sub">${escapeHtml(r.liveId)} — ${new Date().toLocaleString('ja-JP')} 出力${escapeHtml(subSuffix)}${timeSpan.windowed ? ` · 速さ・笑い・気分はコメント全部を${formatBucketMsJa(velocityTimeline.bucketMs || 60_000)}ごとに、沈黙・疲れは新しい側7日分(件数・人数は全件)` : ''} · JSON埋め込み ${escapeHtml(exportedAtIso)}</p>
 </header>
 ${broadcasterProfileCardHtml}
 <main class="mkt-main">

@@ -90,6 +90,14 @@ describe('時間の流れの列の点の数の上限 (marketingTimeSpan.js)', ()
     expect(l.buckets.reduce((a, b) => a + b.total, 0)).toBe(20);
     expect(s.buckets.reduce((a, b) => a + b.total, 0)).toBe(20);
   });
+  it('7日以内(ライブ)は見出しに幅の説明を出さない(今までと同じ)', () => {
+    const t0 = NOW - 3 * 3_600_000;
+    const comments = Array.from({ length: 300 }, (_, i) => ({ id: `l${i}`, liveId: 'lv1', capturedAt: t0 + i * 30_000, text: i % 4 ? 'www' : 'こんばんは', userId: `u${i % 11}`, nickname: 'n' }));
+    const { html } = exportHtml(comments);
+    expect(html).not.toContain('新しい側7日分');
+    expect(html).toContain('水色＝1分ごとのコメ件数 / オレンジ点線＝5分移動平均');
+    expect(html).toContain('30 秒粒度で');
+  });
   it('ライブの長さなら、列は今までと同じ(1分ごと・30秒ごと)', () => {
     const t0 = NOW - 3 * 3_600_000;
     const comments = Array.from({ length: 500 }, (_, i) => ({ capturedAt: t0 + i * 20_000, text: i % 3 ? 'w' : 'a', userId: `u${i % 9}` }));
@@ -115,6 +123,7 @@ describe('YouTube 動画のマーケHTML: 長い幅のコメントでも落ち�
       expect(html.length).toBeLessThan(8_000_000);
       expect(ms).toBeLessThan(5000);
       expect(html).toContain('</html>');
+      if (days > 7) expect(html).toContain('id="mkt-velocity"');
     });
   }
 
@@ -122,17 +131,9 @@ describe('YouTube 動画のマーケHTML: 長い幅のコメントでも落ち�
     const page = JSON.parse(
       readFileSync(join(import.meta.dirname, '../youtube/fixtures/real-dom/mlfY1WYFpEc.comments-page1.json'), 'utf8')
     );
-    // 本文は同じキャプチャの commentEntityPayload から(ytVideoCommentsFromInnertube は人と時刻を返す)
-    /** @type {Map<string, string>} */
-    const textById = new Map();
-    for (const m of page.frameworkUpdates.entityBatchUpdate.mutations) {
-      const pr = m?.payload?.commentEntityPayload?.properties;
-      if (pr?.commentId) textById.set(pr.commentId, String(pr.content?.content || ''));
-    }
-    const parsed = ytVideoCommentsFromInnertube(page, { nowMs: NOW }).map((c) => ({
-      ...c,
-      text: c.text || textById.get(c.commentId) || '',
-    }));
+    // 本文は ytVideoCommentsFromInnertube が同じ記録(commentEntityPayload)から返す
+    const parsed = ytVideoCommentsFromInnertube(page, { nowMs: NOW });
+    expect(parsed.every((c) => typeof c.text === 'string' && c.text.length > 0)).toBe(true);
     const rows = videoCommentRowsForStore(parsed, { videoId: 'mlfY1WYFpEc', platform: 'youtube', nowMs: NOW });
     expect(rows.length).toBeGreaterThanOrEqual(10);
     const ats = rows.map((r) => r.recordedAt);
@@ -150,6 +151,10 @@ describe('YouTube 動画のマーケHTML: 長い幅のコメントでも落ち�
     const { html, ms } = exportHtml(comments);
     expect(html.length).toBeLessThan(8_000_000);
     expect(ms).toBeLessThan(5000);
+    // 速さ・笑い・気分はコメント全部で描く(7日の窓で消えない)・見出しの下に1点の幅を書く
+    expect(html).toContain('id="mkt-velocity"');
+    expect(html).toContain('id="mkt-sentiment"');
+    expect(html).toMatch(/速さ・笑い・気分はコメント全部を\d+(日|時間)ごとに、沈黙・疲れは新しい側7日分/);
     const yt = buildYtMarketingReportHtml({
       nowMs: NOW,
       summary: null,

@@ -40,7 +40,7 @@ describe('YouTube 動画のマーケHTML(何年にもわたるコメント)', ()
     });
     expect(html.length).toBeGreaterThan(1000);
     expect(html.length).toBeLessThan(20_000_000);
-    expect(html).toContain('時間の流れはコメントの新しい側7日分');
+    expect(html).toMatch(/速さ・笑い・気分はコメント全部を\d+(日|時間)ごとに、沈黙・疲れは新しい側7日分/);
   }, 60_000);
 
   it('時間の幅は1か所で決める: 7日以内は同じ配列のまま(ライブは変わらない)、超えると新しい側7日だけ', () => {
