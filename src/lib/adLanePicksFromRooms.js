@@ -12,6 +12,7 @@
 
 import { isNumericNicoUserId } from '../domain/user/identity.js';
 import { deriveAvatarUrlFromUid } from './deriveAvatarUrlFromUid.js';
+import { isSiteDefaultSilhouetteUrl } from './avatarFallbackFromUrl.js';
 
 /**
  * room.userKey が公式由来の数値 uid(officialDomRankingRowsToStripRooms が記名行に採用)か判定する。
@@ -68,7 +69,9 @@ export function adLanePicksFromRooms(rooms, io) {
     const uid = numericUidFromRoomKey(String(room.userKey || ''));
     if (!name && !uid) continue;
 
-    const avatarUrl = String(room.avatarUrl || '').trim();
+    // v0.1.2259: 公式の灰色の既定アイコン(blank.jpg)は顔が無いのと同じ=下の④その人ごとのゆっくり顔へ(正本=avatarFallbackFromUrl.js)
+    const avatarUrlRaw = String(room.avatarUrl || '').trim();
+    const avatarUrl = isSiteDefaultSilhouetteUrl(avatarUrlRaw) ? '' : avatarUrlRaw;
     /*
      * 解決順(2026-06-22 council/lane-show-all-active + ★v0.1.1286 で②を追加):
      *   ①公式API のサムネ(room.avatarUrl)

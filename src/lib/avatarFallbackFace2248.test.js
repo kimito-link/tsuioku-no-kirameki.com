@@ -21,9 +21,9 @@ describe('v0.1.2248 失敗したアイコンは、どのサービスでもゆっ
     expect(avatarFallbackFaceForUrl(TW)).toBe(a);
     expect(avatarFallbackFaceForUrl('https://yt3.ggpht.com/ytc/abc=s88')).not.toBe(a);
   });
-  it('空・公式の既定アイコンは空(呼び出し側の既定に任せる)', () => {
+  it('空は空(呼び出し側の既定に任せる)・公式の既定アイコンは共通のゆっくり顔(v0.1.2259: 灰色にしない)', () => {
     expect(avatarFallbackFaceForUrl('')).toBe('');
-    expect(avatarFallbackFaceForUrl(BLANK)).toBe('');
+    expect(avatarFallbackFaceForUrl(BLANK).startsWith('data:image/')).toBe(true);
   });
   it('ガード経由: Twitch の失敗 URL は blank.jpg ではなくゆっくり顔を選ぶ', () => {
     const g = createSupportAvatarLoadGuard({ fallbackSrc: BLANK, fallbackSrcFor: avatarFallbackFaceForUrl });

@@ -11,6 +11,7 @@ import {
 import { pickStrongerUserId } from './userIdPreference.js';
 import { anonymousNicknameFallback } from './nicoAnonymousDisplay.js';
 import { clampAvatarUrl } from '../shared/avatar/clampAvatarUrl.js';
+import { faceForRowKey } from './avatarFallbackFromUrl.js';
 
 /** コメント本文の上限（storage肥大化を抑制） */
 export const COMMENT_TEXT_MAX_CHARS = 1000;
@@ -83,6 +84,18 @@ export function buildDedupeKey(liveId, rec) {
   const sec = Math.floor(Number(rec.capturedAt || 0) / 1000);
   const uid = String(rec.userId ?? '').trim();
   return `${liveId}||${text}|${sec}|${uid}`;
+}
+
+/**
+ * v0.1.2259: ID の無いコメント行(興味来場など)の顔。記録の重なりの鍵(buildDedupeKey=放送・コメント番号・本文)ごとの
+ *   ゆっくり顔(全員同じ絵・灰色にしない・読み直しても同じ顔)。正本は avatarFallbackFromUrl.js の faceForRowKey。
+ * @param {unknown} liveId
+ * @param {{ commentNo?: unknown, text?: unknown, capturedAt?: unknown }|null|undefined} rec
+ * @returns {string}
+ */
+export function faceForCommentRow(liveId, rec) {
+  const lid = String(liveId || '').trim().toLowerCase();
+  return faceForRowKey(buildDedupeKey(lid, { commentNo: String(rec?.commentNo ?? ''), text: String(rec?.text || ''), capturedAt: Number(rec?.capturedAt) || 0 }));
 }
 
 function randomId() {

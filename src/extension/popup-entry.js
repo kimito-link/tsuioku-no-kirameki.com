@@ -480,7 +480,7 @@ import { buildScreenshotFilename } from '../lib/videoCapture.js';
 import { isThumbAutoEnabled, normalizeThumbIntervalMs } from '../lib/thumbSettings.js';
 import {
   buildDedupeKey,
-  normalizeCommentText
+  normalizeCommentText, faceForCommentRow
 } from '../lib/commentRecord.js';
 import { tailStorageKey } from '../lib/commentTailBuffer.js';
 import {
@@ -703,7 +703,7 @@ import { formatLaneCountOrderLine, makeLaneCountOrderState, orderLaneCandidatesB
 // 人物タイルの ID 行・名前行の正本(person-tile-unify 第3コミット)。popup と会場で共有。
 import { storyUserLaneMetaLines } from '../lib/storyUserLaneMeta.js';
 import { anonymousIdenticonDataUrl } from '../lib/anonymousIdenticon.js';
-import { avatarFallbackFaceForUrl, identiconFallbackForAvatarUrl } from '../lib/avatarFallbackFromUrl.js';
+import { avatarFallbackFaceForUrl, identiconFallbackForAvatarUrl, isSiteDefaultSilhouetteUrl, noAvatarFace } from '../lib/avatarFallbackFromUrl.js';
 import {
   bindCasterThumbElement,
   bindNeutralAvatarError,
@@ -5360,8 +5360,8 @@ function storyGrowthTileSrcForEntry(entry, liveId, entries = STORY_SOURCE_STATE.
   const uid = String(entry?.userId || '').trim();
   const raw = String(entry?.avatarUrl || '').trim();
   const merged = userLaneHttpForTilePick(uid, candidate, raw);
-  if (merged) return merged;
-  return pickSupportGrowthTileForStory(entry?.userId, '');
+  if (merged && !isSiteDefaultSilhouetteUrl(merged)) return merged; // v0.1.2259: 灰色の既定アイコンは下の顔へ。ID の無い行は記録の重なりの鍵ごとのゆっくり顔
+  return uid || !entry ? pickSupportGrowthTileForStory(entry?.userId, merged) : faceForCommentRow(entry.liveId || liveId, entry);
 }
 
 // storyUserLaneMetaLines は person-tile-unify 第3コミット(2026-06-22)で
@@ -10073,7 +10073,7 @@ function bindOnErrorHandlersWithin(root) {
       }, { once: true });
     } else if (node.dataset.onErrorFallback === 'blank') {
       node.addEventListener('error', () => {
-        try { node.src = 'https://secure-dcdn.cdn.nimg.jp/nicoaccount/usericon/defaults/blank.jpg'; } catch { /* ignore */ }
+        try { node.src = avatarFallbackFaceForUrl(node.currentSrc || node.src) || noAvatarFace() || node.src; } catch { /* ignore */ } // v0.1.2259: 灰色の既定アイコンにしない
       }, { once: true });
     }
   });

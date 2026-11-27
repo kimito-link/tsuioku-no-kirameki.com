@@ -5,7 +5,8 @@ import { join } from 'node:path';
 import { createSupportAvatarLoadGuard, sharedAvatarLoadMemory } from './supportGrowthAvatarLoad.js';
 
 const ROOT = join(__dirname, '../..');
-const FB = 'https://secure-dcdn.cdn.nimg.jp/nicoaccount/usericon/defaults/blank.jpg';
+// v0.1.2259: 灰色の既定アイコンはガードが代わりの顔に替えるので、覚えの共有の確かめには別の既定画像を使う
+const FB = 'images/fallback-face.png';
 const URL1 = 'https://static-cdn.jtvnw.net/jtv_user_pictures/a-profile_image-70x70.png';
 
 describe('v0.1.2251 顔の読み込みガードは、ページで1つの覚えを共有する', () => {
