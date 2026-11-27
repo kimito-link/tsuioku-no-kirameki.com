@@ -687,7 +687,7 @@ export function splitCreatorViewerReplies(items) {
 }
 
 /**
- * @typedef {{ id: string, name: string, kind: 'creator' | 'viewer', at: number | null }} ViewerBehaviorReply
+ * @typedef {{ id: string, name: string, kind: 'creator' | 'viewer', at: number | null, avatarUrl?: string }} ViewerBehaviorReply
  */
 
 /** @param {any} raw @returns {ViewerBehaviorReply} */
@@ -699,6 +699,8 @@ function normalizeReply(raw) {
     name: String(raw.name || raw.displayName || '').replace(/\s+/g, ' ').trim(),
     kind: isCreator ? 'creator' : 'viewer',
     at: Number.isFinite(atNum) && atNum > 0 ? Math.floor(atNum) : null,
+    // v0.1.2263: 返信した人の顔(ページにあるときだけ・https のみ)
+    ...(/^https:\/\//i.test(String(raw.avatarUrl || raw.iconUrl || '')) ? { avatarUrl: String(raw.avatarUrl || raw.iconUrl) } : {}),
   };
 }
 
@@ -848,6 +850,8 @@ export function viewerBehaviorPersonDetailInnerHtml(detail) {
   const esc = escapeViewerBehaviorHtml;
   const replyList = (/** @type {string} */ title, /** @type {any[]} */ rows) => {
     if (!rows.length) {
+      // v0.1.2263: 返信を読めないサービス(録画など)は「なし」と書かない(分からないことを「無い」にしない)
+      if (/** @type {any} */ (detail).repliesUnknown === true) return '';
       return `<div class="nlsb-person-detail__replies"><p class="nlsb-person-detail__label">${esc(title)}</p><p>なし</p></div>`;
     }
     const items = rows.map((r) => {

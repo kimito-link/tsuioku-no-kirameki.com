@@ -21,7 +21,7 @@ describe('VOD 通常動画カード', () => {
     expect(html).toContain('nlsb-viewer-behavior__detail');
     expect(html).not.toContain('視聴者の行動');
     expect(html).not.toContain('同時視聴');
-    expect(html).toContain('この動画のデータ');
+    expect(html).toContain('この録画のデータ');
   });
 
   it('ページにコメントが無いときは顔の列を出さず、会場を隠すためのカードだけ残す', () => {

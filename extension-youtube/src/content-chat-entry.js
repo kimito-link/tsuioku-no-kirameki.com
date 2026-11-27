@@ -747,6 +747,13 @@ function setupWatchPageMetaObserver() {
         ...(contentKind === 'video' && viewCount != null ? { slotViewCount: viewCount } : {}),
         ...(contentKind === 'video' && commentCount != null ? { slotCommentCount: commentCount } : {}),
         ...(contentKind === 'video' ? { videoAuthors, videoComments } : {}),
+        // v0.1.2263: 動画の投稿日・長さ(ページの世界が player から写した値。いまの動画の印のときだけ)
+        ...(contentKind === 'video' && !kindIsStale && root?.getAttribute('data-nl-yt-publish-date')
+          ? { slotPublishDate: String(root.getAttribute('data-nl-yt-publish-date')) } : {}),
+        ...(contentKind === 'video' && !kindIsStale && /^\d+$/.test(String(root?.getAttribute('data-nl-yt-length-sec') || ''))
+          ? { slotLengthSec: Number(root?.getAttribute('data-nl-yt-length-sec')) } : {}),
+        ...(contentKind === 'video' && !kindIsStale && /^\d+$/.test(String(root?.getAttribute('data-nl-yt-like-count') || ''))
+          ? { slotLikeCount: Number(root?.getAttribute('data-nl-yt-like-count')) } : {}),
       },
     });
     if (viewers === null) saveViewerProbe();

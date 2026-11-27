@@ -410,7 +410,8 @@ describe('原因4: Twitch 録画は document_idle に 0 人で書いたあと更
     const src = readFileSync(join(ROOT, 'src/extension/viewerBehaviorBoardPaint.js'), 'utf8').replace(/\/\*[\s\S]*?\*\//g, '').replace(/\/\/.*$/gm, '');
     expect(src).not.toMatch(/MutationObserver|setInterval|setTimeout|fetch\(|XMLHttpRequest/);
     const popup = readFileSync(join(ROOT, 'src/extension/popup-entry.js'), 'utf8');
-    expect(popup).toMatch(/if \(INLINE_SIDE_PANEL\) noteVideoPageTabForSidePanel\(tabs\[0\] \|\| null\)/);
+    // v0.1.2263: ツールバーのポップアップでも動画ページの照合をする(ページに埋め込んだ枠は除く)
+    expect(popup).toMatch(/if \(INLINE_SIDE_PANEL \|\| !INLINE_MODE\) noteVideoPageTabForSidePanel\(tabs\[0\] \|\| null\)/);
   });
 });
 

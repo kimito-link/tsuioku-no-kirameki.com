@@ -322,7 +322,18 @@ export function aggregateMarketingReport(comments, liveId, opts = {}) {
   const timeline = [];
   let peakMinute = 0;
   let peakMinuteCount = 0;
-  for (let m = 0; m <= durationMinutes; m++) {
+  // v0.1.2263: 動画のコメント(何年にもわたる投稿日)を書き出すと、1分ごとの列が百万を超えて
+  //   「Maximum call stack size exceeded」になった。7日を超える幅は、1分ごとの列を作らない(山の分は下で数える)。
+  const timelineMinutes = durationMinutes <= MARKETING_TIMELINE_MAX_MINUTES ? durationMinutes : -1;
+  if (timelineMinutes < 0) {
+    for (const [m, b] of bucketMap) {
+      if (b.count > peakMinuteCount || (b.count === peakMinuteCount && m < peakMinute)) {
+        peakMinute = m;
+        peakMinuteCount = b.count;
+      }
+    }
+  }
+  for (let m = 0; m <= timelineMinutes; m++) {
     const b = bucketMap.get(m);
     const count = b ? b.count : 0;
     const uniqueUsers = b ? b.uids.size : 0;
@@ -619,6 +630,9 @@ function computePremiumStats(filtered) {
       knownCount > 0 ? Math.round((premiumCount / knownCount) * 1000) / 10 : 0
   };
 }
+
+/** 1分ごとの時系列を作る最大の幅(7日)。ライブの配信はこの中に収まる。 */
+export const MARKETING_TIMELINE_MAX_MINUTES = 7 * 24 * 60;
 
 /** @param {TimelineBucket[]} timeline */
 function computeTimelineCumulative(timeline) {

@@ -15,6 +15,7 @@ import {
 import { attachRepliesToPeople, buildViewerBehaviorBoard, viewerBehaviorBoardInnerHtml } from '../viewerBehavior.js';
 import { matchVideoCommentersToLive, tallyVisibleSuperThanks } from './ytVideoWatchMeta.js';
 import { attachVideoCommentsToPeople } from '../videoWatch/videoCommentDetail.js';
+import { normalizeVideoFacts, videoFactsLineHtml } from '../videoWatch/videoFacts.js';
 import { videoCommentRowsForStore } from '../videoWatch/videoCommentRows.js';
 
 /** カードの見出し */
@@ -39,6 +40,7 @@ export const YT_VIDEO_WATCH_CARD_TITLE = 'この動画のデータ';
  *   takeHome: ReturnType<typeof formatStreamerTakeHomeDisplay> | null,
  *   behavior?: any,
  *   videoRows?: any[],
+ *   facts?: { commentTotal: number | null, publishedText: string, lengthText: string },
  * }} YtVideoWatchCardModel
  */
 
@@ -53,6 +55,7 @@ export const YT_VIDEO_WATCH_CARD_TITLE = 'この動画のデータ';
  *   spend?: any,
  *   takeHome?: any,
  *   videoComments?: readonly any[],
+ *   facts?: { commentTotal?: unknown, publishDate?: unknown, length?: unknown },
  *   nowMs?: number,
  * }} input
  * @returns {YtVideoWatchCardModel}
@@ -152,6 +155,7 @@ export function buildYtVideoWatchCardModel(input) {
     takeHome,
     behavior,
     // 会場モード・マーケHTML・コメビュが、この動画のコメントを記録の行と同じ形で読む(videoCommentRows.js)
+    facts: normalizeVideoFacts(src.facts),
     videoRows: videoCommentRowsForStore(src.videoComments, { videoId: String(src.videoId || '').trim(), platform: 'youtube' }),
   };
 }
@@ -195,6 +199,7 @@ export function ytVideoWatchCardInnerHtml(model) {
     viewerBehaviorBoardInnerHtml(model.behavior) +
     `<h2 class="nlsb-video-watch-card__title">${esc(YT_VIDEO_WATCH_CARD_TITLE)}</h2>` +
     `<p class="nlsb-video-watch-card__views"><span class="nlsb-video-watch-card__label">再生</span> ${esc(model.viewCountText)}</p>` +
+    videoFactsLineHtml(model.facts) +
     (model.recordedSummary ? `<p class="nlsb-video-watch-card__recorded">${esc(model.recordedSummary)}</p>` : '') +
     (model.matchSummary ? `<p class="nlsb-video-watch-card__match">${esc(model.matchSummary)}</p>` : '') +
     names +

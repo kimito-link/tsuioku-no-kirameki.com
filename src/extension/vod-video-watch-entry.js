@@ -68,6 +68,7 @@ function refresh() {
     ownerId: page.ownerId,
     ownerName: read.ownerName,
     videoAuthors: read.authors,
+    facts: read.facts,
     nowMs: Date.now(),
   });
   // v0.1.2263: 読めた本文の数と先頭の人も見る(本文が後から描かれたときにカードを書き直す)

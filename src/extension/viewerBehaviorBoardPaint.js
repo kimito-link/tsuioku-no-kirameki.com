@@ -238,9 +238,11 @@ export const VIDEO_WATCH_HIDE_LIVE_STATS_CSS =
   `html[${VIDEO_WATCH_ROOT_ATTR}="1"] section.nl-stats,` +
   // v0.1.2263(りんく 11-27 監査): 動画ページでは「配信ページが見つかりません」の箱と、送れないコメント欄(「watchページを開くと…」)も出さない
   `html[${VIDEO_WATCH_ROOT_ATTR}="1"] #noWatchRankingHint,` +
+  `html[${VIDEO_WATCH_ROOT_ATTR}="1"] #topSupportRankStrip,` +
   `html[${VIDEO_WATCH_ROOT_ATTR}="1"] #commentInput,` +
   `html[${VIDEO_WATCH_ROOT_ATTR}="1"] .nl-cheer-palette-wrapper,` +
-  `html[${VIDEO_WATCH_ROOT_ATTR}="1"] #postCommentBtn{display:none !important;}` +
+  `html[${VIDEO_WATCH_ROOT_ATTR}="1"] #postCommentBtn,` +
+  `html[${VIDEO_WATCH_ROOT_ATTR}="1"] #postStatus{display:none !important;}` +
   // 記録の無い録画・ニコ動の動画では、マーケHTML は作れない(行の読み口が YouTube の動画にしか無い)。押せない見た目にして「0件です」の画面を開かない
   `html[${VIDEO_WATCH_ROOT_ATTR}="1"][${VIDEO_WATCH_SOURCE_ATTR}="vod-video"] #exportMarketingQuickBtn,` +
   `html[${VIDEO_WATCH_ROOT_ATTR}="1"][${VIDEO_WATCH_SOURCE_ATTR}="niconico-video"] #exportMarketingQuickBtn{opacity:.4 !important;pointer-events:none !important;filter:grayscale(1);}`;
@@ -328,6 +330,8 @@ export function installViewerBehaviorBoardFromStorage(opts) {
    */
   let pageTabUrl = '';
   let pageTabKey = '';
+  /** 前面タブの動画のサービス(youtube / niconico / twitch …)。動画でなければ '' */
+  let pageTabService = '';
   /** @type {number|null} */
   let pageTabId = null;
 
@@ -357,7 +361,10 @@ export function installViewerBehaviorBoardFromStorage(opts) {
           // v0.1.2244: 「動画を見ている」印は、いまのページ用の動画カードを実際に塗れたときだけ付ける。
           //   YouTube のライブも /watch?v= なので URL だけでは決められない(0.1.2241 はライブでも同時視聴者数を隠していた)。
           //   動画カードは、ページ側が「動画」と判定したときにしか書かれない(ライブでは消される)。
-          applyVideoWatchRootMark(doc, !!html && !!pageTabKey, planned.source);
+          // v0.1.2263: 録画・ニコ動の URL は形だけで動画と決まる(ライブと同じ URL にならない)。カードを塗る前・塗れないときも動画の形にする。
+          //   YouTube はライブも /watch?v= なので、今までどおりページ側が「動画」と決めて書いたカードを塗れたときだけ。
+          const urlIsVideoOnly = !!pageTabKey && planned.identityKey === pageTabKey && pageTabService !== 'youtube' && pageTabService !== '';
+          applyVideoWatchRootMark(doc, (!!html && !!pageTabKey) || urlIsVideoOnly, planned.source !== 'none' ? planned.source : (urlIsVideoOnly ? (pageTabService === 'niconico' ? 'niconico-video' : 'vod-video') : ''));
           paintViewerBehaviorBoardEl({
             document: doc,
             html,
@@ -392,6 +399,7 @@ export function installViewerBehaviorBoardFromStorage(opts) {
       if (!key && !pageTabKey) return;
       const changed = key !== pageTabKey;
       pageTabKey = key;
+      pageTabService = identity ? String(identity.service || '') : '';
       pageTabUrl = key ? url : '';
       pageTabId = key && tab && typeof tab.id === 'number' ? tab.id : null;
       if (!changed) return;

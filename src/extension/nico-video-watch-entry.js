@@ -177,6 +177,7 @@ function refresh() {
         ownerName: meta.ownerName,
         recorded: { streamCount, itemCount },
         videoAuthors: authors,
+        facts: meta.facts,
         livePeople,
         historyReady: streamCount > 0 || histCount > 0,
         nowMs: Date.now(),

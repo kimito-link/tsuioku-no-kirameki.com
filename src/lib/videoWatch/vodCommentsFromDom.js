@@ -30,6 +30,7 @@ import { kickSlugOfName } from '../kick/kickChatParse.js';
  *   authors: { id: string, name: string, avatarUrl: string, postedAtMs: number, commentCount: number, commentId?: string }[],
  *   commentsFound: boolean,
  *   commentsVerified: boolean,
+ *   facts?: { commentTotal?: unknown, publishDate?: unknown, length?: unknown, likes?: unknown },
  * }} VodDomRead
  */
 
@@ -71,10 +72,22 @@ function jsonLdVideos(doc) {
   return out;
 }
 
-/** @param {any} video */
+/**
+ * JSON-LD の再生数。interactionStatistic は WatchAction の数だけ使う(いいね・コメントの数を再生数にしない・v0.1.2263)。
+ * @param {any} video
+ */
 function viewCountFromLd(video) {
-  const n = Number(video?.interactionStatistic?.userInteractionCount ?? video?.commentCount);
-  if (Number.isFinite(n) && n >= 0 && video?.interactionStatistic) return Math.floor(n);
+  const stats = video?.interactionStatistic;
+  if (stats) {
+    const list = Array.isArray(stats) ? stats : [stats];
+    for (const st of list) {
+      const type = String(st?.interactionType?.['@type'] || st?.interactionType || '');
+      if (!/WatchAction$/.test(type)) continue;
+      const n = Number(st?.userInteractionCount);
+      if (Number.isFinite(n) && n >= 0) return Math.floor(n);
+    }
+    return null;
+  }
   const views = Number(video?.interactionCount ?? video?.userInteractionCount);
   return Number.isFinite(views) && views >= 0 ? Math.floor(views) : null;
 }
@@ -85,7 +98,7 @@ function viewCountFromLd(video) {
  * @param {readonly { id: string, name: string, avatarUrl?: string, postedAtMs?: number, commentId?: string, seq?: number, text?: string, timeText?: string }[]} rows
  */
 function mergeAuthors(rows) {
-  /** @type {Map<string, { id: string, name: string, avatarUrl: string, postedAtMs: number, commentCount: number, commentId?: string, seq: number, comments?: { id: string, text: string, timeText: string }[] }>} */
+  /** @type {Map<string, { id: string, name: string, avatarUrl: string, postedAtMs: number, commentCount: number, commentId?: string, seq: number, off: number, comments?: { id: string, text: string, timeText: string }[] }>} */
   const byId = new Map();
   for (const row of rows) {
     const id = String(row.id || '').trim();
@@ -95,6 +108,7 @@ function mergeAuthors(rows) {
     const seq = Number.isFinite(Number(row.seq)) ? Number(row.seq) : -1;
     const body = text(row.text).slice(0, 600);
     const comment = body ? { id: `${id}#${seq}`, text: body, timeText: text(row.timeText).slice(0, 20) } : null;
+    const off = replayOffsetSec(row.timeText);
     if (!cur) {
       byId.set(id, {
         id,
@@ -104,12 +118,14 @@ function mergeAuthors(rows) {
         commentCount: 1,
         commentId: row.commentId ? String(row.commentId) : undefined,
         seq,
+        off,
         ...(comment ? { comments: [comment] } : {}),
       });
       continue;
     }
     cur.commentCount += 1;
     if (seq > cur.seq) cur.seq = seq;
+    if (off > cur.off) cur.off = off;
     // 新しい順(DOM の下ほど新しいので先頭に足す)
     if (comment) cur.comments = [comment, ...(cur.comments || [])].slice(0, 8);
     if (at >= cur.postedAtMs) {
@@ -120,8 +136,19 @@ function mergeAuthors(rows) {
     }
   }
   const merged = [...byId.values()];
-  merged.sort((a, b) => (Number(b.postedAtMs) || 0) - (Number(a.postedAtMs) || 0) || b.seq - a.seq);
-  return merged;
+  // 時刻が無い録画(Twitch・Kick)は、再生位置(00:19 など)の新しい順、同じなら DOM の下ほど新しい
+  merged.sort((a, b) => (Number(b.postedAtMs) || 0) - (Number(a.postedAtMs) || 0) || b.off - a.off || b.seq - a.seq);
+  return merged.map(({ off, ...rest }) => rest);
+}
+
+/**
+ * 再生位置の文字(1:02:03 / 00:19)を秒にする。無ければ -1。
+ * @param {unknown} t
+ */
+export function replayOffsetSec(t) {
+  const m = String(t || '').trim().match(/^(?:(\d{1,2}):)?(\d{1,2}):(\d{2})$/);
+  if (!m) return -1;
+  return (Number(m[1] || 0) * 3600) + Number(m[2]) * 60 + Number(m[3]);
 }
 
 /**
@@ -296,10 +323,37 @@ function readTwitcasting(doc, user) {
     title,
     ownerName: text(info.name),
     viewCount,
+    // v0.1.2263: ページに出ているコメント総数(#comment-count)。無ければ出さない
+    ...(info.stats && Number.isFinite(Number(info.stats.commentTotal)) ? { facts: { commentTotal: Number(info.stats.commentTotal) } } : {}),
     authors,
     commentsFound: authors.length > 0,
     commentsVerified: true,
   };
+}
+
+/**
+ * v0.1.2263: TikTok の動画そのもののいいね(ページが既に持つ __UNIVERSAL_DATA_FOR_REHYDRATION__ の
+ *   webapp.video-detail.itemInfo.itemStruct.stats.diggCount)。動画IDが合うときだけ。投稿者の合計(authorStats)は使わない。
+ * @param {Document | null | undefined} doc
+ * @param {string} videoId
+ * @returns {{ likes?: number, commentTotal?: number }}
+ */
+export function tiktokVideoStatsFromDoc(doc, videoId) {
+  try {
+    const el = doc?.querySelector('script#__UNIVERSAL_DATA_FOR_REHYDRATION__');
+    if (!el?.textContent) return {};
+    const data = JSON.parse(el.textContent);
+    const item = data?.__DEFAULT_SCOPE__?.['webapp.video-detail']?.itemInfo?.itemStruct;
+    if (!item || !videoId || String(item.id || '') !== String(videoId)) return {};
+    const out = {};
+    const likes = Number(item.stats?.diggCount);
+    if (Number.isFinite(likes) && likes >= 0) out.likes = Math.floor(likes);
+    const comments = Number(item.stats?.commentCount);
+    if (Number.isFinite(comments) && comments >= 0) out.commentTotal = Math.floor(comments);
+    return out;
+  } catch {
+    return {};
+  }
 }
 
 /** @param {Document | null | undefined} doc */
@@ -360,7 +414,7 @@ function readTiktokUnverified(doc) {
 
 /**
  * @param {Document | null | undefined} doc
- * @param {{ platform?: string, ownerId?: string }} page
+ * @param {{ platform?: string, ownerId?: string, videoId?: string }} page
  * @returns {VodDomRead}
  */
 export function readVodWatchDom(doc, page) {
@@ -373,8 +427,12 @@ export function readVodWatchDom(doc, page) {
   /** @type {VodDomRead['authors']} */
   let authors = [];
   let commentsVerified = false;
+  /** @type {VodDomRead['facts'] | undefined} */
+  let facts;
   if (platform === 'tiktok') {
     authors = readTiktokUnverified(doc);
+    const st = tiktokVideoStatsFromDoc(doc, String(page?.videoId || ''));
+    if (Object.keys(st).length) facts = st;
   } else if (platform === 'twitch') {
     authors = readTwitchVodReplayChat(doc);
     commentsVerified = true;
@@ -390,5 +448,6 @@ export function readVodWatchDom(doc, page) {
     authors,
     commentsFound: authors.length > 0,
     commentsVerified,
+    ...(facts ? { facts } : {}),
   };
 }

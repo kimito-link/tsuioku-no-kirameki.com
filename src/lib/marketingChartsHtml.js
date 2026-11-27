@@ -288,8 +288,8 @@ function sectionDerivedTimeline(r) {
   const cum = r.timelineCumulative;
   const roll = r.timelineRolling5Min;
   if (tl.length < 2 || cum.length !== tl.length || roll.length !== tl.length) return '';
-  const maxC = Math.max(1, ...cum);
-  const maxR = Math.max(1, ...roll);
+  const maxC = maxOfList(cum);
+  const maxR = maxOfList(roll);
   const W = 900;
   const H = 220;
   const pad = 40;
@@ -3056,6 +3056,16 @@ function buildSectionRevealScriptHtml() {
 }
 
 /**
+ * 長い列でも落ちない最大値(最小 1)。Math.max(...arr) は列が長いと「Maximum call stack size exceeded」になる。
+ * @param {ArrayLike<number>} arr
+ */
+function maxOfList(arr) {
+  let m = 1;
+  for (let i = 0; i < arr.length; i += 1) if (arr[i] > m) m = arr[i];
+  return m;
+}
+
+/**
  * @param {MarketingReport} r
  * @param {{
  *   maskShareLabels?: boolean,
@@ -4098,8 +4108,8 @@ function sectionKpi(r, gap, followerSeries, estimatedSpends) {
 function sectionTimeline(r) {
   const tl = r.timeline;
   if (tl.length < 2) return '';
-  const maxC = Math.max(1, ...tl.map((b) => b.count));
-  const maxU = Math.max(1, ...tl.map((b) => b.uniqueUsers));
+  const maxC = maxOfList(tl.map((b) => b.count));
+  const maxU = maxOfList(tl.map((b) => b.uniqueUsers));
   const W = 900;
   const H = 220;
   const pad = 40;

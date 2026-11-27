@@ -85,6 +85,25 @@ const SERVICE_PAGE = Object.freeze({
   abema: '',
 });
 
+/**
+ * v0.1.2263: 動画ページ(配信ではないページ)を、そのサービスの公式の呼び方で呼ぶ。
+ *   公式で確かめた呼び方だけ(ABEMA は「見逃し」で、録画とは呼ばない・ツイキャスは「録画」・Kick は「VOD」)。
+ *   確かめていないサービスは「動画」。TikTok の /video/ は LIVEリプレイではなく動画。
+ */
+const VIDEO_PAGE_WORD = Object.freeze({
+  youtube: '動画',
+  niconico: '動画',
+  twitcasting: '録画',
+  kick: 'VOD',
+  abema: '見逃し配信',
+  tiktok: '動画',
+});
+
+/** @param {string} platform @returns {string} */
+export function videoPageWordFor(platform) {
+  return /** @type {Record<string, string>} */ (VIDEO_PAGE_WORD)[String(platform || '').trim()] || '動画';
+}
+
 /** パーサがすでに「匿名」と書いているサービスだけ、その言葉を使う。 */
 const ANON_LABEL = new Set(['kick', 'whowatch', 'mixch', 'twitcasting']);
 

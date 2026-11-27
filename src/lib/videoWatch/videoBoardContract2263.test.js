@@ -35,6 +35,7 @@ import { exportCommentsFromStoredRows } from '../youtube/exportStoredComments.js
 import { whatsNewSiteOfLocation, whatsNewSummaryForSite, WHATS_NEW_GENERIC_SUMMARY } from '../whatsNewNotice.js';
 import { startYtPageViewerReader } from '../youtube/ytPageViewerReader.js';
 import { venueItemsForPlatform } from '../platform/platformMetrics.js';
+import { ytVideoCommentAuthorsFromDom } from '../youtube/ytVideoWatchMeta.js';
 
 const FIX = join(dirname(fileURLToPath(import.meta.url)), '../youtube/fixtures/real-dom');
 const NOW = Date.parse('2026-11-26T11:37:20+09:00');
@@ -259,5 +260,78 @@ describe('6. ページを読み直さずに動画を移っても、移った先�
     expect(root().getAttribute('data-nl-yt-is-live')).toBe('0');
     expect(root().getAttribute('data-nl-yt-is-live-content')).toBe('0');
     expect(root().getAttribute('data-nl-yt-content-kind')).toBe('video');
+  });
+});
+
+describe('7. 動画の数字(ある値だけ)と、ライブだけの枠を隠す', async () => {
+  const { normalizeVideoFacts, videoFactsLineHtml } = await import('./videoFacts.js');
+  const { VIDEO_WATCH_HIDE_LIVE_STATS_CSS } = await import('../../extension/viewerBehaviorBoardPaint.js');
+  it('コメント総数・投稿日・長さは、ある値だけ1行に出す(いいねは作らない)', () => {
+    const f = normalizeVideoFacts({ commentTotal: 2506, publishDate: '2026-11-13T05:00:00-08:00', length: 754 });
+    expect(textOf(videoFactsLineHtml(f)).trim()).toBe('コメント 2,506 件 ・ 投稿 2026/11/13 ・ 長さ 12:34');
+    expect(textOf(videoFactsLineHtml(normalizeVideoFacts({ length: 'PT320S' }))).trim()).toBe('長さ 5:20');
+    expect(videoFactsLineHtml(normalizeVideoFacts({}))).toBe('');
+    expect(videoFactsLineHtml(normalizeVideoFacts({ commentTotal: 5 }))).not.toMatch(/いいね|👍/);
+    expect(textOf(videoFactsLineHtml(normalizeVideoFacts({ likes: '179000' }))).trim()).toBe('いいね 179,000');
+  });
+  it('ニコ動・ツイキャスのカードにも出す', () => {
+    const nico = nicoVideoWatchCardInnerHtml(buildNicoVideoWatchCardModel({ videoId: 'sm9', viewCount: 1, facts: { commentTotal: 5704936, publishDate: '2007-03-06T00:33:00+09:00', length: 'PT320S' } }));
+    expect(textOf(nico)).toContain('コメント 5,704,936 件 ・ 投稿 2007/03/06 ・ 長さ 5:20');
+    const tc = vodVideoWatchCardInnerHtml(buildVodVideoWatchCardModel({ platform: 'twitcasting', videoId: 'm', facts: { commentTotal: 12 } }));
+    expect(textOf(tc)).toContain('コメント 12 件');
+  });
+  it('JSON-LD の再生数は WatchAction の数だけ(コメント数・いいねを再生数にしない)', () => {
+    const doc = docOf(`<script type="application/ld+json">${JSON.stringify({ '@type': 'VideoObject', name: 'x', commentCount: 99, interactionStatistic: [{ interactionType: 'https://schema.org/LikeAction', userInteractionCount: 7 }] })}</script>`, 'https://www.tiktok.com/@a/video/1');
+    expect(readVodWatchDom(doc, { platform: 'tiktok' }).viewCount).toBe(null);
+    const doc2 = docOf(`<script type="application/ld+json">${JSON.stringify({ '@type': 'VideoObject', name: 'x', interactionStatistic: [{ interactionType: { '@type': 'WatchAction' }, userInteractionCount: 1234 }] })}</script>`, 'https://www.tiktok.com/@a/video/1');
+    expect(readVodWatchDom(doc2, { platform: 'tiktok' }).viewCount).toBe(1234);
+  });
+  it('Kick の録画は、DOM の番号が戻っても再生位置(00:19 など)の新しい順に並ぶ', () => {
+    const line = (idx, name, t, body) => `<div data-index="${idx}"><span class="whitespace-nowrap">${t}</span><button data-prevent-expand title="${name}">${name}</button><span class="font-normal">${body}</span></div>`;
+    const doc = docOf(`<div id="chatroom-messages">${line(5, 'aaa', '00:10', 'x')}${line(1, 'bbb', '00:30', 'y')}${line(2, 'ccc', '00:20', 'z')}</div>`, 'https://kick.com/xqc/videos/01a214cb-42f8-75cd-b00f-f083ea893dfd');
+    const r = readVodWatchDom(doc, { platform: 'kick', videoId: '01a214cb-42f8-75cd-b00f-f083ea893dfd' });
+    expect(r.authors.map((a) => a.name)).toEqual(['bbb', 'ccc', 'aaa']);
+    expect(r.authors[0].comments?.[0]).toMatchObject({ text: 'y', timeText: '00:30' });
+  });
+  it('YouTube: ふつうの作者バッジや空のハートの枠では、投稿者の返信・ハートにしない', () => {
+    const doc = docOf(`<ytd-comment-thread-renderer><ytd-comment-view-model comment-id="A">
+      <a href="/channel/UCaaaaaaaaaaaaaaaaaaaaaa">a</a><yt-attributed-string id="name">a</yt-attributed-string>
+      <ytd-author-comment-badge-renderer></ytd-author-comment-badge-renderer><div id="creator-heart"></div>
+    </ytd-comment-view-model></ytd-comment-thread-renderer>
+    <ytd-comment-thread-renderer><ytd-comment-view-model comment-id="B">
+      <a href="/channel/UCbbbbbbbbbbbbbbbbbbbbbb">b</a><yt-attributed-string id="name">b</yt-attributed-string>
+      <div id="creator-heart"><ytd-creator-heart-renderer></ytd-creator-heart-renderer></div>
+    </ytd-comment-view-model><ytd-comment-replies-renderer><ytd-comment-view-model comment-id="B.r">
+      <a href="/channel/UCcccccccccccccccccccccc">owner</a><ytd-author-comment-badge-renderer creator></ytd-author-comment-badge-renderer>
+    </ytd-comment-view-model></ytd-comment-replies-renderer></ytd-comment-thread-renderer>`, 'https://www.youtube.com/watch?v=kKl0E22tU78');
+    const rows = ytVideoCommentAuthorsFromDom(doc.body);
+    const a = rows.find((r) => r.channelId === 'UCaaaaaaaaaaaaaaaaaaaaaa');
+    const b = rows.find((r) => r.channelId === 'UCbbbbbbbbbbbbbbbbbbbbbb');
+    expect(a).toMatchObject({ creatorHeart: false, creatorReply: false, pending: true });
+    expect(b).toMatchObject({ creatorHeart: true, creatorReply: true, pending: false });
+  });
+  it('録画の見出しは、そのサービスの公式の呼び方(ABEMA は見逃し・録画と呼ばない)', async () => {
+    const { vodVideoWatchCardTitle } = await import('./videoWatchCard.js');
+    expect(vodVideoWatchCardTitle('abema')).toBe('この見逃し配信のデータ');
+    expect(vodVideoWatchCardTitle('abema')).not.toContain('録画');
+    expect(vodVideoWatchCardTitle('twitcasting')).toBe('この録画のデータ');
+    expect(vodVideoWatchCardTitle('kick')).toBe('このVODのデータ');
+    expect(vodVideoWatchCardTitle('tiktok')).toBe('この動画のデータ');
+    expect(vodVideoWatchCardTitle('twitch')).toBe('この動画のデータ');
+  });
+  it('TikTok の動画のいいねは、動画IDが合う itemStruct.stats.diggCount だけ(投稿者の合計は使わない)', async () => {
+    const { tiktokVideoStatsFromDoc } = await import('./vodCommentsFromDom.js');
+    const data = { __DEFAULT_SCOPE__: { 'webapp.video-detail': { itemInfo: { itemStruct: { id: '711', stats: { diggCount: 5000, commentCount: 42 }, authorStats: { diggCount: 999999 } } } } } };
+    const doc = docOf(`<script id="__UNIVERSAL_DATA_FOR_REHYDRATION__" type="application/json">${JSON.stringify(data)}</script>`, 'https://www.tiktok.com/@a/video/711');
+    expect(tiktokVideoStatsFromDoc(doc, '711')).toEqual({ likes: 5000, commentTotal: 42 });
+    expect(tiktokVideoStatsFromDoc(doc, '999')).toEqual({});
+    expect(readVodWatchDom(doc, { platform: 'tiktok', videoId: '711' }).facts).toEqual({ likes: 5000, commentTotal: 42 });
+    // 録画(Twitch など)は、いいねを作らない
+    expect(readVodWatchDom(docOf('', 'https://www.twitch.tv/videos/1'), { platform: 'twitch', videoId: '1' }).facts).toBeUndefined();
+  });
+  it('動画の印が付いたときだけ、トップファン・配信ページなし・送れないコメント欄も隠す', () => {
+    for (const sel of ['#topSupportRankStrip', '#noWatchRankingHint', '#commentInput', '#postCommentBtn', '#postStatus', '#watchConcurrentCard', '#liveStatCards', '#nlEventStanding', 'section.nl-stats']) {
+      expect(VIDEO_WATCH_HIDE_LIVE_STATS_CSS).toContain(sel);
+    }
   });
 });

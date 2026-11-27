@@ -7,9 +7,16 @@
  *   （視聴者の行動は viewerBehavior.js。YouTube・ニコ動のカード関数は変えない）
  */
 
+import { normalizeVideoFacts, videoFactsLineHtml } from './videoFacts.js';
 import { attachRepliesToPeople, buildViewerBehaviorBoard, viewerBehaviorBoardInnerHtml } from '../viewerBehavior.js';
+import { videoPageWordFor } from '../platform/marketingPlatformPlan.js';
 
 export const VOD_VIDEO_WATCH_CARD_TITLE = 'この動画のデータ';
+
+/** @param {string} platform */
+export function vodVideoWatchCardTitle(platform) {
+  return `この${videoPageWordFor(platform)}のデータ`;
+}
 
 const PLATFORMS = new Set(['twitch', 'kick', 'twitcasting', 'abema', 'tiktok']);
 
@@ -24,6 +31,7 @@ const PLATFORMS = new Set(['twitch', 'kick', 'twitcasting', 'abema', 'tiktok']);
  *   ownerName?: string,
  *   videoAuthors?: readonly any[],
  *   videoComments?: readonly any[],
+ *   facts?: { commentTotal?: unknown, publishDate?: unknown, length?: unknown },
  *   nowMs?: number,
  * }} input
  */
@@ -79,6 +87,7 @@ export function buildVodVideoWatchCardModel(input) {
     ownerName: String(src.ownerName || '').replace(/\s+/g, ' ').trim(),
     videoAuthorCount: authors.length,
     recordedSummary,
+    facts: normalizeVideoFacts(src.facts),
     behavior,
   };
 }
@@ -98,11 +107,14 @@ export function vodVideoWatchCardInnerHtml(model) {
   const views = model.viewCountText
     ? `<p class="nlsb-video-watch-card__views"><span class="nlsb-video-watch-card__label">再生</span> ${esc(model.viewCountText)}</p>`
     : '';
+  // そのサービスの呼び方(ツイキャスは「この録画のデータ」・ABEMA は「この見逃し配信のデータ」)
+  const title = vodVideoWatchCardTitle(model.platform);
   return (
-    `<section class="nlsb-video-watch-card" data-video-id="${esc(model.videoId)}" data-platform="${esc(model.platform)}" aria-label="${esc(VOD_VIDEO_WATCH_CARD_TITLE)}">` +
+    `<section class="nlsb-video-watch-card" data-video-id="${esc(model.videoId)}" data-platform="${esc(model.platform)}" aria-label="${esc(title)}">` +
     viewerBehaviorBoardInnerHtml(model.behavior) +
-    `<h2 class="nlsb-video-watch-card__title">${esc(VOD_VIDEO_WATCH_CARD_TITLE)}</h2>` +
+    `<h2 class="nlsb-video-watch-card__title">${esc(title)}</h2>` +
     views +
+    videoFactsLineHtml(model.facts) +
     `<p class="nlsb-video-watch-card__recorded">${esc(model.recordedSummary)}</p>` +
     `</section>`
   );

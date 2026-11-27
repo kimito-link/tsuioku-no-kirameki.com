@@ -170,6 +170,15 @@ export function startYtPageViewerReader() {
     if (!root || !id) return;
     const views = viewCountInInnertube(data, id) ?? viewCountInInnertube(player, id);
     if (views != null) root.setAttribute('data-nl-yt-view-count', String(views));
+    // v0.1.2263: 動画の投稿日と長さ(プレーヤーの応答に既にある値だけ)。この動画の player のときだけ(playerFor)
+    const micro = player?.microformat?.playerMicroformatRenderer;
+    const pub = String(micro?.publishDate || micro?.uploadDate || '');
+    if (/^\d{4}-\d{2}-\d{2}/.test(pub)) root.setAttribute('data-nl-yt-publish-date', pub.slice(0, 25));
+    // v0.1.2263: 動画そのもののいいね(player の microformat.likeCount・正確な整数の文字列)。ytInitialData は探さない
+    const likes = String(micro?.likeCount ?? '');
+    if (/^\d+$/.test(likes)) root.setAttribute('data-nl-yt-like-count', likes);
+    const len = String(player?.videoDetails?.lengthSeconds || '');
+    if (/^\d+$/.test(len) && len !== '0') root.setAttribute('data-nl-yt-length-sec', len);
     const fromPlayer = ytLiveFlagsFromPlayerOrInitial(player);
     const fromData = ytLiveFlagsFromPlayerOrInitial(data);
     const isLive = fromPlayer.isLive ?? fromData.isLive;
@@ -290,6 +299,9 @@ export function startYtPageViewerReader() {
     root?.removeAttribute('data-nl-yt-is-live-content');
     root?.removeAttribute('data-nl-yt-content-kind');
     root?.removeAttribute('data-nl-yt-kind-video-id');
+    root?.removeAttribute('data-nl-yt-publish-date');
+    root?.removeAttribute('data-nl-yt-length-sec');
+    root?.removeAttribute('data-nl-yt-like-count');
     setTimeout(arm, 0);
   });
 }

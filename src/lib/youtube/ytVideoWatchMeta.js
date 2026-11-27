@@ -739,8 +739,12 @@ export function ytVideoCommentAuthorsFromDom(root, opts = {}) {
     const paidEl = queryDeep(el, '[id*="super-thanks"], [class*="super-thanks"], [class*="superThanks"], #paid-comment-chip, .paid-comment-chip');
     const paid = parseYtPaidCommentAmount({ amount: String(paidEl?.textContent || '').trim() });
     const avatarUrl = ytCommentAvatarUrlFromEl(el);
-    const creatorHeart = Boolean(queryDeep(el, '#creator-heart, ytd-creator-heart-renderer, [id*="creator-heart"], [class*="creator-heart"]'));
-    const creatorReply = Boolean(queryDeep(el, 'ytd-author-comment-badge-renderer, #author-comment-badge, [class*="author-comment-badge"]'));
+    // v0.1.2263(Codex 監査): 空の #creator-heart の枠はハートではない。描かれたハートの部品があるときだけ。
+    const creatorHeart = Boolean(queryDeep(el, '#creator-heart ytd-creator-heart-renderer, ytd-creator-heart-renderer #creator-heart-button'));
+    // 投稿者の返信は、返信の中の投稿者の印(creator 属性・channel-owner)だけ。ふつうの作者バッジ(アーティストなど)では返信扱いにしない。
+    const replyHost = typeof el.closest === 'function' && !el.closest('ytd-comment-replies-renderer')
+      ? (el.closest('ytd-comment-thread-renderer') || el) : null;
+    const creatorReply = Boolean(replyHost && queryDeep(replyHost, 'ytd-comment-replies-renderer ytd-author-comment-badge-renderer[creator], ytd-comment-replies-renderer .channel-owner'));
     const pending = !creatorHeart && !creatorReply;
     const publishedEl = queryDeep(el, '#published-time-text, #published-time-text a, .published-time-text, yt-formatted-string#published-time-text');
     const publishedText = String(publishedEl?.getAttribute?.('aria-label') || publishedEl?.getAttribute?.('title') || publishedEl?.textContent || '').trim();

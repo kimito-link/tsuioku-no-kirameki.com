@@ -15024,7 +15024,7 @@ async function refresh() {
   if (openBagRaw) lastGoodRefreshOpenBag = openBagRaw;
   const lastFocusedNormalActiveTab =
     lastFocusedNormal?.tabs?.find((t) => t?.active) ?? null;
-  if (INLINE_SIDE_PANEL) noteVideoPageTabForSidePanel(tabs[0] || null); // v0.1.2241: 前面タブを動画カードの照合へ(問い合わせは増やさない)
+  if (INLINE_SIDE_PANEL || !INLINE_MODE) noteVideoPageTabForSidePanel(tabs[0] || null); // v0.1.2241: 前面タブを動画カードの照合へ(問い合わせは増やさない)
   applySelfPostedRecentsFromBag(openBag);
   const calmOn = normalizeCalmPanelMotion(openBag[KEY_CALM_PANEL_MOTION], {
     inlineDefault: INLINE_MODE
@@ -21911,7 +21911,9 @@ if (typeof window !== 'undefined') {
 //   2235 ではコメントのたびに storage へ書き、横の欄の全体更新が走って内訳がちらつき、会場の上にも板が重なった。
 //   通常動画のサイドパネルだけ出す（ツールバーの POPUP とライブは master と同じ）。
 try {
-  if (INLINE_SIDE_PANEL) {
+  // v0.1.2263(りんく 11-27「ポップアップも動画向けに」): ツールバーのポップアップでも動画ページなら動画のカードと形にする
+  //   (ページに埋め込んだ枠は今までどおり出さない)。ライブでは動画カードが無いので何も変わらない。
+  if (INLINE_SIDE_PANEL || !INLINE_MODE) {
     installViewerBehaviorBoardFromStorage({
       document,
       storage: typeof chrome !== 'undefined' ? chrome.storage : undefined,

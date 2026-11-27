@@ -121,7 +121,7 @@ const ytViewerSampler = createYtViewerSampler({ merged: YT_MERGED });
 
 /**
  * 通常動画のカードを書いて会場へ渡す。ライブのコメント保存とは別経路。
- * @param {{ videoId: string, title?: string, viewCount?: number | null, channelId?: string, handle?: string, videoAuthors?: any[], videoComments?: any[] }} parts
+ * @param {{ videoId: string, title?: string, viewCount?: number | null, channelId?: string, handle?: string, facts?: any, videoAuthors?: any[], videoComments?: any[] }} parts
  */
 function publishVideoWatchCard(parts) {
   const videoId = String(parts?.videoId || '').trim();
@@ -154,6 +154,7 @@ function publishVideoWatchCard(parts) {
         recorded,
         videoAuthors: parts.videoAuthors || [],
         videoComments: parts.videoComments || [],
+        facts: parts.facts || {},
         livePeople,
         spend: formatEstimatedViewerSpendDisplay(spendModel),
         takeHome: formatStreamerTakeHomeDisplay('youtube', estimateStreamerTakeHomeJpy('youtube', { amounts })),
@@ -1517,6 +1518,12 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
           viewCount: typeof payload.slotViewCount === 'number' ? payload.slotViewCount : summaries[videoId]?.slotViewCount,
           channelId: summaries[videoId]?.broadcasterChannelId || payload.broadcasterChannelId || '',
           handle: summaries[videoId]?.broadcasterHandle || payload.broadcasterHandle || '',
+          facts: {
+            commentTotal: typeof payload.slotCommentCount === 'number' ? payload.slotCommentCount : summaries[videoId]?.slotCommentCount,
+            publishDate: typeof payload.slotPublishDate === 'string' ? payload.slotPublishDate : '',
+            length: typeof payload.slotLengthSec === 'number' ? payload.slotLengthSec : null,
+            likes: typeof payload.slotLikeCount === 'number' ? payload.slotLikeCount : null,
+          },
           videoAuthors: Array.isArray(payload.videoAuthors) ? payload.videoAuthors : [],
           videoComments: Array.isArray(payload.videoComments) ? payload.videoComments : [],
         });

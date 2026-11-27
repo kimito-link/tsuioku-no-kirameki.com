@@ -16,7 +16,10 @@ const threads =
   fs.readFileSync(path.join(FIX, 'kKl0E22tU78-thread-pinned-hikakin.slim.html'), 'utf8') +
   fs.readFileSync(path.join(FIX, 'kKl0E22tU78-thread-kvibaba.slim.html'), 'utf8');
 
-const player = (id, live) => ({ videoDetails: { videoId: id, isLive: live, isLiveContent: live, viewCount: '6781234' } });
+const player = (id, live) => ({
+  videoDetails: { videoId: id, isLive: live, isLiveContent: live, viewCount: '6781234', lengthSeconds: '754' },
+  microformat: { playerMicroformatRenderer: { likeCount: '12345', publishDate: '2026-11-13T05:00:00-08:00' } },
+});
 const initial = (id) => ({ currentVideoEndpoint: { watchEndpoint: { videoId: id } } });
 
 function pageHtml(id) {
@@ -85,6 +88,8 @@ test.describe('YouTube の通常動画(v0.1.2263)', () => {
     expect(hk.comments[0].likes).toBe('4597');
     expect(hk.comments[0].replyCount).toBe(54);
     expect(wrap.card.videoRows.length).toBeGreaterThan(0);
+    // 動画そのもののいいね・投稿日・長さは player の値だけ
+    expect(wrap.card.facts).toMatchObject({ likes: 12345, publishedText: '2026/11/13', lengthText: '12:34' });
     const ext = await context.newPage();
     await ext.goto(`${sw.url().replace(/\/[^/]*$/, '')}/status.html`).catch(() => {});
     const res = await ext.evaluate((vid) => chrome.runtime.sendMessage({ type: 'YT_GET_STREAM_COMMENTS', videoId: vid }), VID);
