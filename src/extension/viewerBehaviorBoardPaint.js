@@ -10,6 +10,7 @@ import { ytVideoWatchCardInnerHtml } from '../lib/youtube/ytVideoWatchCard.js';
 import { nicoVideoWatchCardInnerHtml } from '../lib/niconico/nicoVideoWatchCard.js';
 import { vodVideoWatchCardInnerHtml } from '../lib/videoWatch/videoWatchCard.js';
 import { VENUE_STAT_STRIP_CSS } from '../lib/venueStatStrip.js';
+import { summaryStorageKey } from '../lib/youtube/ytSplitPersist.js';
 
 export const VIEWER_BEHAVIOR_BOARD_EL_ID = 'nlsb-viewer-behavior-board';
 export const VIEWER_BEHAVIOR_BOARD_STYLE_ID = 'nlsb-viewer-behavior-board-style';
@@ -242,10 +243,24 @@ export const VIDEO_WATCH_HIDE_LIVE_STATS_CSS =
   `html[${VIDEO_WATCH_ROOT_ATTR}="1"] #commentInput,` +
   `html[${VIDEO_WATCH_ROOT_ATTR}="1"] .nl-cheer-palette-wrapper,` +
   `html[${VIDEO_WATCH_ROOT_ATTR}="1"] #postCommentBtn,` +
-  `html[${VIDEO_WATCH_ROOT_ATTR}="1"] #postStatus{display:none !important;}` +
-  // 記録の無い録画・ニコ動の動画では、マーケHTML は作れない(行の読み口が YouTube の動画にしか無い)。押せない見た目にして「0件です」の画面を開かない
+  `html[${VIDEO_WATCH_ROOT_ATTR}="1"] #postStatus,` +
+  `html[${VIDEO_WATCH_ROOT_ATTR}="1"] .nl-record-nav-hint{display:none !important;}` +
+  // 記録の無い録画・ニコ動の動画では、マーケHTML・スクショ・再読み込み・コメビュは、この動画を対象にできない
+  //   (どれもライブの watch・記録の行を前提にしている)。押せない見た目にして、「0件です」や前の配信の画面を開かない。
+  // 読み上げは「いま来たコメント」を読むもの。動画のコメントは過去のものなので、どの動画ページでも押せない見た目にする(ON に見えて何も読まないのをやめる)。
   `html[${VIDEO_WATCH_ROOT_ATTR}="1"][${VIDEO_WATCH_SOURCE_ATTR}="vod-video"] #exportMarketingQuickBtn,` +
-  `html[${VIDEO_WATCH_ROOT_ATTR}="1"][${VIDEO_WATCH_SOURCE_ATTR}="niconico-video"] #exportMarketingQuickBtn{opacity:.4 !important;pointer-events:none !important;filter:grayscale(1);}`;
+  `html[${VIDEO_WATCH_ROOT_ATTR}="1"][${VIDEO_WATCH_SOURCE_ATTR}="vod-video"] #devMonitorExportMarketingBtn,` +
+  `html[${VIDEO_WATCH_ROOT_ATTR}="1"][${VIDEO_WATCH_SOURCE_ATTR}="vod-video"] #captureScreenshot,` +
+  `html[${VIDEO_WATCH_ROOT_ATTR}="1"][${VIDEO_WATCH_SOURCE_ATTR}="vod-video"] #reloadWatchTabBtn,` +
+  `html[${VIDEO_WATCH_ROOT_ATTR}="1"][${VIDEO_WATCH_SOURCE_ATTR}="vod-video"] #reloadWatchTabPanelBtn,` +
+  `html[${VIDEO_WATCH_ROOT_ATTR}="1"][${VIDEO_WATCH_SOURCE_ATTR}="vod-video"] #openComeviewBtn,` +
+  `html[${VIDEO_WATCH_ROOT_ATTR}="1"][${VIDEO_WATCH_SOURCE_ATTR}="niconico-video"] #exportMarketingQuickBtn,` +
+  `html[${VIDEO_WATCH_ROOT_ATTR}="1"][${VIDEO_WATCH_SOURCE_ATTR}="niconico-video"] #devMonitorExportMarketingBtn,` +
+  `html[${VIDEO_WATCH_ROOT_ATTR}="1"][${VIDEO_WATCH_SOURCE_ATTR}="niconico-video"] #captureScreenshot,` +
+  `html[${VIDEO_WATCH_ROOT_ATTR}="1"][${VIDEO_WATCH_SOURCE_ATTR}="niconico-video"] #reloadWatchTabBtn,` +
+  `html[${VIDEO_WATCH_ROOT_ATTR}="1"][${VIDEO_WATCH_SOURCE_ATTR}="niconico-video"] #reloadWatchTabPanelBtn,` +
+  `html[${VIDEO_WATCH_ROOT_ATTR}="1"][${VIDEO_WATCH_SOURCE_ATTR}="niconico-video"] #openComeviewBtn,` +
+  `html[${VIDEO_WATCH_ROOT_ATTR}="1"] #openComeviewVoiceBtn{opacity:.4 !important;pointer-events:none !important;filter:grayscale(1);}`;
 
 /**
  * 横の欄の根元に「動画ページを見ている」印を付け外しする(印が変わるときだけ DOM を触る)。
@@ -341,7 +356,9 @@ export function installViewerBehaviorBoardFromStorage(opts) {
         paintViewerBehaviorBoardEl({ document: doc, hide: true });
         return;
       }
-      void storage.local.get([KEY_VIEWER_BEHAVIOR_BOARD, KEY_YT_VIDEO_WATCH_CARD, KEY_NICO_VIDEO_WATCH_CARD, KEY_VOD_VIDEO_WATCH_CARD, KEY_LAST_WATCH_URL]).then((/** @type {any} */ bag) => {
+      // v0.1.2263: YouTube はページ側が決めた種別(まとめの contentKind)も読む。カードを塗れたかどうかと切り離す
+      const ytSumKey = pageTabService === 'youtube' && pageTabKey ? summaryStorageKey(pageTabKey) : '';
+      void storage.local.get([KEY_VIEWER_BEHAVIOR_BOARD, KEY_YT_VIDEO_WATCH_CARD, KEY_NICO_VIDEO_WATCH_CARD, KEY_VOD_VIDEO_WATCH_CARD, KEY_LAST_WATCH_URL, ...(ytSumKey ? [ytSumKey] : [])]).then((/** @type {any} */ bag) => {
         try {
           if (opts.skipIfVideoCardId && doc.getElementById(opts.skipIfVideoCardId)) {
             paintViewerBehaviorBoardEl({ document: doc, hide: true });
@@ -364,7 +381,9 @@ export function installViewerBehaviorBoardFromStorage(opts) {
           // v0.1.2263: 録画・ニコ動の URL は形だけで動画と決まる(ライブと同じ URL にならない)。カードを塗る前・塗れないときも動画の形にする。
           //   YouTube はライブも /watch?v= なので、今までどおりページ側が「動画」と決めて書いたカードを塗れたときだけ。
           const urlIsVideoOnly = !!pageTabKey && planned.identityKey === pageTabKey && pageTabService !== 'youtube' && pageTabService !== '';
-          applyVideoWatchRootMark(doc, (!!html && !!pageTabKey) || urlIsVideoOnly, planned.source !== 'none' ? planned.source : (urlIsVideoOnly ? (pageTabService === 'niconico' ? 'niconico-video' : 'vod-video') : ''));
+          const ytSum = ytSumKey ? bag?.[ytSumKey] : null;
+          const ytKindVideo = !!ytSum && String(ytSum.videoId || '') === pageTabKey && ytSum.contentKind === 'video';
+          applyVideoWatchRootMark(doc, (!!html && !!pageTabKey) || urlIsVideoOnly || ytKindVideo, planned.source !== 'none' ? planned.source : (urlIsVideoOnly ? (pageTabService === 'niconico' ? 'niconico-video' : 'vod-video') : (ytKindVideo ? 'youtube-video' : '')));
           paintViewerBehaviorBoardEl({
             document: doc,
             html,
@@ -459,7 +478,8 @@ export function installViewerBehaviorBoardFromStorage(opts) {
   try {
     storage.onChanged?.addListener?.((/** @type {any} */ changes, /** @type {string} */ area) => {
       if (area !== 'local') return;
-      if (!changes?.[KEY_VIEWER_BEHAVIOR_BOARD] && !changes?.[KEY_YT_VIDEO_WATCH_CARD] && !changes?.[KEY_NICO_VIDEO_WATCH_CARD] && !changes?.[KEY_VOD_VIDEO_WATCH_CARD]) return;
+      const ytSumKey = pageTabService === 'youtube' && pageTabKey ? summaryStorageKey(pageTabKey) : '';
+      if (!changes?.[KEY_VIEWER_BEHAVIOR_BOARD] && !changes?.[KEY_YT_VIDEO_WATCH_CARD] && !changes?.[KEY_NICO_VIDEO_WATCH_CARD] && !changes?.[KEY_VOD_VIDEO_WATCH_CARD] && !(ytSumKey && changes?.[ytSumKey])) return;
       refresh();
     });
   } catch {

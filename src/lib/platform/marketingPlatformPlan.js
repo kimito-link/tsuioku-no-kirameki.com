@@ -87,7 +87,7 @@ const SERVICE_PAGE = Object.freeze({
 
 /**
  * v0.1.2263: 動画ページ(配信ではないページ)を、そのサービスの公式の呼び方で呼ぶ。
- *   公式で確かめた呼び方だけ(ABEMA は「見逃し」で、録画とは呼ばない・ツイキャスは「録画」・Kick は「VOD」)。
+ *   公式で確かめた呼び方だけ(muse-platform-words.md の公式確認: ABEMA は「見逃し視聴」で録画とは呼ばない・ツイキャスは「録画」・Kick は「VODs」)。
  *   確かめていないサービスは「動画」。TikTok の /video/ は LIVEリプレイではなく動画。
  */
 const VIDEO_PAGE_WORD = Object.freeze({
@@ -95,7 +95,7 @@ const VIDEO_PAGE_WORD = Object.freeze({
   niconico: '動画',
   twitcasting: '録画',
   kick: 'VOD',
-  abema: '見逃し配信',
+  abema: '見逃し視聴',
   tiktok: '動画',
 });
 

@@ -311,7 +311,7 @@ describe('7. 動画の数字(ある値だけ)と、ライブだけの枠を隠�
   });
   it('録画の見出しは、そのサービスの公式の呼び方(ABEMA は見逃し・録画と呼ばない)', async () => {
     const { vodVideoWatchCardTitle } = await import('./videoWatchCard.js');
-    expect(vodVideoWatchCardTitle('abema')).toBe('この見逃し配信のデータ');
+    expect(vodVideoWatchCardTitle('abema')).toBe('この見逃し視聴のデータ');
     expect(vodVideoWatchCardTitle('abema')).not.toContain('録画');
     expect(vodVideoWatchCardTitle('twitcasting')).toBe('この録画のデータ');
     expect(vodVideoWatchCardTitle('kick')).toBe('このVODのデータ');
@@ -332,5 +332,14 @@ describe('7. 動画の数字(ある値だけ)と、ライブだけの枠を隠�
     for (const sel of ['#topSupportRankStrip', '#noWatchRankingHint', '#commentInput', '#postCommentBtn', '#postStatus', '#watchConcurrentCard', '#liveStatCards', '#nlEventStanding', 'section.nl-stats']) {
       expect(VIDEO_WATCH_HIDE_LIVE_STATS_CSS).toContain(sel);
     }
+  });
+  it('録画・ニコ動では、対象にできないボタン(マーケHTML・スクショ・再読み込み・コメビュ)を押せない見た目に。読み上げはどの動画でも', () => {
+    for (const src of ['vod-video', 'niconico-video']) {
+      for (const b of ['exportMarketingQuickBtn', 'devMonitorExportMarketingBtn', 'captureScreenshot', 'reloadWatchTabBtn', 'reloadWatchTabPanelBtn', 'openComeviewBtn']) {
+        expect(VIDEO_WATCH_HIDE_LIVE_STATS_CSS).toContain(`="${src}"] #${b}`);
+      }
+    }
+    expect(VIDEO_WATCH_HIDE_LIVE_STATS_CSS).not.toContain('="youtube-video"] #openComeviewBtn');
+    expect(VIDEO_WATCH_HIDE_LIVE_STATS_CSS).toMatch(/="1"\] #openComeviewVoiceBtn\{opacity:\.4/);
   });
 });

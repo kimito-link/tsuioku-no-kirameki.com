@@ -104,6 +104,22 @@ describe('① 横の欄を開いたまま同じタブでページを移っても
     expect(board?.innerHTML).not.toContain('twvod:2940252213');
   });
 
+  it('v0.1.2263: YouTube はカードがまだ無くても、ページが「動画」と決めたまとめで動画の形にする。ライブのまとめなら付けない', async () => {
+    const doc = freshDoc();
+    const tab = { id: 5, windowId: 1, active: true, url: 'https://www.youtube.com/watch?v=kKl0E22tU78' };
+    const t = fakeTabs(tab);
+    const s = fakeStorage({ 'ytm:sum:v1:kKl0E22tU78': { videoId: 'kKl0E22tU78', contentKind: 'video' } });
+    installViewerBehaviorBoardFromStorage({ document: doc, storage: s.storage, getUrl: () => '', placement: 'flow', sources: 'video', tabs: t.api, windows: t.windows });
+    await flush();
+    expect(doc.documentElement.getAttribute(VIDEO_WATCH_ROOT_ATTR)).toBe('1');
+    const doc2 = freshDoc();
+    const t2 = fakeTabs({ id: 6, windowId: 1, active: true, url: 'https://www.youtube.com/watch?v=LIVE0000000' });
+    const s2 = fakeStorage({ 'ytm:sum:v1:LIVE0000000': { videoId: 'LIVE0000000', contentKind: 'live' } });
+    installViewerBehaviorBoardFromStorage({ document: doc2, storage: s2.storage, getUrl: () => '', placement: 'flow', sources: 'video', tabs: t2.api, windows: t2.windows });
+    await flush();
+    expect(doc2.documentElement.getAttribute(VIDEO_WATCH_ROOT_ATTR)).toBeNull();
+  });
+
   it('タブを切り替えたとき(onActivated)も、その前面タブで塗る。別のウィンドウのタブは見ない', async () => {
     const doc = freshDoc();
     const t = fakeTabs(null);

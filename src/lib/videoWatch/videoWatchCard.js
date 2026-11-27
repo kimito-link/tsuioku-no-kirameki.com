@@ -107,7 +107,7 @@ export function vodVideoWatchCardInnerHtml(model) {
   const views = model.viewCountText
     ? `<p class="nlsb-video-watch-card__views"><span class="nlsb-video-watch-card__label">再生</span> ${esc(model.viewCountText)}</p>`
     : '';
-  // そのサービスの呼び方(ツイキャスは「この録画のデータ」・ABEMA は「この見逃し配信のデータ」)
+  // そのサービスの呼び方(ツイキャスは「この録画のデータ」・ABEMA は「この見逃し視聴のデータ」)
   const title = vodVideoWatchCardTitle(model.platform);
   return (
     `<section class="nlsb-video-watch-card" data-video-id="${esc(model.videoId)}" data-platform="${esc(model.platform)}" aria-label="${esc(title)}">` +
