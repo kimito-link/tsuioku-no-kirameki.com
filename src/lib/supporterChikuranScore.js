@@ -7,6 +7,7 @@
  */
 
 import { isNiconicoAnonymousUserId } from './nicoAnonymousDisplay.js';
+import { isTcBroadcastScopedAnonComment, isTcBroadcastScopedAnonPersonKey } from './twitcasting/tcParse.js';
 
 export const SUPPORTER_CHIKURAN_ANONYMOUS_KEY = '__supporter_chikuran_anonymous__';
 
@@ -157,6 +158,7 @@ function isAnonymousSupporter(uid, name, raw) {
   if (!uid && (!name || /^(名無し|匿名|anonymous)$/i.test(name))) return true;
   // v0.1.1559: 匿名判定は正本(a: と、タイムシフトの a: 無し hashed 形)。内部キー(__anon_/__gift_sender_)は下で別途。
   if (isNiconicoAnonymousUserId(uid)) return true;
+  if (isTcBroadcastScopedAnonPersonKey(uid) || isTcBroadcastScopedAnonComment({ ...(raw && typeof raw === 'object' ? raw : {}), userId: uid, nickname: name })) return true;
   if (lower.startsWith('__anon_')) return true;
   if (lower.startsWith('__gift_sender_')) return true;
   return false;

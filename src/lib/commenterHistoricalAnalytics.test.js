@@ -263,3 +263,36 @@ describe('buildCommenterAttendanceMatrix', () => {
     expect(r.users[0].nickname).toBe('たろう');
   });
 });
+
+describe('ツイキャス匿名の仮IDは配信をまたいだ新規/常連に入れない', () => {
+  it('同じ「匿名コメント#1026」が別配信に現れても repeat にしない', () => {
+    const r = classifyCommentersAgainstHistory({
+      currentLiveId: 'tc.host.2',
+      currentComments: [
+        { userId: 'tc:n:匿名#1026', nickname: '匿名コメント#1026', channelId: 'tc:n:匿名#1026', badges: ['anonymous'] },
+        { userId: 'tc:en01_on', nickname: 'えン' }
+      ],
+      pastBroadcasts: [
+        bcast('tc.host.1', [
+          { userId: 'tc:n:匿名#1026', nickname: '匿名コメント#1026', count: 4 },
+          { userId: 'tc:en01_on', nickname: 'えン', count: 2 }
+        ])
+      ]
+    });
+    expect(r.totalCurrent).toBe(1);
+    expect(r.repeatCount).toBe(1);
+    expect(r.newCount).toBe(0);
+  });
+
+  it('表示名だけの行（hashed userId + 匿名コメント#N）も除外する', () => {
+    const r = classifyCommentersAgainstHistory({
+      currentLiveId: 'tc.host.2',
+      currentComments: [{ userId: '8123456789', nickname: '匿名コメント#1045' }, { userId: '1', nickname: '稲葉' }],
+      pastBroadcasts: [
+        { liveId: 'tc.host.1', comments: [{ userId: '8123456789', nickname: '匿名コメント#1045' }, { userId: '1', nickname: '稲葉' }] }
+      ]
+    });
+    expect(r.totalCurrent).toBe(1);
+    expect(r.repeatCount).toBe(1);
+  });
+});

@@ -1053,7 +1053,7 @@
     - `verify-extension.mjs` — global Buffer, URL, chrome, console
     - `verify-host.mjs` — global process, Buffer, setTimeout, clearTimeout, URL, console
     - `verify-setup.ps1`
-- 📁 **scripts/** (120)
+- 📁 **scripts/** (121)
   - 📁 **audit/** (4)
     - `dead-selector-baseline.json`
     - `make-dead-selector-baseline.mjs` — 静的デッドセレクタ監査(static-dead-selectors.mjs)の基準値(dead-selector-baseline.json)を作る/更新する。
@@ -1116,6 +1116,7 @@
   - `council-daily.mjs` — 会議ハーネスの日課を1本にまとめる（2026-09-16 新設）
   - `council-env.mjs` — 会議ハーネスに必要な env の診断と流し込み（2026-08-25 新設）
   - `council-lineup.mjs` — 会議メンバー名簿（クラウドのみ。ローカルOllamaは従来通り meeting.mjs 側の
+  - `council-roles.classify.test.js`
   - `council-roles.mjs` — 会議ハーネス共通の「役割・出力フォーマット・批判強制」定義。
   - `council-roles.stance.test.js`
   - `council-synth.mjs` — 会議の②統合（全員の回答を1案に束ねる工程）の「誰に・どの順で頼むか」を決める純粋関数。
@@ -1203,7 +1204,7 @@
   - `gift-coin-hq.wav`
   - `gift-register-hq.wav`
   - `gift-register.mp3`
-- 📁 **src/** (2743)
+- 📁 **src/** (2746)
   - 📁 **data/** (7)
     - 📁 **acquirers/** (2)
       - `laneFromStorage.js` — 応援レーン acquirer: chrome.storage.local(nls_comments) → laneStore の橋渡し。
@@ -1562,7 +1563,7 @@
         - `logo_funlink_white_RGB_link_black.png`
         - `logo_funlink_white_RGB_maru_black.png`
     - `hero-connect-hub.svg`
-  - 📁 **lib/** (2409)
+  - 📁 **lib/** (2412)
     - 📁 **__snapshots__/** (4)
       - `marketing-abema-baseline.html`
       - `marketing-niconico.html`
@@ -1701,7 +1702,11 @@
       - `ttParse.test.js`
       - `ttProto.js` — TikTok LIVE のソケットの中身(protobuf)を読む、小さな自前の読み取り(council/tiktok-support-PLAN.md)。
       - `ttProto.test.js`
-    - 📁 **twitcasting/** (4)
+    - 📁 **twitcasting/** (7)
+      - 📁 **__fixtures__/** (3)
+        - `anon-comments-5.html`
+        - `named-comments-5.html`
+        - `tc-anon-result.json`
       - `tcPageInfo.js` — ツイキャスの配信ページに出ている数と配信の情報を読む(ページの文字を読むだけ・通信しない)
       - `tcPageInfo.test.js`
       - `tcParse.js` — ツイキャス(twitcasting.tv)の配信・コメント・ギフトを、YouTube 版の記録と同じ形にする(純関数)

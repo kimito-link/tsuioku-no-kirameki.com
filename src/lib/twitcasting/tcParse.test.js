@@ -1,4 +1,7 @@
 import { describe, it, expect } from 'vitest';
+import { readFileSync } from 'node:fs';
+import { dirname, join } from 'node:path';
+import { fileURLToPath } from 'node:url';
 import {
   isTcUser,
   parseTcUserFromUrl,
@@ -17,6 +20,9 @@ import {
   isTcStreamKey,
   tcUserOfStreamKey,
   tcUserUrl,
+  isTcBroadcastScopedAnonPersonKey,
+  isTcBroadcastScopedAnonComment,
+  tcAnonPersonKeyFromName,
 } from './tcParse.js';
 import { platformOfStreamKey, platformOfPersonKey, platformChannelOfUrl, platformOfHostname, placeholderStreamKeyForChannel, STREAM_PLATFORMS } from '../platform/streamPlatform.js';
 
@@ -259,5 +265,76 @@ describe('ツイキャスの開く前のコメント(listall)', () => {
     expect(parseTcCommentList(null)).toEqual([]);
     expect(parseTcCommentList({ comments: 'x' })).toEqual([]);
     expect(parseTcCommentList([])).toEqual([]);
+  });
+});
+
+const FIXTURE_DIR = join(dirname(fileURLToPath(import.meta.url)), '__fixtures__');
+
+describe('ツイキャス匿名の公式番号', () => {
+  it('番号なしの匿名は従来どおり1つの席。c:tw* では分けない', () => {
+    const a = parseTcEvent({ ...COMMENT, isAnonymous: true, author: { id: 'c:tw2', name: '匿名コメント', screenName: 'c:tw2' } }, { user: 'a' });
+    const b = parseTcEvent({ ...COMMENT, author: { id: 'c:tw1', name: '匿名コメント', screenName: 'c:tw1' } }, { user: 'a' });
+    expect(a).toMatchObject({ channelId: 'tc:n:匿名', name: '匿名コメント', login: '', badges: ['anonymous'] });
+    expect(b?.channelId).toBe('tc:n:匿名');
+    expect(tcAnonPersonKeyFromName('匿名コメント')).toBe('tc:n:匿名');
+  });
+
+  it('公式の「匿名コメント#N」だけを席に使う。同じ番号は同じ席、違う番号は別席、同じ c:tw でも分けない', () => {
+    const a = parseTcEvent({ ...COMMENT, isAnonymous: true, id: 1, author: { id: 'c:tw3', name: '匿名コメント#1026', screenName: 'c:tw3' } }, { user: 'yuucho311' });
+    const b = parseTcEvent({ ...COMMENT, isAnonymous: true, id: 2, author: { id: 'c:tw3', name: '匿名コメント#1138', screenName: 'c:tw3' } }, { user: 'yuucho311' });
+    const c = parseTcEvent({ ...COMMENT, isAnonymous: true, id: 3, author: { id: 'c:tw1', name: '匿名コメント#1026', screenName: 'c:tw1' } }, { user: 'yuucho311' });
+    expect(a).toMatchObject({ channelId: 'tc:n:匿名#1026', name: '匿名コメント#1026', login: '', badges: ['anonymous'] });
+    expect(b).toMatchObject({ channelId: 'tc:n:匿名#1138', name: '匿名コメント#1138' });
+    expect(c?.channelId).toBe('tc:n:匿名#1026');
+    expect(isTcBroadcastScopedAnonPersonKey('tc:n:匿名#1026')).toBe(true);
+    expect(isTcBroadcastScopedAnonPersonKey('tc:n:匿名')).toBe(true);
+    expect(isTcBroadcastScopedAnonPersonKey('tc:en01_on')).toBe(false);
+  });
+
+  it('本物の c: ユーザー（c:twicas1986 等）を匿名と誤検出しない', () => {
+    const r = parseTcEvent({ ...COMMENT, author: { id: 'c:twicas1986', name: 'メイ牛山', screenName: 'c:twicas1986' } }, { user: 'a' });
+    expect(r).toMatchObject({ channelId: 'tc:c:twicas1986', name: 'メイ牛山', login: 'c:twicas1986' });
+    expect(r?.badges).toEqual([]);
+  });
+
+  it('匿名ギフト（twitcastinguest）の席は変えない', () => {
+    const r = parseTcEvent({ ...GIFT, sender: { id: 'twitcastinguest', name: '匿名さん', screenName: 'twitcastinguest' }, item: { name: '応援スター', showsSenderInfo: true }, score_items: [{ title: '🍡', text: '90' }] }, { user: 'a' });
+    expect(r).toMatchObject({ channelId: 'tc:n:匿名', name: '匿名さん', login: '' });
+  });
+
+  it('実DOMフィクスチャ（86d0c67b6・c:yuucho311）の匿名は番号で分かれ、記名は個人キーのまま', () => {
+    const raw = JSON.parse(readFileSync(join(FIXTURE_DIR, 'tc-anon-result.json'), 'utf8'));
+    const htmlAnon = readFileSync(join(FIXTURE_DIR, 'anon-comments-5.html'), 'utf8');
+    const htmlNamed = readFileSync(join(FIXTURE_DIR, 'named-comments-5.html'), 'utf8');
+    expect(htmlAnon).toContain('匿名コメント#1026');
+    expect(htmlNamed).toContain('en01_on');
+    const anons = raw.anonComments.map((row) => parseTcEvent(row, { user: 'c:yuucho311' }));
+    expect(anons.map((r) => r?.channelId)).toEqual([
+      'tc:n:匿名#1026',
+      'tc:n:匿名#1045',
+      'tc:n:匿名#1138',
+      'tc:n:匿名#1112',
+      'tc:n:匿名#1104',
+    ]);
+    expect(anons.map((r) => r?.name)).toEqual([
+      '匿名コメント#1026',
+      '匿名コメント#1045',
+      '匿名コメント#1138',
+      '匿名コメント#1112',
+      '匿名コメント#1104',
+    ]);
+    expect(new Set(anons.map((r) => r?.channelId)).size).toBe(5);
+    // 3件が同じ c:tw3 でも席は番号で分かれる
+    expect(anons.filter((r) => r && raw.anonComments[anons.indexOf(r)].author.id === 'c:tw3').map((r) => r.channelId)).toEqual([
+      'tc:n:匿名#1026',
+      'tc:n:匿名#1138',
+      'tc:n:匿名#1104',
+    ]);
+    const named = raw.namedComments.map((row) => parseTcEvent(row, { user: 'c:yuucho311' }));
+    expect(named[0]).toMatchObject({ channelId: 'tc:en01_on', name: 'えン', login: 'en01_on' });
+    expect(named[1]).toMatchObject({ channelId: 'tc:17257vavivuvevo', name: '稲葉', login: '17257VAVIVUVEVO' });
+    expect(named.every((r) => r && !r.badges.includes('anonymous'))).toBe(true);
+    expect(isTcBroadcastScopedAnonComment(anons[0])).toBe(true);
+    expect(isTcBroadcastScopedAnonComment(named[0])).toBe(false);
   });
 });
