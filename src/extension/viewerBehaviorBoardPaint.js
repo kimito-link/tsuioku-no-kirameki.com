@@ -353,7 +353,7 @@ export function installViewerBehaviorBoardFromStorage(opts) {
 
   /**
    * 横の欄が前に出しているタブの本当の URL(既存の refresh() が既に問い合わせたタブを渡してもらう)。
-   * 動画の身元が取れたときだけ入る。ライブ・知らないページでは '' のまま=照合の道は今までどおり。
+   * ライブに戻ったあとも、一つ前の動画の保存URLへ戻らないように保持する。
    */
   let pageTabUrl = '';
   let pageTabKey = '';
@@ -432,7 +432,8 @@ export function installViewerBehaviorBoardFromStorage(opts) {
       const key = identity ? identity.key : '';
       if (!url) return;
       const service = identity ? String(identity.service || '') : '';
-      const changed = key !== pageTabKey || service !== pageTabService || (!key && url !== pageTabUrl);
+      const changed = key !== pageTabKey || service !== pageTabService ||
+        (!key && !pageTabUrl && !!doc.querySelector('.nlsb-video-watch-card'));
       pageTabKey = key;
       pageTabService = service;
       pageTabUrl = url;

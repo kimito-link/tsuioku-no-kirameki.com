@@ -115,7 +115,9 @@ describe('動画の顔の列は、ライブと同じ顔の決め方を通す (0.
   });
 
   it('ニコの数値 ID は推測 URL(読み込みはガードが確かめ、失敗したら uid のゆっくり顔)', () => {
-    expect(viewerBehaviorLaneFaceSrc({ id: '12345678' })).toMatch(/usericon\/s\/1234\/12345678\.jpg$/);
+    expect(viewerBehaviorLaneFaceSrc({ id: '12345678' }, 'niconico')).toMatch(/usericon\/s\/1234\/12345678\.jpg$/);
+    expect(viewerBehaviorLaneFaceSrc({ id: '12345678' }, 'twitch')).toMatch(/^data:image\/svg/);
+    expect(viewerBehaviorLaneFaceSrc({ id: '12345678' })).toMatch(/^data:image\/svg/);
   });
 
   it('列に入る顔は空にならない', () => {
