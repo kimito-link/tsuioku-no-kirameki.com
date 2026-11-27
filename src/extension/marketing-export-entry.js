@@ -943,9 +943,9 @@ async function runExport(lid) {
     mktProf.mark('html_report');
     const liveIcons = await readLiveIconMap();
     const html = buildMarketingDashboardHtml(report, {
-      ...(marketingView ? { platform: marketingView.id, pageCount: marketingPageCount, pageFacts: marketingPageFacts } : (marketingPageFacts ? { pageFacts: marketingPageFacts } : {})),
       mediaKitHtml,
       htmlReportHtml,
+      ...(marketingView ? { platform: marketingView.id, pageCount: marketingPageCount, pageFacts: marketingPageFacts } : (marketingPageFacts ? { pageFacts: marketingPageFacts } : {})),
       programStartAtMs: Number(snapshot?.programStartAtMs || snapshot?.startAtMs) || undefined,
       followerSamples,
       maskShareLabels: maskShareLabels,

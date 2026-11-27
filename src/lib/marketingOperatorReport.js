@@ -84,7 +84,7 @@ export function operatorDisplayName(person, opts = {}) {
   const login = String(person?.login || '').trim();
   if (login && operatorLoginIsPublic(platformId, person)) return login;
   const uid = String(person?.uid || person?.userId || '').trim();
-  if (/^\d{5,14}$/.test(uid) && operatorUidIsPublicNumericId(platformId)) return `ID ${uid}`;
+  if (/^\d{3,14}$/.test(uid) && operatorUidIsPublicNumericId(platformId)) return `ID ${uid}`;
   return '名前未取得';
 }
 
