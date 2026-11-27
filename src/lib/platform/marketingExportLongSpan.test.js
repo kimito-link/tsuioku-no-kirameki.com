@@ -1,0 +1,160 @@
+/**
+ * v0.1.2263: YouTube 動画のマーケHTML「Invalid string length」の再現と予算。
+ * 動画のコメントは投稿日が「1日前」〜「19年前」にわたる。時間の流れの列(速さ・笑い・気分)が
+ * 30秒/1分ごとに何百万点にもなり、笑い密度の SVG が 15億文字を作って落ちていた。
+ */
+import { readFileSync } from 'node:fs';
+import { join } from 'node:path';
+import { describe, expect, it } from 'vitest';
+import { aggregateMarketingReport } from '../marketingAggregate.js';
+import { buildMarketingDashboardHtml } from '../marketingChartsHtml.js';
+import { buildCommentVelocityTimeline, buildLaughterDensityTimeline } from '../commentVelocityTimeline.js';
+import { scoreSentimentTimeline } from '../commenterCulturalAnalytics.js';
+import {
+  MARKETING_SERIES_MAX_BUCKETS,
+  capSeriesPoints,
+  maxOfList,
+  seriesBucketMs
+} from '../marketingTimeSpan.js';
+import { buildYtMarketingReportHtml } from '../youtube/ytReportHtml.js';
+import { ytVideoCommentsFromInnertube } from '../youtube/ytVideoWatchMeta.js';
+import { videoCommentRowsForStore } from '../videoWatch/videoCommentRows.js';
+
+const DAY = 86_400_000;
+const NOW = Date.parse('2026-11-26T10:37:00+09:00');
+const TEXTS = ['草', 'www', 'すごい', 'かわいい', 'えっ', '8888', 'なんで？', '最高', 'こんにちは', 'ワロタ'];
+
+/** @param {number} spanDays @param {number} count */
+function spreadComments(spanDays, count) {
+  const out = [];
+  for (let i = 0; i < count; i += 1) {
+    const at = NOW - Math.round((spanDays * DAY * i) / Math.max(1, count - 1));
+    out.push({
+      id: `c${i}`,
+      liveId: 'yt-video-long',
+      text: TEXTS[i % TEXTS.length],
+      userId: `UC${String(i % 37).padStart(22, 'x')}`,
+      nickname: `viewer${i % 37}`,
+      capturedAt: at,
+      ytKind: 'text',
+      ytPlatform: 'youtube',
+    });
+  }
+  return out.sort((a, b) => a.capturedAt - b.capturedAt);
+}
+
+/** 書き出しと同じ順で: 集計 → HTML。落ちず、大きさと時間が上限の中 */
+/** @param {any[]} comments */
+function exportHtml(comments) {
+  const started = performance.now();
+  const report = aggregateMarketingReport(comments, 'yt-video-long');
+  const html = buildMarketingDashboardHtml(report, { platform: 'youtube', commentsForAnalytics: comments });
+  return { html, ms: performance.now() - started };
+}
+
+describe('時間の流れの列の点の数の上限 (marketingTimeSpan.js)', () => {
+  it('ライブ(24時間まで・1分ごと / 12時間まで・30秒ごと)は今までと同じ細かさ', () => {
+    expect(seriesBucketMs(6 * 3_600_000, 60_000)).toBe(60_000);
+    expect(seriesBucketMs(23.9 * 3_600_000, 60_000)).toBe(60_000);
+    expect(seriesBucketMs(11.9 * 3_600_000, 30_000)).toBe(30_000);
+  });
+  it('何年にもわたる幅は1点の幅を広げ、点の数はいつも上限まで', () => {
+    for (const days of [2, 22, 400, 1460, 4014, 6570, 20_000]) {
+      for (const base of [30_000, 60_000]) {
+        const span = days * DAY;
+        const b = seriesBucketMs(span, base);
+        expect(Math.floor(span / b) + 1).toBeLessThanOrEqual(MARKETING_SERIES_MAX_BUCKETS);
+      }
+    }
+  });
+  it('maxOfList は百万点でも落ちない / capSeriesPoints は上限まで間引く', () => {
+    const big = new Array(2_000_000).fill(0);
+    big[1_234_567] = 42;
+    expect(maxOfList(big)).toBe(42);
+    expect(maxOfList([])).toBe(1);
+    expect(capSeriesPoints(big).length).toBe(MARKETING_SERIES_MAX_BUCKETS);
+    expect(capSeriesPoints([1, 2, 3])).toEqual([1, 2, 3]);
+  });
+  it('4つの時間の流れの関数は、どれも点の数が上限まで(18年分のコメント)', () => {
+    const comments = spreadComments(18 * 365, 20);
+    const v = buildCommentVelocityTimeline(comments, { bucketMs: 60_000 });
+    const l = buildLaughterDensityTimeline(comments, { bucketMs: 30_000 });
+    const s = scoreSentimentTimeline(comments, { bucketMs: 60_000 });
+    const r = aggregateMarketingReport(comments, 'yt-video-long');
+    expect(v.buckets.length).toBeLessThanOrEqual(MARKETING_SERIES_MAX_BUCKETS);
+    expect(l.buckets.length).toBeLessThanOrEqual(MARKETING_SERIES_MAX_BUCKETS);
+    expect(s.buckets.length).toBeLessThanOrEqual(MARKETING_SERIES_MAX_BUCKETS);
+    expect(r.timeline.length).toBeLessThanOrEqual(7 * 24 * 60 + 1);
+    expect(v.bucketMs).toBeGreaterThan(60_000);
+    expect(v.buckets.reduce((a, b) => a + b.count, 0)).toBe(20);
+    expect(l.buckets.reduce((a, b) => a + b.total, 0)).toBe(20);
+    expect(s.buckets.reduce((a, b) => a + b.total, 0)).toBe(20);
+  });
+  it('ライブの長さなら、列は今までと同じ(1分ごと・30秒ごと)', () => {
+    const t0 = NOW - 3 * 3_600_000;
+    const comments = Array.from({ length: 500 }, (_, i) => ({ capturedAt: t0 + i * 20_000, text: i % 3 ? 'w' : 'a', userId: `u${i % 9}` }));
+    const v = buildCommentVelocityTimeline(comments, { bucketMs: 60_000 });
+    const l = buildLaughterDensityTimeline(comments, { bucketMs: 30_000 });
+    expect(v.bucketMs).toBe(60_000);
+    expect(l.bucketMs).toBe(30_000);
+    expect(v.buckets.length).toBe(Math.floor((499 * 20_000) / 60_000) + 1);
+    expect(v.buckets[10].minute).toBe(10);
+  });
+});
+
+describe('YouTube 動画のマーケHTML: 長い幅のコメントでも落ちない (Invalid string length)', () => {
+  for (const [label, days, count] of /** @type {const} */ ([
+    ['22日', 22, 20],
+    ['4年', 4 * 365, 20],
+    ['11年(実データの 1日前〜11年前)', 4014, 20],
+    ['18年', 18 * 365, 200],
+  ])) {
+    it(`${label}・${count}件: 例外なし・HTML は 8MB 未満・5秒未満`, () => {
+      const comments = spreadComments(days, count);
+      const { html, ms } = exportHtml(comments);
+      expect(html.length).toBeLessThan(8_000_000);
+      expect(ms).toBeLessThan(5000);
+      expect(html).toContain('</html>');
+    });
+  }
+
+  it('公開キャプチャ mlfY1WYFpEc (1年前〜19年前) の行で、書き出しと YouTube 版レポートが落ちない', () => {
+    const page = JSON.parse(
+      readFileSync(join(import.meta.dirname, '../youtube/fixtures/real-dom/mlfY1WYFpEc.comments-page1.json'), 'utf8')
+    );
+    // 本文は同じキャプチャの commentEntityPayload から(ytVideoCommentsFromInnertube は人と時刻を返す)
+    /** @type {Map<string, string>} */
+    const textById = new Map();
+    for (const m of page.frameworkUpdates.entityBatchUpdate.mutations) {
+      const pr = m?.payload?.commentEntityPayload?.properties;
+      if (pr?.commentId) textById.set(pr.commentId, String(pr.content?.content || ''));
+    }
+    const parsed = ytVideoCommentsFromInnertube(page, { nowMs: NOW }).map((c) => ({
+      ...c,
+      text: c.text || textById.get(c.commentId) || '',
+    }));
+    const rows = videoCommentRowsForStore(parsed, { videoId: 'mlfY1WYFpEc', platform: 'youtube', nowMs: NOW });
+    expect(rows.length).toBeGreaterThanOrEqual(10);
+    const ats = rows.map((r) => r.recordedAt);
+    expect(Math.max(...ats) - Math.min(...ats)).toBeGreaterThan(15 * 365 * DAY);
+    const comments = rows.map((r) => ({
+      id: r.id,
+      liveId: 'mlfY1WYFpEc',
+      text: r.text,
+      userId: r.channelId,
+      nickname: r.name,
+      capturedAt: r.recordedAt,
+      ytKind: 'text',
+      ytPlatform: 'youtube',
+    }));
+    const { html, ms } = exportHtml(comments);
+    expect(html.length).toBeLessThan(8_000_000);
+    expect(ms).toBeLessThan(5000);
+    const yt = buildYtMarketingReportHtml({
+      nowMs: NOW,
+      summary: null,
+      items: rows.map((r) => ({ ...r, at: r.recordedAt, author: r.name, authorChannelId: r.channelId, message: r.text })),
+    });
+    expect(yt.length).toBeLessThan(2_000_000);
+  });
+});

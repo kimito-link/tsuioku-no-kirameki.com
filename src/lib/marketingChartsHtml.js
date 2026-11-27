@@ -5,7 +5,13 @@
  * @typedef {import('./eventRankingReportModel.js').EventRankingReportModel} EventRankingReportModel
  */
 
-import { boundCommentsToTimeWindow } from './marketingTimeSpan.js';
+import {
+  boundCommentsToTimeWindow,
+  capSeriesPoints,
+  formatBucketMsJa,
+  formatSeriesOffsetJa,
+  maxOfList
+} from './marketingTimeSpan.js';
 import { escapeAttr, escapeHtml } from './htmlEscape.js';
 import { maskLabelForShare } from './privacyDisplay.js';
 import { yukkuriBroadcastSummaryEmbeddedCss } from './yukkuriBroadcastSummary.js';
@@ -544,16 +550,19 @@ function sectionCommentVelocityCurve(series) {
   const pad = 40;
   const innerW = W - pad * 2;
   const innerH = H - pad * 2;
-  const n = series.buckets.length;
+  // v0.1.2263: 描く点の数も上限まで(集計側で収まっていても、描く側で二重に守る)
+  const pts = capSeriesPoints(series.buckets);
+  const n = pts.length;
   const maxV = Math.max(1, series.peakValue);
+  const step = formatBucketMsJa(series.bucketMs || 60_000);
   /** @param {number} i */
   const xOf = (i) => pad + (innerW * i) / Math.max(1, n - 1);
   /** @param {number} v */
   const yOfRaw = (v) => pad + innerH - (v / maxV) * innerH;
-  const linePts = series.buckets
+  const linePts = pts
     .map((b, i) => `${xOf(i).toFixed(1)},${yOfRaw(b.count).toFixed(1)}`)
     .join(' ');
-  const rollingPts = series.buckets
+  const rollingPts = pts
     .map((b, i) => `${xOf(i).toFixed(1)},${yOfRaw(b.rolling5).toFixed(1)}`)
     .join(' ');
   const yLabels = Array.from({ length: 5 }, (_, i) => {
@@ -563,7 +572,7 @@ function sectionCommentVelocityCurve(series) {
   }).join('');
   return `<section class="mkt-section" id="mkt-velocity">
 <h2>コメ速度カーブ（CPM）<span class="mkt-pro-tag">PRO</span></h2>
-<p class="mkt-note">水色＝1分ごとのコメ件数 / オレンジ点線＝5分移動平均。ピーク: ${series.peakMinute != null ? `${series.peakMinute}分目（${series.peakValue}件）` : '-'}</p>
+<p class="mkt-note">水色＝${step}ごとのコメ件数 / オレンジ点線＝${step === '1分' ? '5分' : '直近5点の'}移動平均。ピーク: ${series.peakMinute != null ? `${formatSeriesOffsetJa(series.peakMinute * 60_000, series.bucketMs || 60_000)}目（${series.peakValue}件）` : '-'}</p>
 <div class="mkt-chart-wrap">
 <svg viewBox="0 0 ${W} ${H}" class="mkt-svg">
 <rect x="${pad}" y="${pad}" width="${innerW}" height="${innerH}" fill="none" stroke="#334155" stroke-width="0.5"/>
@@ -619,7 +628,7 @@ function sectionCommentFatigue(fatigue, view = null) {
   const innerW = W - pad * 2;
   const innerH = H - pad * 2;
   const n = buckets.length;
-  const maxPerUser = Math.max(1, ...buckets.map((b) => b.perUser));
+  const maxPerUser = maxOfList(buckets.map((b) => b.perUser));
   /** @param {number} i */
   const xOf = (i) => pad + (innerW * i) / Math.max(1, n - 1);
   /** @param {number} v @param {number} max */
@@ -712,23 +721,24 @@ function sectionLaughterDensity(laugh) {
   const pad = 36;
   const innerW = W - pad * 2;
   const innerH = H - pad * 2;
+  // v0.1.2263: 1点の幅は集計側が決める(何年にもわたる動画のコメントは広がる)。描く点の数も上限まで、コメントの無い棒は描かない。
+  const bucketMs = laugh.bucketMs || 30_000;
   const n = laugh.buckets.length;
   const maxV = Math.max(1, laugh.peakValue);
   /** @param {number} i */
   const xOf = (i) => pad + (innerW * i) / Math.max(1, n - 1);
   const barW = Math.max(1, Math.min(8, innerW / n - 1));
-  const bars = laugh.buckets
-    .map((b, i) => {
-      const x = xOf(i);
+  const shown = capSeriesPoints(laugh.buckets.filter((b) => b.total > 0));
+  const bars = shown
+    .map((b) => {
+      const x = xOf(b.minute);
       const h = (b.count / maxV) * innerH;
-      const halfMin = Math.floor(b.minute / 2);
-      const halfSec = (b.minute % 2) * 30;
-      return `<rect x="${x.toFixed(1)}" y="${(pad + innerH - h).toFixed(1)}" width="${barW}" height="${h.toFixed(1)}" fill="#fbbf24" opacity="0.85"><title>${halfMin}分${halfSec}秒〜: 笑い ${b.count}件 / 総 ${b.total}件 (${(b.ratio * 100).toFixed(0)}%)</title></rect>`;
+      return `<rect x="${x.toFixed(1)}" y="${(pad + innerH - h).toFixed(1)}" width="${barW}" height="${h.toFixed(1)}" fill="#fbbf24" opacity="0.85"><title>${formatSeriesOffsetJa(b.minute * bucketMs, bucketMs)}〜: 笑い ${b.count}件 / 総 ${b.total}件 (${(b.ratio * 100).toFixed(0)}%)</title></rect>`;
     })
     .join('');
   return `<section class="mkt-section" id="mkt-laughter">
 <h2>笑い密度（盛り上がり指標）<span class="mkt-pro-tag">PRO</span></h2>
-<p class="mkt-note">w / 草 / 8888 / 笑 / 爆笑 / ワロタ 等の出現を 30 秒粒度で。全体の笑い比率 ${(laugh.overallRatio * 100).toFixed(1)}% / ピーク: ${laugh.peakBucket != null ? `${Math.floor(laugh.peakBucket / 2)}分${(laugh.peakBucket % 2) * 30}秒〜` : '-'}（${laugh.peakValue}件）（ラテラル分析 L4）</p>
+<p class="mkt-note">w / 草 / 8888 / 笑 / 爆笑 / ワロタ 等の出現を ${bucketMs === 30_000 ? '30 秒粒度で' : `${formatBucketMsJa(bucketMs)}ごとに`}。全体の笑い比率 ${(laugh.overallRatio * 100).toFixed(1)}% / ピーク: ${laugh.peakBucket != null ? `${formatSeriesOffsetJa(laugh.peakBucket * bucketMs, bucketMs)}〜` : '-'}（${laugh.peakValue}件）（ラテラル分析 L4）</p>
 <div class="mkt-chart-wrap">
 <svg viewBox="0 0 ${W} ${H}" class="mkt-svg">
 <rect x="${pad}" y="${pad}" width="${innerW}" height="${innerH}" fill="none" stroke="#334155" stroke-width="0.5"/>
@@ -1027,8 +1037,8 @@ function sectionRecentComparison(cmp) {
   const innerW = W - pad * 2;
   const innerH = H - pad * 2;
   const n = cmp.bars.length;
-  const maxC = Math.max(1, ...cmp.bars.map((b) => b.totalComments));
-  const maxU = Math.max(1, ...cmp.bars.map((b) => b.uniqueUsers));
+  const maxC = maxOfList(cmp.bars.map((b) => b.totalComments));
+  const maxU = maxOfList(cmp.bars.map((b) => b.uniqueUsers));
   const groupW = innerW / n;
   const barW = Math.max(2, groupW / 3 - 2);
   const bars = cmp.bars
@@ -1121,8 +1131,8 @@ function sectionOpeningFivePrediction(pts) {
   const pad = 40;
   const innerW = W - pad * 2;
   const innerH = H - pad * 2;
-  const maxX = Math.max(1, ...pts.points.map((p) => p.openingCpm));
-  const maxY = Math.max(1, ...pts.points.map((p) => p.peakCpm));
+  const maxX = maxOfList(pts.points.map((p) => p.openingCpm));
+  const maxY = maxOfList(pts.points.map((p) => p.peakCpm));
   /** @param {number} v */
   const xOf = (v) => pad + (innerW * v) / maxX;
   /** @param {number} v */
@@ -1228,7 +1238,7 @@ ${syncRows ? `<h3 style="font-size:.95rem;margin:.8rem 0 .4rem">被り瞬間（5
  */
 function sectionFirstSecondLatency(latency) {
   if (!latency || latency.totalUsers === 0) return '';
-  const max = Math.max(1, ...Object.values(latency.distribution));
+  const max = maxOfList(Object.values(latency.distribution));
   const labels = Object.keys(latency.distribution);
   const rows = labels
     .map((k) => {
@@ -1288,11 +1298,13 @@ function sectionSentimentCurve(sentiment) {
   const pad = 36;
   const innerW = W - pad * 2;
   const innerH = H - pad * 2;
-  const n = sentiment.buckets.length;
-  const maxV = Math.max(
-    1,
-    ...sentiment.buckets.flatMap((b) => [b.positive, b.negative, b.surprise, b.confusion])
-  );
+  // v0.1.2263: Math.max に列を広げて渡すと、列が長いと落ちる。最大は1回ずつ数える。描く点の数も上限まで。
+  const pts = capSeriesPoints(sentiment.buckets);
+  const n = pts.length;
+  let maxV = 1;
+  for (const b of sentiment.buckets) {
+    maxV = Math.max(maxV, b.positive, b.negative, b.surprise, b.confusion);
+  }
   /** @param {number} i */
   const xOf = (i) => pad + (innerW * i) / Math.max(1, n - 1);
   /** @param {number} v */
@@ -1300,12 +1312,12 @@ function sectionSentimentCurve(sentiment) {
   /** @param {keyof Pick<typeof sentiment.buckets[number], 'positive' | 'negative' | 'surprise' | 'confusion'>} key
    *  @param {string} color */
   const lineFor = (key, color) => {
-    const pts = sentiment.buckets.map((b, i) => `${xOf(i).toFixed(1)},${yOf(b[key]).toFixed(1)}`).join(' ');
-    return `<polyline points="${pts}" fill="none" stroke="${color}" stroke-width="2"/>`;
+    const line = pts.map((b, i) => `${xOf(i).toFixed(1)},${yOf(b[key]).toFixed(1)}`).join(' ');
+    return `<polyline points="${line}" fill="none" stroke="${color}" stroke-width="2"/>`;
   };
   return `<section class="mkt-section" id="mkt-sentiment">
 <h2>感情曲線 <span class="mkt-pro-tag">PRO</span></h2>
-<p class="mkt-note">語彙辞書ベースで「ポジ／ネガ／驚き／困惑」を 1 分粒度で時系列表示（ラテラル分析 L11）。総計：ポジ ${sentiment.totals.positive} / ネガ ${sentiment.totals.negative} / 驚き ${sentiment.totals.surprise} / 困惑 ${sentiment.totals.confusion}。</p>
+<p class="mkt-note">語彙辞書ベースで「ポジ／ネガ／驚き／困惑」を ${(sentiment.bucketMs || 60_000) === 60_000 ? '1 分粒度で' : `${formatBucketMsJa(sentiment.bucketMs)}ごとに`}時系列表示（ラテラル分析 L11）。総計：ポジ ${sentiment.totals.positive} / ネガ ${sentiment.totals.negative} / 驚き ${sentiment.totals.surprise} / 困惑 ${sentiment.totals.confusion}。</p>
 <div class="mkt-chart-wrap">
 <svg viewBox="0 0 ${W} ${H}" class="mkt-svg">
 <rect x="${pad}" y="${pad}" width="${innerW}" height="${innerH}" fill="none" stroke="#334155" stroke-width="0.5"/>
@@ -1665,7 +1677,7 @@ ${notes}
  */
 function giftLedgerSenderBarChartHtml(aggregates, maskShare, identiconResolver = undefined) {
   if (!Array.isArray(aggregates) || !aggregates.length) return '';
-  const max = Math.max(1, ...aggregates.map((s) => s.totalPoints));
+  const max = maxOfList(aggregates.map((s) => s.totalPoints));
   const rows = aggregates
     .slice(0, 12)
     .map((s) => {
@@ -1712,7 +1724,7 @@ function giftLedgerItemThumbHtml(thumbnailUrl, maskShare, size = 28) {
  */
 function giftLedgerItemBarChartHtml(aggregates, maskShare) {
   if (!Array.isArray(aggregates) || !aggregates.length) return '';
-  const max = Math.max(1, ...aggregates.map((it) => it.points));
+  const max = maxOfList(aggregates.map((it) => it.points));
   const rows = aggregates
     .slice(0, 12)
     .map((it) => {
@@ -2685,7 +2697,7 @@ function supporterChikuranSummaryLine(rows, maskShare, view = null) {
 function sectionSupporterChikuranBeta(analysis, maskShare, identiconResolver, view = null) {
   if (!analysis || !Array.isArray(analysis.rows) || analysis.rows.length === 0) return '';
   const rows = analysis.rows.slice(0, 15);
-  const maxScore = Math.max(1, ...rows.map((row) => row.totalScore || 0));
+  const maxScore = maxOfList(rows.map((row) => row.totalScore || 0));
   const giftSupporterCount = rows.filter(
     (row) => row.giftThrowCount > 0 || row.giftPointTotal > 0
   ).length;
@@ -3054,16 +3066,6 @@ function buildSectionRevealScriptHtml() {
   }
 })();
 </script>`;
-}
-
-/**
- * 長い列でも落ちない最大値(最小 1)。Math.max(...arr) は列が長いと「Maximum call stack size exceeded」になる。
- * @param {ArrayLike<number>} arr
- */
-function maxOfList(arr) {
-  let m = 1;
-  for (let i = 0; i < arr.length; i += 1) if (arr[i] > m) m = arr[i];
-  return m;
 }
 
 /**
@@ -5177,7 +5179,7 @@ ${note}
 
 /** @param {MarketingReport} r */
 function sectionHourHeatmap(r) {
-  const max = Math.max(1, ...r.hourDistribution);
+  const max = maxOfList(r.hourDistribution);
   const cells = r.hourDistribution
     .map((v, h) => {
       const intensity = v / max;

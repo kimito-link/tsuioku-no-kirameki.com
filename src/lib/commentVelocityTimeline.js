@@ -8,6 +8,8 @@
  *     w / ｗ / 草 / 8888 / 笑 / 爆笑 / ワロタ などのパターンマッチ（簡易）。
  */
 
+import { seriesBucketMs } from './marketingTimeSpan.js';
+
 /**
  * @typedef {{ capturedAt?: any, text?: any }} VelocityCommentInput
  */
@@ -26,6 +28,7 @@
  *   buckets: VelocityBucket[],
  *   peakValue: number,
  *   peakMinute: number|null,
+ *   bucketMs?: number,
  *   totalCount: number
  * }} CommentVelocityTimeline
  */
@@ -62,21 +65,24 @@ function collectValidSorted(comments) {
  * @returns {CommentVelocityTimeline}
  */
 export function buildCommentVelocityTimeline(comments, opts = {}) {
-  const bucketMs =
+  const baseBucketMs =
     typeof opts.bucketMs === 'number' && opts.bucketMs > 0 ? opts.bucketMs : 60_000;
   const rollingWindowMin =
     typeof opts.rollingWindowMin === 'number' && opts.rollingWindowMin > 0
       ? opts.rollingWindowMin
       : 5;
   const collected = collectValidSorted(comments);
-  if (!collected) return { buckets: [], peakValue: 0, peakMinute: null, totalCount: 0 };
+  if (!collected) return { buckets: [], peakValue: 0, peakMinute: null, totalCount: 0, bucketMs: baseBucketMs };
 
   const { valid, firstAt, lastAt } = collected;
+  // v0.1.2263: 何年にもわたる動画のコメントでも点の数は上限まで(1点の幅を広げる。marketingTimeSpan.js)。
+  const bucketMs = seriesBucketMs(lastAt - firstAt, baseBucketMs);
   const totalBuckets = Math.max(1, Math.floor((lastAt - firstAt) / bucketMs) + 1);
   /** @type {VelocityBucket[]} */
   const buckets = [];
   for (let m = 0; m < totalBuckets; m++) {
-    buckets.push({ minute: m, atStart: firstAt + m * bucketMs, count: 0, rolling5: 0 });
+    // minute は最初のコメントからの経過分(1点が1分なら今までと同じ番号)
+    buckets.push({ minute: Math.floor((m * bucketMs) / 60_000), atStart: firstAt + m * bucketMs, count: 0, rolling5: 0 });
   }
   for (const c of valid) {
     const idx = Math.floor((/** @type {number} */ (c.capturedAt) - firstAt) / bucketMs);
@@ -105,7 +111,7 @@ export function buildCommentVelocityTimeline(comments, opts = {}) {
     }
   }
 
-  return { buckets, peakValue, peakMinute, totalCount: valid.length };
+  return { buckets, peakValue, peakMinute, totalCount: valid.length, bucketMs };
 }
 
 /**
@@ -154,6 +160,7 @@ export function isLaughterText(text) {
  * @typedef {{
  *   buckets: LaughterBucket[],
  *   peakBucket: number|null,
+ *   bucketMs?: number,
  *   peakValue: number,
  *   totalLaughter: number,
  *   totalCount: number,
@@ -168,7 +175,7 @@ export function isLaughterText(text) {
  * @returns {LaughterDensityTimeline}
  */
 export function buildLaughterDensityTimeline(comments, opts = {}) {
-  const bucketMs =
+  const baseBucketMs =
     typeof opts.bucketMs === 'number' && opts.bucketMs > 0 ? opts.bucketMs : 30_000;
   const collected = collectValidSorted(comments);
   if (!collected) {
@@ -178,10 +185,13 @@ export function buildLaughterDensityTimeline(comments, opts = {}) {
       peakValue: 0,
       totalLaughter: 0,
       totalCount: 0,
-      overallRatio: 0
+      overallRatio: 0,
+      bucketMs: baseBucketMs
     };
   }
   const { valid, firstAt, lastAt } = collected;
+  // v0.1.2263: 30秒ごとの列が何年分(数百万)にならないよう、点の数は上限まで(marketingTimeSpan.js)。
+  const bucketMs = seriesBucketMs(lastAt - firstAt, baseBucketMs);
   const totalBuckets = Math.max(1, Math.floor((lastAt - firstAt) / bucketMs) + 1);
   /** @type {LaughterBucket[]} */
   const buckets = [];
@@ -213,6 +223,7 @@ export function buildLaughterDensityTimeline(comments, opts = {}) {
     peakValue,
     totalLaughter,
     totalCount: valid.length,
-    overallRatio: valid.length > 0 ? Math.round((totalLaughter / valid.length) * 1000) / 1000 : 0
+    overallRatio: valid.length > 0 ? Math.round((totalLaughter / valid.length) * 1000) / 1000 : 0,
+    bucketMs
   };
 }

@@ -9,6 +9,8 @@
  *   - L15 computeReachCoefficient         … 同接 / 5 分内ユニーク = "リーチ係数"
  */
 
+import { seriesBucketMs } from './marketingTimeSpan.js';
+
 /**
  * @typedef {{ capturedAt?: any, userId?: any, text?: any, selfPosted?: any }} CulturalCommentInput
  */
@@ -168,17 +170,20 @@ const SENTIMENT_LEXICON = {
  * @param {{ bucketMs?: number } | undefined} [opts]
  * @returns {{
  *   buckets: SentimentBucket[],
- *   totals: { positive: number, negative: number, surprise: number, confusion: number }
+ *   totals: { positive: number, negative: number, surprise: number, confusion: number },
+ *   bucketMs: number
  * }}
  */
 export function scoreSentimentTimeline(comments, opts = {}) {
-  const bucketMs =
+  const baseBucketMs =
     typeof opts?.bucketMs === 'number' && opts.bucketMs > 0 ? opts.bucketMs : 60_000;
   const valid = collectValid(comments || []);
   const totals = { positive: 0, negative: 0, surprise: 0, confusion: 0 };
-  if (!valid.length) return { buckets: [], totals };
+  if (!valid.length) return { buckets: [], totals, bucketMs: baseBucketMs };
   const first = valid[0].at;
   const last = valid[valid.length - 1].at;
+  // v0.1.2263: 何年にもわたる動画のコメントでも点の数は上限まで(1点の幅を広げる。marketingTimeSpan.js)。
+  const bucketMs = seriesBucketMs(last - first, baseBucketMs);
   const total = Math.max(1, Math.floor((last - first) / bucketMs) + 1);
   /** @type {SentimentBucket[]} */
   const buckets = Array.from({ length: total }, (_, m) => ({
@@ -205,7 +210,7 @@ export function scoreSentimentTimeline(comments, opts = {}) {
       }
     }
   }
-  return { buckets, totals };
+  return { buckets, totals, bucketMs };
 }
 
 /* ═══ L14: 視聴者発の人気語 TOP ═══ */
