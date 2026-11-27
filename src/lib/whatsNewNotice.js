@@ -205,3 +205,67 @@ export function checkLpWhatsNewSection(input) {
   }
   return violations;
 }
+
+/**
+ * v0.1.2263(りんく 11-27: YouTube の横の欄に「Kick の録画で…」と出ていた):
+ *   版の一言が別のサービスのことだけなら、いまの画面ではサービス名を出さない一言にする。
+ *   どのサービスの名前も無い一言・いまのサービスの名前がある一言は、そのまま。版番号と「詳しく」は今までどおり LP のその版へ。
+ */
+export const WHATS_NEW_SITE_NAMES = Object.freeze([
+  { site: 'niconico', re: /ニコ生|ニコニコ|ニコ動|niconico/i },
+  { site: 'youtube', re: /YouTube|ユーチューブ/i },
+  { site: 'twitch', re: /Twitch/i },
+  { site: 'kick', re: /Kick/ },
+  { site: 'twitcasting', re: /ツイキャス|TwitCasting/i },
+  { site: 'tiktok', re: /TikTok/i },
+  { site: 'abema', re: /ABEMA/i },
+  { site: 'whowatch', re: /ふわっち/ },
+  { site: 'showroom', re: /SHOWROOM/i },
+  { site: 'mixch', re: /ミクチャ/ },
+]);
+
+/** 別のサービスのことだけのときに代わりに出す一言 */
+export const WHATS_NEW_GENERIC_SUMMARY = 'ほかのサービス向けの直しです。くわしくは「詳しく」から';
+
+/**
+ * @param {unknown} summary 版の一言
+ * @param {unknown} site いまの画面のサービス(youtube / niconico / twitch …)。分からなければ ''
+ * @param {readonly unknown[] | null | undefined} [platforms] 版のサービスの印(changelog.js の platforms)。無ければ本文で決める
+ * @returns {string}
+ */
+export function whatsNewSummaryForSite(summary, site, platforms) {
+  const text = String(summary || '');
+  const cur = String(site || '').trim().toLowerCase();
+  if (!text || !cur) return text;
+  // 版にサービスの印(platforms: ['kick'] など)があれば、それで決める。印の無い版は本文のサービス名で決める。
+  if (Array.isArray(platforms) && platforms.length) {
+    return platforms.map((x) => String(x).toLowerCase()).includes(cur) ? text : WHATS_NEW_GENERIC_SUMMARY;
+  }
+  const named = WHATS_NEW_SITE_NAMES.filter((n) => n.re.test(text)).map((n) => n.site);
+  if (!named.length || named.includes(cur)) return text;
+  return WHATS_NEW_GENERIC_SUMMARY;
+}
+
+/**
+ * 横の欄・ポップアップの URL から、いまの画面のサービスを読む(YouTube 版の画面は &site= か &stream=<サービス>:…)。
+ * @param {{ pathname?: string, search?: string } | null | undefined} loc
+ * @returns {string}
+ */
+export function whatsNewSiteOfLocation(loc) {
+  const path = String(loc?.pathname || '');
+  const search = String(loc?.search || '');
+  if (!/yt-sidepanel\.html|yt-comeview\.html|yt-venue\.html/.test(path)) {
+    return /\/(popup|sidepanel)\.html$/.test(path) ? 'niconico' : '';
+  }
+  try {
+    const q = new URLSearchParams(search);
+    const site = String(q.get('site') || '').trim().toLowerCase();
+    if (site) return site;
+    const stream = String(q.get('stream') || '');
+    const m = stream.match(/^([a-z]+):/);
+    if (m) return m[1] === 'yt' ? 'youtube' : m[1];
+  } catch {
+    /* 読めなければ分からないまま */
+  }
+  return '';
+}

@@ -50,6 +50,8 @@ export function buildVodVideoWatchCardModel(input) {
     creatorReplies: a?.creatorReplies,
     viewerReplies: a?.viewerReplies,
     replies: a?.replies,
+    // v0.1.2263: 再生チャットで読めた本文(タップで「何を書いたか」)。読めなければ無い
+    ...(Array.isArray(a?.comments) && a.comments.length ? { comments: a.comments } : {}),
   })), src.videoComments);
   const behavior = buildViewerBehaviorBoard({
     visiblePeople,
@@ -60,9 +62,10 @@ export function buildVodVideoWatchCardModel(input) {
     platform,
     contentKind: 'video',
   });
-  let recordedSummary = 'この配信者の配信を、このPCではまだ記録していません。配信を開いて記録すると、動画のコメント欄と照合できます。';
+  // v0.1.2263(りんく 11-27「…まだ記録していません。…」は動画ページで否定から入って読める): 否定の言い方をやめる
+  let recordedSummary = `いま見えているコメントの投稿者は ${authors.length.toLocaleString('ja-JP')} 人です。`;
   if (authors.length === 0) {
-    recordedSummary = 'このページの表示の中に、いま読めるコメントの投稿者はまだありません。コメント欄が読み込まれていれば、顔の列に出します。';
+    recordedSummary = 'コメント欄が読み込まれると、ここに書いた人が並びます。';
   }
   return {
     videoId: String(src.pageKey || src.videoId || '').trim(),

@@ -283,7 +283,7 @@ describe('原因3/6: 動画ページでは横の欄の同時視聴・来場・�
     expect(html).not.toMatch(/0 回/);
     expect(html).not.toMatch(/読み込み中/);
     expect(html).not.toMatch(/同時視聴/);
-    expect(html).toMatch(/いま読めるコメントの投稿者はまだありません/);
+    expect(html).toMatch(/コメント欄が読み込まれると、ここに書いた人が並びます/);
   });
 });
 

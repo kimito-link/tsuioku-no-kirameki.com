@@ -27,7 +27,7 @@
 
 > 値が次の段へ届かない「断線」(broadcaster バグ型)は `npm run feature-map -- --check` が機械検知。
 
-## ⚠️ 役割コメントが無いソース 15 / 1395 件
+## ⚠️ 役割コメントが無いソース 15 / 1397 件
 - `docs/handoff/bench/bench-interval.mjs`
 - `docs/handoff/bench/bench-lane.mjs`
 - `extension-youtube/cloak-failsafe.js`
@@ -1204,7 +1204,7 @@
   - `gift-coin-hq.wav`
   - `gift-register-hq.wav`
   - `gift-register.mp3`
-- 📁 **src/** (2750)
+- 📁 **src/** (2753)
   - 📁 **data/** (7)
     - 📁 **acquirers/** (2)
       - `laneFromStorage.js` — 応援レーン acquirer: chrome.storage.local(nls_comments) → laneStore の橋渡し。
@@ -1563,7 +1563,7 @@
         - `logo_funlink_white_RGB_link_black.png`
         - `logo_funlink_white_RGB_maru_black.png`
     - `hero-connect-hub.svg`
-  - 📁 **lib/** (2416)
+  - 📁 **lib/** (2419)
     - 📁 **__snapshots__/** (4)
       - `marketing-abema-baseline.html`
       - `marketing-niconico.html`
@@ -1720,7 +1720,7 @@
       - `twIrcParse.test.js`
       - `twShim.test.js`
       - `twStreamKey.js` — Twitch の「配信キー」(YouTube 版の videoId の位置に入る文字列)の作り方と読み方(純関数)
-    - 📁 **videoWatch/** (17)
+    - 📁 **videoWatch/** (20)
       - 📁 **fixtures/** (2)
         - `twitcasting-movie-843232645-comment-items.slim.html`
         - `twitch-vod-2940252213-replay-chat.slim.html`
@@ -1728,6 +1728,9 @@
       - `kickVodReplay2247.test.js`
       - `twVodLiveIcons.js` — v0.1.2253: Twitch の録画チャットには顔の画像が無い(実測 DOM)。ライブの Twitch でこの PC が覚えた顔
       - `twVodLiveIcons2253.test.js`
+      - `videoBoardContract2263.test.js`
+      - `videoCommentDetail.js` — 【層】L0 判定層(純粋関数・I/O禁止)
+      - `videoCommentRows.js` — 【層】L0 判定層(純粋関数・I/O禁止)
       - `videoIdentity.js` — 【層】L0 判定層(純粋関数・I/O禁止)
       - `videoIdentity2241.test.js`
       - `videoPanel2244.test.js`
@@ -4044,13 +4047,13 @@
     - `yozora-small-yell.mp3`
   - `build-globals.d.ts` — ビルド時に esbuild の `define` で注入される定数の型宣言。
   - `speech-recognition-globals.d.ts` — Web Speech API（Chrome は webkit 接頭辞のことがある）
-- 📁 **tests/** (103)
+- 📁 **tests/** (104)
   - 📁 **contract/** (4)
     - `contentEntryFunctionBudget.test.js`
     - `layer-dependency.test.js`
     - `popupEntryFunctionBudget.test.js`
     - `wiringTestSource.test.js`
-  - 📁 **e2e/** (96)
+  - 📁 **e2e/** (97)
     - 📁 **fixtures/** (2)
       - 📁 **watch/** (1)
         - 📁 **lv888888888/** (1)
@@ -4150,6 +4153,7 @@
     - `watch-messaging.spec.js`
     - `whowatch-recording.spec.js`
     - `youtube-concurrent-viewers.spec.js`
+    - `youtube-video-board-2263.spec.js`
   - 📁 **helpers/** (3)
     - `laneCssSource.js` — laneCssSource — 応援レーン(タイル)CSS を3ファイル(popup.html / venueBar.js / app/live-view.html)から
     - `laneImportContract.js` — 応援レーンの「輸入契約」(テスト専用の定数・実装コードは import しない)。

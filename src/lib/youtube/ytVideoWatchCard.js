@@ -14,6 +14,8 @@ import {
 } from '../estimatedViewerSpend.js';
 import { attachRepliesToPeople, buildViewerBehaviorBoard, viewerBehaviorBoardInnerHtml } from '../viewerBehavior.js';
 import { matchVideoCommentersToLive, tallyVisibleSuperThanks } from './ytVideoWatchMeta.js';
+import { attachVideoCommentsToPeople } from '../videoWatch/videoCommentDetail.js';
+import { videoCommentRowsForStore } from '../videoWatch/videoCommentRows.js';
 
 /** カードの見出し */
 export const YT_VIDEO_WATCH_CARD_TITLE = 'この動画のデータ';
@@ -36,6 +38,7 @@ export const YT_VIDEO_WATCH_CARD_TITLE = 'この動画のデータ';
  *   spend: ReturnType<typeof formatEstimatedViewerSpendDisplay> | null,
  *   takeHome: ReturnType<typeof formatStreamerTakeHomeDisplay> | null,
  *   behavior?: any,
+ *   videoRows?: any[],
  * }} YtVideoWatchCardModel
  */
 
@@ -67,7 +70,9 @@ export function buildYtVideoWatchCardModel(input) {
   const thanks = tallyVisibleSuperThanks(src.videoAuthors || []);
   const spend = src.spend || formatEstimatedViewerSpendDisplay(estimateYoutubeSupportSpendJpy(thanks.amounts));
   const takeHome = src.takeHome || formatStreamerTakeHomeDisplay('youtube', estimateStreamerTakeHomeJpy('youtube', { amounts: thanks.amounts }));
-  let recordedSummary = 'このチャンネルの配信を、このPCではまだ記録していません。配信を開いて記録すると、動画のコメント欄と照合できます。';
+  // v0.1.2263: 動画ページで「まだ記録していません」と否定から入らない(りんく 11-27「youtubeなのにこちらの配信を記録してないとか」)。
+  //   配信の記録があるときだけ、その事実を1行。無いときは何も出さない(この動画のコメントと人が主役)。
+  let recordedSummary = '';
   if (streamCount > 0) {
     recordedSummary = `このチャンネルの配信を、このPCで ${streamCount.toLocaleString('ja-JP')} 本記録しています（コメント合計 ${itemCount.toLocaleString('ja-JP')} 件）。`;
   }
@@ -79,13 +84,11 @@ export function buildYtVideoWatchCardModel(input) {
     if (id) shownAuthorIds.add(id);
   }
   const videoAuthorCount = Math.max(overlap.videoAuthorCount, shownAuthorIds.size);
-  let matchSummary = 'いま見えているコメントから、配信でも見かけた人を照合します。';
+  let matchSummary = '';
   if (videoAuthorCount === 0) {
-    matchSummary = streamCount > 0
-      ? 'いま見えている範囲に、照合できるコメントの投稿者はまだありません。コメント欄が読み込まれると更新します。'
-      : '配信の記録があると、この動画のコメント欄にいる人と照合できます。';
+    matchSummary = 'コメント欄が読み込まれると、ここに書いた人が並びます。';
   } else if (streamCount === 0) {
-    matchSummary = `いま見えているコメントの投稿者は ${videoAuthorCount.toLocaleString('ja-JP')} 人です。このチャンネルの配信を記録すると、配信でもコメントしているか照合できます。`;
+    matchSummary = `いま見えているコメントの投稿者は ${videoAuthorCount.toLocaleString('ja-JP')} 人です。`;
   } else if (overlap.matchedCount === 0) {
     matchSummary = `いま見えている ${videoAuthorCount.toLocaleString('ja-JP')} 人のうち、このチャンネルの配信でもコメントしていた人はまだ見つかりません。`;
   } else {
@@ -113,9 +116,14 @@ export function buildYtVideoWatchCardModel(input) {
       creatorReplies: a?.creatorReplies,
       viewerReplies: a?.viewerReplies,
       replies: a?.replies,
+      channelId: String(a?.channelId || '').trim(),
+      handle: String(a?.handle || '').trim(),
+      channelUrl: ytChannelUrlOf(a),
     })), src.videoComments);
+  // v0.1.2263: サムネイルを押したときに出す「この動画で書いたこと」(本文・いいね・返信)。ページの行だけ・作らない。
+  const peopleWithComments = attachVideoCommentsToPeople(visiblePeople, src.videoComments);
   const behavior = buildViewerBehaviorBoard({
-    visiblePeople,
+    visiblePeople: peopleWithComments,
     historyById: livePeople,
     historyReady: streamCount > 0 || histCount > 0,
     nowMs: src.nowMs,
@@ -143,7 +151,17 @@ export function buildYtVideoWatchCardModel(input) {
     spend,
     takeHome,
     behavior,
+    // 会場モード・マーケHTML・コメビュが、この動画のコメントを記録の行と同じ形で読む(videoCommentRows.js)
+    videoRows: videoCommentRowsForStore(src.videoComments, { videoId: String(src.videoId || '').trim(), platform: 'youtube' }),
   };
+}
+
+/** @param {any} a @returns {string} */
+function ytChannelUrlOf(a) {
+  const ch = String(a?.channelId || '').trim();
+  if (/^UC[A-Za-z0-9_-]{22}$/.test(ch)) return `https://www.youtube.com/channel/${ch}`;
+  const h = String(a?.handle || (String(a?.id || '').startsWith('@') ? a.id : '')).trim();
+  return /^@[^\s/?#]{1,100}$/.test(h) ? `https://www.youtube.com/${encodeURIComponent(h).replace(/^%40/, '@')}` : '';
 }
 
 /**
@@ -177,8 +195,8 @@ export function ytVideoWatchCardInnerHtml(model) {
     viewerBehaviorBoardInnerHtml(model.behavior) +
     `<h2 class="nlsb-video-watch-card__title">${esc(YT_VIDEO_WATCH_CARD_TITLE)}</h2>` +
     `<p class="nlsb-video-watch-card__views"><span class="nlsb-video-watch-card__label">再生</span> ${esc(model.viewCountText)}</p>` +
-    `<p class="nlsb-video-watch-card__recorded">${esc(model.recordedSummary)}</p>` +
-    `<p class="nlsb-video-watch-card__match">${esc(model.matchSummary)}</p>` +
+    (model.recordedSummary ? `<p class="nlsb-video-watch-card__recorded">${esc(model.recordedSummary)}</p>` : '') +
+    (model.matchSummary ? `<p class="nlsb-video-watch-card__match">${esc(model.matchSummary)}</p>` : '') +
     names +
     thanks.join('') +
     `</section>`

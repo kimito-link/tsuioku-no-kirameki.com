@@ -220,6 +220,8 @@ function vodCardHtmlIfMatches(wrap, identity) {
 
 /** 動画ページを前に出しているとき、横の欄のライブ用の数字(同時視聴・来場・経過など)を隠す印 */
 export const VIDEO_WATCH_ROOT_ATTR = 'data-nl-video-watch';
+/** どの動画カードを塗ったか(youtube-video / vod-video / niconico-video)。印と一緒に付け外しする */
+export const VIDEO_WATCH_SOURCE_ATTR = 'data-nl-video-source';
 export const VIDEO_WATCH_HIDE_STYLE_ID = 'nlsb-video-watch-hide-live-stats';
 /**
  * 動画には「いま何人」が無い。ライブ用の枠を出すと「読み込み中」のまま止まって見える(0.1.2239 実機・全 7 ページ)。
@@ -233,16 +235,30 @@ export const VIDEO_WATCH_HIDE_LIVE_STATS_CSS =
   `html[${VIDEO_WATCH_ROOT_ATTR}="1"] .nl-official-nico-stats__row,` +
   `html[${VIDEO_WATCH_ROOT_ATTR}="1"] #liveStatCards,` +
   `html[${VIDEO_WATCH_ROOT_ATTR}="1"] #nlEventStanding,` +
-  `html[${VIDEO_WATCH_ROOT_ATTR}="1"] section.nl-stats{display:none !important;}`;
+  `html[${VIDEO_WATCH_ROOT_ATTR}="1"] section.nl-stats,` +
+  // v0.1.2263(りんく 11-27 監査): 動画ページでは「配信ページが見つかりません」の箱と、送れないコメント欄(「watchページを開くと…」)も出さない
+  `html[${VIDEO_WATCH_ROOT_ATTR}="1"] #noWatchRankingHint,` +
+  `html[${VIDEO_WATCH_ROOT_ATTR}="1"] #commentInput,` +
+  `html[${VIDEO_WATCH_ROOT_ATTR}="1"] .nl-cheer-palette-wrapper,` +
+  `html[${VIDEO_WATCH_ROOT_ATTR}="1"] #postCommentBtn{display:none !important;}` +
+  // 記録の無い録画・ニコ動の動画では、マーケHTML は作れない(行の読み口が YouTube の動画にしか無い)。押せない見た目にして「0件です」の画面を開かない
+  `html[${VIDEO_WATCH_ROOT_ATTR}="1"][${VIDEO_WATCH_SOURCE_ATTR}="vod-video"] #exportMarketingQuickBtn,` +
+  `html[${VIDEO_WATCH_ROOT_ATTR}="1"][${VIDEO_WATCH_SOURCE_ATTR}="niconico-video"] #exportMarketingQuickBtn{opacity:.4 !important;pointer-events:none !important;filter:grayscale(1);}`;
 
 /**
  * 横の欄の根元に「動画ページを見ている」印を付け外しする(印が変わるときだけ DOM を触る)。
  * @param {Document | null | undefined} doc
  * @param {boolean} on
+ * @param {string} [source] 塗ったカード(planViewerBehaviorBoardPaint の source)
  */
-export function applyVideoWatchRootMark(doc, on) {
+export function applyVideoWatchRootMark(doc, on, source = '') {
   const root = doc?.documentElement;
   if (!root) return;
+  const src = on ? String(source || '') : '';
+  if ((root.getAttribute(VIDEO_WATCH_SOURCE_ATTR) || '') !== src) {
+    if (src) root.setAttribute(VIDEO_WATCH_SOURCE_ATTR, src);
+    else root.removeAttribute(VIDEO_WATCH_SOURCE_ATTR);
+  }
   const cur = root.getAttribute(VIDEO_WATCH_ROOT_ATTR) === '1';
   if (cur === on) return;
   if (on) {
@@ -341,7 +357,7 @@ export function installViewerBehaviorBoardFromStorage(opts) {
           // v0.1.2244: 「動画を見ている」印は、いまのページ用の動画カードを実際に塗れたときだけ付ける。
           //   YouTube のライブも /watch?v= なので URL だけでは決められない(0.1.2241 はライブでも同時視聴者数を隠していた)。
           //   動画カードは、ページ側が「動画」と判定したときにしか書かれない(ライブでは消される)。
-          applyVideoWatchRootMark(doc, !!html && !!pageTabKey);
+          applyVideoWatchRootMark(doc, !!html && !!pageTabKey, planned.source);
           paintViewerBehaviorBoardEl({
             document: doc,
             html,

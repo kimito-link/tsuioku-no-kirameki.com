@@ -48,6 +48,8 @@ import { callerNameFromStack, createPanelStreamDiag, panelStreamDiagContext, ser
 import { createStaleFrameHold } from '../../src/lib/youtube/ytStaleFrameHold.js';
 import { ytFullRefreshIntervalMs } from '../../src/lib/youtube/ytFullRefreshInterval.js';
 import { dropPseudoLvCommentWrites } from '../../src/lib/youtube/ytShimCommentWrites.js';
+import { recordedRowsOrVideoRows } from '../../src/lib/videoWatch/videoCommentRows.js';
+import { KEY_YT_VIDEO_WATCH_CARD } from '../../src/lib/storageKeys.js';
 import { shouldYieldForBigRecord, yieldToMainThread } from '../../src/lib/bigRecordYield.js';
 import {
   mergeLiveRowsByRecordedAt,
@@ -1035,7 +1037,8 @@ const inPageSkipFetchUntil = new Map();
  */
 async function fetchStreamRows(vid, afterRecordedAt) {
   if (!YT_SHIM_IN_PAGE) {
-    return afterRecordedAt === undefined ? getYtStreamCommentsByVideoId(vid) : getYtStreamCommentsSince(vid, afterRecordedAt);
+    if (afterRecordedAt !== undefined) return getYtStreamCommentsSince(vid, afterRecordedAt);
+    return withVideoRows(await getYtStreamCommentsByVideoId(vid), vid);
   }
   const res = await real?.runtime?.sendMessage?.(
     afterRecordedAt === undefined ? { type: 'YT_GET_STREAM_COMMENTS', videoId: vid } : { type: 'YT_GET_STREAM_COMMENTS', videoId: vid, afterRecordedAt },
@@ -1096,6 +1099,22 @@ async function getCommentsViaBackground(vid) {
   const c = inPageCommentCache.get(vid);
   if (!c) return null;
   return sortedRowsOfCache(c);
+}
+
+/**
+ * v0.1.2263: 記録の行が無い通常動画は、動画のカード(横の欄のサムネイルと同じページの行)を記録の行の形で使う(videoCommentRows.js)。
+ *   記録が1件でもある配信は記録のまま(ライブの会場・横の欄・コメビュは変わらない)。
+ * @param {any[]} rows
+ * @param {string} vid
+ */
+async function withVideoRows(rows, vid) {
+  if (Array.isArray(rows) && rows.length) return rows;
+  try {
+    const bag = await real?.storage?.local?.get?.(KEY_YT_VIDEO_WATCH_CARD);
+    return recordedRowsOrVideoRows(rows, bag?.[KEY_YT_VIDEO_WATCH_CARD], vid);
+  } catch {
+    return Array.isArray(rows) ? rows : [];
+  }
 }
 
 /** 会場の読み上げで大事なコメントのキー(venueSpeech.js の venueSpeechKey と同じ形 no:<番号>) */
@@ -1415,7 +1434,7 @@ if (real && real.storage && real.storage.local && (real.tabs || YT_SHIM_IN_PAGE)
     await knownVideosReady;
     const vid = videoIdForPseudoLv(lv);
     if (!vid) return null;
-    const raw = await getYtStreamCommentsByVideoId(vid);
+    const raw = await withVideoRows(await getYtStreamCommentsByVideoId(vid), vid);
     return exportCommentsFromStoredRows(Array.isArray(raw) ? raw : [], String(lv || ''));
   });
   /**

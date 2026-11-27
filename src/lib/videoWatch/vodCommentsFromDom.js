@@ -80,16 +80,21 @@ function viewCountFromLd(video) {
 }
 
 /**
- * @param {readonly { id: string, name: string, avatarUrl?: string, postedAtMs?: number, commentId?: string }[]} rows
+ * v0.1.2263: 再生チャット(Twitch・Kick)は時刻が DOM に無く postedAtMs が 0。並びは DOM の順(下ほど新しい)なので、
+ *   seq(DOM の何番目か)を持たせ、同じ時刻なら seq の大きい(新しい)人を先にする。本文が読めたら comments に載せる(作らない)。
+ * @param {readonly { id: string, name: string, avatarUrl?: string, postedAtMs?: number, commentId?: string, seq?: number, text?: string, timeText?: string }[]} rows
  */
 function mergeAuthors(rows) {
-  /** @type {Map<string, { id: string, name: string, avatarUrl: string, postedAtMs: number, commentCount: number, commentId?: string }>} */
+  /** @type {Map<string, { id: string, name: string, avatarUrl: string, postedAtMs: number, commentCount: number, commentId?: string, seq: number, comments?: { id: string, text: string, timeText: string }[] }>} */
   const byId = new Map();
   for (const row of rows) {
     const id = String(row.id || '').trim();
     if (!id) continue;
     const cur = byId.get(id);
     const at = Number(row.postedAtMs) > 0 ? Math.floor(Number(row.postedAtMs)) : 0;
+    const seq = Number.isFinite(Number(row.seq)) ? Number(row.seq) : -1;
+    const body = text(row.text).slice(0, 600);
+    const comment = body ? { id: `${id}#${seq}`, text: body, timeText: text(row.timeText).slice(0, 20) } : null;
     if (!cur) {
       byId.set(id, {
         id,
@@ -98,10 +103,15 @@ function mergeAuthors(rows) {
         postedAtMs: at,
         commentCount: 1,
         commentId: row.commentId ? String(row.commentId) : undefined,
+        seq,
+        ...(comment ? { comments: [comment] } : {}),
       });
       continue;
     }
     cur.commentCount += 1;
+    if (seq > cur.seq) cur.seq = seq;
+    // 新しい順(DOM の下ほど新しいので先頭に足す)
+    if (comment) cur.comments = [comment, ...(cur.comments || [])].slice(0, 8);
     if (at >= cur.postedAtMs) {
       cur.postedAtMs = at;
       if (row.name) cur.name = text(row.name).slice(0, 80);
@@ -110,8 +120,62 @@ function mergeAuthors(rows) {
     }
   }
   const merged = [...byId.values()];
-  merged.sort((a, b) => (Number(b.postedAtMs) || 0) - (Number(a.postedAtMs) || 0));
+  merged.sort((a, b) => (Number(b.postedAtMs) || 0) - (Number(a.postedAtMs) || 0) || b.seq - a.seq);
   return merged;
+}
+
+/**
+ * 再生チャットの1行の本文(名前・時刻を除いた文字と、絵文字の画像の代わりの文字)。読めなければ ''。
+ * 実測(2026-11-27): Twitch 録画 .video-chat__message の .text-fragment / img[alt]、Kick 録画 span.font-normal。
+ * @param {Element | null | undefined} el
+ */
+function chatLineText(el) {
+  if (!el) return '';
+  try {
+    const body = el.querySelector('.video-chat__message, [data-a-target="chat-line-message-body"]') ||
+      [...el.querySelectorAll('span')].reverse().find((x) => /(^|\s)font-normal(\s|$)/.test(String(x.getAttribute('class') || ''))) ||
+      el.querySelector('.chat-entry-content');
+    if (!body) return '';
+    let out = '';
+    const walk = (/** @type {Node} */ n) => {
+      for (const c of Array.from(n.childNodes || [])) {
+        if (c.nodeType === 3) out += c.textContent || '';
+        else if (c.nodeType === 1) {
+          const e = /** @type {Element} */ (c);
+          if (e.tagName === 'IMG') out += String(e.getAttribute('alt') || '');
+          else if (e.getAttribute('aria-hidden') === 'true') continue;
+          else walk(e);
+        }
+      }
+    };
+    walk(body);
+    return text(out.replace(/^\s*:\s*/, ''));
+  } catch {
+    return '';
+  }
+}
+
+/** Kick 録画の行の頭の時刻(実測 span.whitespace-nowrap「00:22」)。無ければ ''
+ * @param {Element | null | undefined} el */
+function kickLineTime(el) {
+  try {
+    const t = text(el?.querySelector('span.whitespace-nowrap')?.textContent);
+    return /^\d{1,2}:\d{2}(?::\d{2})?$/.test(t) ? t : '';
+  } catch {
+    return '';
+  }
+}
+
+/** Twitch 録画の行の頭にある再生位置(例 1:02:03)。無ければ ''
+ * @param {Element | null | undefined} el */
+function vodLineTime(el) {
+  try {
+    const t = text(el?.querySelector('.vod-message__header, [data-test-selector="vod-message-timestamp"]')?.textContent);
+    const m = t.match(/\b(\d{1,2}:\d{2}(?::\d{2})?)\b/);
+    return m ? m[1] : '';
+  } catch {
+    return '';
+  }
 }
 
 /**
@@ -167,7 +231,7 @@ function parseTcPlayerDatetime(s) {
  * @param {Document | null | undefined} doc
  */
 function readTwitchVodReplayChat(doc) {
-  /** @type {{ id: string, name: string, avatarUrl?: string, postedAtMs?: number, commentId?: string }[]} */
+  /** @type {{ id: string, name: string, avatarUrl?: string, postedAtMs?: number, commentId?: string, seq?: number, text?: string, timeText?: string }[]} */
   const rows = [];
   if (!doc || typeof doc.querySelectorAll !== 'function') return mergeAuthors(rows);
   const items = doc.querySelectorAll('.vod-message');
@@ -182,6 +246,9 @@ function readTwitchVodReplayChat(doc) {
       name: name || login,
       avatarUrl: '',
       postedAtMs: 0,
+      seq: i,
+      text: chatLineText(el),
+      timeText: vodLineTime(el),
     });
   }
   return mergeAuthors(rows);
@@ -192,7 +259,7 @@ function readTwitchVodReplayChat(doc) {
  * @param {Document | null | undefined} doc
  */
 function readKickVodReplayChat(doc) {
-  /** @type {{ id: string, name: string, avatarUrl?: string, postedAtMs?: number, commentId?: string }[]} */
+  /** @type {{ id: string, name: string, avatarUrl?: string, postedAtMs?: number, commentId?: string, seq?: number, text?: string, timeText?: string }[]} */
   const rows = [];
   if (!doc || typeof doc.querySelectorAll !== 'function') return mergeAuthors(rows);
   const items = doc.querySelectorAll('#chatroom-messages [data-index]');
@@ -201,7 +268,8 @@ function readKickVodReplayChat(doc) {
     const name = text(userEl?.getAttribute?.('title') || userEl?.textContent);
     if (!name) continue;
     const slug = kickSlugOfName(name);
-    rows.push({ id: slug ? `kk:@${slug}` : `kk:${name}`, name, avatarUrl: '', postedAtMs: 0 });
+    const idx = Number(items[i].getAttribute?.('data-index'));
+    rows.push({ id: slug ? `kk:@${slug}` : `kk:${name}`, name, avatarUrl: '', postedAtMs: 0, seq: Number.isFinite(idx) ? idx : i, text: chatLineText(items[i]), timeText: kickLineTime(items[i]) });
   }
   return mergeAuthors(rows);
 }
@@ -254,7 +322,7 @@ function readTiktokUnverified(doc) {
   } catch {
     data = null;
   }
-  /** @type {{ id: string, name: string, avatarUrl?: string, postedAtMs?: number, commentId?: string }[]} */
+  /** @type {{ id: string, name: string, avatarUrl?: string, postedAtMs?: number, commentId?: string, seq?: number, text?: string, timeText?: string }[]} */
   const rows = [];
   const walk = (/** @type {any} */ node, /** @type {number} */ depth) => {
     if (!node || depth > 8) return;

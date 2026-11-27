@@ -1216,5 +1216,10 @@ export function venueItemsForPlatform(platformId, bag) {
       title: chip.title || '',
     });
   }
+  // v0.1.2263(りんく 11-27「会場モードでもコメント確認できるようにしたい」): YouTube の通常動画の会場は、ライブだけの数
+  //   (経過・推定・受取・数え始め・このPCの記録)を出さない。再生とページのコメント数だけ。ライブ・アーカイブは変えない。
+  if (id === 'youtube' && facts.contentKind === 'video') {
+    return items.filter((it) => it.key === 'concurrent' || it.key === 'comments');
+  }
   return items;
 }

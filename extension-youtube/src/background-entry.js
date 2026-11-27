@@ -20,6 +20,7 @@ import { mergeYtStreamSummary, prepareYtCommentsForIdb } from '../../src/lib/you
 import { classifyYtWatchContentKind, summarizeChannelRecordedLives } from '../../src/lib/youtube/ytVideoWatchMeta.js';
 import { peopleInChannelCommenterIndex } from '../../src/lib/youtube/ytChannelCommenterIndex.js';
 import { buildYtVideoWatchCardModel } from '../../src/lib/youtube/ytVideoWatchCard.js';
+import { recordedRowsOrVideoRows } from '../../src/lib/videoWatch/videoCommentRows.js';
 import {
   estimateYoutubeSupportSpendJpy,
   estimateStreamerTakeHomeJpy,
@@ -120,7 +121,7 @@ const ytViewerSampler = createYtViewerSampler({ merged: YT_MERGED });
 
 /**
  * 通常動画のカードを書いて会場へ渡す。ライブのコメント保存とは別経路。
- * @param {{ videoId: string, title?: string, viewCount?: number | null, channelId?: string, videoAuthors?: any[], videoComments?: any[] }} parts
+ * @param {{ videoId: string, title?: string, viewCount?: number | null, channelId?: string, handle?: string, videoAuthors?: any[], videoComments?: any[] }} parts
  */
 function publishVideoWatchCard(parts) {
   const videoId = String(parts?.videoId || '').trim();
@@ -128,7 +129,7 @@ function publishVideoWatchCard(parts) {
   void (async () => {
     try {
       const bag = await chrome.storage.local.get([STORAGE_KEYS.STREAM_SUMMARIES, KEY_YT_CHANNEL_COMMENTERS]);
-      const recorded = summarizeChannelRecordedLives(bag?.[STORAGE_KEYS.STREAM_SUMMARIES], parts.channelId || '');
+      const recorded = summarizeChannelRecordedLives(bag?.[STORAGE_KEYS.STREAM_SUMMARIES], parts.channelId || '', parts.handle || '');
       const livePeople = peopleInChannelCommenterIndex(bag?.[KEY_YT_CHANNEL_COMMENTERS], parts.channelId || '');
       const spendModel = estimateYoutubeSupportSpendJpy(
         (parts.videoAuthors || []).reduce((/** @type {Record<string, number>} */ acc, a) => {
@@ -1299,6 +1300,12 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
     const vid = String(message.videoId || '');
     const after = Number(message.afterRecordedAt || 0);
     (after > 0 ? getYtStreamCommentsSince(vid, after) : getYtStreamCommentsByVideoId(vid))
+      .then(async (items) => {
+        // v0.1.2263: 記録の無い通常動画は、動画のカードの行(横の欄と同じページの行)を会場に渡す(videoCommentRows.js)
+        if (after > 0 || (Array.isArray(items) && items.length)) return items;
+        const bag = await chrome.storage.local.get(KEY_YT_VIDEO_WATCH_CARD).catch(() => null);
+        return recordedRowsOrVideoRows(items, bag?.[KEY_YT_VIDEO_WATCH_CARD], vid);
+      })
       .then((items) => sendResponse({ ok: true, items: Array.isArray(items) ? items : [] }))
       .catch((err) => sendResponse({ ok: false, items: [], error: String(err && err.message || err) }));
     return true;
@@ -1500,13 +1507,16 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
       // 裏の ABEMA タブは claimActive:false(#608)。要約は更新し、いま見ている配信は奪わない。
       if (payload.claimActive !== false) await claimActiveVideo(sender, videoId);
       void ytViewerSampler.maybeSample(videoId, payload.concurrentViewers, summaries[videoId]);
-      const kind = String(summaries[videoId]?.contentKind || payload.contentKind || '');
+      // v0.1.2263: 公式の印が両方「配信ではない」なら、前に live と保存されていても動画として扱う(一度 live になると戻らなかった)
+      const officialVideo = payload.isLive === false && payload.isLiveContent === false;
+      const kind = officialVideo ? 'video' : String(summaries[videoId]?.contentKind || payload.contentKind || '');
       if (kind === 'video') {
         publishVideoWatchCard({
           videoId,
           title: summaries[videoId]?.title || payload.title || '',
           viewCount: typeof payload.slotViewCount === 'number' ? payload.slotViewCount : summaries[videoId]?.slotViewCount,
           channelId: summaries[videoId]?.broadcasterChannelId || payload.broadcasterChannelId || '',
+          handle: summaries[videoId]?.broadcasterHandle || payload.broadcasterHandle || '',
           videoAuthors: Array.isArray(payload.videoAuthors) ? payload.videoAuthors : [],
           videoComments: Array.isArray(payload.videoComments) ? payload.videoComments : [],
         });

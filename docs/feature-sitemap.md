@@ -130,7 +130,7 @@
   - `src/lib/monotonicCommentCount.js`
 - **storage キー定義** — chrome.storage のキー名の正本(nls_comments_<lv> 等)
   - `src/lib/storageKeys.js`
-<details><summary>🗂 このカテゴリの全担当ファイル(自動分類) 80</summary>
+<details><summary>🗂 このカテゴリの全担当ファイル(自動分類) 81</summary>
 
 - `extension-youtube/sidepanel.js` — ニコ生版 popup-entry.js(本物)+ YouTube の記録を読む入口のバンドル
 - `extension-youtube/src/pfEmoteStore.js` — Twitch/Kick の視聴ページ(content)で見た絵文字の「名前 → 画像」を storage に覚える。
@@ -204,6 +204,7 @@
 - `src/lib/userCommentProfileMerge.js` — 横の欄(popup)の描き直しごとに、記録の行から名前・顔の控えを学び、行を補い、控えを刈る1回分。
 - `src/lib/userProfileLinkHtml.js` — 応援コメントの各種 HTML 出力（マーケティング HTML・HTML 保存レポート等）で、
 - `src/lib/userRooms.js` — 保存済みコメントを「ユーザー＝ルーム」に集計（純関数）
+- `src/lib/videoWatch/videoCommentDetail.js` — 【層】L0 判定層(純粋関数・I/O禁止)
 - `src/lib/youtube/ytChunkedRead.js` — 配信の記録を「少しずつ」読む(v0.1.1977)。
 - `src/lib/youtube/ytCrossVideoDuplicates.js` — 別の配信の記録に紛れ込んだコメントを見分ける純関数(片付け用)。
 - `src/lib/youtube/ytLeaderboardSig.js` — 0.1.1959: 公式ランキングの中身の指紋。中身が前回と同じなら storage に書き直さない。
@@ -1258,7 +1259,7 @@
   - `src/extension/live-ranking-entry.js`
   - `tsuioku-no-kirameki/live/index.html`
   - `.github/workflows/live-ranking.yml`
-<details><summary>🗂 このカテゴリの全担当ファイル(自動分類) 384</summary>
+<details><summary>🗂 このカテゴリの全担当ファイル(自動分類) 385</summary>
 
 - `app/app.js` — スマホ閲覧用 status Web 版。
 - `app/live-view-block.js` — iPhone アプリの「🚩 見たくない人を隠す・報告する」(App Store の審査 1.2: ほかの人の書き込みを見せるアプリの決まり)。
@@ -1594,6 +1595,7 @@
 - `src/lib/versionMismatch.js` — 「本体とページで版がズレている」を検知する純関数(2026-07-06)。
 - `src/lib/videoCapture.js` — watch ページの video から PNG を取るためのユーティリティ。
 - `src/lib/videoWatch/twVodLiveIcons.js` — v0.1.2253: Twitch の録画チャットには顔の画像が無い(実測 DOM)。ライブの Twitch でこの PC が覚えた顔
+- `src/lib/videoWatch/videoCommentRows.js` — 【層】L0 判定層(純粋関数・I/O禁止)
 - `src/lib/videoWatch/videoPanelRoute.js` — 横の欄の外枠(sidepanel-iframe-boot-entry.js)が、録画・通常動画のページで中身を付け替えるかを決める純関数。v0.1.2244
 - `src/lib/videoWatch/videoWatchCard.js` — 【層】L0 判定層(純粋関数・I/O禁止)
 - `src/lib/videoWatch/vodCommentsFromDom.js` — 【層】L0 判定層(純粋関数・I/O禁止)
@@ -1659,6 +1661,7 @@
 - `v0.1.2257` 2026-11-27 — ツイキャスの番号付き匿名コメントを人ごとに分ける
 
 ### 🏟 会場・席 (8版)
+- `v0.1.2263` 2026-11-27 — 動画ページで、顔を新しい順に並べ、タップで書いたことを出す
 - `v0.1.2259` 2026-11-27 — ニコ生で、アイコン未設定の人も灰色の丸にしない
 - `v0.1.2258` 2026-11-27 — 内訳を足した数が、いつも記録と同じになるように
 - `v0.1.2257` 2026-11-27 — ツイキャスの番号付き匿名コメントを人ごとに分ける
@@ -1666,12 +1669,10 @@
 - `v0.1.2248` 2026-11-26 — ライブの横の欄でも、顔が出ない人を白い丸にしない
 - `v0.1.2239` 2026-11-26 — 実測の録画コメントを拾って顔を出す
 - `v0.1.2238` 2026-11-26 — 動画でも会場を出さず、コメントがあれば顔を出す
-- `v0.1.2237` 2026-11-26 — 動画では顔を押すと、横の欄にその人の行動が出る
 
-### 🎁 ギフト (3版)
+### 🎁 ギフト (2版)
 - `v0.1.2261` 2026-11-27 — 広告ランキングの名無しを、灰色の「未取得」札にしない
 - `v0.1.2259` 2026-11-27 — ニコ生で、アイコン未設定の人も灰色の丸にしない
-- `v0.1.2237` 2026-11-26 — 動画では顔を押すと、横の欄にその人の行動が出る
 
 ### その他 (11版)
 - `v0.1.2262` 2026-11-27 — Kick の録画で、ライブで見た人の顔が出るようにした

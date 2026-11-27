@@ -25,7 +25,6 @@ import { isVenuePageHidden } from '../../src/lib/venuePaintSchedule.js';
 import { installLastStreamUrlRemember } from './pfLastStreamUrl.js';
 import { venueRootVisibilityAction } from '../../src/lib/venueWatchPageVisibility.js';
 import { KEY_YT_VIDEO_WATCH_CARD, KEY_VIEWER_BEHAVIOR_BOARD } from '../../src/lib/storageKeys.js';
-import { ytPageShouldHideVenueMode } from '../../src/lib/youtube/ytVideoWatchMeta.js';
 
 /** Twitch/Kick の視聴ページで動いているか(council/twitch-support-PLAN.md・会場は YouTube と同じくニコ生版の venueBar をそのまま使う) */
 const PAGE_PLATFORM = platformOfHostname(location.hostname);
@@ -104,41 +103,18 @@ function paintVideoWatchCard() {
 
 
 
-function storedWatchLooksLikeVideo(changes, vid) {
-  const take = (key) => {
-    const v = changes?.[key]?.newValue;
-    if (!v || typeof v !== 'object') return '';
-    const row = v.contentKind ? v : (vid && v[vid]) || Object.values(v).find((x) => x && typeof x === 'object' && x.contentKind) || v;
-    return String(row?.contentKind || row?.kind || '');
-  };
-  return take(KEY_YT_VIDEO_WATCH_CARD) === 'video' || take(KEY_VIEWER_BEHAVIOR_BOARD) === 'video';
-}
-
-function pageIsYtOrdinaryVideo() {
-  try {
-    const root = document.documentElement;
-    const kind = root?.getAttribute('data-nl-yt-content-kind') || '';
-    const isLiveAttr = root?.getAttribute('data-nl-yt-is-live');
-    const isLive = isLiveAttr === '0' ? false : isLiveAttr === '1' ? true : undefined;
-    const isLiveContent = root?.getAttribute('data-nl-yt-is-live-content') === '1';
-    return ytPageShouldHideVenueMode({ contentKind: kind, isLive, isLiveContent });
-  } catch {
-    /* 属性が読めなくても会場ボタンはライブだけで出す */
-  }
-  return false;
-}
-
-function hideVenueModeForVideoPage(hide) {
+/**
+ * v0.1.2263: 0.1.2245〜2262 は通常動画で会場モードを隠していた(隠す印 data-nl-video-hidden)。
+ *   いまは動画でも会場を出す(りんく 11-27「会場モードでもコメント確認できるようにしたい」)。
+ *   会場は記録の読み口(ytNicoShim の fetchStreamRows → background の YT_GET_STREAM_COMMENTS)で、
+ *   記録の無い動画は動画のカードの行(横の欄のサムネイルと同じページのコメント)を読む。ライブの会場は変えない。
+ *   前の版が付けた隠す印が残っていたら外す。
+ */
+function unhideVenueModeFromOldVideoRule() {
   const root = document.getElementById('nlsb-venue-root');
-  if (!root) return;
-  if (hide) {
-    root.hidden = true;
-    root.setAttribute('data-nl-video-hidden', '1');
-    try { document.documentElement.classList.remove('nlsb-venue-open'); } catch { /* 会場を閉じるだけ */ }
-  } else if (root.getAttribute('data-nl-video-hidden') === '1') {
-    root.hidden = false;
-    root.removeAttribute('data-nl-video-hidden');
-  }
+  if (!root || root.getAttribute('data-nl-video-hidden') !== '1') return;
+  root.hidden = false;
+  root.removeAttribute('data-nl-video-hidden');
 }
 
 function sync() {
@@ -153,12 +129,7 @@ function sync() {
   setRootShown(true);
   paintVideoWatchCard(vid);
   paintViewerBehaviorBoard(vid);
-  const videoPage = pageIsYtOrdinaryVideo();
-  hideVenueModeForVideoPage(videoPage);
-  if (videoPage) {
-    mountedVid = vid;
-    return;
-  }
+  unhideVenueModeFromOldVideoRule();
   if (vid === mountedVid) return;
   __ytSetVenueLiveId(pseudoLvForVideoId(vid));
   mountedVid = vid;
@@ -259,10 +230,6 @@ try {
     const vid = currentVideoId();
     if (changes?.[KEY_YT_VIDEO_WATCH_CARD]) paintVideoWatchCard(vid);
     if (changes?.[KEY_VIEWER_BEHAVIOR_BOARD]) paintViewerBehaviorBoard(vid);
-    // 最初の sync が属性より先でも、カードや板が来たときに会場モードを隠す（新しい定期確認は足さない）。
-    if (changes?.[KEY_YT_VIDEO_WATCH_CARD] || changes?.[KEY_VIEWER_BEHAVIOR_BOARD]) {
-      hideVenueModeForVideoPage(pageIsYtOrdinaryVideo() || storedWatchLooksLikeVideo(changes, vid));
-    }
   });
 } catch {
   /* 監視できなくても sync で塗る */

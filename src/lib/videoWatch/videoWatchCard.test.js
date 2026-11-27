@@ -32,7 +32,7 @@ describe('VOD 通常動画カード', () => {
       title: 'VOD',
     });
     const html = vodVideoWatchCardInnerHtml(card);
-    expect(html).toContain('いま読めるコメントの投稿者はまだありません');
+    expect(html).toContain('コメント欄が読み込まれると、ここに書いた人が並びます');
     expect(html).not.toContain('視聴者の行動');
     expect(vodVideoWatchCardInnerHtml(buildVodVideoWatchCardModel({ platform: 'youtube' }))).toBe('');
   });

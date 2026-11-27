@@ -70,7 +70,9 @@ function refresh() {
     videoAuthors: read.authors,
     nowMs: Date.now(),
   });
-  const sig = `${key}:${card ? (card.videoAuthorCount || 0) : 0}:${card?.title || ''}:${card?.viewCountText || ''}:${tw ? tw.filled : 0}`;
+  // v0.1.2263: 読めた本文の数と先頭の人も見る(本文が後から描かれたときにカードを書き直す)
+  const textN = read.authors.reduce((n, a) => n + (Array.isArray(/** @type {any} */ (a).comments) ? /** @type {any} */ (a).comments.length : 0), 0);
+  const sig = `${key}:${card ? (card.videoAuthorCount || 0) : 0}:${card?.title || ''}:${card?.viewCountText || ''}:${tw ? tw.filled : 0}:${textN}:${read.authors[0]?.id || ''}`;
   if (sig === lastSig) return;
   lastSig = sig;
   try {

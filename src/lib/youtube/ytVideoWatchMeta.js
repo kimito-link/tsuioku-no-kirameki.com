@@ -267,8 +267,16 @@ export function concurrentViewersIsViewCountLeak(concurrent, viewCount) {
     rest /= 10;
     unit *= 10;
   }
-  if (unit < 1000) return false;
-  return fa > fb && fa - fb < unit;
+  if (unit >= 1000 && fa > fb && fa - fb < unit) return true;
+  // v0.1.2263: 逆向き。同時視聴の欄に丸めた再生数(「678万 回視聴」→ 6,780,000)が入り、再生数は正確な値(6,781,234)のとき。
+  //   丸めは切り捨てなので、正確な値は丸めた値以上・次の桁未満。ライブの同時視聴者数がこの形で重なることは実際には無い。
+  let unitA = 1;
+  let restA = fa;
+  while (restA > 0 && restA % 10 === 0 && unitA < 100_000_000) {
+    restA /= 10;
+    unitA *= 10;
+  }
+  return unitA >= 1000 && fb > fa && fb - fa < unitA;
 }
 
 /** @param {any} signals */
@@ -276,6 +284,8 @@ export function classifyYtWatchContentKind(signals) {
   const s = signals && typeof signals === 'object' ? signals : {};
   if (s.hasLiveChatReplay === true) return 'live_replay';
   if (s.isLive === true) return 'live';
+  // v0.1.2263: 公式が「いま配信ではない・配信だったものでもない」と両方出していれば、残ったチャット枠や画面の「視聴中」の文字で live にしない
+  if (s.isLive === false && s.isLiveContent === false) return 'video';
   // 公式が「いまは配信ではない」と出しているときは、取り違えた同時視聴の数や残ったチャット枠で live にしない
   if (s.hasLiveChat === true && s.isLive !== false) return 'live';
   // v0.1.2241: 公式が「この動画はライブ配信ではない」(isLiveContent=false)と出していれば、同時視聴の欄に数が入っていても通常動画。
@@ -781,7 +791,8 @@ export function ytVideoCommentAuthorsFromDom(root, opts = {}) {
 
 /**
  * 画面に既に描かれているコメントから、返信（replyLevel / isCreator / parentId）も含めて集める。
- * 本文は返さない。新しい通信はしない。
+ * v0.1.2263: 横の欄でその人が書いたことを見られるよう、本文(上限 YT_COMMENT_TEXT_MAX 字)といいね・ハートなども返す
+ *   (このPCの中だけ・ytCommentExtrasFromViewModel)。新しい通信はしない。
  * 投稿者の印は .channel-owner か、ytd-author-comment-badge-renderer の creator 属性。
  * アーティストなどのバッジだけでは投稿者にしない。
  * @param {ParentNode | null | undefined} root
@@ -905,7 +916,103 @@ function ytCommentRecordFromViewModel(el, opts = {}) {
     isCreator,
     replyLevel,
     postedAtMs,
+    ...ytCommentExtrasFromViewModel(el, publishedText),
   };
+}
+
+/** 本文の長さの上限(横の欄に出す分・保存の大きさを抑える) */
+export const YT_COMMENT_TEXT_MAX = 600;
+
+/**
+ * v0.1.2263: 画面に描かれている1件のコメントから、横の欄の「詳しく」に出す項目を読む。新しい通信・Observer はしない。
+ *   無い項目は返さない(作らない)。いいねの数は画面の表示のまま(「1.1万」)と、読み上げ用の文から取れた正確な数。
+ *   セレクタの根拠: 2026-11-27 未ログインの実ページ(kKl0E22tU78)の ytd-comment-view-model。
+ * @param {Element} el
+ * @param {string} publishedText
+ */
+export function ytCommentExtrasFromViewModel(el, publishedText) {
+  /** @type {Record<string, any>} */
+  const out = {};
+  try {
+    const body = queryDeep(el, '#content-text');
+    const text = body ? textWithEmojiAlt(body).replace(/[ \t]+/g, ' ').replace(/\n{3,}/g, '\n\n').trim() : '';
+    if (text) out.text = text.slice(0, YT_COMMENT_TEXT_MAX);
+    const timeText = String(publishedText || '').replace(/\s+/g, ' ').trim();
+    if (timeText) out.timeText = timeText.replace(/\s*[（(](?:編集済み|edited)[）)]\s*/i, '').trim();
+    if (/編集済み|edited/i.test(timeText)) out.edited = true;
+    const likeText = String(queryDeep(el, '#vote-count-middle')?.textContent || '').replace(/\s+/g, ' ').trim();
+    if (likeText && /\d/.test(likeText)) out.likes = likeText;
+    const likeLabel = String(queryDeep(el, '#like-button button[aria-label]')?.getAttribute?.('aria-label') || '');
+    const exact = likeLabel.match(/([\d,]+)\s*人/) || likeLabel.match(/([\d,]+)\s*other/i);
+    if (exact) {
+      const n = Number(exact[1].replace(/,/g, ''));
+      if (Number.isFinite(n) && n >= 0) out.likeCount = n;
+    }
+    if (queryDeep(el, '#creator-heart ytd-creator-heart-renderer')) out.heart = true;
+    if (el.hasAttribute?.('pinned') || String(queryDeep(el, '#pinned-comment-badge')?.textContent || '').trim()) out.pinned = true;
+    const sponsor = queryDeep(el, '#sponsor-comment-badge img[alt], #sponsor-comment-badge [aria-label]');
+    const member = String(sponsor?.getAttribute?.('alt') || sponsor?.getAttribute?.('aria-label') || '').replace(/\s+/g, ' ').trim();
+    if (member) out.member = member.slice(0, 60);
+    const badge = queryDeep(el, '#header-author ytd-badge-supported-renderer:not([hidden]) [aria-label], #header-author .badge[aria-label]');
+    const badgeLabel = String(badge?.getAttribute?.('aria-label') || '').trim();
+    if (badgeLabel) out.badge = badgeLabel.slice(0, 40);
+    const chip = queryDeep(el, '#paid-comment-chip:not([hidden]) #comment-chip-price');
+    const paid = String(chip?.textContent || '').replace(/\s+/g, ' ').trim();
+    if (paid) out.paid = paid.slice(0, 30);
+    /** @type {ArrayLike<Element>} */
+    const tLinks = body && body.querySelectorAll ? body.querySelectorAll('a[href*="t="]') : [];
+    const marks = [];
+    for (let i = 0; i < tLinks.length && marks.length < 5; i += 1) {
+      const t = String(tLinks[i].textContent || '').trim();
+      if (/^\d{1,2}(?::\d{2}){1,2}$/.test(t)) marks.push(t);
+    }
+    if (marks.length) out.timeMarks = marks;
+    // 返信の数(「54 件の返信」)。スレッドの先頭のコメントだけ(返信の中には無い)
+    const thread = typeof el.closest === 'function' ? el.closest('ytd-comment-thread-renderer') : null;
+    if (thread && !(typeof el.closest === 'function' && el.closest('ytd-comment-replies-renderer'))) {
+      const more = thread.querySelector?.('ytd-comment-replies-renderer #more-replies button[aria-label], ytd-comment-replies-renderer #more-replies [aria-label]');
+      const label = String(more?.getAttribute?.('aria-label') || more?.textContent || '');
+      const m = label.match(/([\d,]+)\s*件の返信/) || label.match(/([\d,]+)\s*repl/i);
+      if (m) {
+        const n = Number(m[1].replace(/,/g, ''));
+        if (Number.isFinite(n) && n > 0) out.replyCount = n;
+      }
+    }
+  } catch {
+    /* 読めない項目は出さない */
+  }
+  return out;
+}
+
+/**
+ * 本文の文字。絵文字の画像は alt の文字にする(画面に出ている文字のまま)。
+ * @param {Element} node
+ * @returns {string}
+ */
+function textWithEmojiAlt(node) {
+  let s = '';
+  /** @param {any} n @param {number} depth */
+  const walk = (n, depth) => {
+    if (!n || depth > 30 || s.length > YT_COMMENT_TEXT_MAX * 2) return;
+    if (n.nodeType === 3) {
+      s += String(n.nodeValue || '');
+      return;
+    }
+    if (n.nodeType !== 1) return;
+    const tag = String(n.tagName || '').toLowerCase();
+    if (tag === 'img') {
+      s += String(n.getAttribute?.('alt') || '');
+      return;
+    }
+    if (tag === 'br') {
+      s += '\n';
+      return;
+    }
+    const kids = n.childNodes || [];
+    for (let i = 0; i < kids.length; i += 1) walk(kids[i], depth + 1);
+  };
+  walk(node, 0);
+  return s;
 }
 
 /**
@@ -967,9 +1074,12 @@ export function ytViewCountFromDom(root) {
  * @param {string} broadcasterChannelId
  * @returns {{ streamCount: number, itemCount: number, videoIds: string[] }}
  */
-export function summarizeChannelRecordedLives(summaries, broadcasterChannelId) {
+export function summarizeChannelRecordedLives(summaries, broadcasterChannelId, broadcasterHandle = '') {
   const ch = String(broadcasterChannelId || '').trim();
+  const handle = String(broadcasterHandle || '').trim().replace(/^@/, '').toLowerCase();
   const bag = summaries && typeof summaries === 'object' ? summaries : {};
+  // v0.1.2263: チャンネルが分からないとき、全チャンネルの記録を数えない。@名前 があればそれで照合し、無ければ数えない。
+  if (!ch && !handle) return { streamCount: 0, itemCount: 0, videoIds: [] };
   /** @type {Array<{ id: string, at: number, items: number }>} */
   const rows = [];
   for (const [id, sum] of Object.entries(bag)) {
@@ -979,7 +1089,9 @@ export function summarizeChannelRecordedLives(summaries, broadcasterChannelId) {
     }
     if (!isVideoId(id)) continue;
     const s = sum && typeof sum === 'object' ? sum : {};
-    if (ch && String(s.broadcasterChannelId || '').trim() !== ch) continue;
+    if (ch) {
+      if (String(s.broadcasterChannelId || '').trim() !== ch) continue;
+    } else if (String(s.broadcasterHandle || '').trim().replace(/^@/, '').toLowerCase() !== handle) continue;
     const items = Number(s.itemCount);
     if (!Number.isFinite(items) || items <= 0) continue;
     if (s.contentKind === 'video') continue;

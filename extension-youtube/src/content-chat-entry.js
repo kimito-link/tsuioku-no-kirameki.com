@@ -673,7 +673,11 @@ function setupWatchPageMetaObserver() {
     const ended = endedAtFields(videoId);
     const sub = followerSampleFromDom(document, 'youtube');
     const root = document.documentElement;
+    // v0.1.2263: ページの世界が書いた「配信かどうか」の印は、いまの動画の印のときだけ使う(前の動画の印で取り違えない)
+    const kindVid = String(root?.getAttribute('data-nl-yt-kind-video-id') || '');
+    const kindIsStale = !!kindVid && kindVid !== videoId;
     const attrBool = (/** @type {string} */ name) => {
+      if (kindIsStale && (name === 'data-nl-yt-is-live' || name === 'data-nl-yt-is-live-content')) return null;
       const v = root?.getAttribute(name);
       if (v === '1') return true;
       if (v === '0') return false;
