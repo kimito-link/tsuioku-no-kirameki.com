@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest';
 import { aggregateMarketingReport } from './marketingAggregate.js';
 import { buildMarketingDashboardHtml } from './marketingChartsHtml.js';
 import { OPERATOR_SECTION_ORDER, inventedNumberViolations, buildOperatorReportModel } from './marketingOperatorReport.js';
+import { OPERATOR_REPORT_CSS } from './marketingOperatorReportHtml.js';
 
 const T0 = Date.parse('2026-11-27T12:00:00.000Z');
 
@@ -138,6 +139,40 @@ describe('運営者向けマーケ HTML の契約', () => {
     expect(html).toContain('自分の動画');
   });
 
+  it('YouTube 動画の見出しは公式の呼び方と watch id で、仮 lv は出さない', () => {
+    const liveId = 'lv927058321372';
+    const comments = commentsFor('youtube', liveId, {
+      likeCount: 12,
+      text: '夜の歌が好きです',
+    });
+    const html = buildMarketingDashboardHtml(aggregateMarketingReport(comments, liveId), {
+      platform: 'youtube',
+      commentsForAnalytics: comments,
+      contentKind: 'video',
+      broadcastTitle: '夜の歌',
+      watchId: 'kKl0E22tU78',
+    });
+    const kicker = (html.match(/mkt-header__kicker">([^<]+)/) || [])[1] || '';
+    const sub = (html.match(/mkt-header__sub">([^<]+)/) || [])[1] || '';
+    expect(kicker).toContain('YouTube 動画 の記録');
+    expect(sub).toContain('kKl0E22tU78');
+    expect(sub).not.toContain('lv927058321372');
+    expect(kicker).not.toContain('ニコニコ');
+    expect(html).toContain('夜の歌');
+    expect(html).toContain('コメントのいいね合計');
+  });
+
+  it('いいね数が無いときは、いいね列を出さない', () => {
+    const liveId = 'lv123';
+    const comments = commentsFor('niconico', liveId);
+    const html = buildMarketingDashboardHtml(aggregateMarketingReport(comments, liveId), {
+      commentsForAnalytics: comments,
+      contentKind: 'live',
+    });
+    expect(html).toContain('ニコニコ生放送 の記録');
+    expect(html).not.toContain('コメントのいいね合計');
+  });
+
   it('配信ではギフトがあると「声をかけてくれた人」が出る', () => {
     const liveId = 'lv900000000003';
     const comments = commentsFor('twitch', liveId, {
@@ -152,5 +187,12 @@ describe('運営者向けマーケ HTML の契約', () => {
     });
     expect(html).toContain('声をかけてくれた人');
     expect(html).not.toContain('おへんじ待ち');
+  });
+});
+
+describe('暖色の配信者プロフィール', () => {
+  it('自己紹介とチップの色を暖色に上書きする', () => {
+    expect(OPERATOR_REPORT_CSS).toMatch(/\.mkt-shell--warm \.mkt-bcaster__bio\{[^}]*background:#fff7ec/);
+    expect(OPERATOR_REPORT_CSS).toMatch(/\.mkt-shell--warm \.mkt-bcaster__chip\{[^}]*background:#fff7ec/);
   });
 });

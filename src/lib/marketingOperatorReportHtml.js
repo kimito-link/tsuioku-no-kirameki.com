@@ -71,6 +71,28 @@ export const OPERATOR_REPORT_CSS = `
 .mkt-shell--warm .mkt-participation-lead-card__value,.mkt-shell--warm .mkt-hero-stat__val{color:#4a3b34}
 .mkt-shell--warm .mkt-hero-card{background:#fffdf9;border-color:#e3c9b5;box-shadow:0 10px 30px rgba(74,59,52,.06)}
 .mkt-shell--warm .mkt-bar{background:#f3e4d4}
+
+.mkt-shell--warm .mkt-section--bcaster{background:#fffdf9;border-color:#e3c9b5}
+.mkt-shell--warm .mkt-section--bcaster h2{border-left-color:#e85a8a;color:#4a3b34}
+.mkt-shell--warm .mkt-bcaster__avatar{background:#fff7ec;border-color:#e3c9b5;color:#e85a8a}
+.mkt-shell--warm .mkt-bcaster__name{color:#4a3b34}
+.mkt-shell--warm .mkt-bcaster__name .nl-user-profile-link{color:#3b6ea5}
+.mkt-shell--warm .mkt-bcaster__metas,.mkt-shell--warm .mkt-bcaster__meta{color:#7a6458}
+.mkt-shell--warm .mkt-bcaster__chip{border-color:#e3c9b5;background:#fff7ec;color:#4a3b34}
+.mkt-shell--warm .mkt-bcaster__chip--prem{border-color:#e8c48a;background:#fff4df;color:#8a5a12}
+.mkt-shell--warm .mkt-bcaster__chip--reg{border-color:#e3c9b5;background:#f3eee8;color:#7a6458}
+.mkt-shell--warm .mkt-bcaster__link{color:#3b6ea5}
+.mkt-shell--warm .mkt-bcaster__link--wish{color:#b83b68}
+.mkt-shell--warm .mkt-bcaster__link--sns{color:#1c6f65}
+.mkt-shell--warm .mkt-bcaster__bio-link{color:#3b6ea5}
+.mkt-shell--warm .mkt-bcaster__bio{border-left-color:#e3c9b5;background:#fff7ec;color:#4a3b34}
+.mkt-shell--warm .mkt-acct-badge--prem{border-color:#e8c48a;background:#fff4df;color:#8a5a12}
+.mkt-shell--warm .mkt-acct-badge--reg{border-color:#e3c9b5;background:#f3eee8;color:#7a6458}
+.mkt-shell--warm .mkt-ext-link-chip{border-color:#e3c9b5;background:#fff7ec;color:#3b6ea5}
+.mkt-shell--warm .mkt-ext-link-chip:hover{border-color:#e85a8a}
+.mkt-shell--warm .nl-user-thumb-link:hover{outline-color:#e85a8a}
+.mkt-shell--warm .mkt-gift-thumb{background:#fff7ec}
+.mkt-shell--warm .mkt-gift-thumb--empty{border-color:#e3c9b5}
 `;
 
 /** @param {string} name */
@@ -221,7 +243,7 @@ function renderTop(data, ctx) {
   const rows = Array.isArray(data?.rows) ? data.rows : [];
   const hasLikes = data?.hasLikes === true;
   const hasGifts = Boolean(data?.giftWord) && rows.some((p) => String(p.giftLabel || '').trim());
-  const head = `<tr><th></th><th>名前</th><th class="num">コメント</th>${hasLikes ? '<th class="num">いいね合計</th>' : ''}${hasGifts ? '<th>応援</th>' : ''}<th>メモ</th></tr>`;
+  const head = `<tr><th></th><th>名前</th><th class="num">コメント</th>${hasLikes ? '<th class="num">コメントのいいね合計</th>' : ''}${hasGifts ? '<th>応援</th>' : ''}<th>メモ</th></tr>`;
   const body = rows
     .map((p, i) => {
       const memo = [];

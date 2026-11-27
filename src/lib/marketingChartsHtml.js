@@ -22,7 +22,7 @@ import {
 } from './platform/marketingPlatformChapters.js';
 import { followerKpiTexts } from './platform/followerCountSample.js';
 import { followerSeriesForPlatform } from './platform/followerSampleStore.js';
-import { buildOperatorReportModel } from './marketingOperatorReport.js';
+import { buildOperatorReportModel, operatorServiceLabel, operatorPublicId } from './marketingOperatorReport.js';
 import { OPERATOR_REPORT_CSS, renderOperatorReportHtml, wrapLegacyAnalysisAppendix } from './marketingOperatorReportHtml.js';
 import {
   estimateNiconicoGiftSpendJpy,
@@ -3092,7 +3092,9 @@ function buildSectionRevealScriptHtml() {
  *   relatedChip?: object | null,
  *   videoThreads?: readonly object[],
  *   visitorCount?: number,
- *   officialGiftPts?: number
+ *   officialGiftPts?: number,
+ *   watchId?: string,
+ *   publicId?: string
  * }} [opts]
  * @returns {string}
  */
@@ -3659,10 +3661,18 @@ ${typeof opts.htmlReportHtml === 'string' ? sectionHtmlReportChapter(opts.htmlRe
     `${finalBody}\n${idWrap('mkt-json', sectionMachineReadableJson(embedJson, maskShare))}`
   );
   const programWord = operatorModel.programWord || '配信';
+  const serviceLabel = operatorServiceLabel(operatorModel.platformId, operatorModel.contentKind);
+  const publicId = operatorPublicId({
+    platformId: operatorModel.platformId,
+    liveId: r.liveId,
+    watchId: String(opts.watchId || /** @type {{ videoId?: string }|null} */ (pageFacts)?.videoId || ''),
+    publicId: String(opts.publicId || ''),
+  });
   const pageTitle = operatorModel.title
     ? `${operatorModel.title} — この${programWord}の記録`
-    : `この${programWord}の記録 — ${r.liveId}`;
+    : (publicId ? `この${programWord}の記録 — ${publicId}` : `この${programWord}の記録`);
   const headerTitle = operatorModel.title || `この${programWord}の記録`;
+  const subId = publicId || (operatorModel.title ? '' : r.liveId);
 
   return eagerInlineImages(`<!DOCTYPE html>
 <html lang="ja">
@@ -3675,9 +3685,9 @@ ${buildSectionRevealBootScriptHtml()}
 </head>
 <body class="mkt-shell--warm">
 <header class="mkt-header">
-<p class="mkt-header__kicker">${escapeHtml((view && view.id) ? view.id : 'ニコニコ生放送')} の記録 ・ 運営者向け</p>
+<p class="mkt-header__kicker">${escapeHtml(serviceLabel)} の記録 ・ 運営者向け</p>
 <h1 class="mkt-header__title">${escapeHtml(headerTitle)}</h1>
-<p class="mkt-header__sub">${escapeHtml(r.liveId)} — ${new Date().toLocaleString('ja-JP')} 出力${escapeHtml(subSuffix)}</p>
+<p class="mkt-header__sub">${subId ? `${escapeHtml(subId)} — ` : ''}${new Date().toLocaleString('ja-JP')} 出力${escapeHtml(subSuffix)}</p>
 <p class="mkt-header__source">このレポートに出すのは、このPCに残っている記録と、書き出したときに画面に出ていたものだけです。分からない項目は載せていません。</p>
 </header>
 ${broadcasterProfileCardHtml}

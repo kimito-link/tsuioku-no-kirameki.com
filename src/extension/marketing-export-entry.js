@@ -599,8 +599,8 @@ function youtubeTabMatchesVideo(tabUrl, videoId) {
 
 /** @param {WatchMetaSnapshot|null} snapshot @param {string} [liveId] */
 async function readYoutubePageExportSnapshot(snapshot, liveId) {
-  /** @type {{ relatedChip: object | null, commentThreads: object[] }} */
-  const empty = { relatedChip: null, commentThreads: [] };
+  /** @type {{ relatedChip: object | null, commentThreads: object[], videoId: string }} */
+  const empty = { relatedChip: null, commentThreads: [], videoId: '' };
   const platform = String(snapshot?.platform || '');
   if (platform && platform !== 'youtube') return empty;
   if (!platform && liveId && !isYtPseudoLvShape(liveId)) return empty;
@@ -633,6 +633,7 @@ async function readYoutubePageExportSnapshot(snapshot, liveId) {
     return {
       relatedChip: res.relatedChip && typeof res.relatedChip === 'object' ? res.relatedChip : null,
       commentThreads: Array.isArray(res.commentThreads) ? res.commentThreads : [],
+      videoId,
     };
   } catch {
     return empty;
@@ -936,6 +937,7 @@ async function runExport(lid) {
       contentKind: String(snapshot?.platformFacts?.contentKind || (pageExportSnap.commentThreads.length ? 'video' : '')),
       relatedChip: pageExportSnap.relatedChip,
       videoThreads: pageExportSnap.commentThreads,
+      watchId: String(pageExportSnap.videoId || videoIdFromWatchSnapshot(snapshot) || ''),
       slimForHeavyExport: heavyMkt
     });
     mktProf.mark('build_html');

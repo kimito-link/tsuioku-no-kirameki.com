@@ -5,6 +5,8 @@ import {
   officialEstimatesForOperator,
   inventedNumberViolations,
   resolveOperatorContentKind,
+  operatorServiceLabel,
+  operatorPublicId,
 } from './marketingOperatorReport.js';
 import { renderOperatorReportHtml, wrapLegacyAnalysisAppendix } from './marketingOperatorReportHtml.js';
 
@@ -252,5 +254,17 @@ describe('resolveOperatorContentKind', () => {
       platformId: 'youtube',
       pageFacts: { contentKind: 'video' },
     })).toBe('video');
+  });
+});
+
+describe('operatorServiceLabel / operatorPublicId', () => {
+  it('YouTube 動画は公式の呼び方と watch id を出し、仮 lv は出さない', () => {
+    expect(operatorServiceLabel('youtube', 'video')).toBe('YouTube 動画');
+    expect(operatorServiceLabel('youtube', 'live')).toBe('YouTube ライブ');
+    expect(operatorServiceLabel('niconico', 'live')).toBe('ニコニコ生放送');
+    expect(operatorServiceLabel('niconico', 'video')).toBe('ニコニコ動画');
+    expect(operatorPublicId({ platformId: 'youtube', liveId: 'lv927058321372', watchId: 'kKl0E22tU78' })).toBe('kKl0E22tU78');
+    expect(operatorPublicId({ platformId: 'youtube', liveId: 'lv927058321372' })).toBe('');
+    expect(operatorPublicId({ platformId: 'niconico', liveId: 'lv351899008' })).toBe('lv351899008');
   });
 });

@@ -5,6 +5,7 @@
  */
 
 import { toEpochMs } from './timeAuthority.js';
+import { isYtPseudoLvShape } from './youtube/ytPseudoLv.js';
 import { isMarketingSupportRow, speechCommentsForMarketing } from './marketingAggregate.js';
 import { indexPastUsers } from './commenterHistoricalAnalytics.js';
 import { judgeNewVsRepeatBasis } from './newVsRepeatBasis.js';
@@ -54,6 +55,43 @@ function capturedAtOf(c) {
 
 
 /** @param {unknown} platformId */
+
+/**
+ * サービスの公式の呼び方。kicker に使う。
+ * @param {unknown} platformId
+ * @param {unknown} contentKind
+ */
+export function operatorServiceLabel(platformId, contentKind) {
+  const id = String(platformId || '').trim() || 'niconico';
+  const video = contentKind === 'video' || contentKind === 'live_replay';
+  if (id === 'niconico') return video ? 'ニコニコ動画' : 'ニコニコ生放送';
+  if (id === 'youtube') return video ? 'YouTube 動画' : 'YouTube ライブ';
+  if (id === 'twitch') return 'Twitch';
+  if (id === 'kick') return 'Kick';
+  if (id === 'twitcasting') return 'ツイキャス';
+  if (id === 'showroom') return 'SHOWROOM';
+  if (id === 'mixch') return 'ミクチャ';
+  if (id === 'tiktok') return video ? 'TikTok' : 'TikTok LIVE';
+  if (id === 'abema') return 'ABEMA';
+  if (id === 'whowatch') return 'ふわっち';
+  const view = marketingViewFor(id);
+  return view?.id || 'ニコニコ生放送';
+}
+
+/**
+ * 見出しに出す公式の ID。YouTube の仮 lv は出さない。
+ * @param {{ platformId?: string, liveId?: string, watchId?: string, publicId?: string }} input
+ */
+export function operatorPublicId(input) {
+  const explicit = String(input?.publicId || '').trim();
+  if (explicit) return explicit;
+  const watch = String(input?.watchId || '').trim();
+  if (/^[A-Za-z0-9_-]{11}$/.test(watch)) return watch;
+  const liveId = String(input?.liveId || '').trim();
+  if (isYtPseudoLvShape(liveId)) return watch;
+  return liveId;
+}
+
 export function operatorKindLabel(platformId, contentKind) {
   const view = marketingViewFor(platformId);
   if (contentKind === 'video') return '動画';
