@@ -10,12 +10,16 @@
  * 配信の視聴・ギフトの子フレーム・広告の貢献度だけに載せる。
  */
 
+import { isNicoVideoWatchUrl } from './niconico/nicoVideoWatchMeta.js';
+
 /**
  * @param {string} href
  * @param {{ isTop?: boolean, hasCommentPanel?: boolean }} [opts]
  * @returns {boolean}
  */
 export function needsNicoEngineFrame(href, opts = {}) {
+  // 通常動画（sm/so/nm）には 1.5MB の記録エンジンを載せない。コメント欄があっても同じ。
+  if (isNicoVideoWatchUrl(href)) return false;
   if (opts.hasCommentPanel) return true;
   let url;
   try {
@@ -64,4 +68,16 @@ export function shouldPollNicoEngine(href, isTop) {
     return true;
   }
   return host === 'nicovideo.jp' || host.endsWith('.nicovideo.jp');
+}
+
+/**
+ * ニコニコ動画の通常動画（sm / so / nm）に、小さい視聴カードだけを載せるか。
+ * 親フレームだけ。記録エンジン（content.js）は載せない。
+ * @param {string} href
+ * @param {boolean} isTop
+ * @returns {boolean}
+ */
+export function needsNicoVideoWatchFrame(href, isTop) {
+  if (!isTop) return false;
+  return isNicoVideoWatchUrl(href);
 }

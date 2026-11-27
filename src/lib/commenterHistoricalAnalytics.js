@@ -32,7 +32,7 @@ function cleanUid(v) {
   return String(v).trim();
 }
 
-/** 配信をまたいだ人の集計から、ツイキャス匿名の仮IDを外す。 @param {unknown} c */
+/** 配信をまたいだ人の集計から、ツイキャス匿名の仮IDを外す。 @param {HistoricalCommentInput|null|undefined} c */
 function personUid(c) {
   const uid = cleanUid(c?.userId);
   if (!uid) return '';

@@ -7,6 +7,8 @@
  */
 
 import { isHttpOrHttpsUrl } from './supportGrowthTileSrc.js';
+/** v0.1.2248: 失敗時の代替顔(全サービス共通)。ガードと一緒に使う呼び出し側のために同じ場所からも出す */
+export { avatarFallbackFaceForUrl } from './avatarFallbackFromUrl.js';
 
 /**
  * @param {string} url
@@ -53,6 +55,17 @@ export function isProbeRetryEligible(rec, nowMs, policy) {
   return nowMs - lastFailAt > backoffMs;
 }
 
+/** @type {{ failedKeys: Map<string, any>, succeededKeys: Set<string> } | null} */
+let SHARED_AVATAR_LOAD_MEMORY = null;
+/**
+ * v0.1.2251: ページに1つの「顔の URL の読み込み結果」の覚え(共有の正本)。
+ * @returns {{ failedKeys: Map<string, any>, succeededKeys: Set<string> }}
+ */
+export function sharedAvatarLoadMemory() {
+  if (!SHARED_AVATAR_LOAD_MEMORY) SHARED_AVATAR_LOAD_MEMORY = { failedKeys: new Map(), succeededKeys: new Set() };
+  return SHARED_AVATAR_LOAD_MEMORY;
+}
+
 /**
  * @param {{
  *   fallbackSrc: string,
@@ -61,7 +74,8 @@ export function isProbeRetryEligible(rec, nowMs, policy) {
  *   onFallbackApplied?: (img: HTMLImageElement) => void,
  *   onRemoteSuccess?: (img: HTMLImageElement) => void,
  *   timeoutMs?: number,
- *   retryPolicy?: RetryPolicy|null
+ *   retryPolicy?: RetryPolicy|null,
+ *   sharedMemory?: boolean
  * }} options
  */
 export function createSupportAvatarLoadGuard(options) {
@@ -117,10 +131,14 @@ export function createSupportAvatarLoadGuard(options) {
   //   不変(段階0はここまで=挙動不変)。retryPolicy(段階1で追加予定)が無い間は今までどおり
   //   一度失敗したら永久に fallback のまま(TTL/リトライは無い)。
   /** @typedef {{ kind: 'timeout'|'error', failCount: number, lastFailAt: number }} FailedProbeRecord */
+  // v0.1.2251: sharedMemory を指定したガードどうしは、同じページの中で「読めた／読めなかった URL」の覚えを共有する
+  //   (横の欄・動画の顔の列・会場・状態ページの4つ。同じ URL を2回確かめない・片方で失敗した顔をもう片方で白くしない)。
+  //   未指定(テスト・その他)は従来どおりガードごとに別。
+  const memory = options?.sharedMemory === true ? sharedAvatarLoadMemory() : null;
   /** @type {Map<string, FailedProbeRecord>} */
-  const failedKeys = new Map();
+  const failedKeys = memory ? memory.failedKeys : new Map();
   /** @type {Set<string>} */
-  const succeededKeys = new Set();
+  const succeededKeys = memory ? memory.succeededKeys : new Set();
   /** @type {WeakMap<HTMLImageElement, () => void>} */
   const activeProbes = new WeakMap();
   // venue-avatar-stale-mirror-DESIGN.md §C-1b: retryPolicy有効時にfailedKeys経由で

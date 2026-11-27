@@ -235,13 +235,29 @@ describe('buildPersonTileEl: 遠いマスの画像は近くに来てから読む
     document.body.appendChild(cell);
     const img = cell.querySelector('img');
     expect(img.getAttribute('loading')).toBe('lazy');
-    expect(img.getAttribute('src')).toBe(FALLBACK);
+    // v0.1.2250: ニコの式の URL でない本物の URL は、最初から本物を指す(読み込みはブラウザの遅延読み込み)
+    expect(img.getAttribute('src')).toBe('https://example.test/a.png');
     expect(io.storyAvatarLoadGuard.noteRemoteAttempt).not.toHaveBeenCalled();
     resolveNear(true);
     await Promise.resolve(); await Promise.resolve();
     expect(io.storyAvatarLoadGuard.noteRemoteAttempt).toHaveBeenCalledTimes(1);
     expect(io.storyAvatarLoadGuard.noteRemoteAttempt).toHaveBeenCalledWith(img, 'https://example.test/a.png');
     cell.remove();
+  });
+
+  it('v0.1.2250: ニコの式の usericon URL(404 が多い)は従来どおり代わりの顔から', () => {
+    const io = ioFar(() => new Promise(() => {}));
+    const item = makeItem();
+    item.displaySrc = 'https://secure-dcdn.cdn.nimg.jp/nicoaccount/usericon/s/1234/12345678.jpg';
+    const img = buildPersonTileEl(item, io).querySelector('img');
+    expect(img.getAttribute('src')).toBe(FALLBACK);
+  });
+
+  it('v0.1.2250: 本物を指した遠いマスが読めなければ、その場で代わりの顔へ戻す', () => {
+    const io = ioFar(() => new Promise(() => {}));
+    const img = buildPersonTileEl(makeItem(), io).querySelector('img');
+    img.dispatchEvent(new Event('error'));
+    expect(img.getAttribute('src')).toBe(FALLBACK);
   });
 
   it('★近くに来る前に外されたマス(near=false)は確かめを始めない', async () => {

@@ -1,0 +1,46 @@
+{
+  "source": {
+    "file": "next-follow-1.json",
+    "fetchedAt": "2026-11-26T10:37:00+09:00"
+  },
+  "frameworkUpdates": {
+    "entityBatchUpdate": {
+      "mutations": [
+        {
+          "payload": {
+            "commentEntityPayload": {
+              "key": "EjFVZ3dyLVVuTGJoMjV2RjVwMm5GNEFhQUJBZy44a2lyQnNLSUxnWjhwWGNCY1BtODRPICgoAQ%3D%3D",
+              "properties": {
+                "commentId": "Ugwr-UnLbh25vF5p2nF4AaABAg.8kirBsKILgZ8pXcBcPm84O",
+                "content": {
+                  "content": "その通りですよね!\n心に刻んで毎日を生きていきたいものですね..."
+                },
+                "publishedTime": "7 年前",
+                "replyLevel": 1
+              },
+              "author": {
+                "channelId": "UCP4pElPBo_l1nvap2vw93Ng",
+                "displayName": "@mickx_dreamer_YT",
+                "avatarThumbnailUrl": "https://yt3.ggpht.com/GdMWy3U2Rs8naFbRjvsayQ8QNnEvfOmxBAfWbJpg-0D4xFdfHmn60mPoLKZmctgYwyN6JGavkFU=s88-c-k-c0x00ffffff-no-rj",
+                "isVerified": false,
+                "isCreator": false,
+                "channelCommand": {
+                  "innertubeCommand": {
+                    "browseEndpoint": {
+                      "browseId": "UCP4pElPBo_l1nvap2vw93Ng",
+                      "canonicalBaseUrl": "/@mickx_dreamer_YT"
+                    }
+                  }
+                }
+              },
+              "toolbar": {
+                "likeCountNotliked": "4",
+                "replyCount": ""
+              }
+            }
+          }
+        }
+      ]
+    }
+  }
+}

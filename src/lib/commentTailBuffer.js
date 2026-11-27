@@ -186,6 +186,74 @@ export function appendToTail(currentTail, freshRows) {
 }
 
 /**
+ * v0.1.2230「記録」が保存件数より多く居座る根治(テール ⊥ メインの不変条件)。
+ *
+ * 表示カウントは `メイン件数 + テール長` で、テールの行がメインに【まだ無い】ことが前提
+ *   (selectNewTailRows の knownKeys は「メイン＋テールに既にあるキー」)。
+ *   ところが大口バッチ(TAIL_BULK_BYPASS_MIN_ROWS 以上・deep harvest 等)はテールを経由せず
+ *   メインへ直行するため、①直行した行のキーがテール側の既知集合に入らず、②その時テールに
+ *   居た行も直行バッチで同時にメインへ入る、の2点でテール⊥メインが崩れていた。
+ *   結果「メイン(テール分を含む) + テール」で二重に数え、同じ行の再到来がテールに再追記され、
+ *   畳み込みで +0 件でも下限(メイン + テール長)が過大値を引き継ぎ、単調ゲートが焼き付けた
+ *   (決定的再現: 保存 325 件で「記録 426」・実測 2026-11-26)。
+ *
+ * 直し方は既存の畳み込みと同じ形に揃えるだけ: メインへ書くときは今のテールも同じ書き込みに
+ *   載せ(重複は既存の mergeNewComments 系 dedupe が弾く)、成功したら載せた分をテールから外し、
+ *   直行した行のキーを既知集合へ足す。
+ *
+ * @param {Array<object>} batch メインへ直行させる行
+ * @param {Array<object>|unknown} tail 現在のテール
+ * @returns {{ rows: Array<object>, foldLen: number }} rows=書き込む行(バッチ→テールの順)、
+ *   foldLen=成功時にテール先頭から外す件数
+ */
+export function planMainWriteWithTailFold(batch, tail) {
+  const b = Array.isArray(batch) ? batch : [];
+  const t = Array.isArray(tail) ? tail : [];
+  return { rows: t.length ? b.concat(t) : b.slice(), foldLen: t.length };
+}
+
+/**
+ * メインへの書き込み成功後に、テールと既知キーを不変条件どおりに戻す純関数。
+ * @param {string} liveId
+ * @param {{
+ *   tail: Array<object>|unknown,
+ *   foldLen: number,
+ *   writtenRows: Array<object>|unknown,
+ *   knownKeys: Set<string>|unknown,
+ *   mainCount: number
+ * }} args
+ * @returns {{ tail: Array<object>, knownKeys: Set<string>, recordedCount: number }}
+ *   recordedCount = mainCount + 残ったテール長(テール⊥メインなので二重にならない)
+ */
+export function settleTailAfterMainWrite(liveId, args) {
+  const t = Array.isArray(args?.tail) ? args.tail : [];
+  const foldLen = Math.max(0, Math.min(t.length, Math.floor(Number(args?.foldLen) || 0)));
+  const nextTail = foldLen ? t.slice(foldLen) : t;
+  const knownKeys = args?.knownKeys instanceof Set ? args.knownKeys : new Set();
+  for (const k of collectCommentNoKeys(liveId, args?.writtenRows)) knownKeys.add(k);
+  const mainCount = Math.max(0, Math.floor(Number(args?.mainCount) || 0));
+  return { tail: nextTail, knownKeys, recordedCount: mainCount + nextTail.length };
+}
+
+/**
+ * 保存件数の「下限」(取りこぼしで件数を後退させないための床)を求める純関数。
+ * 畳み込み中の行はテールにもまだ残っているので、床のテール分からはその件数を引く
+ *   (引かないと、畳み込みが重複で +0 件だったときに「メイン + テール長」が過大値のまま
+ *   新しいメイン件数になる＝ v0.1.2230 で根治した二重計上)。
+ * @param {{ savedTotals?: unknown[], tailMainCount?: unknown, tailLength?: unknown, tailFoldCount?: unknown }} args
+ * @returns {number}
+ */
+export function knownStoredFloor(args = {}) {
+  const totals = Array.isArray(args.savedTotals) ? args.savedTotals : [];
+  let floor = 0;
+  for (const v of totals) floor = Math.max(floor, Number(v) || 0);
+  const tailLen = Math.max(0, Number(args.tailLength) || 0);
+  const fold = Math.max(0, Math.min(tailLen, Number(args.tailFoldCount) || 0));
+  const main = Math.max(0, Number(args.tailMainCount) || 0);
+  return Math.max(floor, main + tailLen - fold);
+}
+
+/**
  * v0.1.998: commentNo 欠落行が tail に何件あるかを数える純関数。
  *
  * 背景（「記録>本家コメ」101% 二次バグの根治）: commentNo を持つ行は seed/append 時に

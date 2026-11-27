@@ -298,6 +298,25 @@ export const KEY_PROFILE_RESOLVE_STATE = 'nls_profile_resolve_state_v1';
  */
 export const KEY_COMMENTER_FOLLOW_CACHE = 'nls_commenter_follow_v1';
 
+/** YouTube のチャンネルごとのライブコメント投稿者索引（UC… と短い名前・回数だけ。本文は持たない） */
+export const KEY_YT_CHANNEL_COMMENTERS = 'yt_channel_commenters_v1';
+
+/** いま見ている YouTube 通常動画のカード（会場・横の欄が読む。ライブのコメント正本ではない） */
+export const KEY_YT_VIDEO_WATCH_CARD = 'yt_video_watch_card_v1';
+
+/** ニコニコの投稿者（数値ユーザー ID）ごとのコメント投稿者索引（名前・回数・日時だけ。本文は持たない） */
+export const KEY_NICO_CHANNEL_COMMENTERS = 'nls_nico_channel_commenters_v1';
+
+/** いま見ているニコニコ動画の通常動画カード（ライブのコメント正本ではない） */
+export const KEY_NICO_VIDEO_WATCH_CARD = 'nls_nico_video_watch_card_v1';
+
+/** いま見ている Twitch/Kick/ツイキャス/ABEMA/TikTok の通常動画カード（ライブのコメント正本ではない） */
+export const KEY_VOD_VIDEO_WATCH_CARD = 'nls_vod_video_watch_card_v1';
+
+/** いま見えている人の「視聴者の行動」ボード（動画・配信で共通。記録の正本ではない） */
+export const KEY_VIEWER_BEHAVIOR_BOARD = 'nls_viewer_behavior_board_v1';
+
+
 /**
  * v0.1.541: コメンター（数値 userId）のフォロー先 userId リスト横断キャッシュ。
  * nvapi /v1/users/{uid}/following/users（非公式・ログイン Cookie 必須）。
