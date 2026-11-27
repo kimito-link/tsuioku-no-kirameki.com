@@ -94,3 +94,30 @@ describe('buildViewerRetentionSectionHtml', () => {
     expect((restPart.match(/<tr>\n<td>/g) || []).length).toBe(7);
   });
 });
+
+const ALL_PLATFORMS = ['niconico', 'youtube', 'twitch', 'kick', 'twitcasting', 'showroom', 'mixch', 'abema', 'tiktok', 'whowatch'];
+
+describe('視聴維持率の表はどのサービスでも表示名と identicon に揃える', () => {
+  it('内部 ID を名前にせず、壊れた顔はニコの灰色ではなく identicon に倒す', () => {
+    for (const platform of ALL_PLATFORMS) {
+      const anonId = platform === 'niconico' ? 'a:abcdefg' : 'tw:438946545';
+      const comments = [
+        { userId: anonId, capturedAt: T0, text: 'hi', nickname: anonId, avatarUrl: 'https://example.invalid/broken.png' },
+        { userId: anonId, capturedAt: T0 + 60 * MIN, text: 'bye', nickname: anonId, avatarUrl: 'https://example.invalid/broken.png' },
+        { userId: 'lantern', capturedAt: T0 + 10 * MIN, text: 'yo', nickname: 'Lantern' },
+        { userId: 'lantern', capturedAt: T0 + 59 * MIN, text: 'yo2', nickname: 'Lantern' },
+      ];
+      const html = buildViewerRetentionSectionHtml(estimateViewerRetention(comments), { platformId: platform });
+      expect(html, platform).toContain('id="mkt-viewer-retention"');
+      expect(html, platform).toContain('Lantern');
+      expect(html, platform).not.toContain('usericon/defaults');
+      expect(html, platform).not.toContain('a:abcdefg');
+      expect(html, platform).not.toContain('（tw:');
+      expect(html, platform).toMatch(/onerror="this\.onerror=null;this\.src='data:image/);
+      const visibleNames = [...html.matchAll(/<td>([\s\S]*?)<\/td>/g)]
+        .map((m) => m[1].replace(/<[^>]+>/g, ''))
+        .filter((t) => t && !/^\d+$/.test(t) && !/分|始まり|最後|途中/.test(t));
+      expect(visibleNames.some((n) => /a:|（tw:|login:/.test(n)), `${platform} names=${visibleNames.join('|')}`).toBe(false);
+    }
+  });
+});

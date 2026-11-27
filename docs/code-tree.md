@@ -27,7 +27,7 @@
 
 > 値が次の段へ届かない「断線」(broadcaster バグ型)は `npm run feature-map -- --check` が機械検知。
 
-## ⚠️ 役割コメントが無いソース 16 / 1399 件
+## ⚠️ 役割コメントが無いソース 16 / 1404 件
 - `docs/handoff/bench/bench-interval.mjs`
 - `docs/handoff/bench/bench-lane.mjs`
 - `extension-youtube/cloak-failsafe.js`
@@ -1205,7 +1205,7 @@
   - `gift-coin-hq.wav`
   - `gift-register-hq.wav`
   - `gift-register.mp3`
-- 📁 **src/** (2759)
+- 📁 **src/** (2769)
   - 📁 **data/** (7)
     - 📁 **acquirers/** (2)
       - `laneFromStorage.js` — 応援レーン acquirer: chrome.storage.local(nls_comments) → laneStore の橋渡し。
@@ -1564,7 +1564,7 @@
         - `logo_funlink_white_RGB_link_black.png`
         - `logo_funlink_white_RGB_maru_black.png`
     - `hero-connect-hub.svg`
-  - 📁 **lib/** (2425)
+  - 📁 **lib/** (2435)
     - 📁 **__snapshots__/** (4)
       - `marketing-abema-baseline.html`
       - `marketing-niconico.html`
@@ -1750,7 +1750,7 @@
     - 📁 **whowatch/** (2)
       - `wwParse.js` — ふわっち(whowatch.tv)の配信とコメントを、YouTube 版の記録と同じ形にする(純関数)
       - `wwParse.test.js`
-    - 📁 **youtube/** (128)
+    - 📁 **youtube/** (134)
       - 📁 **fixtures/** (9)
         - 📁 **real-dom/** (9)
           - `README.md`
@@ -1764,6 +1764,8 @@
           - `mlfY1WYFpEc.reply-viewer.json`
       - `exportStoredComments.js` — 疑似 lv の書き出しは、画面用の組み立て（人物・アイコン・ランキング）を待たない。
       - `pfLastStreamUrl.test.js`
+      - `youtubeExportTabMatch.js` — マーケ書き出しが、今開いている YouTube タブの DOM を読んでよいか。
+      - `youtubeExportTabMatch.test.js`
       - `ytActiveVideoId.js` — 「いま見ている配信」(yt_active_video_id) を書いてよいか。
       - `ytActiveVideoId.test.js`
       - `ytChannelCommenterIndex.js` — 【層】L0 判定層(純粋関数・I/O禁止)
@@ -1827,6 +1829,8 @@
       - `ytPseudoLv.js` — YouTube の videoId から決まった疑似 lv(lv9 + 11桁)を作る純粋関数。
       - `ytRankLinesHtml.js` — 応援ユーザーの順位カード(`.nl-top-support-rank__line`)の HTML を YouTube 用に組む純関数。
       - `ytRankLinesHtml.test.js`
+      - `ytRelatedChipSnapshot.js` — YouTube 動画ページの右側チップと、いま画面に出ている関連動画を、
+      - `ytRelatedChipSnapshot.test.js`
       - `ytReplayChatJson.js` — アーカイブのチャットのリプレイ(get_live_chat_replay の返事)を、
       - `ytReplayChatJson.test.js`
       - `ytReportHtml.js` — YouTube 版の「💾 HTML（記録レポート）」と「📊 マーケ（分析レポート）」を組み立てる純粋関数
@@ -1858,6 +1862,8 @@
       - `ytVenueBoot.js` — 【層】L0 判定層(純粋関数・I/O禁止)
       - `ytVenueBoot.test.js`
       - `ytVenueStripPlayCount2263.test.js`
+      - `ytVideoCommentThreadSnapshot.js` — YouTube 動画ページのコメント欄を、呼んだ瞬間の DOM だけから読む。
+      - `ytVideoCommentThreadSnapshot.test.js`
       - `ytVideoWatch2234.test.js`
       - `ytVideoWatch2235.test.js`
       - `ytVideoWatchCard.js` — 【層】L0 判定層(純粋関数・I/O禁止)
@@ -2878,6 +2884,10 @@
     - `marketingGiftThrowLedger.js` — マーケ分析 HTML 用: 「誰が・どのアイテムを・いくら投げたか」の投げ履歴台帳を組み立てる純関数。
     - `marketingGiftThrowLedger.test.js`
     - `marketingHtmlAdvisorAvatars.js` — マーケ分析HTML内のキャラアイコン（単体HTMLで表示するため data URI）。
+    - `marketingOperatorDashboard.test.js`
+    - `marketingOperatorReport.js` — 運営者向けマーケHTMLの章立て（純関数）。
+    - `marketingOperatorReport.test.js`
+    - `marketingOperatorReportHtml.js` — 運営者向けマーケHTMLの見た目（暖色）。章の中身は buildOperatorReportModel の結果だけを描く。
     - `marketingReportEmbed.js` — マーケ分析 HTML に埋め込む JSON（表計算・ツール連携用）。
     - `marketingReportEmbed.test.js`
     - `marketingSupportParticipationCounts.js` — マーケ分析・HTMLレポート先頭 KPI: ギフト投げ主・広告した人の人数。
