@@ -629,7 +629,7 @@ async function readYoutubePageExportSnapshot(snapshot, liveId) {
   if (platform && platform !== 'youtube') return empty;
   if (!platform && liveId && !isYtPseudoLvShape(liveId)) return empty;
   if (typeof chrome === 'undefined' || !chrome.tabs || typeof chrome.tabs.query !== 'function') return empty;
-  let videoId = videoIdFromWatchSnapshot(snapshot);
+  const videoId = videoIdFromWatchSnapshot(snapshot);
   const operatorChannelId = String(snapshot?.broadcasterPageUrl || '').match(/\/channel\/(UC[A-Za-z0-9_-]{22})/)?.[1] || '';
   try {
     const tabs = await chrome.tabs.query({
