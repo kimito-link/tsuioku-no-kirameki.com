@@ -4,6 +4,7 @@ import { needsYtVenue, shouldPollYtVenue } from '../lib/youtube/ytVenueBoot.js';
 import { startPageStallWatch } from '../lib/stallTrace.js';
 import { readYtRelatedChipSnapshot } from '../lib/youtube/ytRelatedChipSnapshot.js';
 import { readYtVideoCommentThreadSnapshot } from '../lib/youtube/ytVideoCommentThreadSnapshot.js';
+import { youtubeExportPageMatchesVideo } from '../lib/youtube/youtubeExportTabMatch.js';
 
 /** @param {string} [href] */
 function isYoutubeWatchPage(href) {
@@ -25,15 +26,25 @@ if (typeof chrome !== 'undefined' && chrome.runtime && chrome.runtime.onMessage)
       try { sendResponse({ ok: false, reason: 'not-watch' }); } catch { /* 閉じたタブ */ }
       return false;
     }
+    const wantedVideoId = String(msg.videoId || '').trim();
+    if (!wantedVideoId || !youtubeExportPageMatchesVideo(typeof location !== 'undefined' ? location.href : '', wantedVideoId)) {
+      try { sendResponse({ ok: false, reason: 'video-mismatch' }); } catch { /* 閉じたタブ */ }
+      return false;
+    }
     try {
+      // スクレイプ直前にもう一度確認する（途中で次の動画へ移っていることがある）。
+      if (!youtubeExportPageMatchesVideo(typeof location !== 'undefined' ? location.href : '', wantedVideoId)) {
+        try { sendResponse({ ok: false, reason: 'video-mismatch' }); } catch { /* 閉じたタブ */ }
+        return false;
+      }
       const relatedChip = readYtRelatedChipSnapshot(document, {
         operatorChannelId: String(msg.operatorChannelId || ''),
         operatorChannelName: String(msg.operatorChannelName || ''),
         operatorHandle: String(msg.operatorHandle || ''),
-        videoId: String(msg.videoId || ''),
+        videoId: wantedVideoId,
       });
       const commentThreads = readYtVideoCommentThreadSnapshot(document);
-      sendResponse({ ok: true, relatedChip, commentThreads });
+      sendResponse({ ok: true, relatedChip, commentThreads, videoId: wantedVideoId });
     } catch (err) {
       try { sendResponse({ ok: false, reason: String(err && err.message || err) }); } catch { /* 閉じたタブ */ }
     }

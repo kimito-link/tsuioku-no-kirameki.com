@@ -27,7 +27,7 @@
 
 > 値が次の段へ届かない「断線」(broadcaster バグ型)は `npm run feature-map -- --check` が機械検知。
 
-## ⚠️ 役割コメントが無いソース 15 / 1399 件
+## ⚠️ 役割コメントが無いソース 15 / 1400 件
 - `docs/handoff/bench/bench-interval.mjs`
 - `docs/handoff/bench/bench-lane.mjs`
 - `extension-youtube/cloak-failsafe.js`
@@ -1204,7 +1204,7 @@
   - `gift-coin-hq.wav`
   - `gift-register-hq.wav`
   - `gift-register.mp3`
-- 📁 **src/** (2758)
+- 📁 **src/** (2760)
   - 📁 **data/** (7)
     - 📁 **acquirers/** (2)
       - `laneFromStorage.js` — 応援レーン acquirer: chrome.storage.local(nls_comments) → laneStore の橋渡し。
@@ -1563,7 +1563,7 @@
         - `logo_funlink_white_RGB_link_black.png`
         - `logo_funlink_white_RGB_maru_black.png`
     - `hero-connect-hub.svg`
-  - 📁 **lib/** (2424)
+  - 📁 **lib/** (2426)
     - 📁 **__snapshots__/** (4)
       - `marketing-abema-baseline.html`
       - `marketing-niconico.html`
@@ -1742,7 +1742,7 @@
     - 📁 **whowatch/** (2)
       - `wwParse.js` — ふわっち(whowatch.tv)の配信とコメントを、YouTube 版の記録と同じ形にする(純関数)
       - `wwParse.test.js`
-    - 📁 **youtube/** (131)
+    - 📁 **youtube/** (133)
       - 📁 **fixtures/** (9)
         - 📁 **real-dom/** (9)
           - `README.md`
@@ -1756,6 +1756,8 @@
           - `mlfY1WYFpEc.reply-viewer.json`
       - `exportStoredComments.js` — 疑似 lv の書き出しは、画面用の組み立て（人物・アイコン・ランキング）を待たない。
       - `pfLastStreamUrl.test.js`
+      - `youtubeExportTabMatch.js` — マーケ書き出しが、今開いている YouTube タブの DOM を読んでよいか。
+      - `youtubeExportTabMatch.test.js`
       - `ytActiveVideoId.js` — 「いま見ている配信」(yt_active_video_id) を書いてよいか。
       - `ytActiveVideoId.test.js`
       - `ytChannelCommenterIndex.js` — 【層】L0 判定層(純粋関数・I/O禁止)

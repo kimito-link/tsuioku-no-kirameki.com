@@ -8,6 +8,8 @@ import {
   operatorServiceLabel,
   operatorPublicId,
   operatorDisplayName,
+  liveIconUrlForComment,
+  isInternalMarketingId,
 } from './marketingOperatorReport.js';
 import { renderOperatorReportHtml, wrapLegacyAnalysisAppendix } from './marketingOperatorReportHtml.js';
 
@@ -288,7 +290,7 @@ describe('運営者レポートの顔', () => {
           ytPlatform: 'twitch',
         }),
       ],
-      liveIcons: { lantern: 'https://static-cdn.jtvnw.net/jtv_user_pictures/lantern-profile.png' },
+      liveIcons: { twitch: { lantern: 'https://static-cdn.jtvnw.net/jtv_user_pictures/lantern-profile.png' } },
     });
     const html = renderOperatorReportHtml(model);
     expect(html).toContain('src="https://static-cdn.jtvnw.net/jtv_user_pictures/lantern-profile.png"');
@@ -450,6 +452,132 @@ describe('測れていない 0 はサマリーに出さない', () => {
       const n = kpiMainNumber(kpi.value);
       expect(n).not.toBe(0);
     }
+  });
+});
+
+const ALL_PLATFORMS = ['niconico', 'youtube', 'twitch', 'kick', 'twitcasting', 'showroom', 'mixch', 'abema', 'tiktok', 'whowatch'];
+
+describe('測れていない値と空文字は 0 と混ぜない', () => {
+  it('どのサービスでも、未計測・空・本当の 0・正の数を区別する', () => {
+    for (const platformId of ALL_PLATFORMS) {
+      const base = {
+        liveId: platformId === 'niconico' ? 'lv123' : 'lv900000000001',
+        platformId,
+        contentKind: 'live',
+        comments: [comment({ userId: 'u1', nickname: '灯台', ytPlatform: platformId === 'niconico' ? '' : platformId })],
+      };
+      const unmeasured = buildOperatorReportModel({ ...base, pageCount: undefined, visitorCount: undefined });
+      const empty = buildOperatorReportModel({ ...base, pageCount: '', visitorCount: '  ', pageFacts: { viewCount: '', commentCount: null } });
+      const zero = buildOperatorReportModel({ ...base, pageCount: 0, visitorCount: 0, pageFacts: { viewCount: 0, commentCount: 0 } });
+      const positive = buildOperatorReportModel({
+        ...base,
+        pageCount: platformId === 'abema' || platformId === 'whowatch' || platformId === 'twitcasting' ? 1200 : undefined,
+        visitorCount: platformId === 'niconico' ? 800 : undefined,
+        concurrentPeak: 4975,
+      });
+      for (const model of [unmeasured, empty, zero]) {
+        expect(model.kpis.some((k) => k.key === 'views' || k.key === 'visitors'), platformId).toBe(false);
+        for (const kpi of model.kpis) {
+          const n = kpiMainNumber(kpi.value);
+          expect(n, `${platformId} ${kpi.label}=${kpi.value}`).not.toBe(0);
+        }
+      }
+      if (platformId === 'niconico') {
+        expect(positive.kpis.some((k) => k.key === 'visitors' && k.value === '800人')).toBe(true);
+      } else if (platformId === 'abema' || platformId === 'whowatch' || platformId === 'twitcasting') {
+        expect(positive.kpis.some((k) => k.key === 'views' && k.value === '1,200')).toBe(true);
+      } else {
+        expect(positive.kpis.some((k) => k.key === 'concurrent' && k.value === '4,975人'), platformId).toBe(true);
+      }
+    }
+  });
+
+  it('YouTube 動画のいいね合計は、測れていない null を 0 にせず、測れた 0 と正の数は残す', () => {
+    const none = buildOperatorReportModel({
+      liveId: 'vid1',
+      platformId: 'youtube',
+      contentKind: 'video',
+      comments: [
+        comment({ userId: 'UC1111111111111111111111', nickname: 'A', likeCount: null, ytPlatform: 'youtube' }),
+        comment({ userId: 'UC1111111111111111111111', nickname: 'A', likeCount: undefined, ytPlatform: 'youtube' }),
+      ],
+    });
+    expect(none.sections.find((s) => s.key === 'top')?.data.rows[0].likeTotal).toBeNull();
+
+    const realZero = buildOperatorReportModel({
+      liveId: 'vid1',
+      platformId: 'youtube',
+      contentKind: 'video',
+      comments: [
+        comment({ userId: 'UC1111111111111111111111', nickname: 'A', likeCount: 0, ytPlatform: 'youtube' }),
+      ],
+    });
+    expect(realZero.sections.find((s) => s.key === 'top')?.data.rows[0].likeTotal).toBe(0);
+
+    const positive = buildOperatorReportModel({
+      liveId: 'vid1',
+      platformId: 'youtube',
+      contentKind: 'video',
+      comments: [
+        comment({ userId: 'UC1111111111111111111111', nickname: 'A', likeCount: 3, ytPlatform: 'youtube' }),
+        comment({ userId: 'UC1111111111111111111111', nickname: 'A', likeCount: 4, ytPlatform: 'youtube' }),
+      ],
+      pageFacts: { commentCount: 100, loadedCommentCount: 2 },
+    });
+    expect(positive.sections.find((s) => s.key === 'top')?.data.rows[0].likeTotal).toBe(7);
+    expect(positive.kpis.find((k) => k.key === 'commenters')?.hint).toContain('画面に出ていた 2件から');
+    expect(positive.kpis.some((k) => k.key === 'pageComments' && k.value === '100件')).toBe(true);
+  });
+});
+
+describe('内部 ID は表示名に出さない', () => {
+  it('a: や不正な login、サービス不明の数字ハッシュを名前にしない', () => {
+    expect(isInternalMarketingId('a:abcdefg', 'niconico')).toBe(true);
+    expect(operatorDisplayName({ name: 'a:abcdefg', comparable: false }, { platformId: 'niconico' })).toBe('匿名');
+    expect(operatorDisplayName({ name: 'a:abcdefg', comparable: true, uid: '4046119' }, { platformId: 'niconico' })).toBe('ID 4046119');
+    expect(operatorDisplayName({ name: '', comparable: true, login: 'a:notlogin', uid: '8123456789' }, { platformId: 'twitch' })).toBe('名前未取得');
+    expect(operatorDisplayName({ name: '', comparable: true, uid: '8123456789' }, { platformId: '' })).toBe('名前未取得');
+    expect(operatorDisplayName({ name: '', comparable: true, uid: '8123456789' }, { platformId: 'youtube' })).toBe('名前未取得');
+    expect(operatorDisplayName({ name: '', comparable: true, login: 'login:lantern', uid: '8123456789' }, { platformId: 'twitch' })).toBe('名前未取得');
+  });
+});
+
+describe('顔の控えはサービスごとに分ける', () => {
+  it('同じ表示名でも、別サービスのアイコンは使わない', () => {
+    const icons = {
+      twitch: { alice: 'https://static-cdn.jtvnw.net/jtv_user_pictures/alice.png' },
+      kick: { alice: 'https://files.kick.com/icons/alice.png' },
+    };
+    expect(liveIconUrlForComment({ login: 'alice', ytPlatform: 'twitch' }, icons, 'twitch')).toBe(
+      'https://static-cdn.jtvnw.net/jtv_user_pictures/alice.png',
+    );
+    expect(liveIconUrlForComment({ login: 'alice', ytPlatform: 'kick' }, icons, 'kick')).toBe(
+      'https://files.kick.com/icons/alice.png',
+    );
+    expect(liveIconUrlForComment({ name: 'alice', nickname: 'alice', ytPlatform: 'twitch' }, icons, 'twitch')).toBe('');
+    expect(liveIconUrlForComment({ login: 'bob', name: 'alice', ytPlatform: 'twitch' }, icons, 'twitch')).toBe('');
+  });
+
+  it('運営者欄は、https と控えが両方壊れても最後に identicon を残し、img を消さない', () => {
+    const model = buildOperatorReportModel({
+      liveId: 'lv900000000003',
+      platformId: 'twitch',
+      comments: [
+        comment({
+          userId: '8123456789',
+          nickname: 'lantern',
+          login: 'lantern',
+          avatarUrl: 'https://example.invalid/broken.png',
+          text: 'Hi',
+          ytPlatform: 'twitch',
+        }),
+      ],
+    });
+    const html = renderOperatorReportHtml(model);
+    expect(html).toContain('data-mkt-av-fb=');
+    expect(html).toMatch(/data-mkt-av-fb="data:image\//);
+    expect(html).not.toContain('usericon/defaults/');
+    expect(html).not.toContain('this.remove()');
   });
 });
 

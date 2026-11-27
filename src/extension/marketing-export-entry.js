@@ -81,6 +81,7 @@ import { EXPORT_COMMENT_READ_TIMEOUT_MS, readCommentsForExport } from '../lib/re
 import { isYtPseudoLvShape } from '../lib/youtube/ytPseudoLv.js';
 import { readStoredExportComments } from '../lib/youtube/exportStoredComments.js';
 import { mergeYtThreadsOntoComments } from '../lib/youtube/ytVideoCommentThreadSnapshot.js';
+import { youtubeTabMatchesVideo } from '../lib/youtube/youtubeExportTabMatch.js';
 import { MARKETING_EXPORT_STATE_PARAM, withMarketingExportState } from '../lib/marketingExportTabState.js';
 import { followerSamplesStorageKey, readStoredFollowerSamples } from '../lib/platform/followerSampleStore.js';
 
@@ -350,21 +351,25 @@ function getCachedAnonymousIdenticonDataUrl(userId) {
  */
 async function readLiveIconMap() {
   try {
-    const keys = Object.values(STREAM_PLATFORMS)
-      .map((p) => p.lateIconsKey)
-      .filter((k) => typeof k === 'string' && k);
-    if (!keys.length) return {};
-    const bag = await chrome.storage.local.get(keys);
-    /** @type {Record<string, string>} */
+    const platforms = Object.values(STREAM_PLATFORMS).filter((p) => p && typeof p.lateIconsKey === 'string' && p.lateIconsKey);
+    if (!platforms.length) return {};
+    const bag = await chrome.storage.local.get(platforms.map((p) => p.lateIconsKey));
+    /** @type {Record<string, Record<string, string>>} */
     const out = {};
-    for (const k of keys) {
-      const store = bag?.[k];
+    for (const p of platforms) {
+      const store = bag?.[p.lateIconsKey];
       if (!store || typeof store !== 'object') continue;
-      for (const [name, url] of Object.entries(store)) {
+      /** @type {Record<string, string>} */
+      const dict = {};
+      for (const [key, url] of Object.entries(store)) {
         const u = String(url || '').trim();
-        if (!name || !/^https:\/\//i.test(u) || out[name]) continue;
-        out[name] = u;
+        const k = String(key || '').trim();
+        if (!k || !/^https:\/\//i.test(u) || dict[k]) continue;
+        dict[k] = u;
+        const lower = k.toLowerCase();
+        if (lower !== k && !dict[lower]) dict[lower] = u;
       }
+      if (Object.keys(dict).length) out[p.id] = dict;
     }
     return out;
   } catch {
@@ -616,23 +621,6 @@ function videoIdFromWatchSnapshot(snapshot) {
   return /^[A-Za-z0-9_-]{11}$/.test(id) ? id : '';
 }
 
-/** @param {unknown} tabUrl @param {string} videoId */
-function youtubeTabMatchesVideo(tabUrl, videoId) {
-  try {
-    const u = new URL(String(tabUrl || ''));
-    if (!/(^|\.)youtube\.com$/i.test(u.hostname)) return false;
-    const path = u.pathname || '';
-    const isWatch = path === '/watch' || path.startsWith('/watch/') || path.startsWith('/live/') || path.startsWith('/shorts/');
-    if (!isWatch) return false;
-    const v = u.searchParams.get('v');
-    if (videoId && v === videoId) return true;
-    if (videoId && new RegExp(`/(?:live|shorts)/${videoId}(?:/|$)`).test(path)) return true;
-    return !videoId;
-  } catch {
-    return false;
-  }
-}
-
 /** @param {WatchMetaSnapshot|null} snapshot @param {string} [liveId] */
 async function readYoutubePageExportSnapshot(snapshot, liveId) {
   /** @type {{ relatedChip: object | null, commentThreads: object[], videoId: string }} */
@@ -647,13 +635,17 @@ async function readYoutubePageExportSnapshot(snapshot, liveId) {
     const tabs = await chrome.tabs.query({
       url: ['*://www.youtube.com/*', '*://youtube.com/*', '*://m.youtube.com/*'],
     });
-    let match = (tabs || []).find((t) => videoId && youtubeTabMatchesVideo(t.url, videoId));
-    if (!match && !videoId) {
-      const open = (tabs || []).filter((t) => youtubeTabMatchesVideo(t.url, ''));
-      if (open.length === 1) match = open[0];
-    }
+    // 同じ videoId のタブだけ読む。ID が無いときは、ただ一つ開いている視聴タブでも拾わない。
+    if (!videoId) return empty;
+    let match = (tabs || []).find((t) => youtubeTabMatchesVideo(t.url, videoId));
     if (!match || match.id == null) return empty;
-    if (!videoId) videoId = youtubeTabMatchesVideo(match.url, '') ? (String(match.url || '').match(/[?&]v=([A-Za-z0-9_-]{11})/) || [])[1] || '' : '';
+    try {
+      const fresh = await chrome.tabs.get(match.id);
+      if (!youtubeTabMatchesVideo(fresh?.url, videoId)) return empty;
+      match = fresh && fresh.id != null ? fresh : match;
+    } catch {
+      if (!youtubeTabMatchesVideo(match.url, videoId)) return empty;
+    }
     const res = await withTimeout(
       chrome.tabs.sendMessage(match.id, {
         type: 'YT_READ_PAGE_EXPORT_SNAPSHOT',
@@ -769,14 +761,20 @@ async function runExport(lid) {
     const platformHint = String(snapshot?.platform || (isYtPseudoLvShape(lid) ? 'youtube' : '')).trim();
     const marketingView = marketingViewFor(platformHint || undefined);
     const pageCountRaw = Number(snapshot?.slotViewCount ?? snapshot?.platformFacts?.viewCount ?? snapshot?.platformFacts?.official?.totalViews);
-    const marketingPageCount = marketingView && pageCountRaw > 0 && pageCountRaw <= 50_000_000 ? Math.floor(pageCountRaw) : 0;
+    const marketingPageCount = marketingView && pageCountRaw > 0 && pageCountRaw <= 50_000_000 ? Math.floor(pageCountRaw) : undefined;
     const facts = snapshot?.platformFacts;
-    const marketingPageFacts = marketingView && facts && typeof facts === 'object'
+    const loadedFromPage = pageExportSnap.commentThreads.length > 0 ? pageExportSnap.commentThreads.length : undefined;
+    const marketingPageFacts = (marketingView && facts && typeof facts === 'object') || loadedFromPage
       ? {
-          official: facts.official,
-          commentCount: facts.commentCount,
-          ...(facts.contentKind ? { contentKind: facts.contentKind } : {}),
-          ...(facts.viewCount != null ? { viewCount: facts.viewCount } : {}),
+          ...(facts && typeof facts === 'object'
+            ? {
+                official: facts.official,
+                commentCount: facts.commentCount,
+                ...(facts.contentKind ? { contentKind: facts.contentKind } : {}),
+                ...(facts.viewCount != null ? { viewCount: facts.viewCount } : {}),
+              }
+            : {}),
+          ...(loadedFromPage ? { loadedCommentCount: loadedFromPage } : {}),
         }
       : null;
     setWaitStageText('分析中… (2/3) 集計・画像準備', 35);
@@ -945,7 +943,7 @@ async function runExport(lid) {
     mktProf.mark('html_report');
     const liveIcons = await readLiveIconMap();
     const html = buildMarketingDashboardHtml(report, {
-      ...(marketingView ? { platform: marketingView.id, pageCount: marketingPageCount, pageFacts: marketingPageFacts } : {}),
+      ...(marketingView ? { platform: marketingView.id, pageCount: marketingPageCount, pageFacts: marketingPageFacts } : (marketingPageFacts ? { pageFacts: marketingPageFacts } : {})),
       mediaKitHtml,
       htmlReportHtml,
       programStartAtMs: Number(snapshot?.programStartAtMs || snapshot?.startAtMs) || undefined,

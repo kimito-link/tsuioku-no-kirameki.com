@@ -22,7 +22,7 @@ import {
 } from './platform/marketingPlatformChapters.js';
 import { followerKpiTexts } from './platform/followerCountSample.js';
 import { followerSeriesForPlatform } from './platform/followerSampleStore.js';
-import { buildOperatorReportModel, operatorServiceLabel, operatorPublicId } from './marketingOperatorReport.js';
+import { buildOperatorReportModel, operatorServiceLabel, operatorPublicId, operatorDisplayName } from './marketingOperatorReport.js';
 import { OPERATOR_REPORT_CSS, renderOperatorReportHtml, wrapLegacyAnalysisAppendix } from './marketingOperatorReportHtml.js';
 import {
   estimateNiconicoGiftSpendJpy,
@@ -41,10 +41,10 @@ import {
   buildBroadcasterProfileMarketingCardHtml,
   BROADCASTER_PROFILE_MARKETING_CSS
 } from './broadcasterProfileCard.js';
-import { displayUserLabel, UNKNOWN_USER_KEY } from './userRooms.js';
-import { resolveReportUserThumbSrc } from './reportUserThumb.js';
+import { UNKNOWN_USER_KEY } from './userRooms.js';
+import { resolveReportUserThumbSrc as resolveReportUserThumbSrcBase } from './reportUserThumb.js';
 import { categorizeUsersForThumbGrid } from './userThumbGrid.js';
-import { NICONICO_OFFICIAL_DEFAULT_USERICON_HTTPS } from './supportGrowthTileSrc.js';
+import { faceForRowKey } from './avatarFallbackFromUrl.js';
 import { buildConcurrentTimelineSeries } from './concurrentTimelineSeries.js';
 import { analyzeConcurrentPeak } from './concurrentPeakAnalysis.js';
 import { detectCommentSilenceZones } from './commentSilenceZones.js';
@@ -110,7 +110,51 @@ import {
 } from './marketingSupportParticipationCounts.js';
 import { buildSupporterChikuranRows } from './supporterChikuranScore.js';
 
-const DEFAULT_USERICON_ONERROR_ATTR = `onerror="this.onerror=null;this.src='${escapeHtml(NICONICO_OFFICIAL_DEFAULT_USERICON_HTTPS)}'"`;
+/** マーケ HTML 組み立て中だけ使う（表示ラベル・顔の控え）。popup / 会場モードは触らない。 */
+const marketingRenderCtx = { platformId: '', maskShare: false, identiconResolver: undefined };
+
+function marketingVisibleName(userId, nickname) {
+  if (marketingRenderCtx.maskShare) return '視聴者';
+  return operatorDisplayName(
+    { name: nickname, nickname, uid: userId, userId, platformId: marketingRenderCtx.platformId },
+    { platformId: marketingRenderCtx.platformId, maskShare: marketingRenderCtx.maskShare },
+  );
+}
+
+function marketingIdenticonSrc(userId) {
+  const uid = String(userId || '').trim();
+  const resolver = marketingRenderCtx.identiconResolver;
+  if (typeof resolver === 'function' && uid) {
+    const r = resolver(uid, 36);
+    if (typeof r === 'string' && /^data:/i.test(r)) return r;
+  }
+  if (uid) {
+    const face = faceForRowKey(uid);
+    if (face && /^data:/i.test(face)) return face;
+  }
+  const face = faceForRowKey(uid || 'unknown');
+  return face && /^data:/i.test(face) ? face : '';
+}
+
+/** ユーザー顔が壊れたときの控え。ニコの灰色既定アイコンは使わない。 */
+function marketingUserFaceOnerrorAttr(userId) {
+  const fb = marketingIdenticonSrc(userId);
+  if (!fb) return `onerror="this.onerror=null;this.style.visibility='hidden'"`;
+  return `onerror="this.onerror=null;this.src='${escapeAttr(fb)}'"`;
+}
+
+/** ギフト商品サムネなど、人の顔ではない画像。 */
+const MARKETING_ITEM_ONERROR_ATTR = `onerror="this.onerror=null;this.remove()"`;
+
+function resolveReportUserThumbSrc(opts) {
+  const src = resolveReportUserThumbSrcBase({
+    ...opts,
+    platformId: opts?.platformId || marketingRenderCtx.platformId,
+  });
+  if (src) return src;
+  return marketingIdenticonSrc(opts?.userId);
+}
+
 
 
 
@@ -837,7 +881,7 @@ function sectionDepartedHeavy(departed, maskShare, identiconResolver, view = nul
       // 0.1.34 (AI): 過去配信から拾えた nickname を表示する
       const labelHtml = buildUserProfileLinkedLabelHtml(
         d.userId,
-        displayUserLabel(d.userId, d.nickname || '')
+        marketingVisibleName(d.userId, d.nickname || '')
       );
       // 0.1.27 (AB): 数値 ID なら CDN usericon、a:プレフィックスなら identicon
       // を出す。avatarUrl は離反者なので過去配信のものが来る保証がないため、
@@ -850,7 +894,7 @@ function sectionDepartedHeavy(departed, maskShare, identiconResolver, view = nul
       const thumbCell = wrapThumbWithProfileLink(
         d.userId,
         thumbSrc
-          ? `<img class="mkt-departed-thumb" src="${escapeHtml(thumbSrc)}" alt="" loading="lazy" decoding="async" referrerpolicy="no-referrer" ${DEFAULT_USERICON_ONERROR_ATTR}>`
+          ? `<img class="mkt-departed-thumb" src="${escapeHtml(thumbSrc)}" alt="" loading="lazy" decoding="async" referrerpolicy="no-referrer" ${marketingUserFaceOnerrorAttr(d.userId)}>`
           : '<span class="mkt-departed-thumb mkt-departed-thumb--empty"></span>'
       );
       return `<tr>
@@ -892,7 +936,7 @@ function sectionAttendanceMatrix(matrix, maskShare, identiconResolver, view = nu
       // 0.1.34 (AI): 過去配信から拾えた nickname を表示する
       const labelHtml = buildUserProfileLinkedLabelHtml(
         u.userId,
-        displayUserLabel(u.userId, u.nickname || '')
+        marketingVisibleName(u.userId, u.nickname || '')
       );
       const thumbSrc = resolveReportUserThumbSrc({
         userId: u.userId,
@@ -902,7 +946,7 @@ function sectionAttendanceMatrix(matrix, maskShare, identiconResolver, view = nu
       const thumbCell = wrapThumbWithProfileLink(
         u.userId,
         thumbSrc
-          ? `<img class="mkt-departed-thumb" src="${escapeHtml(thumbSrc)}" alt="" loading="lazy" decoding="async" referrerpolicy="no-referrer" ${DEFAULT_USERICON_ONERROR_ATTR}>`
+          ? `<img class="mkt-departed-thumb" src="${escapeHtml(thumbSrc)}" alt="" loading="lazy" decoding="async" referrerpolicy="no-referrer" ${marketingUserFaceOnerrorAttr(u.userId)}>`
           : '<span class="mkt-departed-thumb mkt-departed-thumb--empty"></span>'
       );
       const cells = u.attendance
@@ -1407,13 +1451,13 @@ function sectionAdObserved(obs, adRows, maskShare, identiconResolver = undefined
     .slice(0, SHOW)
     .map(([uid, e]) => {
       const row = rowByUid.get(uid);
-      const rawLabel = row && String(row.name || '').trim() ? String(row.name).trim() : `ID ${uid}`;
+      const rawLabel = marketingVisibleName(uid, row && String(row.name || '').trim() ? String(row.name).trim() : '');
       const nameHtml = maskShare ? escapeHtml(maskLabelForShare(rawLabel)) : buildUserProfileLinkedLabelHtml(uid, rawLabel);
       const thumbSrc = maskShare
         ? ''
         : resolveReportUserThumbSrc({ userId: uid, avatarUrl: row && row.thumbnailUrl ? String(row.thumbnailUrl) : '', identiconResolver });
       const thumbImg = thumbSrc
-        ? `<img class="mkt-gift-thumb" src="${escapeHtml(thumbSrc)}" alt="" width="28" height="28" loading="lazy" decoding="async" referrerpolicy="no-referrer" ${DEFAULT_USERICON_ONERROR_ATTR}>`
+        ? `<img class="mkt-gift-thumb" src="${escapeHtml(thumbSrc)}" alt="" width="28" height="28" loading="lazy" decoding="async" referrerpolicy="no-referrer" ${marketingUserFaceOnerrorAttr(uid)}>`
         : '<span class="mkt-gift-thumb mkt-gift-thumb--empty"></span>';
       const thumbCell = wrapThumbWithProfileLink(uid, thumbImg, maskShare);
       const last =
@@ -1470,7 +1514,7 @@ function sectionGiftMoments(analysis, nextLines, maskShare, identiconResolver = 
       const giftLines = m.gifts
         .slice(0, GIFT_LINES_MAX)
         .map((g) => {
-          const rawLabel = g.userId && /^\d+$/.test(g.userId) ? displayUserLabel(g.userId, g.senderName) : g.senderName || '名無し';
+          const rawLabel = g.userId && /^\d+$/.test(g.userId) ? marketingVisibleName(g.userId, g.senderName) : g.senderName || '名無し';
           const nameHtml = maskShare
             ? escapeHtml(maskLabelForShare(rawLabel))
             : g.userId && /^\d+$/.test(g.userId)
@@ -1480,7 +1524,7 @@ function sectionGiftMoments(analysis, nextLines, maskShare, identiconResolver = 
             ? ''
             : resolveReportUserThumbSrc({ userId: g.userId || '', avatarUrl: g.avatarUrl || '', identiconResolver });
           const thumbImg = thumbSrc
-            ? `<img class="mkt-gift-thumb" src="${escapeHtml(thumbSrc)}" alt="" width="28" height="28" loading="lazy" decoding="async" referrerpolicy="no-referrer" ${DEFAULT_USERICON_ONERROR_ATTR}>`
+            ? `<img class="mkt-gift-thumb" src="${escapeHtml(thumbSrc)}" alt="" width="28" height="28" loading="lazy" decoding="async" referrerpolicy="no-referrer" ${marketingUserFaceOnerrorAttr(g.userId)}>`
             : '<span class="mkt-gift-thumb mkt-gift-thumb--empty"></span>';
           const thumbCell = wrapThumbWithProfileLink(g.userId, thumbImg, maskShare);
           return `<li class="mkt-gm-gift">${thumbCell}<span class="mkt-gm-sender">${nameHtml}</span><span class="mkt-gm-item">${escapeHtml(g.itemName || '(名称未取得)')}</span><span class="mkt-gm-pt">${escapeHtml(formatEventRankingNumber(g.points))}pt</span></li>`;
@@ -1575,7 +1619,7 @@ function sectionGiftMomentum(analysis, maskShare, identiconResolver = undefined)
     .slice(0, 10)
     .map((row, i) => {
       const rawLabel = row.userId && /^\d+$/.test(row.userId)
-        ? displayUserLabel(row.userId, row.label)
+        ? marketingVisibleName(row.userId, row.label)
         : row.label;
       const nameHtml = maskShare
         ? escapeHtml(maskLabelForShare(rawLabel))
@@ -1592,7 +1636,7 @@ function sectionGiftMomentum(analysis, maskShare, identiconResolver = undefined)
             identiconResolver
           });
       const thumbImg = thumbSrc
-        ? `<img class="mkt-gift-thumb" src="${escapeHtml(thumbSrc)}" alt="" width="28" height="28" loading="lazy" decoding="async" referrerpolicy="no-referrer" ${DEFAULT_USERICON_ONERROR_ATTR}>`
+        ? `<img class="mkt-gift-thumb" src="${escapeHtml(thumbSrc)}" alt="" width="28" height="28" loading="lazy" decoding="async" referrerpolicy="no-referrer" ${marketingUserFaceOnerrorAttr(row.userId)}>`
         : '<span class="mkt-gift-thumb mkt-gift-thumb--empty"></span>';
       const thumbCell = wrapThumbWithProfileLink(row.userId, thumbImg, maskShare);
       return `<tr>
@@ -1702,7 +1746,7 @@ function giftLedgerSenderBarChartHtml(aggregates, maskShare, identiconResolver =
 function giftLedgerItemThumbHtml(thumbnailUrl, maskShare, size = 28) {
   const src = maskShare ? '' : String(thumbnailUrl || '').trim();
   if (src) {
-    return `<img class="mkt-gift-ledger-item__thumb" src="${escapeHtml(src)}" alt="" width="${size}" height="${size}" loading="lazy" decoding="async" referrerpolicy="no-referrer" ${DEFAULT_USERICON_ONERROR_ATTR}>`;
+    return `<img class="mkt-gift-ledger-item__thumb" src="${escapeHtml(src)}" alt="" width="${size}" height="${size}" loading="lazy" decoding="async" referrerpolicy="no-referrer" ${MARKETING_ITEM_ONERROR_ATTR}>`;
   }
   return `<span class="mkt-gift-ledger-item__thumb mkt-gift-ledger-item__thumb--empty" style="width:${size}px;height:${size}px"></span>`;
 }
@@ -1743,7 +1787,7 @@ function giftLedgerUserIdentityCells(identity, maskShare, identiconResolver = un
   const uid = String(identity.userId || '').trim();
   const rawLabel =
     uid && /^\d{1,18}$/.test(uid)
-      ? displayUserLabel(uid, identity.senderLabel || '')
+      ? marketingVisibleName(uid, identity.senderLabel || '')
       : String(identity.senderLabel || '').trim() || '（不明）';
   const accountHtml = maskShare
     ? escapeHtml(maskLabelForShare(rawLabel))
@@ -1758,7 +1802,7 @@ function giftLedgerUserIdentityCells(identity, maskShare, identiconResolver = un
         identiconResolver
       });
   const thumbInner = thumbSrc
-    ? `<img class="mkt-gift-thumb" src="${escapeHtml(thumbSrc)}" alt="" width="28" height="28" loading="lazy" decoding="async" referrerpolicy="no-referrer" ${DEFAULT_USERICON_ONERROR_ATTR}>`
+    ? `<img class="mkt-gift-thumb" src="${escapeHtml(thumbSrc)}" alt="" width="28" height="28" loading="lazy" decoding="async" referrerpolicy="no-referrer" ${marketingUserFaceOnerrorAttr(uid)}>`
     : '<span class="mkt-gift-thumb mkt-gift-thumb--empty"></span>';
   const thumbCell = wrapThumbWithProfileLink(uid, thumbInner, maskShare);
   const idInner =
@@ -1837,7 +1881,7 @@ function sectionGiftThrowLedger(ledger, maskShare, identiconResolver = undefined
     ? `<div class="mkt-gift-ledger-items">${ledger.itemAggregates
         .map((row) => {
           const thumb = row.thumbnailUrl
-            ? `<img class="mkt-gift-ledger-item__thumb" src="${escapeHtml(row.thumbnailUrl)}" alt="" width="32" height="32" loading="lazy" decoding="async" referrerpolicy="no-referrer" ${DEFAULT_USERICON_ONERROR_ATTR}>`
+            ? `<img class="mkt-gift-ledger-item__thumb" src="${escapeHtml(row.thumbnailUrl)}" alt="" width="32" height="32" loading="lazy" decoding="async" referrerpolicy="no-referrer" ${MARKETING_ITEM_ONERROR_ATTR}>`
             : '<span class="mkt-gift-ledger-item__thumb mkt-gift-ledger-item__thumb--empty"></span>';
           const ptNote =
             row.points > 0 ? ` / ${escapeHtml(formatEventRankingNumber(row.points))}${unit === 'pt' ? 'pt' : escapeHtml(unit)}` : '';
@@ -1851,7 +1895,7 @@ function sectionGiftThrowLedger(ledger, maskShare, identiconResolver = undefined
       const idCells = giftLedgerUserIdentityCells(row, maskShare, identiconResolver);
       const itemThumbSrc = maskShare ? '' : String(row.thumbnailUrl || '').trim();
       const itemThumbInner = itemThumbSrc
-        ? `<img class="mkt-gift-ledger-row__thumb" src="${escapeHtml(itemThumbSrc)}" alt="" width="28" height="28" loading="lazy" decoding="async" referrerpolicy="no-referrer" ${DEFAULT_USERICON_ONERROR_ATTR}>`
+        ? `<img class="mkt-gift-ledger-row__thumb" src="${escapeHtml(itemThumbSrc)}" alt="" width="28" height="28" loading="lazy" decoding="async" referrerpolicy="no-referrer" ${MARKETING_ITEM_ONERROR_ATTR}>`
         : '<span class="mkt-gift-ledger-row__thumb mkt-gift-ledger-row__thumb--empty"></span>';
       const points = `${formatEventRankingNumber(row.points)}${unit === 'pt' ? ' pt' : ` ${unit}`}`;
       return `<tr>
@@ -2610,7 +2654,7 @@ function supporterChikuranNameHtml(row, maskShare) {
   const rawLabel = row.isAnonymousAggregate
     ? '匿名応援'
     : row.userId && /^\d+$/.test(row.userId)
-      ? displayUserLabel(row.userId, row.displayName || '')
+      ? marketingVisibleName(row.userId, row.displayName || '')
       : row.displayName || '応援者';
   if (row.isAnonymousAggregate) return escapeHtml(rawLabel);
   if (maskShare) return escapeHtml(maskLabelForShare(rawLabel));
@@ -2638,7 +2682,7 @@ function supporterChikuranAvatarHtml(row, rank, maskShare, identiconResolver) {
   return wrapThumbWithProfileLink(
     row.userId,
     thumbSrc
-      ? `<img class="mkt-supporter-avatar" src="${escapeAttr(thumbSrc)}" alt="" width="34" height="34" loading="lazy" decoding="async" referrerpolicy="no-referrer" ${DEFAULT_USERICON_ONERROR_ATTR}>`
+      ? `<img class="mkt-supporter-avatar" src="${escapeAttr(thumbSrc)}" alt="" width="34" height="34" loading="lazy" decoding="async" referrerpolicy="no-referrer" ${marketingUserFaceOnerrorAttr(row.userId)}>`
       : `<span class="mkt-supporter-avatar mkt-supporter-avatar--empty" aria-hidden="true">${rank}</span>`
   );
 }
@@ -2666,7 +2710,7 @@ function supporterChikuranSummaryLine(rows, maskShare, view = null) {
   const rawName = top.isAnonymousAggregate
     ? '匿名応援'
     : top.userId && /^\d+$/.test(top.userId)
-      ? displayUserLabel(top.userId, top.displayName || '')
+      ? marketingVisibleName(top.userId, top.displayName || '')
       : top.displayName || '応援者';
   const name = !top.isAnonymousAggregate && maskShare ? maskLabelForShare(rawName) : rawName;
   // 先頭応援者の名前は、数値 ID かつ非匿名・非マスク時だけユーザーページへリンク化する。
@@ -3101,9 +3145,12 @@ function buildSectionRevealScriptHtml() {
  */
 export function buildMarketingDashboardHtml(r, opts = {}) {
   const maskShare = opts.maskShareLabels === true;
+  marketingRenderCtx.platformId = String(opts.platform || opts.platformId || '').trim() || 'niconico';
+  marketingRenderCtx.maskShare = maskShare;
+  marketingRenderCtx.identiconResolver = typeof opts.anonymousIdenticonResolver === 'function' ? opts.anonymousIdenticonResolver : undefined;
   // ニコ生（platform 無し）は null。null の間は下の文言も計算も今までどおり。
   const view = marketingViewFor(opts.platform);
-  const pageCount = view && Number(opts.pageCount) > 0 ? Math.floor(Number(opts.pageCount)) : 0;
+  const pageCount = view && Number(opts.pageCount) > 0 ? Math.floor(Number(opts.pageCount)) : null;
   const pageFacts = view && opts.pageFacts && typeof opts.pageFacts === 'object' ? opts.pageFacts : null;
   // 0.1.12 (F1/F3): 匿名 a:... に identicon SVG data URL を当てるための resolver。
   // popup-entry 側で事前計算したマップを引いてもらう（ここからは識別の責務は持たない）。
@@ -3818,11 +3865,11 @@ function sectionUsersWithThumbnails(r, maskShare, identiconResolver, broadcaster
    */
   const cellHtml = (u) => {
     const uidForLabel = u.userId || UNKNOWN_USER_KEY;
-    const rawLabel = displayUserLabel(u.userId, u.nickname || '');
+    const rawLabel = marketingVisibleName(u.userId, u.nickname || '');
     const labelHtml = buildUserProfileLinkedLabelHtml(uidForLabel, rawLabel);
     const countText = `${u.count}件`;
     const followHtml = followerInlineHtml(followByUid.get(String(u.userId || '')) || null, maskShare);
-    const avatarInner = `<span class="mkt-thumb-grid__avatar-wrap"><img class="mkt-thumb-grid__avatar" src="${escapeHtml(u.thumbSrc)}" alt="" loading="lazy" decoding="async" referrerpolicy="no-referrer" ${DEFAULT_USERICON_ONERROR_ATTR}></span>`;
+    const avatarInner = `<span class="mkt-thumb-grid__avatar-wrap"><img class="mkt-thumb-grid__avatar" src="${escapeHtml(u.thumbSrc)}" alt="" loading="lazy" decoding="async" referrerpolicy="no-referrer" ${marketingUserFaceOnerrorAttr(u.userId)}></span>`;
     // 2026-07-31(ユーザー要望): 名前とIDで絞り込めるようにする。「あの人を探したいのに
     //   アイコンが並んでいるだけで見つけられない」という指摘への回答。
     //   HTMLレポート側の検索(htmlReportDocument.js:1610)と同じ data-search 方式に揃える。
@@ -4338,7 +4385,7 @@ function sectionCommenterFollowDirectory(
 
   const rows = users
     .map((u, i) => {
-      const rawLabel = displayUserLabel(u.userId, u.nickname || '');
+      const rawLabel = marketingVisibleName(u.userId, u.nickname || '');
       const nameCellHtml = maskShare
         ? escapeHtml(maskLabelForShare(rawLabel))
         : buildUserProfileLinkedLabelHtml(u.userId, rawLabel);
@@ -4351,7 +4398,7 @@ function sectionCommenterFollowDirectory(
             identiconResolver
           });
       const thumbInner = thumbSrc
-        ? `<img class="mkt-cf-thumb" src="${escapeHtml(thumbSrc)}" alt="" width="28" height="28" loading="lazy" decoding="async" referrerpolicy="no-referrer" ${DEFAULT_USERICON_ONERROR_ATTR}>`
+        ? `<img class="mkt-cf-thumb" src="${escapeHtml(thumbSrc)}" alt="" width="28" height="28" loading="lazy" decoding="async" referrerpolicy="no-referrer" ${marketingUserFaceOnerrorAttr(u.userId)}>`
         : '<span class="mkt-cf-thumb mkt-cf-thumb--empty"></span>';
       const thumbCell = wrapThumbWithProfileLink(u.userId, thumbInner, maskShare);
       const followers =
@@ -4516,7 +4563,7 @@ function commenterFollowSegmentCardsHtml(analytics) {
   const rows = segments
     .flatMap((seg) =>
       seg.representatives.map((row) => {
-        const rawLabel = displayUserLabel(row.userId, row.nickname || '');
+        const rawLabel = marketingVisibleName(row.userId, row.nickname || '');
         return `<tr><td><span class="mkt-cfa-card__dot" style="background:${commenterFollowSegmentColor(seg.id)}"></span> ${escapeHtml(seg.label)}</td><td>${buildUserProfileLinkedLabelHtml(row.userId, rawLabel)}</td><td class="mkt-num">${formatEventRankingNumber(row.commentCount)}</td><td class="mkt-num">${formatEventRankingNumber(row.followerCount)}</td></tr>`;
       })
     )
@@ -4626,7 +4673,7 @@ function commenterFollowDeltaPanelHtml(deltas, timing) {
       .slice(0, 5)
       .map(
         (row) => `<tr>
-<td data-label="ユーザー">${escapeHtml(row.nickname || row.userId)}</td>
+<td data-label="ユーザー">${escapeHtml(marketingVisibleName(row.userId, row.nickname || ''))}</td>
 <td data-label="フォロワー差" class="mkt-num">${sign}${formatEventRankingNumber(Math.abs(row.followerDelta))}</td>
 <td data-label="フォロー差" class="mkt-num">${row.followeeDelta >= 0 ? '+' : ''}${formatEventRankingNumber(row.followeeDelta)}</td>
 <td data-label="コメント" class="mkt-num">${formatEventRankingNumber(row.commentCount)}</td>
@@ -5099,7 +5146,7 @@ function sectionSupporterPowerDiagnostic(
           identiconResolver
         });
     const thumbInner = thumbSrc
-      ? `<img class="mkt-spd-thumb" src="${escapeHtml(thumbSrc)}" alt="" width="28" height="28" loading="lazy" decoding="async" referrerpolicy="no-referrer" ${DEFAULT_USERICON_ONERROR_ATTR}>`
+      ? `<img class="mkt-spd-thumb" src="${escapeHtml(thumbSrc)}" alt="" width="28" height="28" loading="lazy" decoding="async" referrerpolicy="no-referrer" ${marketingUserFaceOnerrorAttr(row.userId)}>`
       : '<span class="mkt-spd-thumb mkt-spd-thumb--empty"></span>';
     const thumbCell = wrapThumbWithProfileLink(row.userId, thumbInner, maskShare);
 
@@ -5190,7 +5237,7 @@ function sectionTopUsers(r, maskShare = false, identiconResolver = undefined, br
       // へのリンクで包む。maskShare 時はリンクにせず、マスクだけ適用する。
       const uidForLabel = u.userId || UNKNOWN_USER_KEY;
       const rawLabel = u.userId
-        ? displayUserLabel(u.userId, u.nickname || '')
+        ? marketingVisibleName(u.userId, u.nickname || '')
         : u.nickname || '—';
       const nameCellHtml = maskShare
         ? escapeHtml(maskLabelForShare(rawLabel))

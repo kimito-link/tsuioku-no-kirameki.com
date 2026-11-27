@@ -802,7 +802,7 @@
   - `app/supporter.html`
   - `app/referral-passthrough.js`
   - `tsuioku-no-kirameki/tokushoho.html`
-<details><summary>🗂 このカテゴリの全担当ファイル(自動分類) 62</summary>
+<details><summary>🗂 このカテゴリの全担当ファイル(自動分類) 63</summary>
 
 - `extension-youtube/marketing-export-guard.js` — マーケ分析タブ(marketing-export.html)の「何があっても開く」保険。
 - `extension-youtube/marketing-export.js` — ニコ生版 marketing-export-entry.js(本物)+ YouTube の記録を読む入口のバンドル
@@ -861,6 +861,7 @@
 - `src/lib/topSupportRankLinesHtml.js` — 応援ランクストリップの各行（renderTopSupportRankStrip の <a>/<div> 行群）の HTML を組む純関数。
 - `src/lib/viewerRetentionSectionHtml.js` — マーケ分析レポートの章「視聴維持率（最後まで見たか・推定）」。
 - `src/lib/youtube/exportStoredComments.js` — 疑似 lv の書き出しは、画面用の組み立て（人物・アイコン・ランキング）を待たない。
+- `src/lib/youtube/youtubeExportTabMatch.js` — マーケ書き出しが、今開いている YouTube タブの DOM を読んでよいか。
 - `src/lib/youtube/ytLvKeyBridge.js` — 疑似 lv → 配信キー。マーケの過去比較が他サービスの配信を混ぜないために使う。
 - `src/lib/youtube/ytPanelExportTarget.js` — 【層】L0 判定層(純粋関数・I/O禁止)
 - `src/lib/youtube/ytRankLinesHtml.js` — 応援ユーザーの順位カード(`.nl-top-support-rank__line`)の HTML を YouTube 用に組む純関数。
@@ -1658,11 +1659,13 @@
 ### 💾 記録件数 (1版)
 - `v0.1.2264` 2026-11-27 — マーケHTMLを、運営者が知りたい順にした
 
-### 📥 コメント取得 (2版)
+### 📥 コメント取得 (3版)
+- `v0.1.2264` 2026-11-27 — マーケHTMLを、運営者が知りたい順にした
 - `v0.1.2261` 2026-11-27 — 広告ランキングの名無しを、灰色の「未取得」札にしない
 - `v0.1.2257` 2026-11-27 — ツイキャスの番号付き匿名コメントを人ごとに分ける
 
-### 🙂 匿名(184) (1版)
+### 🙂 匿名(184) (2版)
+- `v0.1.2264` 2026-11-27 — マーケHTMLを、運営者が知りたい順にした
 - `v0.1.2257` 2026-11-27 — ツイキャスの番号付き匿名コメントを人ごとに分ける
 
 ### 🏟 会場・席 (7版)

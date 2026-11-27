@@ -157,10 +157,14 @@ function avHttpSrc(p, platformId) {
   return '';
 }
 
-function avImg(src, fallback) {
-  const fb = fallback && fallback !== src ? fallback : '';
-  const fbAttr = fb ? ` data-mkt-av-fb="${escapeAttr(fb)}"` : '';
-  const onerr = ` onerror="this.onerror=null;var f=this.getAttribute('data-mkt-av-fb');if(f){this.removeAttribute('data-mkt-av-fb');this.src=f;}else{this.remove();}"`;
+function avImg(src, queue) {
+  const rest = (Array.isArray(queue) ? queue : [queue]).map((u) => String(u || '').trim()).filter((u) => u && u !== src);
+  const uniq = [];
+  for (const u of rest) {
+    if (!uniq.includes(u)) uniq.push(u);
+  }
+  const fbAttr = uniq.length ? ` data-mkt-av-fb="${escapeAttr(uniq.join('\t'))}"` : '';
+  const onerr = ` onerror="(function(el){var q=(el.getAttribute('data-mkt-av-fb')||'').split('\t').filter(Boolean);if(!q.length){el.onerror=null;return;}el.setAttribute('data-mkt-av-fb',q.slice(1).join('\t'));el.src=q[0];})(this)"`;
   return `<img class="mkt-op-av" src="${escapeAttr(src)}" alt="" width="36" height="36" referrerpolicy="no-referrer" decoding="async"${fbAttr}${onerr}>`;
 }
 
@@ -168,10 +172,10 @@ function avHtml(p, ctx = {}) {
   if (ctx.maskShare) {
     return `<div class="mkt-op-av" style="background:${avColor('')}">?</div>`;
   }
-  const fallback = avFallbackSrc(p, ctx);
+  const identicon = avFallbackSrc(p, ctx);
   const http = avHttpSrc(p, String(ctx.platformId || ''));
-  if (http) return avImg(http, fallback);
-  if (fallback) return avImg(fallback, '');
+  if (http) return avImg(http, identicon);
+  if (identicon) return avImg(identicon, []);
   const name = String(p?.name || '');
   return `<div class="mkt-op-av" style="background:${avColor(name)}">${escapeHtml(initialOf(name))}</div>`;
 }
@@ -285,7 +289,11 @@ function renderWho(data, ctx) {
     }
   }
   if (data.isVideo && data.pageCommentCount != null) {
-    rightBits.push(`ページのコメント見出しは ${Number(data.pageCommentCount).toLocaleString('ja-JP')}件。書き出したときに画面へ読み込まれていたのは ${Number(data.loadedCommentCount || 0).toLocaleString('ja-JP')}件です。`);
+    let loadedLine = `ページのコメント見出しは ${Number(data.pageCommentCount).toLocaleString('ja-JP')}件。`;
+    if (data.loadedCommentCount != null && Number(data.loadedCommentCount) > 0) {
+      loadedLine += `書き出したときに画面へ読み込まれていたのは ${Number(data.loadedCommentCount).toLocaleString('ja-JP')}件です。`;
+    }
+    rightBits.push(loadedLine);
   }
   const right = `<div><h3 class="mkt-subhead">数の読み方</h3>${rightBits.map((t) => `<p class="mkt-note">${t}</p>`).join('')}</div>`;
   return `<div class="mkt-op-split">${left}${right}</div>`;

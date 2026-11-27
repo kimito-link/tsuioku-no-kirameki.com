@@ -324,10 +324,11 @@ export function mergeYtThreadsOntoComments(comments, threads, liveId = '') {
   const used = new Set();
   for (const c of list) {
     if (!c || typeof c !== 'object') continue;
-    const id = String(c.commentId || '').trim();
+    const id = String(c.commentId || c.id || '').trim();
     const hit = id ? byId.get(id) : null;
     if (!hit) continue;
     used.add(id);
+    if (!c.commentId && id) c.commentId = id;
     if (hit.text && !String(c.text || '').trim()) c.text = hit.text;
     if (hit.likeCount != null) c.likeCount = hit.likeCount;
     if (hit.replyCount != null) c.replyCount = hit.replyCount;
@@ -337,6 +338,16 @@ export function mergeYtThreadsOntoComments(comments, threads, liveId = '') {
     if (hit.parentId && !c.parentId) c.parentId = hit.parentId;
     if (hit.timeText && !c.timeText) c.timeText = hit.timeText;
     if (hit.postedAtMs && !Number(c.capturedAt)) c.capturedAt = hit.postedAtMs;
+    if (hit.channelId) {
+      if (!c.channelId) c.channelId = hit.channelId;
+      if (!c.ytChannelId) c.ytChannelId = hit.channelId;
+      c.userId = hit.channelId;
+    }
+    if (hit.name && !String(c.nickname || c.name || '').trim()) {
+      c.nickname = hit.name;
+      c.name = hit.name;
+    }
+    if (hit.avatarUrl && !c.avatarUrl) c.avatarUrl = hit.avatarUrl;
   }
   const leftovers = rows.filter((t) => t.commentId && !used.has(t.commentId));
   if (!leftovers.length) return list;

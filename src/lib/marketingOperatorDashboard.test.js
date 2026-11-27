@@ -267,7 +267,7 @@ describe('控えアイコンの顔', () => {
       commentsForAnalytics: comments,
       contentKind: 'live',
       liveIcons: {
-        viewer0: 'https://static-cdn.jtvnw.net/jtv_user_pictures/viewer0.png',
+        twitch: { viewer0: 'https://static-cdn.jtvnw.net/jtv_user_pictures/viewer0.png' },
       },
     });
     expect(html).toContain('src="https://static-cdn.jtvnw.net/jtv_user_pictures/viewer0.png"');
@@ -431,6 +431,64 @@ describe('測れていない 0 はサマリーに出さない', () => {
     for (const card of cards) {
       const n = kpiMainNumber(card.value);
       expect(n).not.toBe(0);
+    }
+  });
+});
+
+const ALL_PLATFORMS = ['niconico', 'youtube', 'twitch', 'kick', 'twitcasting', 'showroom', 'mixch', 'abema', 'tiktok', 'whowatch'];
+
+describe('appendix の顔と名前の契約', () => {
+  it('どのサービスでも、appendix は閉じたまま、内部 ID を表示名にせず、壊れた顔は identicon に倒す', () => {
+    for (const platform of ALL_PLATFORMS) {
+      const liveId = platform === 'niconico' ? 'lv123' : 'lv900000000001';
+      const comments = [
+        {
+          id: `${platform}-anon`,
+          liveId,
+          commentNo: '1',
+          text: '匿名です',
+          userId: platform === 'niconico' ? 'a:abcdefg' : '',
+          nickname: 'a:abcdefg',
+          is184: platform === 'niconico',
+          capturedAt: T0,
+          ytPlatform: platform === 'niconico' ? '' : platform,
+          avatarUrl: 'https://example.invalid/broken.png',
+        },
+        {
+          id: `${platform}-hash`,
+          liveId,
+          commentNo: '2',
+          text: 'hash',
+          userId: platform === 'niconico' ? '4046119' : '8123456789',
+          nickname: '',
+          login: platform === 'twitch' || platform === 'kick' ? 'lantern' : '',
+          capturedAt: T0 + 60_000,
+          ytPlatform: platform === 'niconico' ? '' : platform,
+        },
+      ];
+      const html = buildMarketingDashboardHtml(aggregateMarketingReport(comments, liveId), {
+        ...(platform === 'niconico' ? {} : { platform }),
+        commentsForAnalytics: comments,
+        contentKind: 'live',
+        liveIcons: {
+          twitch: { lantern: 'https://static-cdn.jtvnw.net/jtv_user_pictures/lantern.png' },
+          kick: { lantern: 'https://files.kick.com/icons/other.png' },
+        },
+      });
+      const appendix = html.slice(html.indexOf('id="mkt-appendix"'));
+      expect(html, platform).toMatch(/<details class="mkt-appendix" id="mkt-appendix">/);
+      expect(html, platform).not.toMatch(/<details[^>]*id="mkt-appendix"[^>]*open/);
+      const exportJson = html.match(/<script type="application\/json" id="nl-marketing-export-v1">([\s\S]*?)<\/script>/);
+      expect(exportJson, platform).toBeTruthy();
+      expect(exportJson[1], platform).toContain(comments[1].userId);
+      const visibleOp = html.split('id="mkt-appendix"')[0];
+      expect(visibleOp, platform).not.toContain('a:abcdefg');
+      expect(visibleOp, platform).not.toContain('login:lantern');
+      if (platform !== 'niconico') {
+        expect(visibleOp, platform).not.toContain('ID 8123456789');
+      }
+      expect(html, platform).not.toMatch(/onerror="this\.onerror=null;this\.src='https:\/\/secure-dcdn\.cdn\.nimg\.jp\/nicoaccount\/usericon\/defaults/);
+      expect(appendix, platform).toMatch(/data-search="/);
     }
   });
 });

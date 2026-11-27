@@ -19,6 +19,9 @@ import {
   STREAMER_TAKE_HOME_PLATFORMS,
 } from './estimatedViewerSpend.js';
 import { marketingViewFor } from './platform/marketingPlatformPlan.js';
+import { isTwLogin } from './twitch/twIrcParse.js';
+import { isKickSlug } from './kick/kickChatParse.js';
+
 
 /** 章の決まった順。lead は見出しの前に出す。 */
 export const OPERATOR_SECTION_ORDER = Object.freeze([
@@ -74,10 +77,10 @@ function capturedAtOf(c) {
  */
 export function operatorDisplayName(person, opts = {}) {
   if (opts.maskShare === true) return '視聴者';
-  const name = String(person?.name || person?.nickname || '').replace(/\s+/g, ' ').trim();
-  if (name) return name;
-  if (!isOperatorPersonComparable(person)) return '匿名';
   const platformId = String(opts.platformId || person?.platformId || '').trim();
+  const name = String(person?.name || person?.nickname || '').replace(/\s+/g, ' ').trim();
+  if (name && !isInternalMarketingId(name, platformId)) return name;
+  if (!isOperatorPersonComparable(person)) return '匿名';
   const login = String(person?.login || '').trim();
   if (login && operatorLoginIsPublic(platformId, person)) return login;
   const uid = String(person?.uid || person?.userId || '').trim();
@@ -97,16 +100,35 @@ function isOperatorPersonComparable(person) {
 
 /** @param {string} platformId @param {any} person */
 function operatorLoginIsPublic(platformId, person) {
+  const login = String(person?.login || '').trim();
+  if (!login || isInternalMarketingId(login, platformId)) return false;
   const id = String(platformId || '').trim();
-  if (id === 'twitch' || id === 'kick') return true;
   const ch = String(person?.channelId || person?.uid || '').trim();
-  return /^(tw:|kk:)/i.test(ch);
+  if (id === 'twitch' || /^tw:/i.test(ch)) return isTwLogin(login);
+  if (id === 'kick' || /^kk:/i.test(ch)) return isKickSlug(login.toLowerCase());
+  return false;
 }
 
-/** @param {string} platformId */
+/** 数字の「ID n」は、サービスがニコニコだと分かっているときだけ。 */
 function operatorUidIsPublicNumericId(platformId) {
-  const id = String(platformId || '').trim();
-  return !id || id === 'niconico';
+  return String(platformId || '').trim() === 'niconico';
+}
+
+/**
+ * 内部キー・匿名 ID・他サービス接頭辞を、表示名として出さない。
+ * @param {unknown} value
+ * @param {unknown} [platformId]
+ */
+export function isInternalMarketingId(value, platformId) {
+  const s = String(value || '').trim();
+  if (!s) return true;
+  if (/^a:[A-Za-z0-9_-]+$/i.test(s)) return true;
+  if (/^(tw|kk|tc|sr|tt|mx|ww|ab):/i.test(s)) return true;
+  if (/^(login|name):/i.test(s)) return true;
+  if (s.startsWith('__row:') || s === '__unknown__') return true;
+  if (/^stored_\d+$/i.test(s)) return true;
+  void platformId;
+  return false;
 }
 
 export function operatorServiceLabel(platformId, contentKind) {
@@ -305,10 +327,12 @@ export function resolveOperatorContentKind(input) {
  * @param {any} row
  * @param {Record<string, string>|null|undefined} liveIcons
  */
-export function liveIconUrlForComment(row, liveIcons) {
+export function liveIconUrlForComment(row, liveIcons, platformHint) {
   const direct = String(row?.avatarUrl || row?.iconUrl || '').trim();
   if (/^https:\/\//i.test(direct) && !isSiteDefaultSilhouetteUrl(direct)) return direct;
-  if (!liveIcons || typeof liveIcons !== 'object') return '';
+  const plat = String(platformHint || row?.ytPlatform || row?.platform || inferIconPlatform(row) || '').trim();
+  const dict = platformLiveIconDict(liveIcons, plat);
+  if (!dict) return '';
   /** @type {string[]} */
   const keys = [];
   const login = String(row?.login || '').trim().toLowerCase();
@@ -318,14 +342,47 @@ export function liveIconUrlForComment(row, liveIcons) {
   const kk = /^kk:@?(.+)$/i.exec(ch);
   if (tw) keys.push(String(tw[1] || '').trim().toLowerCase());
   if (kk) keys.push(String(kk[1] || '').trim().toLowerCase());
-  const name = String(row?.name || row?.nickname || '').trim().toLowerCase();
-  if (name) keys.push(name);
+  if (ch) keys.push(ch, ch.toLowerCase());
+  const uid = String(row?.uid || row?.userId || '').trim();
+  if (uid) keys.push(uid, uid.toLowerCase());
+  const seen = new Set();
   for (const k of keys) {
-    if (!k) continue;
-    const u = String(liveIcons[k] || '').trim();
+    if (!k || seen.has(k)) continue;
+    seen.add(k);
+    const u = String(dict[k] || dict[k.toLowerCase()] || '').trim();
     if (/^https:\/\//i.test(u) && !isSiteDefaultSilhouetteUrl(u)) return u;
   }
   return '';
+}
+
+/** @param {any} row */
+function inferIconPlatform(row) {
+  const ch = String(row?.channelId || row?.ytChannelId || '');
+  if (ch.startsWith('tw:')) return 'twitch';
+  if (ch.startsWith('kk:')) return 'kick';
+  if (ch.startsWith('tc:')) return 'twitcasting';
+  if (ch.startsWith('sr:')) return 'showroom';
+  if (ch.startsWith('tt:')) return 'tiktok';
+  if (ch.startsWith('mx:')) return 'mixch';
+  if (ch.startsWith('ww:')) return 'whowatch';
+  if (ch.startsWith('ab:')) return 'abema';
+  if (/^UC[A-Za-z0-9_-]{22}$/.test(ch)) return 'youtube';
+  return '';
+}
+
+/**
+ * サービスごとの控えだけを見る。横断の名前キーは使わない。
+ * @param {unknown} liveIcons
+ * @param {string} platformId
+ * @returns {Record<string, string>|null}
+ */
+function platformLiveIconDict(liveIcons, platformId) {
+  if (!liveIcons || typeof liveIcons !== 'object') return null;
+  const plat = String(platformId || '').trim();
+  if (!plat) return null;
+  const nested = /** @type {Record<string, unknown>} */ (liveIcons)[plat];
+  if (!nested || typeof nested !== 'object' || Array.isArray(nested)) return null;
+  return /** @type {Record<string, string>} */ (nested);
 }
 
 export function inferOperatorPlatform(input) {
@@ -391,7 +448,7 @@ export function buildOperatorReportModel(input) {
         uid,
         name: nameOf(c),
         login: String(c?.login || '').trim(),
-        avatarUrl: liveIconUrlForComment(c, input?.liveIcons),
+        avatarUrl: liveIconUrlForComment(c, input?.liveIcons, platformId),
         comments: [],
         comparable,
         returning: Boolean(pastRow),
@@ -404,7 +461,7 @@ export function buildOperatorReportModel(input) {
     row.comments.push(c);
     if (isMarketingSupportRow(c)) row.giftRows.push(c);
     if (nameOf(c) && !row.name) row.name = nameOf(c);
-    if (!row.avatarUrl) row.avatarUrl = liveIconUrlForComment(c, input?.liveIcons);
+    if (!row.avatarUrl) row.avatarUrl = liveIconUrlForComment(c, input?.liveIcons, platformId);
     if (c?.login && !row.login) row.login = String(c.login).trim();
   }
   // incomparable was incremented per comment; recount people
@@ -474,7 +531,7 @@ export function buildOperatorReportModel(input) {
         uid: p.uid,
         login: p.login,
         comparable: p.comparable,
-        avatarUrl: p.avatarUrl || liveIconUrlForComment(p, input?.liveIcons),
+        avatarUrl: p.avatarUrl || liveIconUrlForComment(p, input?.liveIcons, platformId),
         text: String(last?.text || ''),
         timeText: capturedAtOf(last) ? formatClock(capturedAtOf(last)) : '',
         giftLabel: p.giftLabel,
@@ -493,7 +550,7 @@ export function buildOperatorReportModel(input) {
         uid: p.uid,
         login: p.login,
         comparable: p.comparable,
-        avatarUrl: p.avatarUrl || liveIconUrlForComment(p, input?.liveIcons),
+        avatarUrl: p.avatarUrl || liveIconUrlForComment(p, input?.liveIcons, platformId),
         text: String(first?.text || ''),
         timeText: capturedAtOf(first) ? formatClock(capturedAtOf(first)) : '',
         commentCount: p.comments.filter((c) => !isMarketingSupportRow(c)).length,
@@ -511,7 +568,7 @@ export function buildOperatorReportModel(input) {
       uid: p.uid,
       login: p.login,
       comparable: p.comparable,
-      avatarUrl: p.avatarUrl || liveIconUrlForComment(p, input?.liveIcons),
+      avatarUrl: p.avatarUrl || liveIconUrlForComment(p, input?.liveIcons, platformId),
       commentCount: p.comments.filter((c) => !isMarketingSupportRow(c)).length,
       likeTotal: sumKnownLikes(p.comments),
       giftLabel: p.giftRows.length ? summarizeGiftRows(p.giftRows, giftWord, view) : '',
@@ -543,6 +600,7 @@ export function buildOperatorReportModel(input) {
   const pageViews = measuredPositiveCount(input?.pageCount ?? input?.pageFacts?.viewCount);
   const visitors = measuredPositiveCount(input?.visitorCount);
   const concurrentPeak = measuredPositiveCount(input?.concurrentPeak);
+  const loadedCommentCount = measuredPositiveCount(input?.pageFacts?.loadedCommentCount ?? input?.loadedCommentCount);
   const viewsLabel = isVideo ? '再生数' : String(view?.pageCountLabel || '').trim();
 
   /** @type {Array<{ key: string, value: string, label: string, hint: string }>} */
@@ -553,8 +611,8 @@ export function buildOperatorReportModel(input) {
       key: 'commenters',
       value: `${commenterCount.toLocaleString('ja-JP')}人`,
       label: 'コメントした人',
-      hint: isVideo && pageCommentCount != null
-        ? `画面に出ていた ${speech.length.toLocaleString('ja-JP')}件から`
+      hint: isVideo && loadedCommentCount != null
+        ? `画面に出ていた ${loadedCommentCount.toLocaleString('ja-JP')}件から`
         : `このPCの記録 ${speech.length.toLocaleString('ja-JP')}件から`,
     });
   }
@@ -670,7 +728,7 @@ export function buildOperatorReportModel(input) {
         uid: p.uid,
         login: p.login,
         comparable: p.comparable,
-        avatarUrl: p.avatarUrl || liveIconUrlForComment(p, input?.liveIcons),
+        avatarUrl: p.avatarUrl || liveIconUrlForComment(p, input?.liveIcons, platformId),
         pastBroadcasts: p.pastBroadcasts,
         commentCount: p.comments.filter((c) => !isMarketingSupportRow(c)).length,
       })),
@@ -680,7 +738,7 @@ export function buildOperatorReportModel(input) {
       commenterCount,
       visitorCount: visitors,
       pageCommentCount,
-      loadedCommentCount: speech.length,
+      loadedCommentCount,
       basisOk: basis.ok,
       isVideo,
     },
@@ -764,7 +822,9 @@ function sumKnownLikes(comments) {
   let sum = 0;
   let any = false;
   for (const c of comments) {
-    const n = Number(c?.likeCount);
+    if (c?.likeCount == null || c.likeCount === '') continue;
+    if (typeof c.likeCount === 'string' && !String(c.likeCount).trim()) continue;
+    const n = Number(c.likeCount);
     if (Number.isFinite(n) && n >= 0) {
       sum += n;
       any = true;
@@ -860,6 +920,8 @@ function giftLedgerRows(support, _view) {
 }
 
 function numOrNull(v) {
+  if (v == null) return null;
+  if (typeof v === 'string' && !v.trim()) return null;
   const n = Number(v);
   return Number.isFinite(n) && n >= 0 ? Math.floor(n) : null;
 }

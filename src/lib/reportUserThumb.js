@@ -60,8 +60,10 @@ export function resolveReportUserThumbSrc(opts) {
     return avatarUrl;
   }
   if (!userId || userId === '__unknown__') return '';
-  // 数値 5〜14 桁: ニコ既定 CDN URL
-  if (/^\d{5,14}$/.test(userId)) {
+  // 数値 5〜14 桁のニコ既定 CDN は、サービスがニコニコだと分かっているときだけ。
+  // platformId を渡さない既存の呼び出し（popup など）は、従来どおりニコの数字 ID とみなす。
+  const platformId = String(opts?.platformId || '').trim();
+  if (/^\d{5,14}$/.test(userId) && (!platformId || platformId === 'niconico')) {
     return buildNiconicoDefaultUserIconUrl(userId);
   }
   // 匿名（a:... / ハッシュ系）: identicon resolver が居れば SVG data URL
