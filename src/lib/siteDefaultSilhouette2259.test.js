@@ -8,8 +8,11 @@ import {
   isSiteDefaultSilhouetteUrl,
   faceInsteadOfSilhouette,
   avatarFallbackFaceForUrl,
-  noAvatarFace
+  noAvatarFace,
+  faceForRowKey
 } from './avatarFallbackFromUrl.js';
+import { adLanePicksFromRooms } from './adLanePicksFromRooms.js';
+import { buildDedupeKey, faceForCommentRow } from './commentRecord.js';
 import { createSupportAvatarLoadGuard } from './supportGrowthAvatarLoad.js';
 import {
   NICONICO_OFFICIAL_DEFAULT_USERICON_HTTPS,
@@ -116,5 +119,37 @@ describe('共通の顔の選び方: 灰色の既定アイコンはその人ご�
     );
     expect(isGrey(models[0].thumbSrc)).toBe(false);
     expect(models[1].thumbSrc).toBe(REAL);
+  });
+});
+
+describe('ID の無い行・ギフト/広告の 名無し', () => {
+  it('ID の無い行は記録の重なりの鍵ごとに違う顔・同じ鍵なら読み直しても同じ顔', () => {
+    const k1 = buildDedupeKey('lv1', { commentNo: '101', text: 'こんにちは' });
+    const k2 = buildDedupeKey('lv1', { commentNo: '102', text: 'こんにちは' });
+    const a = faceForRowKey(k1);
+    expect(a.startsWith('data:image/')).toBe(true);
+    expect(faceForRowKey(k1)).toBe(a);
+    expect(faceForRowKey(k2)).not.toBe(a);
+    expect(faceForRowKey('')).toBe(noAvatarFace());
+    expect(faceForCommentRow('LV1', { commentNo: '101', text: 'こんにちは' })).toBe(a);
+  });
+  it('応援ランキング(公式ランク行・名無し)も灰色の順位札でなくその人ごとのゆっくり顔', () => {
+    const models = topSupportRankLineModels(
+      [
+        { userKey: '__anon_contrib_1', count: 5, avatarUrl: BLANK_B, nickname: '' },
+        { userKey: '__anon_contrib_2', count: 4, avatarUrl: BLANK_B, nickname: '' }
+      ],
+      { defaultThumbSrc: 'y.png', anonymousFallbackThumbSrc: BLANK_A }
+    );
+    expect(isGrey(models[0].thumbSrc)).toBe(false);
+    expect(models[0].thumbSrc).not.toBe(models[1].thumbSrc);
+    expect(models[0].thumbSrc).not.toContain('%E6%9C%AA%E5%8F%96%E5%BE%97'); // 「未取得」の灰色の順位札ではない
+  });
+  it('広告・ギフト列: 公式が blank.jpg を返した人はその人ごとのゆっくり顔', () => {
+    const picks = adLanePicksFromRooms(
+      [{ userKey: '95696250', nickname: 'つゆ', count: 100, avatarUrl: BLANK_B, hasNoIcon: true }],
+      { yukkuriFaceFor: (k) => `data:face:${k}` }
+    );
+    expect(picks[0].displaySrc).toBe('data:face:95696250');
   });
 });

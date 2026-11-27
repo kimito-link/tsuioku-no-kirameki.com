@@ -27,7 +27,7 @@
 
 > 値が次の段へ届かない「断線」(broadcaster バグ型)は `npm run feature-map -- --check` が機械検知。
 
-## ⚠️ 役割コメントが無いソース 15 / 1394 件
+## ⚠️ 役割コメントが無いソース 15 / 1395 件
 - `docs/handoff/bench/bench-interval.mjs`
 - `docs/handoff/bench/bench-lane.mjs`
 - `extension-youtube/cloak-failsafe.js`
@@ -1204,7 +1204,7 @@
   - `gift-coin-hq.wav`
   - `gift-register-hq.wav`
   - `gift-register.mp3`
-- 📁 **src/** (2747)
+- 📁 **src/** (2749)
   - 📁 **data/** (7)
     - 📁 **acquirers/** (2)
       - `laneFromStorage.js` — 応援レーン acquirer: chrome.storage.local(nls_comments) → laneStore の橋渡し。
@@ -1563,7 +1563,7 @@
         - `logo_funlink_white_RGB_link_black.png`
         - `logo_funlink_white_RGB_maru_black.png`
     - `hero-connect-hub.svg`
-  - 📁 **lib/** (2413)
+  - 📁 **lib/** (2415)
     - 📁 **__snapshots__/** (4)
       - `marketing-abema-baseline.html`
       - `marketing-niconico.html`
@@ -3240,6 +3240,8 @@
     - `recentBroadcastLiveIds.js` — 最近の放送 liveId を `broadcastSessionSummary_v1` IDB から取得する純粋関数群。
     - `recentTextRing.js` — 「その人の直近N件の発言」を保持する固定長リングの純関数(v0.1.1218)。
     - `recentTextRing.test.js`
+    - `recordBreakdownInStep.js` — v0.1.2242 → v0.1.2256: 「記録」の下の「内訳: 通常 N …」を、記録と【同じ行・同じ重複の決まり】から数える(状態は呼び出し側が1つ持つ)。
+    - `recordBreakdownInStep.test.js`
     - `recordPathUntouched.test.js`
     - `recordRate.js` — 取得スピード(records/sec)の算出と健康スコア化(純ロジック)。
     - `recordRate.test.js`

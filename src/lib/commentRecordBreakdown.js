@@ -19,7 +19,7 @@
  * @module commentRecordBreakdown
  */
 
-import { createArrivalNoticeGate } from './arrivalNoticeRows.js';
+import { createArrivalNoticeGate, niconicoArrivalSentence } from './arrivalNoticeRows.js';
 
 /**
  * @typedef {{
@@ -69,6 +69,21 @@ export function summarizeCommentRecordBreakdown(comments) {
     normal += 1;
   }
   return { total, normal, interestArrival, followNotice, otherSystem };
+}
+
+/**
+ * v0.1.2256: 記録の1行を内訳の分類に振り分ける(記録の行ごとの正本・summarizeCommentRecordBreakdown と同じ判定)。
+ *   来場の二重受信(約2秒の窓)も、記録に入っている1行なので「興味来場」に数える(内訳の合計=記録の数)。
+ * @param {unknown} row
+ * @returns {'interestArrival'|'followNotice'|'otherSystem'|'normal'}
+ */
+export function classifyRecordRow(row) {
+  const c = /** @type {any} */ (row && typeof row === 'object' ? row : {});
+  if (niconicoArrivalSentence(c)) return 'interestArrival';
+  const kind = String(c.ytKind || c.kind || '');
+  if (c.commentType === 'followNotice' || kind === 'follow') return 'followNotice';
+  if (c.commentType === 'generalSystemMessage' || c.isSystem === true) return 'otherSystem';
+  return 'normal';
 }
 
 /**

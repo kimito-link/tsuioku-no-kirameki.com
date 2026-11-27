@@ -85,6 +85,22 @@ export function noAvatarFace() {
 }
 
 /**
+ * v0.1.2259: ID の無い行(興味来場など)の顔。記録が重なりを見分けるのと同じ鍵(buildDedupeKey=放送・コメント番号・本文)で
+ *   その行ごとのゆっくり顔を決める(全員同じ絵にしない・読み直しても同じ顔)。鍵が無ければ共通のゆっくり顔。
+ * @param {unknown} rowKey
+ * @returns {string}
+ */
+export function faceForRowKey(rowKey) {
+  const k = String(rowKey || '').trim();
+  if (!k) return noAvatarFace();
+  try {
+    return anonymousIdenticonDataUrl(`row:${k}`, 64) || noAvatarFace();
+  } catch {
+    return noAvatarFace();
+  }
+}
+
+/**
  * v0.1.2259: 顔の候補が灰色の既定アイコンなら、その人ごとのゆっくり顔に替える(それ以外はそのまま返す)。
  *   personKey(利用者 ID・名前など)が無いときは共通のゆっくり顔。灰色は出さない。
  * @param {unknown} src

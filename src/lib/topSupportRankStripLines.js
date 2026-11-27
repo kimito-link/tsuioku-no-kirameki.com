@@ -14,7 +14,7 @@ import {
   shortUserKeyDisplay,
   displayUserLabel
 } from './userRooms.js';
-import { isSiteDefaultSilhouetteUrl } from './avatarFallbackFromUrl.js';
+import { isSiteDefaultSilhouetteUrl, faceInsteadOfSilhouette } from './avatarFallbackFromUrl.js';
 import { anonymousNicknameFallback } from './nicoAnonymousDisplay.js';
 import {
   formatNicknameWithUidFallback,
@@ -230,7 +230,10 @@ export function topSupportRankLineModels(stripRooms, opts) {
       (officialRankUrlFreq.get(rawAv) || 0) >= 2;
     let thumbSrc = '';
     // v0.1.2259: 公式の灰色の既定アイコン(blank.jpg)は顔として採らない=下の分岐でその人ごとのゆっくり顔へ(正本=avatarFallbackFromUrl.js)
-    if (isHttpOrHttpsUrl(rawAv) && !rawAvDuplicatedOfficial && !isSiteDefaultSilhouetteUrl(rawAv)) {
+    if (isSiteDefaultSilhouetteUrl(rawAv)) {
+      // v0.1.2259: アイコン未設定と分かっている人(ギフト貢献度・広告ランキングの 名無し も)は、その人ごとのゆっくり顔(灰色の順位札にもしない)
+      thumbSrc = faceInsteadOfSilhouette(rawAv, uidForThumb || userKey);
+    } else if (isHttpOrHttpsUrl(rawAv) && !rawAvDuplicatedOfficial) {
       thumbSrc = String(rawAv).trim();
     } else if (isOfficialRank) {
       // v0.1.282: 公式DOMランキング（広告/貢献度）で実サムネが取れない or
