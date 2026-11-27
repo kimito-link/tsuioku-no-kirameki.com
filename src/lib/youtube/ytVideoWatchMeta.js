@@ -282,10 +282,9 @@ export function concurrentViewersIsViewCountLeak(concurrent, viewCount) {
 /** @param {any} signals */
 export function classifyYtWatchContentKind(signals) {
   const s = signals && typeof signals === 'object' ? signals : {};
-  if (s.hasLiveChatReplay === true) return 'live_replay';
-  if (s.isLive === true) return 'live';
-  // v0.1.2263: 公式が「いま配信ではない・配信だったものでもない」と両方出していれば、残ったチャット枠や画面の「視聴中」の文字で live にしない
   if (s.isLive === false && s.isLiveContent === false) return 'video';
+  if (s.isLive === true) return 'live';
+  if (s.hasLiveChatReplay === true) return 'live_replay';
   // 公式が「いまは配信ではない」と出しているときは、取り違えた同時視聴の数や残ったチャット枠で live にしない
   if (s.hasLiveChat === true && s.isLive !== false) return 'live';
   // v0.1.2241: 公式が「この動画はライブ配信ではない」(isLiveContent=false)と出していれば、同時視聴の欄に数が入っていても通常動画。
@@ -1191,4 +1190,24 @@ export function tallyVisibleSuperThanks(authors) {
     amounts[cur] = (amounts[cur] || 0) + n;
   }
   return { count, amounts };
+}
+
+/** @param {Document} doc @param {string} videoId */
+export function readYtWatchIndicators(doc, videoId) {
+  const root = doc.documentElement;
+  const raw = root?.getAttribute('data-nl-yt-view-count') || '';
+  const tagged = root?.getAttribute('data-nl-yt-view-count-video-id') === videoId;
+  const viewCount = tagged && /^\d+$/.test(raw) ? Number(raw) : ytViewCountFromDom(doc);
+  let hasLiveChat = false;
+  let hasLiveChatReplay = false;
+  for (const frame of doc.querySelectorAll('iframe[src]')) {
+    try {
+      const url = new URL(frame.getAttribute('src') || '', 'https://www.youtube.com');
+      const id = url.searchParams.get('v') || url.searchParams.get('video_id');
+      if (!videoId || id !== videoId || !/(^|\.)youtube\.com$/i.test(url.hostname)) continue;
+      if (url.pathname === '/live_chat_replay') hasLiveChatReplay = true;
+      else if (url.pathname === '/live_chat') hasLiveChat = true;
+    } catch { /* Ignore malformed iframe URLs. */ }
+  }
+  return { viewCount, hasLiveChat, hasLiveChatReplay };
 }

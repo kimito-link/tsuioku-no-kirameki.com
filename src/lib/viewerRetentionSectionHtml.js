@@ -4,6 +4,7 @@
  */
 
 import { escapeAttr, escapeHtml } from '../shared/html/escape.js';
+import { formatLongGapJa } from './marketingTimeSpan.js';
 import { maskLabelForShare } from './privacyDisplay.js';
 import { displayUserLabel } from './userRooms.js';
 import { buildUserProfileLinkedLabelHtml } from './userProfileLinkHtml.js';
@@ -18,6 +19,8 @@ export const VIEWER_RETENTION_OPEN_ROWS = 50;
 
 /** @param {number} ms */
 function minLabel(ms) {
+  const long = formatLongGapJa(ms);
+  if (long) return long;
   const m = Math.max(0, Math.round(ms / 60_000));
   if (m < 60) return `${m}分`;
   return `${Math.floor(m / 60)}時間${m % 60}分`;

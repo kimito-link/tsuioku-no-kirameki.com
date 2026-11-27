@@ -29,23 +29,29 @@ export function boundCommentsToTimeWindow(comments, maxMinutes = MARKETING_TIMEL
   const limit = Math.max(1, Math.floor(Number(maxMinutes) || MARKETING_TIMELINE_MAX_MINUTES)) * 60_000;
   let minT = Infinity;
   let maxT = -Infinity;
+  let previousMax = -Infinity;
+  let dated = 0;
   for (let i = 0; i < list.length; i += 1) {
     const t = toEpochMs(list[i]?.capturedAt);
     if (!Number.isFinite(t) || t <= 0) continue;
     if (t < minT) minT = t;
-    if (t > maxT) maxT = t;
+    dated += 1;
+    if (t >= maxT) { previousMax = maxT; maxT = t; }
+    else if (t > previousMax) previousMax = t;
   }
   if (!(maxT >= minT)) return { comments: list, windowed: false, spanMinutes: 0, fromMs: 0, toMs: 0 };
   const spanMinutes = Math.round((maxT - minT) / 60_000);
   if (maxT - minT <= limit) return { comments: list, windowed: false, spanMinutes, fromMs: minT, toMs: maxT };
-  const from = maxT - limit;
+  const isolated = dated >= 3 && previousMax - minT <= limit && maxT - previousMax > 2 * limit;
+  const to = isolated ? previousMax : maxT;
+  const from = to - limit;
   /** @type {T[]} */
   const out = [];
   for (let i = 0; i < list.length; i += 1) {
     const t = toEpochMs(list[i]?.capturedAt);
-    if (!Number.isFinite(t) || t <= 0 || t >= from) out.push(list[i]);
+    if (!Number.isFinite(t) || t <= 0 || (t >= from && t <= to)) out.push(list[i]);
   }
-  return { comments: out, windowed: true, spanMinutes, fromMs: from, toMs: maxT };
+  return { comments: out, windowed: true, spanMinutes, fromMs: from, toMs: to };
 }
 
 /**

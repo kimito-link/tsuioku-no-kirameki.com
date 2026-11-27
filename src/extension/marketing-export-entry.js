@@ -657,7 +657,10 @@ async function runExport(lid) {
       : null;
     setWaitStageText('分析中… (2/3) 集計・画像準備', 35);
     await yieldToBrowserPaint();
-    const report = aggregateMarketingReport(comments, lid, { broadcasterUserId: reportBroadcasterUid });
+    const kind = /** @type {{contentKind?: string}|undefined} */ (facts)?.contentKind;
+    const contentKind = kind === 'live_replay' || kind === 'live' || (!marketingView && /^lv\d+$/.test(lid) && !isYtPseudoLvShape(lid))
+      ? 'live' : kind;
+    const report = aggregateMarketingReport(comments, lid, { broadcasterUserId: reportBroadcasterUid, contentKind });
     mktProf.mark('aggregate');
 
     const [
@@ -831,6 +834,7 @@ async function runExport(lid) {
       sessionSummaryRows,
       // v0.1.1708: 分析の入力は全件(旧: heavy のとき2,500件の均等サンプル=速度・沈黙・笑い・疲労・離脱・出席などが無注記で縮んだ)。
       commentsForAnalytics: comments,
+      contentKind,
       pastBroadcasts,
       giftUsers: giftUsersForMarketing,
       giftEvents: giftEventsForMarketing,

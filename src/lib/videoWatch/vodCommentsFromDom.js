@@ -17,6 +17,7 @@
  *   - TikTok: __UNIVERSAL_DATA_FOR_REHYDRATION__ の comment 配列は実測で空。コメントは後から描かれることがある。
  */
 
+import { videoMetricCount } from './videoFacts.js';
 import { parseTcMovieCommentDoc, readTcPageInfo } from '../twitcasting/tcPageInfo.js';
 import { safeTcImageUrl } from '../twitcasting/tcParse.js';
 import { safeTtImageUrl } from '../tiktok/ttParse.js';
@@ -83,13 +84,12 @@ function viewCountFromLd(video) {
     for (const st of list) {
       const type = String(st?.interactionType?.['@type'] || st?.interactionType || '');
       if (!/WatchAction$/.test(type)) continue;
-      const n = Number(st?.userInteractionCount);
-      if (Number.isFinite(n) && n >= 0) return Math.floor(n);
+      const n = videoMetricCount(st?.userInteractionCount);
+      if (n !== null) return n;
     }
     return null;
   }
-  const views = Number(video?.interactionCount ?? video?.userInteractionCount);
-  return Number.isFinite(views) && views >= 0 ? Math.floor(views) : null;
+  return videoMetricCount(video?.interactionCount ?? video?.userInteractionCount);
 }
 
 /**
@@ -346,10 +346,10 @@ export function tiktokVideoStatsFromDoc(doc, videoId) {
     const item = data?.__DEFAULT_SCOPE__?.['webapp.video-detail']?.itemInfo?.itemStruct;
     if (!item || !videoId || String(item.id || '') !== String(videoId)) return {};
     const out = {};
-    const likes = Number(item.stats?.diggCount);
-    if (Number.isFinite(likes) && likes >= 0) out.likes = Math.floor(likes);
-    const comments = Number(item.stats?.commentCount);
-    if (Number.isFinite(comments) && comments >= 0) out.commentTotal = Math.floor(comments);
+    const likes = videoMetricCount(item.stats?.diggCount);
+    if (likes !== null) out.likes = likes;
+    const comments = videoMetricCount(item.stats?.commentCount);
+    if (comments !== null) out.commentTotal = comments;
     return out;
   } catch {
     return {};

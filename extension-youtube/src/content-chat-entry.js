@@ -19,7 +19,7 @@ import {
   ytVideoCommentAuthorsFromInnertube,
   mergeYtVideoCommentAuthors,
   ytVideoCommentsFromDom,
-  ytViewCountFromDom, ytCommentCountFromDom,
+  readYtWatchIndicators, ytCommentCountFromDom,
   concurrentViewersIsViewCountLeak,
 } from '../../src/lib/youtube/ytVideoWatchMeta.js';
 import { askPageToTagYtCommentPhotos, readYtCommentEntities } from '../../src/lib/youtube/ytCommentPhotoTag.js';
@@ -683,21 +683,7 @@ function setupWatchPageMetaObserver() {
       if (v === '0') return false;
       return null;
     };
-    const attrCount = root?.getAttribute('data-nl-yt-view-count') || '';
-    const viewCountFromAttr = /^\d+$/.test(attrCount) ? Number(attrCount) : null;
-    const viewCount = viewCountFromAttr != null ? viewCountFromAttr : ytViewCountFromDom(document);
-    let hasLiveChat = false;
-    let hasLiveChatReplay = false;
-    try {
-      const iframes = document.querySelectorAll('iframe[src]');
-      for (let i = 0; i < iframes.length; i += 1) {
-        const src = String(iframes[i].getAttribute('src') || '');
-        if (src.includes('live_chat_replay')) hasLiveChatReplay = true;
-        else if (src.includes('/live_chat')) hasLiveChat = true;
-      }
-    } catch {
-      /* フレームが読めなくても種別は他の印で決める */
-    }
+    const { viewCount, hasLiveChat, hasLiveChatReplay } = readYtWatchIndicators(document, videoId);
     let viewersForKind = viewers;
     // v0.1.2241: 丸めた再生回数(474万)と概要欄の再生回数(4,740,759)も同じ数とみなす(ytVideoWatchMeta.js)
     if (viewCount != null && concurrentViewersIsViewCountLeak(viewersForKind, viewCount)) viewersForKind = null;

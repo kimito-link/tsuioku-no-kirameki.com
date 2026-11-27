@@ -277,6 +277,18 @@ export function applyVideoWatchRootMark(doc, on, source = '') {
     else root.removeAttribute(VIDEO_WATCH_SOURCE_ATTR);
   }
   const cur = root.getAttribute(VIDEO_WATCH_ROOT_ATTR) === '1';
+  const voice = /** @type {HTMLButtonElement|null} */ (doc.getElementById('openComeviewVoiceBtn'));
+  if (voice?.tagName === 'BUTTON') {
+    if (on && !voice.disabled) {
+      voice.disabled = true;
+      voice.setAttribute('aria-disabled', 'true');
+      voice.setAttribute('data-nl-video-voice-disabled', '1');
+    } else if (!on && voice.hasAttribute('data-nl-video-voice-disabled')) {
+      voice.disabled = false;
+      voice.removeAttribute('aria-disabled');
+      voice.removeAttribute('data-nl-video-voice-disabled');
+    }
+  }
   if (cur === on) return;
   if (on) {
     if (!doc.getElementById(VIDEO_WATCH_HIDE_STYLE_ID)) {
@@ -349,8 +361,10 @@ export function installViewerBehaviorBoardFromStorage(opts) {
   let pageTabService = '';
   /** @type {number|null} */
   let pageTabId = null;
+  let refreshSequence = 0;
 
   const refresh = () => {
+    const sequence = ++refreshSequence;
     try {
       if (opts.skipIfVideoCardId && doc.getElementById(opts.skipIfVideoCardId)) {
         paintViewerBehaviorBoardEl({ document: doc, hide: true });
@@ -359,6 +373,7 @@ export function installViewerBehaviorBoardFromStorage(opts) {
       // v0.1.2263: YouTube はページ側が決めた種別(まとめの contentKind)も読む。カードを塗れたかどうかと切り離す
       const ytSumKey = pageTabService === 'youtube' && pageTabKey ? summaryStorageKey(pageTabKey) : '';
       void storage.local.get([KEY_VIEWER_BEHAVIOR_BOARD, KEY_YT_VIDEO_WATCH_CARD, KEY_NICO_VIDEO_WATCH_CARD, KEY_VOD_VIDEO_WATCH_CARD, KEY_LAST_WATCH_URL, ...(ytSumKey ? [ytSumKey] : [])]).then((/** @type {any} */ bag) => {
+        if (sequence !== refreshSequence) return;
         try {
           if (opts.skipIfVideoCardId && doc.getElementById(opts.skipIfVideoCardId)) {
             paintViewerBehaviorBoardEl({ document: doc, hide: true });
@@ -415,11 +430,12 @@ export function installViewerBehaviorBoardFromStorage(opts) {
       const url = videoPageUrlOfTab(tab);
       const identity = videoIdentityFromUrl(url);
       const key = identity ? identity.key : '';
-      if (!key && !pageTabKey) return;
-      const changed = key !== pageTabKey;
+      if (!url) return;
+      const service = identity ? String(identity.service || '') : '';
+      const changed = key !== pageTabKey || service !== pageTabService || (!key && url !== pageTabUrl);
       pageTabKey = key;
-      pageTabService = identity ? String(identity.service || '') : '';
-      pageTabUrl = key ? url : '';
+      pageTabService = service;
+      pageTabUrl = url;
       pageTabId = key && tab && typeof tab.id === 'number' ? tab.id : null;
       if (!changed) return;
       refresh();
