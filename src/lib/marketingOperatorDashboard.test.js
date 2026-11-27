@@ -139,6 +139,21 @@ describe('運営者向けマーケ HTML の契約', () => {
     expect(html).toContain('自分の動画');
   });
 
+  it('コメントのサービス名を優先し、Twitch を YouTube ライブと書かない', () => {
+    const liveId = 'lv944571565015';
+    const comments = commentsFor('twitch', liveId);
+    const html = buildMarketingDashboardHtml(aggregateMarketingReport(comments, liveId), {
+      platform: 'youtube',
+      commentsForAnalytics: comments,
+      contentKind: 'live',
+      broadcastTitle: 'ハイゲ前日',
+    });
+    const kicker = (html.match(/mkt-header__kicker">([^<]+)/) || [])[1] || '';
+    expect(kicker).toContain('Twitch の記録');
+    expect(kicker).not.toContain('YouTube');
+    expect(html).toContain('ハイゲ前日');
+  });
+
   it('YouTube 動画の見出しは公式の呼び方と watch id で、仮 lv は出さない', () => {
     const liveId = 'lv927058321372';
     const comments = commentsFor('youtube', liveId, {

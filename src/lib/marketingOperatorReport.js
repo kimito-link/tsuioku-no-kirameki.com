@@ -246,9 +246,42 @@ export function resolveOperatorContentKind(input) {
   return 'live';
 }
 
+
+/**
+ * 記録行に付いているサービス名を優先する。仮 lv だけ見て YouTube と決めない。
+ * @param {{ platformId?: string, comments?: readonly any[], liveId?: string }} input
+ */
+export function inferOperatorPlatform(input) {
+  const fromRow = (row) => {
+    if (!row || typeof row !== 'object') return '';
+    const p = String(row.ytPlatform || row.platform || '').trim();
+    if (p) return p;
+    const ch = String(row.channelId || row.ytChannelId || '');
+    if (ch.startsWith('tw:')) return 'twitch';
+    if (ch.startsWith('kk:')) return 'kick';
+    if (ch.startsWith('tc:')) return 'twitcasting';
+    if (ch.startsWith('sr:')) return 'showroom';
+    if (ch.startsWith('tt:')) return 'tiktok';
+    if (ch.startsWith('mx:')) return 'mixch';
+    if (ch.startsWith('ww:')) return 'whowatch';
+    if (ch.startsWith('ab:')) return 'abema';
+    return '';
+  };
+  const rows = Array.isArray(input?.comments) ? input.comments : [];
+  for (let i = 0; i < rows.length && i < 80; i += 1) {
+    const p0 = fromRow(rows[i]);
+    if (p0) return p0;
+  }
+  const given = String(input?.platformId || '').trim();
+  if (given) return given;
+  const id = String(input?.liveId || '').trim();
+  if (isYtPseudoLvShape(id)) return 'youtube';
+  return given;
+}
+
 export function buildOperatorReportModel(input) {
   const liveId = String(input?.liveId || '').trim();
-  const platformId = String(input?.platformId || '').trim() || 'niconico';
+  const platformId = inferOperatorPlatform({ platformId: input?.platformId, comments: input?.comments, liveId }) || 'niconico';
   const contentKind = resolveOperatorContentKind(input);
   const isVideo = contentKind === 'video';
   const view = marketingViewFor(platformId);
