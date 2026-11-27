@@ -318,6 +318,23 @@ describe('7. 動画の数字(ある値だけ)と、ライブだけの枠を隠�
     expect(vodVideoWatchCardTitle('tiktok')).toBe('この動画のデータ');
     expect(vodVideoWatchCardTitle('twitch')).toBe('この動画のデータ');
   });
+  it('会場の帯(YouTube 動画): 再生数があれば「再生 N 回」、読めないときは「読み込み中」を出さずに隠す', () => {
+    const base = { records: { text: '0', isPlaceholder: false }, concurrent: { text: '—', isPlaceholder: true }, streamAge: { text: '—', isPlaceholder: true } };
+    const withViews = venueItemsForPlatform('youtube', { ...base, facts: { contentKind: 'video', viewCount: 6780000, commentCount: 100 } });
+    expect(withViews.map((i) => `${i.label} ${i.text}`)).toEqual(['再生 6,780,000', 'コメント 100']);
+    const noViews = venueItemsForPlatform('youtube', { ...base, facts: { contentKind: 'video', commentCount: 100 } });
+    expect(noViews.map((i) => i.key)).toEqual(['comments']);
+    expect(JSON.stringify(noViews)).not.toContain('読み込み中');
+  });
+  it('まとめの書き込みの間引きは、再生数・コメント数・種別が変わった書き込みを落とさない', async () => {
+    const { summaryFactsSignature, slimSummaryForStorage } = await import('../youtube/ytSplitPersist.js');
+    const a = summaryFactsSignature(slimSummaryForStorage({ videoId: 'v', contentKind: 'video', slotCommentCount: 10 }));
+    const b = summaryFactsSignature(slimSummaryForStorage({ videoId: 'v', contentKind: 'video', slotCommentCount: 10, slotViewCount: 6780000 }));
+    expect(a).not.toBe(b);
+    expect(summaryFactsSignature(slimSummaryForStorage({ videoId: 'v', contentKind: 'video', slotCommentCount: 10, title: 'x' }))).toBe(a);
+    const src = readFileSync(join(dirname(fileURLToPath(import.meta.url)), '../../../extension-youtube/src/background-entry.js'), 'utf8');
+    expect(src).toMatch(/summaryChromeWriteDue\(summaryChromeAt\.get\(id\) \|\| 0, now\) && summaryChromeSig\.get\(id\) === sig/);
+  });
   it('TikTok の動画のいいねは、動画IDが合う itemStruct.stats.diggCount だけ(投稿者の合計は使わない)', async () => {
     const { tiktokVideoStatsFromDoc } = await import('./vodCommentsFromDom.js');
     const data = { __DEFAULT_SCOPE__: { 'webapp.video-detail': { itemInfo: { itemStruct: { id: '711', stats: { diggCount: 5000, commentCount: 42 }, authorStats: { diggCount: 999999 } } } } } };

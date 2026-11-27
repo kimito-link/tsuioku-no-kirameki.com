@@ -5,6 +5,7 @@
  * @typedef {import('./eventRankingReportModel.js').EventRankingReportModel} EventRankingReportModel
  */
 
+import { boundCommentsToTimeWindow } from './marketingTimeSpan.js';
 import { escapeAttr, escapeHtml } from './htmlEscape.js';
 import { maskLabelForShare } from './privacyDisplay.js';
 import { yukkuriBroadcastSummaryEmbeddedCss } from './yukkuriBroadcastSummary.js';
@@ -3152,9 +3153,10 @@ export function buildMarketingDashboardHtml(r, opts = {}) {
   // velocity / silence / laughter は MarketingReport には乗っていないので、
   // r 経由で comments 全件は取れない。代わりに r.timeline の 1 分 bucket を流用するか、
   // opts.commentsForTimeline を別経路で受ける。今回は opts.commentsForAnalytics を採用。
-  const commentsRaw = Array.isArray(opts.commentsForAnalytics)
-    ? opts.commentsForAnalytics
-    : [];
+  // v0.1.2263: 時間の流れの部品には、上限の幅(7日)までのコメントだけを渡す(marketingTimeSpan.js)。
+  //   何年にもわたる動画のコメントで、1分ごとの列が数百万になり「Invalid string length」になった。
+  const timeSpan = boundCommentsToTimeWindow(Array.isArray(opts.commentsForAnalytics) ? opts.commentsForAnalytics : []);
+  const commentsRaw = /** @type {any[]} */ (timeSpan.comments);
   // ニコ生は配列をコピーしない。他サービスで応援の行があるときだけ、発言だけを分析に渡す。
   const commentsForAnalytics = view ? speechCommentsForMarketing(commentsRaw) : commentsRaw;
   const velocityTimeline = buildCommentVelocityTimeline(commentsForAnalytics, {
@@ -3647,7 +3649,7 @@ ${buildSectionRevealBootScriptHtml()}
 <body>
 <header class="mkt-header">
 <h1 class="mkt-header__title">📊 配信マーケティング分析</h1>
-<p class="mkt-header__sub">${escapeHtml(r.liveId)} — ${new Date().toLocaleString('ja-JP')} 出力${escapeHtml(subSuffix)} · JSON埋め込み ${escapeHtml(exportedAtIso)}</p>
+<p class="mkt-header__sub">${escapeHtml(r.liveId)} — ${new Date().toLocaleString('ja-JP')} 出力${escapeHtml(subSuffix)}${timeSpan.windowed ? ' · 時間の流れはコメントの新しい側7日分(件数・人数は全件)' : ''} · JSON埋め込み ${escapeHtml(exportedAtIso)}</p>
 </header>
 ${broadcasterProfileCardHtml}
 <main class="mkt-main">

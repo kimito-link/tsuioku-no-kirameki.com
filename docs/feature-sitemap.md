@@ -224,7 +224,7 @@
 
 - **応援レーン集約(誰が候補か)** — 保存コメント行を userId 単位に畳み込みレーン候補を作る唯一の集約正本(popup/venue 共通)
   - `src/lib/userLaneCandidatesFromStorage.js`
-<details><summary>🗂 このカテゴリの全担当ファイル(自動分類) 119</summary>
+<details><summary>🗂 このカテゴリの全担当ファイル(自動分類) 118</summary>
 
 - `api/event-ranking.js` — イベント💎ランキングの「公式更新以降 +X」「推定イベントpt」用のサーバ側スナップショット（2026-11-21）。
 - `scripts/council-trial.mjs` — 会議メンバー候補を「本番と同じ条件」で一斉に試す使い捨て計器。
@@ -297,7 +297,6 @@
 - `src/lib/liveviewMirrorSections.js` — ③WEB丸写しの「セクション・レジストリ」= ①POP の各パネルが③に出るための配線を1箇所に集約した一覧表
 - `src/lib/loadLastBroadcastSummary.js` — 0.1.69 (AY): empty state（配信なし）popup で「前回の配信」cards を復元するために、
 - `src/lib/mangaBroadcastSummary.js` — 放送終了後の HTML レポート / マーケ分析の頭にくる「漫画読み体験」要約。
-- `src/lib/marketingAggregate.js` — userId: string,
 - `src/lib/mcpBridge/buildMcpRankingSnippet.js` — MCP / L1 向けに貢献度・広告ランキングの **PII 最小スナップショット** を組み立てる。
 - `src/lib/networkErrorProbe.js` — v0.1.201: 拡張の network 層異常を診断 JSON 用に集約する純関数。
 - `src/lib/nicoadContributionRankingApi.js` — ニコニ広告(nicoad)「貢献度ランキング」無認証 JSON API の URL 組立 & 正規化（純関数）。
@@ -803,7 +802,7 @@
   - `app/supporter.html`
   - `app/referral-passthrough.js`
   - `tsuioku-no-kirameki/tokushoho.html`
-<details><summary>🗂 このカテゴリの全担当ファイル(自動分類) 60</summary>
+<details><summary>🗂 このカテゴリの全担当ファイル(自動分類) 61</summary>
 
 - `extension-youtube/marketing-export-guard.js` — マーケ分析タブ(marketing-export.html)の「何があっても開く」保険。
 - `extension-youtube/marketing-export.js` — ニコ生版 marketing-export-entry.js(本物)+ YouTube の記録を読む入口のバンドル
@@ -837,6 +836,7 @@
 - `src/lib/marketingExportTabState.js` — マーケ分析タブ(marketing-export.html?lv=<lid>)の「状態」を URL に残し、
 - `src/lib/marketingReportEmbed.js` — マーケ分析 HTML に埋め込む JSON（表計算・ツール連携用）。
 - `src/lib/marketingSupportParticipationCounts.js` — マーケ分析・HTMLレポート先頭 KPI: ギフト投げ主・広告した人の人数。
+- `src/lib/marketingTimeSpan.js` — 【層】L0 判定層(純粋関数・I/O禁止)
 - `src/lib/mediaKitEmbed.js` — メディアキットを分析レポートの1章として埋め込むときの、CSS の囲い(id)。
 - `src/lib/mediaKitHtml.js` — 追憶メディアキットの共有用 single-file HTML。
 - `src/lib/mediaKitStats.js` — 追憶メディアキット向けの期間集計。
@@ -1653,6 +1653,9 @@
 ## 🧬 修正系譜マップ(この系統のバグを過去にどう直したか)
 
 > changelog 全 20 版を「バグ系統」で束ねた枝。同系統をまた触るとき、過去の修正と「なぜ毎回触るか」を辿る(再発防止)。新しい順。
+
+### 💾 記録件数 (1版)
+- `v0.1.2263` 2026-11-27 — 動画ページで、顔を新しい順に並べ、タップで書いたことを出す
 
 ### 📥 コメント取得 (2版)
 - `v0.1.2261` 2026-11-27 — 広告ランキングの名無しを、灰色の「未取得」札にしない

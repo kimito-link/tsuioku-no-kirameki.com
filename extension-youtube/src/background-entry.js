@@ -75,6 +75,7 @@ import {
   storageJsonBytes,
   summaryChromeWriteDue,
   summaryStorageKey,
+  summaryFactsSignature,
   verifiedBeforeRetire,
 } from '../../src/lib/youtube/ytSplitPersist.js';
 import { capStallPage, freshStallRows } from '../../src/lib/stallTrace.js';
@@ -293,6 +294,8 @@ let summaryMem = null;
 let summaryRetireStarted = false;
 /** @type {Map<string, number>} */
 const summaryChromeAt = new Map();
+/** 配信ごとの、chrome.storage に最後に書いたまとめの数字(再生・コメント数・種別) @type {Map<string, string>} */
+const summaryChromeSig = new Map();
 /** @type {Record<string, string>} userKey → 最後に書いた JSON */
 const voiceSavedJson = {};
 let activeVideoMem = '';
@@ -529,11 +532,15 @@ async function publishOneSummary(videoId, summary) {
       /* IndexedDB が書けなくても、画面への小さい知らせは続ける */
     }
   }
-  if (!summaryChromeWriteDue(summaryChromeAt.get(id) || 0, now)) return;
   const slim = slimSummaryForStorage(summary);
   const key = summaryStorageKey(id);
   if (!slim || !key) return;
+  // v0.1.2263: 間引き(1秒)で落とした書き込みは、あとで書き直されない(動画のページはコメントが増えないので次の知らせが来ない)。
+  //   再生数・コメント数・種別が変わった書き込みは間引かない(会場の帯が「再生 読み込み中」のまま止まっていた)。
+  const sig = summaryFactsSignature(slim);
+  if (!summaryChromeWriteDue(summaryChromeAt.get(id) || 0, now) && summaryChromeSig.get(id) === sig) return;
   summaryChromeAt.set(id, now);
+  summaryChromeSig.set(id, sig);
   await chrome.storage.local.set({ [key]: slim });
 }
 

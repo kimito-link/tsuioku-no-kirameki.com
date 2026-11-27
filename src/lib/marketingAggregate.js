@@ -2,6 +2,8 @@
  * @typedef {import('./commentRecord.js').StoredComment} StoredComment
  */
 
+import { MARKETING_TIMELINE_MAX_MINUTES } from './marketingTimeSpan.js';
+export { MARKETING_TIMELINE_MAX_MINUTES };
 import { normalizeLv } from '../shared/niconico/liveId.js';
 import { extractNiconicoUserIdFromIconUrl } from '../shared/avatar/avatarUrlGuard.js';
 import { isSameAvatarUrl } from './avatarUrlCompare.js';
@@ -630,9 +632,6 @@ function computePremiumStats(filtered) {
       knownCount > 0 ? Math.round((premiumCount / knownCount) * 1000) / 10 : 0
   };
 }
-
-/** 1分ごとの時系列を作る最大の幅(7日)。ライブの配信はこの中に収まる。 */
-export const MARKETING_TIMELINE_MAX_MINUTES = 7 * 24 * 60;
 
 /** @param {TimelineBucket[]} timeline */
 function computeTimelineCumulative(timeline) {

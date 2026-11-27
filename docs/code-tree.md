@@ -27,7 +27,7 @@
 
 > 値が次の段へ届かない「断線」(broadcaster バグ型)は `npm run feature-map -- --check` が機械検知。
 
-## ⚠️ 役割コメントが無いソース 15 / 1398 件
+## ⚠️ 役割コメントが無いソース 16 / 1399 件
 - `docs/handoff/bench/bench-interval.mjs`
 - `docs/handoff/bench/bench-lane.mjs`
 - `extension-youtube/cloak-failsafe.js`
@@ -38,6 +38,7 @@
 - `src/extension/voice-native-guide-entry.js`
 - `src/lib/laneDomSelfMeasure.js`
 - `src/lib/liveLaneBuckets.js`
+- `src/lib/marketingAggregate.js`
 - `src/lib/mediaKitExport.js`
 - `src/lib/reportPreviewPublish.js`
 - `src/lib/venueLaneBuckets.js`
@@ -1204,7 +1205,7 @@
   - `gift-coin-hq.wav`
   - `gift-register-hq.wav`
   - `gift-register.mp3`
-- 📁 **src/** (2755)
+- 📁 **src/** (2756)
   - 📁 **data/** (7)
     - 📁 **acquirers/** (2)
       - `laneFromStorage.js` — 応援レーン acquirer: chrome.storage.local(nls_comments) → laneStore の橋渡し。
@@ -1563,7 +1564,7 @@
         - `logo_funlink_white_RGB_link_black.png`
         - `logo_funlink_white_RGB_maru_black.png`
     - `hero-connect-hub.svg`
-  - 📁 **lib/** (2421)
+  - 📁 **lib/** (2422)
     - 📁 **__snapshots__/** (4)
       - `marketing-abema-baseline.html`
       - `marketing-niconico.html`
@@ -2859,7 +2860,7 @@
     - `mangaBroadcastSummary.test.js`
     - `manifestHostPermissions.test.js`
     - `manifestKnownKeys.test.js`
-    - `marketingAggregate.js` — userId: string,
+    - `marketingAggregate.js` — ⚠️ 役割コメント無し
     - `marketingAggregate.test.js`
     - `marketingChartsHtml.js` — マーケ集計(MarketingReport)から HTMLレポート用のグラフ/チャート HTML を組み立てる。
     - `marketingChartsHtml.snapshot.test.js`
@@ -2878,6 +2879,7 @@
     - `marketingReportEmbed.test.js`
     - `marketingSupportParticipationCounts.js` — マーケ分析・HTMLレポート先頭 KPI: ギフト投げ主・広告した人の人数。
     - `marketingSupportParticipationCounts.test.js`
+    - `marketingTimeSpan.js` — 【層】L0 判定層(純粋関数・I/O禁止)
     - `mcpDiagDumpServices.js` — ニコ生以外のサービス計器・タブを軽量ダンプするための純粋ロジック（L0）。
     - `mcpDiagDumpServices.test.js`
     - `mediaKitEmbed.js` — メディアキットを分析レポートの1章として埋め込むときの、CSS の囲い(id)。
