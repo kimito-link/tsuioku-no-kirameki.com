@@ -4,7 +4,7 @@
  * 会場モードは隠し、同時視聴は出さない。コメントはページに既にある DOM だけを読む。
  */
 import { KEY_VOD_VIDEO_WATCH_CARD } from '../lib/storageKeys.js';
-import { isVodVideoWatchUrl, vodWatchPageFromUrl } from '../lib/videoWatch/vodWatchUrl.js';
+import { isVodVideoWatchUrl, vodWatchPageFromUrl, venueVideoPageFromUrl } from '../lib/videoWatch/vodWatchUrl.js';
 import { readVodWatchDom } from '../lib/videoWatch/vodCommentsFromDom.js';
 import { buildVodVideoWatchCardModel } from '../lib/videoWatch/videoWatchCard.js';
 import { videoIdentityFromUrl } from '../lib/videoWatch/videoIdentity.js';
@@ -52,7 +52,9 @@ function refresh() {
     lastSig = '';
     return;
   }
-  hideVenueModeForVideoPage(true);
+  // v0.1.2263(りんく 11-28「会場モードは全部のサービスで」): Twitch・Kick・ツイキャス・TikTok の録画・動画は会場を出す
+  //   (YouTube の動画と同じ会場・コメントはこのカードの行)。ABEMA の見逃しは今まで通り隠す
+  hideVenueModeForVideoPage(!venueVideoPageFromUrl(href));
   // 横の欄と同じ関数で作った身元の鍵で書く(書く鍵と探す鍵を 1 つにする・v0.1.2241)
   const identity = videoIdentityFromUrl(href);
   const key = identity ? identity.key : page.pageKey;
@@ -68,9 +70,12 @@ function refresh() {
     ownerId: page.ownerId,
     ownerName: read.ownerName,
     videoAuthors: read.authors,
+    facts: read.facts,
     nowMs: Date.now(),
   });
-  const sig = `${key}:${card ? (card.videoAuthorCount || 0) : 0}:${card?.title || ''}:${card?.viewCountText || ''}:${tw ? tw.filled : 0}`;
+  // v0.1.2263: 読めた本文の数と先頭の人も見る(本文が後から描かれたときにカードを書き直す)
+  const textN = read.authors.reduce((n, a) => n + (Array.isArray(/** @type {any} */ (a).comments) ? /** @type {any} */ (a).comments.length : 0), 0);
+  const sig = `${key}:${card ? (card.videoAuthorCount || 0) : 0}:${card?.title || ''}:${card?.viewCountText || ''}:${tw ? tw.filled : 0}:${textN}:${read.authors[0]?.id || ''}`;
   if (sig === lastSig) return;
   lastSig = sig;
   try {
@@ -89,7 +94,7 @@ function refresh() {
  *   (会場を隠すのは録画の URL のときだけ・ライブへ戻れば自分が隠した会場だけ戻す)。
  */
 {
-  if (isVodVideoWatchUrl(String(location.href || ''))) hideVenueModeForVideoPage(true);
+  if (isVodVideoWatchUrl(String(location.href || ''))) hideVenueModeForVideoPage(!venueVideoPageFromUrl(String(location.href || '')));
   refresh();
   if (LIVE_ICONS_KEY) {
     try {

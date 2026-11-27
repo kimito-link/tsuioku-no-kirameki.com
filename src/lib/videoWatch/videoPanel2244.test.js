@@ -104,6 +104,22 @@ describe('① 横の欄を開いたまま同じタブでページを移っても
     expect(board?.innerHTML).not.toContain('twvod:2940252213');
   });
 
+  it('v0.1.2263: YouTube はカードがまだ無くても、ページが「動画」と決めたまとめで動画の形にする。ライブのまとめなら付けない', async () => {
+    const doc = freshDoc();
+    const tab = { id: 5, windowId: 1, active: true, url: 'https://www.youtube.com/watch?v=kKl0E22tU78' };
+    const t = fakeTabs(tab);
+    const s = fakeStorage({ 'ytm:sum:v1:kKl0E22tU78': { videoId: 'kKl0E22tU78', contentKind: 'video' } });
+    installViewerBehaviorBoardFromStorage({ document: doc, storage: s.storage, getUrl: () => '', placement: 'flow', sources: 'video', tabs: t.api, windows: t.windows });
+    await flush();
+    expect(doc.documentElement.getAttribute(VIDEO_WATCH_ROOT_ATTR)).toBe('1');
+    const doc2 = freshDoc();
+    const t2 = fakeTabs({ id: 6, windowId: 1, active: true, url: 'https://www.youtube.com/watch?v=LIVE0000000' });
+    const s2 = fakeStorage({ 'ytm:sum:v1:LIVE0000000': { videoId: 'LIVE0000000', contentKind: 'live' } });
+    installViewerBehaviorBoardFromStorage({ document: doc2, storage: s2.storage, getUrl: () => '', placement: 'flow', sources: 'video', tabs: t2.api, windows: t2.windows });
+    await flush();
+    expect(doc2.documentElement.getAttribute(VIDEO_WATCH_ROOT_ATTR)).toBeNull();
+  });
+
   it('タブを切り替えたとき(onActivated)も、その前面タブで塗る。別のウィンドウのタブは見ない', async () => {
     const doc = freshDoc();
     const t = fakeTabs(null);
@@ -268,8 +284,10 @@ describe('④ サイトの中のリンクで録画へ移っても(SPA・文書�
       const wrap = e.set.mock.calls[0][0].nls_vod_video_watch_card_v1;
       expect(wrap.videoId).toBe('twvod:2940252213');
       expect(wrap.card.videoAuthorCount).toBeGreaterThan(0);
-      expect(e.win.document.getElementById('nlsb-venue-root')?.hidden).toBe(true);
-      // 録画からライブへ戻れば、自分が隠した会場だけ戻す
+      // v0.1.2263(りんく 11-28「会場モードは全部のサービスで」): Twitch の録画でも会場を隠さない(YouTube の動画と同じ会場)
+      expect(e.win.document.getElementById('nlsb-venue-root')?.hidden).toBe(false);
+      expect(wrap.card.videoRows.length).toBeGreaterThan(0);
+      // 録画からライブへ戻っても、会場は出たまま
       e.win.history.pushState({}, '', '/kenki521');
       for (const fn of e.onMessage) fn({ type: VIDEO_WATCH_REREAD_MESSAGE, key: '' });
       expect(e.win.document.getElementById('nlsb-venue-root')?.hidden).toBe(false);

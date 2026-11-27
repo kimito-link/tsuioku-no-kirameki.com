@@ -18,10 +18,13 @@ describe('ytVenueBoot: 会場は配信の視聴ページだけに載せる', () 
   it('他のサービスの配信ページ', () => {
     expect(needsYtVenue('https://kick.com/testkick')).toBe(true);
     expect(needsYtVenue('https://kick.com/')).toBe(false);
-    expect(needsYtVenue('https://kick.com/xqc/videos/01a20f53-0dd8-717a-9448-de51354741b0')).toBe(false);
-    expect(needsYtVenue('https://www.twitch.tv/videos/2938022552')).toBe(false);
+    // v0.1.2263(りんく 11-28「会場モードは全部のサービスで」): 録画・動画のページにも会場を載せる
+    expect(needsYtVenue('https://kick.com/xqc/videos/01a20f53-0dd8-717a-9448-de51354741b0')).toBe(true);
+    expect(needsYtVenue('https://www.twitch.tv/videos/2938022552')).toBe(true);
+    expect(needsYtVenue('https://www.twitch.tv/directory')).toBe(false);
+    expect(needsYtVenue('https://twitcasting.tv/c:someone/movie/843232645')).toBe(true);
     expect(needsYtVenue('https://www.twitch.tv/kimito_link')).toBe(true);
-    expect(needsYtVenue('https://www.tiktok.com/@example_user/video/7282612548646554922')).toBe(false);
+    expect(needsYtVenue('https://www.tiktok.com/@example_user/video/7282612548646554922')).toBe(true);
     expect(needsYtVenue('https://www.tiktok.com/@example_user/live')).toBe(true);
     expect(needsYtVenue('https://whowatch.tv/viewer/24680')).toBe(true);
     expect(needsYtVenue('https://example.com/watch')).toBe(false);

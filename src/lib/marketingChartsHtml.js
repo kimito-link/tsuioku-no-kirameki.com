@@ -5,6 +5,15 @@
  * @typedef {import('./eventRankingReportModel.js').EventRankingReportModel} EventRankingReportModel
  */
 
+import {
+  boundCommentsToTimeWindow,
+  capSeriesPoints,
+  formatBucketMsJa,
+  formatLongGapJa,
+  formatSeriesOffsetJa,
+  marketingSpanDisplay,
+  maxOfList
+} from './marketingTimeSpan.js';
 import { escapeAttr, escapeHtml } from './htmlEscape.js';
 import { maskLabelForShare } from './privacyDisplay.js';
 import { yukkuriBroadcastSummaryEmbeddedCss } from './yukkuriBroadcastSummary.js';
@@ -117,6 +126,9 @@ const DEFAULT_USERICON_ONERROR_ATTR = `onerror="this.onerror=null;this.src='${es
 /** @param {number} ms */
 function formatSilenceMs(ms) {
   if (ms <= 0) return '—';
+  // v0.1.2263: 1日以上(動画のコメントの間)は「97968分」にせず日・年で
+  const long = formatLongGapJa(ms);
+  if (long) return long;
   const s = Math.floor(ms / 1000);
   if (s < 60) return `${s}秒`;
   const m = Math.floor(s / 60);
@@ -288,8 +300,8 @@ function sectionDerivedTimeline(r) {
   const cum = r.timelineCumulative;
   const roll = r.timelineRolling5Min;
   if (tl.length < 2 || cum.length !== tl.length || roll.length !== tl.length) return '';
-  const maxC = Math.max(1, ...cum);
-  const maxR = Math.max(1, ...roll);
+  const maxC = maxOfList(cum);
+  const maxR = maxOfList(roll);
   const W = 900;
   const H = 220;
   const pad = 40;
@@ -543,16 +555,19 @@ function sectionCommentVelocityCurve(series) {
   const pad = 40;
   const innerW = W - pad * 2;
   const innerH = H - pad * 2;
-  const n = series.buckets.length;
+  // v0.1.2263: 描く点の数も上限まで(集計側で収まっていても、描く側で二重に守る)
+  const pts = capSeriesPoints(series.buckets);
+  const n = pts.length;
   const maxV = Math.max(1, series.peakValue);
+  const step = formatBucketMsJa(series.bucketMs || 60_000);
   /** @param {number} i */
   const xOf = (i) => pad + (innerW * i) / Math.max(1, n - 1);
   /** @param {number} v */
   const yOfRaw = (v) => pad + innerH - (v / maxV) * innerH;
-  const linePts = series.buckets
+  const linePts = pts
     .map((b, i) => `${xOf(i).toFixed(1)},${yOfRaw(b.count).toFixed(1)}`)
     .join(' ');
-  const rollingPts = series.buckets
+  const rollingPts = pts
     .map((b, i) => `${xOf(i).toFixed(1)},${yOfRaw(b.rolling5).toFixed(1)}`)
     .join(' ');
   const yLabels = Array.from({ length: 5 }, (_, i) => {
@@ -562,7 +577,7 @@ function sectionCommentVelocityCurve(series) {
   }).join('');
   return `<section class="mkt-section" id="mkt-velocity">
 <h2>コメ速度カーブ（CPM）<span class="mkt-pro-tag">PRO</span></h2>
-<p class="mkt-note">水色＝1分ごとのコメ件数 / オレンジ点線＝5分移動平均。ピーク: ${series.peakMinute != null ? `${series.peakMinute}分目（${series.peakValue}件）` : '-'}</p>
+<p class="mkt-note">水色＝${step}ごとのコメ件数 / オレンジ点線＝${step === '1分' ? '5分' : '直近5点の'}移動平均。ピーク: ${series.peakMinute != null ? `${formatSeriesOffsetJa(series.peakMinute * 60_000, series.bucketMs || 60_000)}目（${series.peakValue}件）` : '-'}</p>
 <div class="mkt-chart-wrap">
 <svg viewBox="0 0 ${W} ${H}" class="mkt-svg">
 <rect x="${pad}" y="${pad}" width="${innerW}" height="${innerH}" fill="none" stroke="#334155" stroke-width="0.5"/>
@@ -618,7 +633,7 @@ function sectionCommentFatigue(fatigue, view = null) {
   const innerW = W - pad * 2;
   const innerH = H - pad * 2;
   const n = buckets.length;
-  const maxPerUser = Math.max(1, ...buckets.map((b) => b.perUser));
+  const maxPerUser = maxOfList(buckets.map((b) => b.perUser));
   /** @param {number} i */
   const xOf = (i) => pad + (innerW * i) / Math.max(1, n - 1);
   /** @param {number} v @param {number} max */
@@ -678,7 +693,7 @@ function sectionSilenceZones(zones) {
       const sec = Math.round(z.durationMs / 1000);
       const m = Math.floor(sec / 60);
       const s = sec % 60;
-      const dur = m > 0 ? `${m}分${s}秒` : `${s}秒`;
+      const dur = formatLongGapJa(z.durationMs) || (m > 0 ? `${m}分${s}秒` : `${s}秒`);
       const color = qualityColor(z.quality);
       return `<tr>
 <td>${escapeHtml(dur)}</td>
@@ -711,23 +726,25 @@ function sectionLaughterDensity(laugh) {
   const pad = 36;
   const innerW = W - pad * 2;
   const innerH = H - pad * 2;
+  // v0.1.2263: 1点の幅は集計側が決める(何年にもわたる動画のコメントは広がる)。描く点の数も上限まで、コメントの無い棒は描かない。
+  const bucketMs = laugh.bucketMs || 30_000;
   const n = laugh.buckets.length;
   const maxV = Math.max(1, laugh.peakValue);
   /** @param {number} i */
   const xOf = (i) => pad + (innerW * i) / Math.max(1, n - 1);
   const barW = Math.max(1, Math.min(8, innerW / n - 1));
-  const bars = laugh.buckets
-    .map((b, i) => {
-      const x = xOf(i);
+  // ライブ(30秒ごとのまま)は今までと同じ出力。広げた列だけ、コメントの無い棒を省く。
+  const shown = bucketMs === 30_000 ? laugh.buckets : capSeriesPoints(laugh.buckets.filter((b) => b.total > 0));
+  const bars = shown
+    .map((b) => {
+      const x = xOf(b.minute);
       const h = (b.count / maxV) * innerH;
-      const halfMin = Math.floor(b.minute / 2);
-      const halfSec = (b.minute % 2) * 30;
-      return `<rect x="${x.toFixed(1)}" y="${(pad + innerH - h).toFixed(1)}" width="${barW}" height="${h.toFixed(1)}" fill="#fbbf24" opacity="0.85"><title>${halfMin}分${halfSec}秒〜: 笑い ${b.count}件 / 総 ${b.total}件 (${(b.ratio * 100).toFixed(0)}%)</title></rect>`;
+      return `<rect x="${x.toFixed(1)}" y="${(pad + innerH - h).toFixed(1)}" width="${barW}" height="${h.toFixed(1)}" fill="#fbbf24" opacity="0.85"><title>${formatSeriesOffsetJa(b.minute * bucketMs, bucketMs)}〜: 笑い ${b.count}件 / 総 ${b.total}件 (${(b.ratio * 100).toFixed(0)}%)</title></rect>`;
     })
     .join('');
   return `<section class="mkt-section" id="mkt-laughter">
 <h2>笑い密度（盛り上がり指標）<span class="mkt-pro-tag">PRO</span></h2>
-<p class="mkt-note">w / 草 / 8888 / 笑 / 爆笑 / ワロタ 等の出現を 30 秒粒度で。全体の笑い比率 ${(laugh.overallRatio * 100).toFixed(1)}% / ピーク: ${laugh.peakBucket != null ? `${Math.floor(laugh.peakBucket / 2)}分${(laugh.peakBucket % 2) * 30}秒〜` : '-'}（${laugh.peakValue}件）（ラテラル分析 L4）</p>
+<p class="mkt-note">w / 草 / 8888 / 笑 / 爆笑 / ワロタ 等の出現を ${bucketMs === 30_000 ? '30 秒粒度で' : `${formatBucketMsJa(bucketMs)}ごとに`}。全体の笑い比率 ${(laugh.overallRatio * 100).toFixed(1)}% / ピーク: ${laugh.peakBucket != null ? `${formatSeriesOffsetJa(laugh.peakBucket * bucketMs, bucketMs)}〜` : '-'}（${laugh.peakValue}件）（ラテラル分析 L4）</p>
 <div class="mkt-chart-wrap">
 <svg viewBox="0 0 ${W} ${H}" class="mkt-svg">
 <rect x="${pad}" y="${pad}" width="${innerW}" height="${innerH}" fill="none" stroke="#334155" stroke-width="0.5"/>
@@ -1026,8 +1043,8 @@ function sectionRecentComparison(cmp) {
   const innerW = W - pad * 2;
   const innerH = H - pad * 2;
   const n = cmp.bars.length;
-  const maxC = Math.max(1, ...cmp.bars.map((b) => b.totalComments));
-  const maxU = Math.max(1, ...cmp.bars.map((b) => b.uniqueUsers));
+  const maxC = maxOfList(cmp.bars.map((b) => b.totalComments));
+  const maxU = maxOfList(cmp.bars.map((b) => b.uniqueUsers));
   const groupW = innerW / n;
   const barW = Math.max(2, groupW / 3 - 2);
   const bars = cmp.bars
@@ -1120,8 +1137,8 @@ function sectionOpeningFivePrediction(pts) {
   const pad = 40;
   const innerW = W - pad * 2;
   const innerH = H - pad * 2;
-  const maxX = Math.max(1, ...pts.points.map((p) => p.openingCpm));
-  const maxY = Math.max(1, ...pts.points.map((p) => p.peakCpm));
+  const maxX = maxOfList(pts.points.map((p) => p.openingCpm));
+  const maxY = maxOfList(pts.points.map((p) => p.peakCpm));
   /** @param {number} v */
   const xOf = (v) => pad + (innerW * v) / maxX;
   /** @param {number} v */
@@ -1227,7 +1244,7 @@ ${syncRows ? `<h3 style="font-size:.95rem;margin:.8rem 0 .4rem">被り瞬間（5
  */
 function sectionFirstSecondLatency(latency) {
   if (!latency || latency.totalUsers === 0) return '';
-  const max = Math.max(1, ...Object.values(latency.distribution));
+  const max = maxOfList(Object.values(latency.distribution));
   const labels = Object.keys(latency.distribution);
   const rows = labels
     .map((k) => {
@@ -1287,11 +1304,13 @@ function sectionSentimentCurve(sentiment) {
   const pad = 36;
   const innerW = W - pad * 2;
   const innerH = H - pad * 2;
-  const n = sentiment.buckets.length;
-  const maxV = Math.max(
-    1,
-    ...sentiment.buckets.flatMap((b) => [b.positive, b.negative, b.surprise, b.confusion])
-  );
+  // v0.1.2263: Math.max に列を広げて渡すと、列が長いと落ちる。最大は1回ずつ数える。描く点の数も上限まで。
+  const pts = capSeriesPoints(sentiment.buckets);
+  const n = pts.length;
+  let maxV = 1;
+  for (const b of sentiment.buckets) {
+    maxV = Math.max(maxV, b.positive, b.negative, b.surprise, b.confusion);
+  }
   /** @param {number} i */
   const xOf = (i) => pad + (innerW * i) / Math.max(1, n - 1);
   /** @param {number} v */
@@ -1299,12 +1318,12 @@ function sectionSentimentCurve(sentiment) {
   /** @param {keyof Pick<typeof sentiment.buckets[number], 'positive' | 'negative' | 'surprise' | 'confusion'>} key
    *  @param {string} color */
   const lineFor = (key, color) => {
-    const pts = sentiment.buckets.map((b, i) => `${xOf(i).toFixed(1)},${yOf(b[key]).toFixed(1)}`).join(' ');
-    return `<polyline points="${pts}" fill="none" stroke="${color}" stroke-width="2"/>`;
+    const line = pts.map((b, i) => `${xOf(i).toFixed(1)},${yOf(b[key]).toFixed(1)}`).join(' ');
+    return `<polyline points="${line}" fill="none" stroke="${color}" stroke-width="2"/>`;
   };
   return `<section class="mkt-section" id="mkt-sentiment">
 <h2>感情曲線 <span class="mkt-pro-tag">PRO</span></h2>
-<p class="mkt-note">語彙辞書ベースで「ポジ／ネガ／驚き／困惑」を 1 分粒度で時系列表示（ラテラル分析 L11）。総計：ポジ ${sentiment.totals.positive} / ネガ ${sentiment.totals.negative} / 驚き ${sentiment.totals.surprise} / 困惑 ${sentiment.totals.confusion}。</p>
+<p class="mkt-note">語彙辞書ベースで「ポジ／ネガ／驚き／困惑」を ${(sentiment.bucketMs || 60_000) === 60_000 ? '1 分粒度で' : `${formatBucketMsJa(sentiment.bucketMs)}ごとに`}時系列表示（ラテラル分析 L11）。総計：ポジ ${sentiment.totals.positive} / ネガ ${sentiment.totals.negative} / 驚き ${sentiment.totals.surprise} / 困惑 ${sentiment.totals.confusion}。</p>
 <div class="mkt-chart-wrap">
 <svg viewBox="0 0 ${W} ${H}" class="mkt-svg">
 <rect x="${pad}" y="${pad}" width="${innerW}" height="${innerH}" fill="none" stroke="#334155" stroke-width="0.5"/>
@@ -1664,7 +1683,7 @@ ${notes}
  */
 function giftLedgerSenderBarChartHtml(aggregates, maskShare, identiconResolver = undefined) {
   if (!Array.isArray(aggregates) || !aggregates.length) return '';
-  const max = Math.max(1, ...aggregates.map((s) => s.totalPoints));
+  const max = maxOfList(aggregates.map((s) => s.totalPoints));
   const rows = aggregates
     .slice(0, 12)
     .map((s) => {
@@ -1711,7 +1730,7 @@ function giftLedgerItemThumbHtml(thumbnailUrl, maskShare, size = 28) {
  */
 function giftLedgerItemBarChartHtml(aggregates, maskShare) {
   if (!Array.isArray(aggregates) || !aggregates.length) return '';
-  const max = Math.max(1, ...aggregates.map((it) => it.points));
+  const max = maxOfList(aggregates.map((it) => it.points));
   const rows = aggregates
     .slice(0, 12)
     .map((it) => {
@@ -2684,7 +2703,7 @@ function supporterChikuranSummaryLine(rows, maskShare, view = null) {
 function sectionSupporterChikuranBeta(analysis, maskShare, identiconResolver, view = null) {
   if (!analysis || !Array.isArray(analysis.rows) || analysis.rows.length === 0) return '';
   const rows = analysis.rows.slice(0, 15);
-  const maxScore = Math.max(1, ...rows.map((row) => row.totalScore || 0));
+  const maxScore = maxOfList(rows.map((row) => row.totalScore || 0));
   const giftSupporterCount = rows.filter(
     (row) => row.giftThrowCount > 0 || row.giftPointTotal > 0
   ).length;
@@ -3142,12 +3161,21 @@ export function buildMarketingDashboardHtml(r, opts = {}) {
   // velocity / silence / laughter は MarketingReport には乗っていないので、
   // r 経由で comments 全件は取れない。代わりに r.timeline の 1 分 bucket を流用するか、
   // opts.commentsForTimeline を別経路で受ける。今回は opts.commentsForAnalytics を採用。
-  const commentsRaw = Array.isArray(opts.commentsForAnalytics)
-    ? opts.commentsForAnalytics
-    : [];
+  // v0.1.2263: 1分ごとに数える部品(沈黙・疲れなど)には、上限の幅(7日)までのコメントだけを渡す(marketingTimeSpan.js)。
+  //   何年にもわたる動画のコメントで、1分ごとの列が数百万になり「Invalid string length」になった。
+  //   速さ・笑い・気分の列は点の数を自分で上限まで収める(1点の幅を広げる)ので、コメント全部を使う。
+  //   幅が7日以内(ライブ)なら、どちらも同じ配列(コピーしない・今までと同じ出力)。
+  const allCommentsRaw = /** @type {any[]} */ (Array.isArray(opts.commentsForAnalytics) ? opts.commentsForAnalytics : []);
+  const timeSpan = boundCommentsToTimeWindow(allCommentsRaw);
+  const commentsRaw = /** @type {any[]} */ (timeSpan.comments);
   // ニコ生は配列をコピーしない。他サービスで応援の行があるときだけ、発言だけを分析に渡す。
   const commentsForAnalytics = view ? speechCommentsForMarketing(commentsRaw) : commentsRaw;
-  const velocityTimeline = buildCommentVelocityTimeline(commentsForAnalytics, {
+  const commentsForSeries = timeSpan.windowed
+    ? view
+      ? speechCommentsForMarketing(allCommentsRaw)
+      : allCommentsRaw
+    : commentsForAnalytics;
+  const velocityTimeline = buildCommentVelocityTimeline(commentsForSeries, {
     bucketMs: 60_000,
     rollingWindowMin: 5
   });
@@ -3155,7 +3183,7 @@ export function buildMarketingDashboardHtml(r, opts = {}) {
     thresholdMs: 60_000,
     quality: { windowMs: 30_000 }
   });
-  const laughterDensity = buildLaughterDensityTimeline(commentsForAnalytics, {
+  const laughterDensity = buildLaughterDensityTimeline(commentsForSeries, {
     bucketMs: 30_000
   });
   const commentFatigue = computeCommentFatigue(commentsForAnalytics, {
@@ -3280,9 +3308,10 @@ export function buildMarketingDashboardHtml(r, opts = {}) {
   });
   const firstSecondLatency = buildCommenterFirstSecondLatency(currentCommentsForLayer);
   const talentPeaks = detectTalentPeakMoments(currentCommentsForLayer);
-  const sentimentCurve = scoreSentimentTimeline(currentCommentsForLayer, {
-    bucketMs: 60_000
-  });
+  const sentimentCurve = scoreSentimentTimeline(
+    timeSpan.windowed ? filterBroadcaster(commentsForSeries) : currentCommentsForLayer,
+    { bucketMs: 60_000 }
+  );
   // 自コメ抜粋: selfPosted=true のもの
   const selfComments = commentsForAnalytics.filter((c) =>
     Boolean(/** @type {{ selfPosted?: any }} */ (c)?.selfPosted)
@@ -3637,7 +3666,7 @@ ${buildSectionRevealBootScriptHtml()}
 <body>
 <header class="mkt-header">
 <h1 class="mkt-header__title">📊 配信マーケティング分析</h1>
-<p class="mkt-header__sub">${escapeHtml(r.liveId)} — ${new Date().toLocaleString('ja-JP')} 出力${escapeHtml(subSuffix)} · JSON埋め込み ${escapeHtml(exportedAtIso)}</p>
+<p class="mkt-header__sub">${escapeHtml(r.liveId)} — ${new Date().toLocaleString('ja-JP')} 出力${escapeHtml(subSuffix)}${timeSpan.windowed ? ` · 速さ・笑い・気分はコメント全部を${formatBucketMsJa(velocityTimeline.bucketMs || 60_000)}ごとに、沈黙・疲れは新しい側7日分(件数・人数は全件)` : ''} · JSON埋め込み ${escapeHtml(exportedAtIso)}</p>
 </header>
 ${broadcasterProfileCardHtml}
 <main class="mkt-main">
@@ -4004,7 +4033,9 @@ function sectionHeroCard(r, summaryLine, maskShare, gap) {
       ? `来場${participation.totalVisitors.toLocaleString()}人中${participation.uniqueCommenters.toLocaleString()}人がコメント（${participation.commentParticipationPct}%）`
       : '';
   const participantPeople = resolveParticipantPeople(r);
-  const baseLine = `${r.totalComments.toLocaleString()}件 / ${participantPeople.people.toLocaleString()}人 / ${r.durationMinutes}分`;
+  // v0.1.2263: 7日を超える幅(動画のコメント)は「何百万分」にせず「コメントの期間 11年3日」(marketingTimeSpan.js)
+  const span = marketingSpanDisplay(r.durationMinutes);
+  const baseLine = `${r.totalComments.toLocaleString()}件 / ${participantPeople.people.toLocaleString()}人 / ${span.text}`;
   const copyText = maskShare
     ? participationLine ? `${participationLine} · ${baseLine}` : baseLine
     : (summaryLine || (participationLine ? `${participationLine} · ${baseLine}` : baseLine));
@@ -4031,7 +4062,7 @@ ${participationStat}<span class="mkt-hero-stat"><span class="mkt-hero-stat__val"
 <span class="mkt-hero-stat__sep">·</span>
 <span class="mkt-hero-stat"><span class="mkt-hero-stat__val">${escapeHtml(participantPeople.people.toLocaleString())}</span><span class="mkt-hero-stat__label">参加者</span></span>
 <span class="mkt-hero-stat__sep">·</span>
-<span class="mkt-hero-stat"><span class="mkt-hero-stat__val">${escapeHtml(String(r.durationMinutes))}</span><span class="mkt-hero-stat__label">分</span></span>
+<span class="mkt-hero-stat"><span class="mkt-hero-stat__val">${escapeHtml(span.value)}</span><span class="mkt-hero-stat__label">${escapeHtml(span.label)}</span></span>
 </div>
 ${participantPeople.unattributed > 0 ? `<div class="mkt-hero-note">※ID不明のコメント ${escapeHtml(participantPeople.unattributed.toLocaleString())}件は、誰の発言か分からないため参加者の人数に含めていません</div>` : ''}
 <button id="${copyId}" class="mkt-hero-copy">📋 一言まとめをコピー</button>
@@ -4044,6 +4075,7 @@ function sectionKpi(r, gap, followerSeries, estimatedSpends) {
   const participation = gap ? resolveCommentParticipation(r, gap) : null;
   /** @type {{ label: string, value: string, icon: string }[]} */
   const cards = [];
+  const spanKpi = marketingSpanDisplay(r.durationMinutes);
   if (followerSeries) {
     const texts = followerKpiTexts(followerSeries);
     cards.push(
@@ -4075,11 +4107,14 @@ function sectionKpi(r, gap, followerSeries, estimatedSpends) {
   cards.push(
     { label: '総コメント数', value: r.totalComments.toLocaleString(), icon: '💬' },
     { label: 'ユニークユーザー', value: resolveParticipantPeople(r).people.toLocaleString(), icon: '👥' },
-    { label: 'コメント/分', value: String(r.commentsPerMinute), icon: '⚡' },
+    ...(spanKpi.long ? [] : [{ label: 'コメント/分', value: String(r.commentsPerMinute), icon: '⚡' }]),
     { label: '平均コメント/人', value: String(r.avgCommentsPerUser), icon: '📈' },
     { label: '中央値/人', value: String(r.medianCommentsPerUser), icon: '📊' },
-    { label: '配信時間', value: `${r.durationMinutes} 分`, icon: '⏱️' },
-    { label: 'ピーク分', value: `${r.peakMinute} 分目（${r.peakMinuteCount} コメ）`, icon: '🔥' }
+    // v0.1.2263: 7日を超える幅は「配信時間 N分」「ピーク分 N分目」を出さない(何百万分になる)。期間を年・日で
+    spanKpi.long
+      ? { label: 'コメントの期間', value: spanKpi.value, icon: '⏱️' }
+      : { label: '配信時間', value: `${r.durationMinutes} 分`, icon: '⏱️' },
+    ...(spanKpi.long ? [] : [{ label: 'ピーク分', value: `${r.peakMinute} 分目（${r.peakMinuteCount} コメ）`, icon: '🔥' }])
   );
   const inner = cards
     .map(
@@ -4098,8 +4133,8 @@ function sectionKpi(r, gap, followerSeries, estimatedSpends) {
 function sectionTimeline(r) {
   const tl = r.timeline;
   if (tl.length < 2) return '';
-  const maxC = Math.max(1, ...tl.map((b) => b.count));
-  const maxU = Math.max(1, ...tl.map((b) => b.uniqueUsers));
+  const maxC = maxOfList(tl.map((b) => b.count));
+  const maxU = maxOfList(tl.map((b) => b.uniqueUsers));
   const W = 900;
   const H = 220;
   const pad = 40;
@@ -5165,7 +5200,7 @@ ${note}
 
 /** @param {MarketingReport} r */
 function sectionHourHeatmap(r) {
-  const max = Math.max(1, ...r.hourDistribution);
+  const max = maxOfList(r.hourDistribution);
   const cells = r.hourDistribution
     .map((v, h) => {
       const intensity = v / max;

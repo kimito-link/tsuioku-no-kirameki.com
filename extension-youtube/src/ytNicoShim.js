@@ -48,6 +48,9 @@ import { callerNameFromStack, createPanelStreamDiag, panelStreamDiagContext, ser
 import { createStaleFrameHold } from '../../src/lib/youtube/ytStaleFrameHold.js';
 import { ytFullRefreshIntervalMs } from '../../src/lib/youtube/ytFullRefreshInterval.js';
 import { dropPseudoLvCommentWrites } from '../../src/lib/youtube/ytShimCommentWrites.js';
+import { recordedRowsOrAnyVideoCardRows } from '../../src/lib/videoWatch/videoCommentRows.js';
+import { KEY_YT_VIDEO_WATCH_CARD, KEY_VOD_VIDEO_WATCH_CARD } from '../../src/lib/storageKeys.js';
+import { videoCardCommentTotal, videoCardViewCount, videoCardWrapForKey } from '../../src/lib/youtube/ytVideoWatchCard.js';
 import { shouldYieldForBigRecord, yieldToMainThread } from '../../src/lib/bigRecordYield.js';
 import {
   mergeLiveRowsByRecordedAt,
@@ -496,8 +499,9 @@ function ytTrustedStartedAt(sum, videoId, all) {
  * @param {string} videoId
  * @param {string} tabTitle
  * @param {Record<string, any>} [all] 全部の配信のまとめ(開始時刻の取り違えを見分けるため)
+ * @param {any} [videoCardWrap] 動画のカード(yt_video_watch_card_v1)。同じ動画なら再生数はここから(横の欄と同じ正本)
  */
-export function ytSummaryToNicoSnapshot(sum, videoId, tabTitle, all) {
+export function ytSummaryToNicoSnapshot(sum, videoId, tabTitle, all, videoCardWrap) {
   const lv = pseudoLvForVideoId(videoId);
   const plat = platformOfStreamKey(videoId);
   // null を Number() すると 0 になり「0人」と出てしまうので、数のときだけ使う
@@ -596,11 +600,15 @@ export function ytSummaryToNicoSnapshot(sum, videoId, tabTitle, all) {
       streamAgeProvenance: trustedStart > 0 ? 'official' : '',
       support: supportTallyByVid.get(String(videoId || '')) || null,
       // ABEMA は番組情報欄の「視聴数」「コメント数」(ページに出ている数そのもの・#608 がまとめに入れる)
-      viewCount: typeof sum?.slotViewCount === 'number' && sum.slotViewCount >= 0 ? sum.slotViewCount : null,
-      commentCount: typeof sum?.slotCommentCount === 'number' && sum.slotCommentCount >= 0 ? sum.slotCommentCount : null,
+      // v0.1.2263: YouTube の動画は、動画のカードの再生数を先に使う(横の欄と会場の帯で同じ数・通常動画で帯に「再生」が出なかった)
+      viewCount: videoCardViewCount(videoCardWrap, videoId)
+        ?? (typeof sum?.slotViewCount === 'number' && sum.slotViewCount >= 0 ? sum.slotViewCount : null),
+      // v0.1.2263: コメント数も、同じ動画のカードの「ページのコメント数」を先に(横の欄と同じ正本)
+      commentCount: videoCardCommentTotal(videoCardWrap, videoId)
+        ?? (typeof sum?.slotCommentCount === 'number' && sum.slotCommentCount >= 0 ? sum.slotCommentCount : null),
       ...(sum?.contentKind === 'video' || sum?.contentKind === 'live' || sum?.contentKind === 'live_replay'
         ? { contentKind: sum.contentKind }
-        : {}),
+        : (videoCardWrapForKey([videoCardWrap], videoId)?.card?.kind === 'video' ? { contentKind: 'video' } : {})),
       // そのサービス特有の公式の数字(SHOWROOM のイベント順位・ミクチャのレベル等・src/lib/platform/platformStats.js)
       official: sum?.platformStats && typeof sum.platformStats === 'object' ? sum.platformStats : null,
     },
@@ -1035,7 +1043,8 @@ const inPageSkipFetchUntil = new Map();
  */
 async function fetchStreamRows(vid, afterRecordedAt) {
   if (!YT_SHIM_IN_PAGE) {
-    return afterRecordedAt === undefined ? getYtStreamCommentsByVideoId(vid) : getYtStreamCommentsSince(vid, afterRecordedAt);
+    if (afterRecordedAt !== undefined) return getYtStreamCommentsSince(vid, afterRecordedAt);
+    return withVideoRows(await getYtStreamCommentsByVideoId(vid), vid);
   }
   const res = await real?.runtime?.sendMessage?.(
     afterRecordedAt === undefined ? { type: 'YT_GET_STREAM_COMMENTS', videoId: vid } : { type: 'YT_GET_STREAM_COMMENTS', videoId: vid, afterRecordedAt },
@@ -1096,6 +1105,22 @@ async function getCommentsViaBackground(vid) {
   const c = inPageCommentCache.get(vid);
   if (!c) return null;
   return sortedRowsOfCache(c);
+}
+
+/**
+ * v0.1.2263: 記録の行が無い通常動画は、動画のカード(横の欄のサムネイルと同じページの行)を記録の行の形で使う(videoCommentRows.js)。
+ *   記録が1件でもある配信は記録のまま(ライブの会場・横の欄・コメビュは変わらない)。
+ * @param {any[]} rows
+ * @param {string} vid
+ */
+async function withVideoRows(rows, vid) {
+  if (Array.isArray(rows) && rows.length) return rows;
+  try {
+    const bag = await real?.storage?.local?.get?.([KEY_YT_VIDEO_WATCH_CARD, KEY_VOD_VIDEO_WATCH_CARD]);
+    return recordedRowsOrAnyVideoCardRows(rows, [bag?.[KEY_YT_VIDEO_WATCH_CARD], bag?.[KEY_VOD_VIDEO_WATCH_CARD]], vid);
+  } catch {
+    return Array.isArray(rows) ? rows : [];
+  }
 }
 
 /** 会場の読み上げで大事なコメントのキー(venueSpeech.js の venueSpeechKey と同じ形 no:<番号>) */
@@ -1415,7 +1440,7 @@ if (real && real.storage && real.storage.local && (real.tabs || YT_SHIM_IN_PAGE)
     await knownVideosReady;
     const vid = videoIdForPseudoLv(lv);
     if (!vid) return null;
-    const raw = await getYtStreamCommentsByVideoId(vid);
+    const raw = await withVideoRows(await getYtStreamCommentsByVideoId(vid), vid);
     return exportCommentsFromStoredRows(Array.isArray(raw) ? raw : [], String(lv || ''));
   });
   /**
@@ -1760,10 +1785,16 @@ if (real && real.storage && real.storage.local && (real.tabs || YT_SHIM_IN_PAGE)
         if (!vid) return { ok: false, error: 'not_youtube' };
         const bag = await summariesBag();
         const sum = (bag && bag[KEY_YT_SUMMARIES] && bag[KEY_YT_SUMMARIES][vid]) || {};
+        // v0.1.2263: 動画(ライブでない)だけ、再生数の正本の動画のカードを読む(ライブは読まない=今までと同じ)
+        const cardWrap = sum?.contentKind === 'live' || sum?.isLive === true
+          ? null
+          : await Promise.resolve(real?.storage?.local?.get?.([KEY_YT_VIDEO_WATCH_CARD, KEY_VOD_VIDEO_WATCH_CARD]))
+              .then((/** @type {any} */ b) => videoCardWrapForKey([b?.[KEY_YT_VIDEO_WATCH_CARD], b?.[KEY_VOD_VIDEO_WATCH_CARD]], vid))
+              .catch(() => null);
         // 先に記録を読む(アーカイブかどうか・配信者の UC… が記録から分かるため)
         const gifts = await buildGiftBagsForLv(pseudoLvForVideoId(vid), sum).catch(() => undefined);
         const snapshot = /** @type {Record<string, any>} */ (
-          ytSummaryToNicoSnapshot(sum, vid, String(tab?.title || ''), (bag && bag[KEY_YT_SUMMARIES]) || {})
+          ytSummaryToNicoSnapshot(sum, vid, String(tab?.title || ''), (bag && bag[KEY_YT_SUMMARIES]) || {}, cardWrap)
         );
         // 「ギフトpt」= YouTube の有料の応援の合計(円にしたおよその額)
         if (gifts && gifts.totalPoints > 0) snapshot.officialGiftPoints = gifts.totalPoints;

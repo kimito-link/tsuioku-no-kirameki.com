@@ -130,7 +130,7 @@
   - `src/lib/monotonicCommentCount.js`
 - **storage キー定義** — chrome.storage のキー名の正本(nls_comments_<lv> 等)
   - `src/lib/storageKeys.js`
-<details><summary>🗂 このカテゴリの全担当ファイル(自動分類) 80</summary>
+<details><summary>🗂 このカテゴリの全担当ファイル(自動分類) 81</summary>
 
 - `extension-youtube/sidepanel.js` — ニコ生版 popup-entry.js(本物)+ YouTube の記録を読む入口のバンドル
 - `extension-youtube/src/pfEmoteStore.js` — Twitch/Kick の視聴ページ(content)で見た絵文字の「名前 → 画像」を storage に覚える。
@@ -204,6 +204,7 @@
 - `src/lib/userCommentProfileMerge.js` — 横の欄(popup)の描き直しごとに、記録の行から名前・顔の控えを学び、行を補い、控えを刈る1回分。
 - `src/lib/userProfileLinkHtml.js` — 応援コメントの各種 HTML 出力（マーケティング HTML・HTML 保存レポート等）で、
 - `src/lib/userRooms.js` — 保存済みコメントを「ユーザー＝ルーム」に集計（純関数）
+- `src/lib/videoWatch/videoCommentDetail.js` — 【層】L0 判定層(純粋関数・I/O禁止)
 - `src/lib/youtube/ytChunkedRead.js` — 配信の記録を「少しずつ」読む(v0.1.1977)。
 - `src/lib/youtube/ytCrossVideoDuplicates.js` — 別の配信の記録に紛れ込んだコメントを見分ける純関数(片付け用)。
 - `src/lib/youtube/ytLeaderboardSig.js` — 0.1.1959: 公式ランキングの中身の指紋。中身が前回と同じなら storage に書き直さない。
@@ -223,7 +224,7 @@
 
 - **応援レーン集約(誰が候補か)** — 保存コメント行を userId 単位に畳み込みレーン候補を作る唯一の集約正本(popup/venue 共通)
   - `src/lib/userLaneCandidatesFromStorage.js`
-<details><summary>🗂 このカテゴリの全担当ファイル(自動分類) 119</summary>
+<details><summary>🗂 このカテゴリの全担当ファイル(自動分類) 118</summary>
 
 - `api/event-ranking.js` — イベント💎ランキングの「公式更新以降 +X」「推定イベントpt」用のサーバ側スナップショット（2026-11-21）。
 - `scripts/council-trial.mjs` — 会議メンバー候補を「本番と同じ条件」で一斉に試す使い捨て計器。
@@ -296,7 +297,6 @@
 - `src/lib/liveviewMirrorSections.js` — ③WEB丸写しの「セクション・レジストリ」= ①POP の各パネルが③に出るための配線を1箇所に集約した一覧表
 - `src/lib/loadLastBroadcastSummary.js` — 0.1.69 (AY): empty state（配信なし）popup で「前回の配信」cards を復元するために、
 - `src/lib/mangaBroadcastSummary.js` — 放送終了後の HTML レポート / マーケ分析の頭にくる「漫画読み体験」要約。
-- `src/lib/marketingAggregate.js` — userId: string,
 - `src/lib/mcpBridge/buildMcpRankingSnippet.js` — MCP / L1 向けに貢献度・広告ランキングの **PII 最小スナップショット** を組み立てる。
 - `src/lib/networkErrorProbe.js` — v0.1.201: 拡張の network 層異常を診断 JSON 用に集約する純関数。
 - `src/lib/nicoadContributionRankingApi.js` — ニコニ広告(nicoad)「貢献度ランキング」無認証 JSON API の URL 組立 & 正規化（純関数）。
@@ -802,7 +802,7 @@
   - `app/supporter.html`
   - `app/referral-passthrough.js`
   - `tsuioku-no-kirameki/tokushoho.html`
-<details><summary>🗂 このカテゴリの全担当ファイル(自動分類) 60</summary>
+<details><summary>🗂 このカテゴリの全担当ファイル(自動分類) 61</summary>
 
 - `extension-youtube/marketing-export-guard.js` — マーケ分析タブ(marketing-export.html)の「何があっても開く」保険。
 - `extension-youtube/marketing-export.js` — ニコ生版 marketing-export-entry.js(本物)+ YouTube の記録を読む入口のバンドル
@@ -836,6 +836,7 @@
 - `src/lib/marketingExportTabState.js` — マーケ分析タブ(marketing-export.html?lv=<lid>)の「状態」を URL に残し、
 - `src/lib/marketingReportEmbed.js` — マーケ分析 HTML に埋め込む JSON（表計算・ツール連携用）。
 - `src/lib/marketingSupportParticipationCounts.js` — マーケ分析・HTMLレポート先頭 KPI: ギフト投げ主・広告した人の人数。
+- `src/lib/marketingTimeSpan.js` — 【層】L0 判定層(純粋関数・I/O禁止)
 - `src/lib/mediaKitEmbed.js` — メディアキットを分析レポートの1章として埋め込むときの、CSS の囲い(id)。
 - `src/lib/mediaKitHtml.js` — 追憶メディアキットの共有用 single-file HTML。
 - `src/lib/mediaKitStats.js` — 追憶メディアキット向けの期間集計。
@@ -1258,7 +1259,7 @@
   - `src/extension/live-ranking-entry.js`
   - `tsuioku-no-kirameki/live/index.html`
   - `.github/workflows/live-ranking.yml`
-<details><summary>🗂 このカテゴリの全担当ファイル(自動分類) 384</summary>
+<details><summary>🗂 このカテゴリの全担当ファイル(自動分類) 386</summary>
 
 - `app/app.js` — スマホ閲覧用 status Web 版。
 - `app/live-view-block.js` — iPhone アプリの「🚩 見たくない人を隠す・報告する」(App Store の審査 1.2: ほかの人の書き込みを見せるアプリの決まり)。
@@ -1594,6 +1595,8 @@
 - `src/lib/versionMismatch.js` — 「本体とページで版がズレている」を検知する純関数(2026-07-06)。
 - `src/lib/videoCapture.js` — watch ページの video から PNG を取るためのユーティリティ。
 - `src/lib/videoWatch/twVodLiveIcons.js` — v0.1.2253: Twitch の録画チャットには顔の画像が無い(実測 DOM)。ライブの Twitch でこの PC が覚えた顔
+- `src/lib/videoWatch/videoCommentRows.js` — 【層】L0 判定層(純粋関数・I/O禁止)
+- `src/lib/videoWatch/videoFacts.js` — 【層】L0 判定層(純粋関数・I/O禁止)
 - `src/lib/videoWatch/videoPanelRoute.js` — 横の欄の外枠(sidepanel-iframe-boot-entry.js)が、録画・通常動画のページで中身を付け替えるかを決める純関数。v0.1.2244
 - `src/lib/videoWatch/videoWatchCard.js` — 【層】L0 判定層(純粋関数・I/O禁止)
 - `src/lib/videoWatch/vodCommentsFromDom.js` — 【層】L0 判定層(純粋関数・I/O禁止)
@@ -1651,6 +1654,9 @@
 
 > changelog 全 20 版を「バグ系統」で束ねた枝。同系統をまた触るとき、過去の修正と「なぜ毎回触るか」を辿る(再発防止)。新しい順。
 
+### 💾 記録件数 (1版)
+- `v0.1.2263` 2026-11-27 — 動画ページで、顔を新しい順に並べ、タップで書いたことを出す
+
 ### 📥 コメント取得 (2版)
 - `v0.1.2261` 2026-11-27 — 広告ランキングの名無しを、灰色の「未取得」札にしない
 - `v0.1.2257` 2026-11-27 — ツイキャスの番号付き匿名コメントを人ごとに分ける
@@ -1659,6 +1665,7 @@
 - `v0.1.2257` 2026-11-27 — ツイキャスの番号付き匿名コメントを人ごとに分ける
 
 ### 🏟 会場・席 (8版)
+- `v0.1.2263` 2026-11-27 — 動画ページで、顔を新しい順に並べ、タップで書いたことを出す
 - `v0.1.2259` 2026-11-27 — ニコ生で、アイコン未設定の人も灰色の丸にしない
 - `v0.1.2258` 2026-11-27 — 内訳を足した数が、いつも記録と同じになるように
 - `v0.1.2257` 2026-11-27 — ツイキャスの番号付き匿名コメントを人ごとに分ける
@@ -1666,12 +1673,14 @@
 - `v0.1.2248` 2026-11-26 — ライブの横の欄でも、顔が出ない人を白い丸にしない
 - `v0.1.2239` 2026-11-26 — 実測の録画コメントを拾って顔を出す
 - `v0.1.2238` 2026-11-26 — 動画でも会場を出さず、コメントがあれば顔を出す
-- `v0.1.2237` 2026-11-26 — 動画では顔を押すと、横の欄にその人の行動が出る
 
 ### 🎁 ギフト (3版)
+- `v0.1.2263` 2026-11-27 — 動画ページで、顔を新しい順に並べ、タップで書いたことを出す
 - `v0.1.2261` 2026-11-27 — 広告ランキングの名無しを、灰色の「未取得」札にしない
 - `v0.1.2259` 2026-11-27 — ニコ生で、アイコン未設定の人も灰色の丸にしない
-- `v0.1.2237` 2026-11-26 — 動画では顔を押すと、横の欄にその人の行動が出る
+
+### 🔊 読み上げ (1版)
+- `v0.1.2263` 2026-11-27 — 動画ページで、顔を新しい順に並べ、タップで書いたことを出す
 
 ### その他 (11版)
 - `v0.1.2262` 2026-11-27 — Kick の録画で、ライブで見た人の顔が出るようにした

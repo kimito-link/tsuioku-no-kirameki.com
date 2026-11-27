@@ -72,9 +72,10 @@ function vodDom() {
       <a href="/channel/UCaaaaaaaaaaaaaaaaaaaaaa">花子</a>
       <yt-img-shadow><img src="https://yt3.ggpht.com/hanako.jpg" alt=""></yt-img-shadow>
       <yt-attributed-string id="name">花子</yt-attributed-string>
-      <div id="creator-heart"></div>
+      <div id="creator-heart"><ytd-creator-heart-renderer></ytd-creator-heart-renderer></div>
     </ytd-comment-view-model>
     <ytd-comment-view-model comment-id="UgxdBBB">
+      <div id="creator-heart"></div>
       <a href="/channel/UCbbbbbbbbbbbbbbbbbbbbbb">新しい人</a>
       <yt-img-shadow><img src="https://yt3.ggpht.com/new.jpg" alt=""></yt-img-shadow>
       <yt-attributed-string id="name">新しい人</yt-attributed-string>

@@ -20,13 +20,14 @@ import { mergeYtStreamSummary, prepareYtCommentsForIdb } from '../../src/lib/you
 import { classifyYtWatchContentKind, summarizeChannelRecordedLives } from '../../src/lib/youtube/ytVideoWatchMeta.js';
 import { peopleInChannelCommenterIndex } from '../../src/lib/youtube/ytChannelCommenterIndex.js';
 import { buildYtVideoWatchCardModel } from '../../src/lib/youtube/ytVideoWatchCard.js';
+import { recordedRowsOrAnyVideoCardRows } from '../../src/lib/videoWatch/videoCommentRows.js';
 import {
   estimateYoutubeSupportSpendJpy,
   estimateStreamerTakeHomeJpy,
   formatEstimatedViewerSpendDisplay,
   formatStreamerTakeHomeDisplay,
 } from '../../src/lib/estimatedViewerSpend.js';
-import { KEY_YT_CHANNEL_COMMENTERS, KEY_YT_VIDEO_WATCH_CARD } from '../../src/lib/storageKeys.js';
+import { KEY_YT_CHANNEL_COMMENTERS, KEY_YT_VIDEO_WATCH_CARD, KEY_VOD_VIDEO_WATCH_CARD } from '../../src/lib/storageKeys.js';
 import { YT_CHAT_STORAGE_FLUSH_MS } from '../../src/lib/youtube/ytLiveRowOrder.js';
 import {
   appendYtStreamCommentsIdb,
@@ -74,6 +75,7 @@ import {
   storageJsonBytes,
   summaryChromeWriteDue,
   summaryStorageKey,
+  summaryFactsSignature,
   verifiedBeforeRetire,
 } from '../../src/lib/youtube/ytSplitPersist.js';
 import { capStallPage, freshStallRows } from '../../src/lib/stallTrace.js';
@@ -120,7 +122,7 @@ const ytViewerSampler = createYtViewerSampler({ merged: YT_MERGED });
 
 /**
  * 通常動画のカードを書いて会場へ渡す。ライブのコメント保存とは別経路。
- * @param {{ videoId: string, title?: string, viewCount?: number | null, channelId?: string, videoAuthors?: any[], videoComments?: any[] }} parts
+ * @param {{ videoId: string, title?: string, viewCount?: number | null, channelId?: string, handle?: string, facts?: any, videoAuthors?: any[], videoComments?: any[] }} parts
  */
 function publishVideoWatchCard(parts) {
   const videoId = String(parts?.videoId || '').trim();
@@ -128,7 +130,7 @@ function publishVideoWatchCard(parts) {
   void (async () => {
     try {
       const bag = await chrome.storage.local.get([STORAGE_KEYS.STREAM_SUMMARIES, KEY_YT_CHANNEL_COMMENTERS]);
-      const recorded = summarizeChannelRecordedLives(bag?.[STORAGE_KEYS.STREAM_SUMMARIES], parts.channelId || '');
+      const recorded = summarizeChannelRecordedLives(bag?.[STORAGE_KEYS.STREAM_SUMMARIES], parts.channelId || '', parts.handle || '');
       const livePeople = peopleInChannelCommenterIndex(bag?.[KEY_YT_CHANNEL_COMMENTERS], parts.channelId || '');
       const spendModel = estimateYoutubeSupportSpendJpy(
         (parts.videoAuthors || []).reduce((/** @type {Record<string, number>} */ acc, a) => {
@@ -153,6 +155,7 @@ function publishVideoWatchCard(parts) {
         recorded,
         videoAuthors: parts.videoAuthors || [],
         videoComments: parts.videoComments || [],
+        facts: parts.facts || {},
         livePeople,
         spend: formatEstimatedViewerSpendDisplay(spendModel),
         takeHome: formatStreamerTakeHomeDisplay('youtube', estimateStreamerTakeHomeJpy('youtube', { amounts })),
@@ -291,6 +294,8 @@ let summaryMem = null;
 let summaryRetireStarted = false;
 /** @type {Map<string, number>} */
 const summaryChromeAt = new Map();
+/** 配信ごとの、chrome.storage に最後に書いたまとめの数字(再生・コメント数・種別) @type {Map<string, string>} */
+const summaryChromeSig = new Map();
 /** @type {Record<string, string>} userKey → 最後に書いた JSON */
 const voiceSavedJson = {};
 let activeVideoMem = '';
@@ -527,11 +532,15 @@ async function publishOneSummary(videoId, summary) {
       /* IndexedDB が書けなくても、画面への小さい知らせは続ける */
     }
   }
-  if (!summaryChromeWriteDue(summaryChromeAt.get(id) || 0, now)) return;
   const slim = slimSummaryForStorage(summary);
   const key = summaryStorageKey(id);
   if (!slim || !key) return;
+  // v0.1.2263: 間引き(1秒)で落とした書き込みは、あとで書き直されない(動画のページはコメントが増えないので次の知らせが来ない)。
+  //   再生数・コメント数・種別が変わった書き込みは間引かない(会場の帯が「再生 読み込み中」のまま止まっていた)。
+  const sig = summaryFactsSignature(slim);
+  if (!summaryChromeWriteDue(summaryChromeAt.get(id) || 0, now) && summaryChromeSig.get(id) === sig) return;
   summaryChromeAt.set(id, now);
+  summaryChromeSig.set(id, sig);
   await chrome.storage.local.set({ [key]: slim });
 }
 
@@ -1299,6 +1308,13 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
     const vid = String(message.videoId || '');
     const after = Number(message.afterRecordedAt || 0);
     (after > 0 ? getYtStreamCommentsSince(vid, after) : getYtStreamCommentsByVideoId(vid))
+      .then(async (items) => {
+        // v0.1.2263: 記録の無い通常動画は、動画のカードの行(横の欄と同じページの行)を会場に渡す(videoCommentRows.js)
+        if (after > 0 || (Array.isArray(items) && items.length)) return items;
+        // 録画・動画のページ(Twitch・Kick・ツイキャス・TikTok)の会場は、録画のカードの行(鍵は pageKey)
+        const bag = await chrome.storage.local.get([KEY_YT_VIDEO_WATCH_CARD, KEY_VOD_VIDEO_WATCH_CARD]).catch(() => null);
+        return recordedRowsOrAnyVideoCardRows(items, [bag?.[KEY_YT_VIDEO_WATCH_CARD], bag?.[KEY_VOD_VIDEO_WATCH_CARD]], vid);
+      })
       .then((items) => sendResponse({ ok: true, items: Array.isArray(items) ? items : [] }))
       .catch((err) => sendResponse({ ok: false, items: [], error: String(err && err.message || err) }));
     return true;
@@ -1500,13 +1516,22 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
       // 裏の ABEMA タブは claimActive:false(#608)。要約は更新し、いま見ている配信は奪わない。
       if (payload.claimActive !== false) await claimActiveVideo(sender, videoId);
       void ytViewerSampler.maybeSample(videoId, payload.concurrentViewers, summaries[videoId]);
-      const kind = String(summaries[videoId]?.contentKind || payload.contentKind || '');
+      // v0.1.2263: 公式の印が両方「配信ではない」なら、前に live と保存されていても動画として扱う(一度 live になると戻らなかった)
+      const officialVideo = payload.isLive === false && payload.isLiveContent === false;
+      const kind = officialVideo ? 'video' : String(summaries[videoId]?.contentKind || payload.contentKind || '');
       if (kind === 'video') {
         publishVideoWatchCard({
           videoId,
           title: summaries[videoId]?.title || payload.title || '',
           viewCount: typeof payload.slotViewCount === 'number' ? payload.slotViewCount : summaries[videoId]?.slotViewCount,
           channelId: summaries[videoId]?.broadcasterChannelId || payload.broadcasterChannelId || '',
+          handle: summaries[videoId]?.broadcasterHandle || payload.broadcasterHandle || '',
+          facts: {
+            commentTotal: typeof payload.slotCommentCount === 'number' ? payload.slotCommentCount : summaries[videoId]?.slotCommentCount,
+            publishDate: typeof payload.slotPublishDate === 'string' ? payload.slotPublishDate : '',
+            length: typeof payload.slotLengthSec === 'number' ? payload.slotLengthSec : null,
+            likes: typeof payload.slotLikeCount === 'number' ? payload.slotLikeCount : null,
+          },
           videoAuthors: Array.isArray(payload.videoAuthors) ? payload.videoAuthors : [],
           videoComments: Array.isArray(payload.videoComments) ? payload.videoComments : [],
         });

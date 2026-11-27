@@ -12,7 +12,12 @@ import { buildViewerBehaviorPersonDetail, viewerBehaviorPersonDetailInnerHtml } 
  */
 export function wireVideoLanePersonDetail(box, opts = {}) {
   if (!box || typeof box.addEventListener !== 'function') return;
-  if (box.getAttribute('data-nlsb-video-detail-wired') === '1') return;
+  if (box.getAttribute('data-nlsb-video-detail-wired') === '1') {
+    // v0.1.2263: 録画のチャット再生などでカードが描き直されても、開いていた人の詳細を開いたままにする
+    if (opts.board) box.__nlsbBoard = opts.board;
+    reopenVideoLanePersonDetail(box);
+    return;
+  }
   box.setAttribute('data-nlsb-video-detail-wired', '1');
   if (opts.board) box.__nlsbBoard = opts.board;
 
@@ -38,22 +43,54 @@ export function wireVideoLanePersonDetail(box, opts = {}) {
     if (!tile || !box.contains(tile)) return;
     ev.preventDefault();
     ev.stopPropagation();
-    const board = box.__nlsbBoard || opts.board;
-    const target = laneTileUserDetailTarget({
+    const id = laneTileUserDetailTarget({
       userKey: tile.getAttribute('data-user-key') || '',
       title: tile.getAttribute('title') || '',
-    });
-    const id = target?.uid || String(tile.getAttribute('data-user-key') || '').replace(/^u:/, '');
-    const row = Array.isArray(board?.rows) ? board.rows.find((/** @type {any} */ r) => String(r.id) === id) : null;
-    const detailEl = box.querySelector('.nlsb-viewer-behavior__detail');
-    if (!detailEl) return;
-    const detail = buildViewerBehaviorPersonDetail(row || { id, name: target?.uname || '' });
-    detailEl.hidden = false;
-    detailEl.innerHTML = viewerBehaviorPersonDetailInnerHtml(detail);
-    const selected = box.querySelectorAll('.nl-story-userlane-cell[aria-expanded="true"]');
-    for (let i = 0; i < selected.length; i += 1) selected[i].setAttribute('aria-expanded', 'false');
-    tile.setAttribute('aria-expanded', 'true');
+    })?.uid || String(tile.getAttribute('data-user-key') || '').replace(/^u:/, '');
+    showVideoLanePersonDetail(box, tile, id, box.__nlsbBoard || opts.board);
   }, true);
+}
+
+/**
+ * @param {any} box
+ * @param {any} tile
+ * @param {string} id
+ * @param {any} board
+ */
+function showVideoLanePersonDetail(box, tile, id, board) {
+  const detailEl = box.querySelector('.nlsb-viewer-behavior__detail');
+  if (!detailEl || !id) return;
+  const row = Array.isArray(board?.rows) ? board.rows.find((/** @type {any} */ r) => String(r.id) === id) : null;
+  const uname = laneTileUserDetailTarget({ userKey: tile?.getAttribute?.('data-user-key') || '', title: tile?.getAttribute?.('title') || '' })?.uname || '';
+  const detail = /** @type {any} */ (buildViewerBehaviorPersonDetail(row || { id, name: uname }));
+  // 返信を読めるのは YouTube だけ。ほかのサービスの動画・録画では返信の欄を出さない
+  const platform = String(board?.platform || '').trim();
+  if (platform && platform !== 'youtube') detail.repliesUnknown = true;
+  detailEl.hidden = false;
+  const html = viewerBehaviorPersonDetailInnerHtml(detail);
+  if (detailEl.innerHTML !== html) detailEl.innerHTML = html;
+  box.__nlsbOpenDetailId = id;
+  const selected = box.querySelectorAll('.nl-story-userlane-cell[aria-expanded="true"]');
+  for (let i = 0; i < selected.length; i += 1) selected[i].setAttribute('aria-expanded', 'false');
+  tile?.setAttribute?.('aria-expanded', 'true');
+}
+
+/**
+ * 描き直しのあと、開いていた人の詳細を同じ行の最新の値で開き直す。その人のタイルが消えたら閉じたまま。
+ * @param {any} box
+ */
+export function reopenVideoLanePersonDetail(box) {
+  const id = String(box?.__nlsbOpenDetailId || '');
+  if (!id) return;
+  const detailEl = box.querySelector('.nlsb-viewer-behavior__detail');
+  if (!detailEl || !detailEl.hidden) return;
+  const tiles = box.querySelectorAll('.nl-story-userlane-cell[data-user-key^="u:"]');
+  let tile = null;
+  for (let i = 0; i < tiles.length; i += 1) {
+    if (String(tiles[i].getAttribute('data-user-key') || '').replace(/^u:/, '') === id) { tile = tiles[i]; break; }
+  }
+  if (!tile) return;
+  showVideoLanePersonDetail(box, tile, id, box.__nlsbBoard);
 }
 
 /**

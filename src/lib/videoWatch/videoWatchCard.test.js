@@ -21,7 +21,7 @@ describe('VOD 通常動画カード', () => {
     expect(html).toContain('nlsb-viewer-behavior__detail');
     expect(html).not.toContain('視聴者の行動');
     expect(html).not.toContain('同時視聴');
-    expect(html).toContain('この動画のデータ');
+    expect(html).toContain('この録画のデータ');
   });
 
   it('ページにコメントが無いときは顔の列を出さず、会場を隠すためのカードだけ残す', () => {
@@ -32,7 +32,7 @@ describe('VOD 通常動画カード', () => {
       title: 'VOD',
     });
     const html = vodVideoWatchCardInnerHtml(card);
-    expect(html).toContain('いま読めるコメントの投稿者はまだありません');
+    expect(html).toContain('コメント欄が読み込まれると、ここに書いた人が並びます');
     expect(html).not.toContain('視聴者の行動');
     expect(vodVideoWatchCardInnerHtml(buildVodVideoWatchCardModel({ platform: 'youtube' }))).toBe('');
   });

@@ -4,6 +4,7 @@
  */
 
 import { escapeHtml } from '../htmlEscape.js';
+import { marketingSpanDisplay } from '../marketingTimeSpan.js';
 import {
   ESTIMATED_VIEWER_SPEND_LABEL,
   ESTIMATED_VIEWER_SPEND_EMPTY_NOTE,
@@ -600,7 +601,10 @@ export function sectionPlatformSummaryHtml(report, view, series, peak, pageCount
   cards.push(
     { label: 'コメント', value: `${Number(report.totalComments || 0).toLocaleString('ja-JP')}件`, hint: 'このPCの記録' },
     { label: 'コメントした人', value: `${Number(report.identifiedUsers ?? report.uniqueUsers ?? 0).toLocaleString('ja-JP')}人`, hint: 'このPCの記録' },
-    { label: 'コメント/分', value: String(report.commentsPerMinute ?? ''), hint: `${report.durationMinutes}分` },
+    // v0.1.2263: 7日を超える幅(動画のコメント)は「コメント/分」「N分」を出さない(何百万分になる)
+    ...(marketingSpanDisplay(report.durationMinutes).long
+      ? [{ label: 'コメントの期間', value: marketingSpanDisplay(report.durationMinutes).value, hint: '最初と最後のコメントのあいだ' }]
+      : [{ label: 'コメント/分', value: String(report.commentsPerMinute ?? ''), hint: `${report.durationMinutes}分` }]),
   );
   const inner = cards
     .map(

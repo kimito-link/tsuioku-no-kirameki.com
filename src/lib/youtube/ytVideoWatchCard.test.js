@@ -13,8 +13,9 @@ describe('buildYtVideoWatchCardModel', () => {
   it('再生・記録・交差の文言を、数字があるときと無いときで取り違えない', () => {
     const empty = buildYtVideoWatchCardModel({ videoId: 'abcdefghijk' });
     expect(empty.viewCountText).toBe('—');
-    expect(empty.recordedSummary).toContain('まだ記録していません');
-    expect(empty.matchSummary).toContain('配信の記録があると');
+    // v0.1.2263: 動画ページで「まだ記録していません」と否定から入らない(記録が無ければ何も出さない)
+    expect(empty.recordedSummary).toBe('');
+    expect(empty.matchSummary).not.toMatch(/まだ記録|記録していません|記録があると/);
 
     const full = buildYtVideoWatchCardModel({
       videoId: 'abcdefghijk',
