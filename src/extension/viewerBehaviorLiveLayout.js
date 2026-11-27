@@ -6,7 +6,7 @@ import { paintStoryUserLaneDomFilled } from './story/renderStoryUserLaneDom.js';
 import { createVenueStatStrip } from '../lib/venueStatStrip.js';
 import { VIEWER_BEHAVIOR_FALLBACK_AVATAR, resolveViewerBehaviorAvatarUrl, viewerRelationLabel } from '../lib/viewerBehavior.js';
 import { createSupportAvatarLoadGuard } from '../lib/supportGrowthAvatarLoad.js';
-import { avatarFallbackFaceForUrl } from '../lib/avatarFallbackFromUrl.js';
+import { avatarFallbackFaceForUrl, isSiteDefaultSilhouetteUrl } from '../lib/avatarFallbackFromUrl.js';
 import { anonymousIdenticonDataUrl } from '../lib/anonymousIdenticon.js';
 
 /**
@@ -28,7 +28,7 @@ const laneAvatarGuard = createSupportAvatarLoadGuard({
  */
 export function viewerBehaviorLaneFaceSrc(row) {
   const resolved = resolveViewerBehaviorAvatarUrl(row?.isAnonymous ? '' : row?.id, row?.avatarUrl);
-  if (resolved && /^https?:/i.test(resolved) && !/usericon\/defaults\/blank\.jpg/i.test(resolved)) return resolved;
+  if (resolved && /^https?:/i.test(resolved) && !isSiteDefaultSilhouetteUrl(resolved)) return resolved;
   const key = String((row?.isAnonymous ? '' : row?.id) || row?.name || '').trim();
   return anonymousIdenticonDataUrl(key, 64) || VIEWER_BEHAVIOR_FALLBACK_AVATAR;
 }

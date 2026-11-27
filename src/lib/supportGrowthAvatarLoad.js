@@ -7,6 +7,7 @@
  */
 
 import { isHttpOrHttpsUrl } from './supportGrowthTileSrc.js';
+import { isSiteDefaultSilhouetteUrl, noAvatarFace } from './avatarFallbackFromUrl.js';
 /** v0.1.2248: 失敗時の代替顔(全サービス共通)。ガードと一緒に使う呼び出し側のために同じ場所からも出す */
 export { avatarFallbackFaceForUrl } from './avatarFallbackFromUrl.js';
 
@@ -100,7 +101,7 @@ export function createSupportAvatarLoadGuard(options) {
    * @param {string} requestedSrc
    * @returns {string}
    */
-  const resolveFallback = (requestedSrc) => {
+  const resolveFallbackRaw = (requestedSrc) => {
     if (!fallbackSrcFor) return fallbackSrc;
     try {
       const s = String(fallbackSrcFor(String(requestedSrc || '')) || '').trim();
@@ -108,6 +109,13 @@ export function createSupportAvatarLoadGuard(options) {
     } catch {
       return fallbackSrc; // 解決器の失敗で画像を壊さない
     }
+  };
+  // v0.1.2259: 代わりの顔が公式の灰色の既定アイコン(blank.jpg)になるときは、共通のゆっくり顔にする(灰色を出さない)。
+  /** @param {string} requestedSrc */
+  const resolveFallback = (requestedSrc) => {
+    const s = resolveFallbackRaw(requestedSrc);
+    if (!isSiteDefaultSilhouetteUrl(s)) return s;
+    return noAvatarFace() || s;
   };
   const urlKeyFn =
     typeof options?.urlKey === 'function' ? options.urlKey : defaultUrlKey;
@@ -154,6 +162,8 @@ export function createSupportAvatarLoadGuard(options) {
     const req = String(requestedSrc || '').trim();
     if (!req) return resolveFallback(req);
     if (!isHttpOrHttpsUrl(req)) return req;
+    // v0.1.2259: 公式の灰色の既定アイコンは読み込めてしまうので、確かめる前に「顔が無い」として代わりの顔へ(全部の欄で共通)
+    if (isSiteDefaultSilhouetteUrl(req)) return resolveFallback(req);
     if (req === fallbackSrc) return req;
     const key = urlKeyFn(req);
     // ★失敗が確定している URL は、その人ごとの代替顔へ倒す(全員同じ白丸にしない)。
@@ -173,6 +183,8 @@ export function createSupportAvatarLoadGuard(options) {
     const req = String(requestedSrc || '').trim();
     if (!isHttpOrHttpsUrl(req)) return null;
     if (req === fallbackSrc) return null;
+    // v0.1.2259: 灰色の既定アイコンは確かめない(通信しない)。表示は pickDisplaySrc が代わりの顔にしている
+    if (isSiteDefaultSilhouetteUrl(req)) return null;
     const key = urlKeyFn(req);
     if (!key) return null;
     if (failedKeys.has(key)) {

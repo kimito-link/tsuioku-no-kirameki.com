@@ -135,8 +135,9 @@ describe('topSupportRankLineModels', () => {
       ],
       { defaultThumbSrc: DEF_THUMB, anonymousFallbackThumbSrc: tv }
     );
-    expect(row.thumbSrc).toBe(tv);
-    expect(row.thumbNeedsNoReferrer).toBe(true);
+    // v0.1.2259: anonymousFallbackThumbSrc が公式の灰色の既定アイコン(usericon/defaults/)なら、その人ごとのゆっくり顔
+    expect(row.thumbSrc.startsWith('data:image/')).toBe(true);
+    expect(row.thumbNeedsNoReferrer).toBe(false);
   });
 
   it('__anon_<表示名> と表示名が同じとき id 行を出さない（二重表示防止）', () => {
@@ -187,7 +188,8 @@ describe('topSupportRankLineModels', () => {
         anonymousIdenticonResolver: () => ''
       }
     );
-    expect(row.thumbSrc).toBe(tv);
+    // v0.1.2259: 既定が灰色の既定アイコンなら、その人ごとのゆっくり顔(灰色にしない)
+    expect(row.thumbSrc.startsWith('data:image/')).toBe(true);
   });
 
   it('https avatar はその URL と no-referrer フラグ', () => {

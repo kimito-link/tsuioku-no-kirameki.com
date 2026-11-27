@@ -704,7 +704,7 @@ import { formatLaneCountOrderLine, makeLaneCountOrderState, orderLaneCandidatesB
 // 人物タイルの ID 行・名前行の正本(person-tile-unify 第3コミット)。popup と会場で共有。
 import { storyUserLaneMetaLines } from '../lib/storyUserLaneMeta.js';
 import { anonymousIdenticonDataUrl } from '../lib/anonymousIdenticon.js';
-import { avatarFallbackFaceForUrl, identiconFallbackForAvatarUrl } from '../lib/avatarFallbackFromUrl.js';
+import { avatarFallbackFaceForUrl, identiconFallbackForAvatarUrl, isSiteDefaultSilhouetteUrl, noAvatarFace } from '../lib/avatarFallbackFromUrl.js';
 import {
   bindCasterThumbElement,
   bindNeutralAvatarError,
@@ -5343,8 +5343,9 @@ function storyGrowthTileSrcForEntry(entry, liveId, entries = STORY_SOURCE_STATE.
   const uid = String(entry?.userId || '').trim();
   const raw = String(entry?.avatarUrl || '').trim();
   const merged = userLaneHttpForTilePick(uid, candidate, raw);
-  if (merged) return merged;
-  return pickSupportGrowthTileForStory(entry?.userId, '');
+  // v0.1.2259: 公式の灰色の既定アイコンは、共通の選び方(pickSupportGrowthTileForStory)でその人ごとのゆっくり顔へ
+  if (merged && !isSiteDefaultSilhouetteUrl(merged)) return merged;
+  return pickSupportGrowthTileForStory(entry?.userId, merged);
 }
 
 // storyUserLaneMetaLines は person-tile-unify 第3コミット(2026-06-22)で
@@ -10056,7 +10057,8 @@ function bindOnErrorHandlersWithin(root) {
       }, { once: true });
     } else if (node.dataset.onErrorFallback === 'blank') {
       node.addEventListener('error', () => {
-        try { node.src = 'https://secure-dcdn.cdn.nimg.jp/nicoaccount/usericon/defaults/blank.jpg'; } catch { /* ignore */ }
+        // v0.1.2259: 読めなかった顔は灰色の既定アイコンでなく、その人ごとのゆっくり顔(正本=avatarFallbackFromUrl.js)
+        try { node.src = avatarFallbackFaceForUrl(node.currentSrc || node.src) || noAvatarFace() || node.src; } catch { /* ignore */ }
       }, { once: true });
     }
   });
