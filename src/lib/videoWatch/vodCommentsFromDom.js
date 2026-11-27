@@ -138,7 +138,7 @@ function mergeAuthors(rows) {
   const merged = [...byId.values()];
   // 時刻が無い録画(Twitch・Kick)は、再生位置(00:19 など)の新しい順、同じなら DOM の下ほど新しい
   merged.sort((a, b) => (Number(b.postedAtMs) || 0) - (Number(a.postedAtMs) || 0) || b.off - a.off || b.seq - a.seq);
-  return merged.map(({ off, ...rest }) => rest);
+  return merged.map(({ off: _off, ...rest }) => rest);
 }
 
 /**

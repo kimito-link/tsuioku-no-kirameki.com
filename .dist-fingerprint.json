@@ -1,7 +1,7 @@
 {
   "schema": 1,
   "mode": "default",
-  "fingerprint": "25e7605266575483433620893755d4ebffaf1dc5ab2cd4ce0af8fe11fd3b9739",
+  "fingerprint": "6b7976fe98a409533b5155af7c7c7b72f4e8c29daae772c67b1dd7efe48c6dc8",
   "inputs": [
     "app/app.js",
     "app/live-view-block.js",
@@ -1145,7 +1145,7 @@
     "extension/dist/content.js": "0e7e13594bd174dc11469ca63f477aa47491ae3226cd4598204374a9c2547737",
     "extension/dist/content-boot.js": "5de85a1efb9f95820fdad442b8335419b05974ebbce87646121063b26c5f011a",
     "extension/dist/nico-video-watch.js": "63d55cc566baaba1ef0d51dfb510e0ece6bc948ffbb5cb0b8a0f2ddc561499fe",
-    "extension/dist/vod-video-watch.js": "92babf771a14f37ea13eeeb5cfcf18936a1621361f4a3ee2e84d8c8af7167fa8",
+    "extension/dist/vod-video-watch.js": "eddc4c56c6690624da190a74b6202e11169056c0360f593c7352939bdce28d1f",
     "extension/dist/yt-page-boot.js": "d0b12fa2d6a04e8820c71f242b74155fa072bbb8eb7a4f811e3e1b109a7759fc",
     "extension/dist/popup.js": "5ad9c304fa8933a8a64716a4e8ecce4eb98b24352483c81a3a343a707891546c",
     "extension/dist/offscreen.js": "13f187bf4e9ff818cb10221faced5ac817a67a01ab8c6b4f45de92565bfa9f9b",

@@ -21911,9 +21911,7 @@ if (typeof window !== 'undefined') {
 //   2235 ではコメントのたびに storage へ書き、横の欄の全体更新が走って内訳がちらつき、会場の上にも板が重なった。
 //   通常動画のサイドパネルだけ出す（ツールバーの POPUP とライブは master と同じ）。
 try {
-  // v0.1.2263(りんく 11-27「ポップアップも動画向けに」): ツールバーのポップアップでも動画ページなら動画のカードと形にする
-  //   (ページに埋め込んだ枠は今までどおり出さない)。ライブでは動画カードが無いので何も変わらない。
-  if (INLINE_SIDE_PANEL || !INLINE_MODE) {
+  if (INLINE_SIDE_PANEL || !INLINE_MODE) { // v0.1.2263: ツールバーのポップアップも動画ページなら動画の形(ライブは動画カードが無いので不変)
     installViewerBehaviorBoardFromStorage({
       document,
       storage: typeof chrome !== 'undefined' ? chrome.storage : undefined,

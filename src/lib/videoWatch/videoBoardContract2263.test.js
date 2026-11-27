@@ -35,7 +35,6 @@ import { exportCommentsFromStoredRows } from '../youtube/exportStoredComments.js
 import { whatsNewSiteOfLocation, whatsNewSummaryForSite, WHATS_NEW_GENERIC_SUMMARY } from '../whatsNewNotice.js';
 import { startYtPageViewerReader } from '../youtube/ytPageViewerReader.js';
 import { venueItemsForPlatform } from '../platform/platformMetrics.js';
-import { ytVideoCommentAuthorsFromDom } from '../youtube/ytVideoWatchMeta.js';
 
 const FIX = join(dirname(fileURLToPath(import.meta.url)), '../youtube/fixtures/real-dom');
 const NOW = Date.parse('2026-11-26T11:37:20+09:00');
