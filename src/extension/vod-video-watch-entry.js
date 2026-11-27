@@ -8,7 +8,7 @@ import { isVodVideoWatchUrl, vodWatchPageFromUrl } from '../lib/videoWatch/vodWa
 import { readVodWatchDom } from '../lib/videoWatch/vodCommentsFromDom.js';
 import { buildVodVideoWatchCardModel } from '../lib/videoWatch/videoWatchCard.js';
 import { videoIdentityFromUrl } from '../lib/videoWatch/videoIdentity.js';
-import { TW_LIVE_ICONS_KEY, fillTwitchVodAvatarsFromLiveIcons } from '../lib/videoWatch/twVodLiveIcons.js';
+import { vodLiveIconsKeyForPlatform, fillVodAvatarsFromLiveIcons } from '../lib/videoWatch/twVodLiveIcons.js';
 
 /** 横の欄(viewerBehaviorBoardPaint.js)が既存の見回りで送る「読み直して」の合図 */
 const VIDEO_WATCH_REREAD_MESSAGE = 'NLS_VIDEO_WATCH_REREAD';
@@ -32,9 +32,17 @@ function hideVenueModeForVideoPage(hide) {
 }
 
 let lastSig = '';
-/** v0.1.2253: ライブの Twitch で覚えた顔(login → URL)。Twitch のページでだけ1回読み、変わったら差し替える */
+/** v0.1.2253: ライブの Twitch で覚えた顔(login → URL)。Twitch のページでだけ1回読み、変わったら差し替える
+ *  v0.1.2260: Kick も同じ形(slug → URL・yt_kk_icons)。このページのサービスの分だけ読む */
 /** @type {Record<string, unknown> | null} */
-let twLiveIcons = null;
+let liveIcons = null;
+/** このページのサービスの「ライブで覚えた顔」の鍵(Twitch・Kick のページだけ。ほかは '') */
+const LIVE_ICONS_KEY = (() => {
+  const host = String(location.hostname || '');
+  if (/(^|\.)twitch\.tv$/.test(host)) return vodLiveIconsKeyForPlatform('twitch');
+  if (/(^|\.)kick\.com$/.test(host)) return vodLiveIconsKeyForPlatform('kick');
+  return '';
+})();
 
 function refresh() {
   const href = String(location.href || '');
@@ -49,7 +57,7 @@ function refresh() {
   const identity = videoIdentityFromUrl(href);
   const key = identity ? identity.key : page.pageKey;
   const read = readVodWatchDom(document, page);
-  const tw = page.platform === 'twitch' ? fillTwitchVodAvatarsFromLiveIcons(read.authors, twLiveIcons) : null;
+  const tw = fillVodAvatarsFromLiveIcons(page.platform, read.authors, liveIcons);
   if (tw) read.authors = tw.authors;
   const card = buildVodVideoWatchCardModel({
     platform: page.platform,
@@ -83,12 +91,13 @@ function refresh() {
 {
   if (isVodVideoWatchUrl(String(location.href || ''))) hideVenueModeForVideoPage(true);
   refresh();
-  if (/(^|\.)twitch\.tv$/.test(String(location.hostname || ''))) {
+  if (LIVE_ICONS_KEY) {
     try {
       // v0.1.2253: ライブの Twitch で覚えた顔を1回だけ読む(この PC の storage・通信なし)。読めたら録画の顔に使う
-      void Promise.resolve(chrome.storage.local.get(TW_LIVE_ICONS_KEY)).then((bag) => {
-        const v = bag?.[TW_LIVE_ICONS_KEY];
-        twLiveIcons = v && typeof v === 'object' ? /** @type {Record<string, unknown>} */ (v) : {};
+      // v0.1.2260: Kick のページでは、ライブの Kick で覚えた顔(yt_kk_icons)を同じように読む
+      void Promise.resolve(chrome.storage.local.get(LIVE_ICONS_KEY)).then((bag) => {
+        const v = bag?.[LIVE_ICONS_KEY];
+        liveIcons = v && typeof v === 'object' ? /** @type {Record<string, unknown>} */ (v) : {};
         if (isVodVideoWatchUrl(String(location.href || ''))) refresh();
       }, () => { /* 読めなければ今までどおり */ });
     } catch { /* 同上 */ }
@@ -116,9 +125,9 @@ function refresh() {
   }
   try {
     chrome.storage.onChanged.addListener((changes, area) => {
-      if (area === 'local' && changes?.[TW_LIVE_ICONS_KEY] && twLiveIcons) {
-        const v = changes[TW_LIVE_ICONS_KEY].newValue;
-        twLiveIcons = v && typeof v === 'object' ? /** @type {Record<string, unknown>} */ (v) : null;
+      if (area === 'local' && LIVE_ICONS_KEY && changes?.[LIVE_ICONS_KEY] && liveIcons) {
+        const v = changes[LIVE_ICONS_KEY].newValue;
+        liveIcons = v && typeof v === 'object' ? /** @type {Record<string, unknown>} */ (v) : null;
         if (isVodVideoWatchUrl(String(location.href || ''))) refresh();
       }
       if (area !== 'local' || !changes?.[KEY_VOD_VIDEO_WATCH_CARD]) return;

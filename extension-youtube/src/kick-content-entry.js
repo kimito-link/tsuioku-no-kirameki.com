@@ -41,6 +41,7 @@ import { kickEmotesFromCatalog, kickEmotesFromDom } from '../../src/lib/platform
 import { runBackfillLoop } from '../../src/lib/platform/historyBackfill.js';
 import { createPageWatchScheduler } from '../../src/lib/pageWatchScheduler.js';
 import { isVenuePageHidden } from '../../src/lib/venuePaintSchedule.js';
+import { rememberLiveIcon, mergeLiveIconStore } from '../../src/lib/platform/liveIconStore.js';
 import { isExtensionContextAlive } from '../../src/lib/reportSilentError.js';
 import { startOrphanTabAutoReloadInPage } from '../../src/extension/orphanTabAutoReloadHost.js';
 import { createThrottledSnapshotWriter } from '../../src/lib/diagFlushThrottle.js';
@@ -239,31 +240,49 @@ const iconPending = new Set();
 /** @type {string[]} */
 const iconQueue = [];
 let iconRunning = 0;
+// 待ちに間に合わず顔なしで記録した人の顔を storage(yt_kk_icons)に置き、画面が描くときに埋める。
+// v0.1.2260: 間に合った人の顔も同じ場所に置く(録画の Kick の顔 twVodLiveIcons.js が引く。今までは遅れた人だけで録画が全員ゆっくり顔)。
+//   Twitch(v0.1.2254・tw-content-entry.js)と同じ: 遅れた人は今までどおり1.5秒で書く。間に合った人は急がず30秒まとめて1回・
+//   タブを隠したとき・離れたときに書く。上限 3000 を超えたら古い順に捨てる(liveIconStore.js)。
 const LATE_ICONS_KEY = 'yt_kk_icons';
 const LATE_ICONS_MAX = 3000;
+const LATE_SAVE_MS = 1500;
+const KEEP_SAVE_MS = 30_000;
 /** @type {Set<string>} */
 const lateWanted = new Set();
-/** @type {Record<string, string>} */
+/** @type {Record<string, string>} このタブで分かった顔(新しい順) */
 let lateIcons = {};
-let lateLoaded = false;
+let lateDirty = false;
 let lateTimer = 0;
-function saveLateIconsSoon() {
-  if (lateTimer) return;
-  lateTimer = setTimeout(async () => {
+let lateDueAt = 0;
+async function writeLateIconsNow() {
+  if (lateTimer) clearTimeout(lateTimer);
+  lateTimer = 0;
+  lateDueAt = 0;
+  if (!lateDirty) return;
+  lateDirty = false;
+  try {
+    if (!isExtensionContextAlive()) return;
+    // ほかのタブ(別のチャンネル)が書いた分を消さないよう、書く直前に読んで合わせる
+    const old = (await chrome.storage.local.get(LATE_ICONS_KEY))?.[LATE_ICONS_KEY];
+    const merged = mergeLiveIconStore(old, lateIcons, LATE_ICONS_MAX);
+    lateIcons = mergeLiveIconStore(null, lateIcons, LATE_ICONS_MAX);
+    void chrome.storage.local.set({ [LATE_ICONS_KEY]: merged });
+  } catch {
+    /* 拡張が入れ替わった直後 */
+  }
+}
+/** @param {number} [delayMs] */
+function saveLateIconsSoon(delayMs = LATE_SAVE_MS) {
+  lateDirty = true;
+  const due = Date.now() + delayMs;
+  if (lateTimer && lateDueAt <= due) return;
+  if (lateTimer) clearTimeout(lateTimer);
+  lateDueAt = due;
+  lateTimer = setTimeout(() => {
     lateTimer = 0;
-    try {
-      if (!lateLoaded) {
-        const old = (await chrome.storage.local.get(LATE_ICONS_KEY))?.[LATE_ICONS_KEY];
-        if (old && typeof old === 'object') lateIcons = { ...old, ...lateIcons };
-        lateLoaded = true;
-      }
-      const keys = Object.keys(lateIcons);
-      if (keys.length > LATE_ICONS_MAX) for (const k of keys.slice(0, keys.length - LATE_ICONS_MAX)) delete lateIcons[k];
-      void chrome.storage.local.set({ [LATE_ICONS_KEY]: lateIcons });
-    } catch {
-      /* 拡張が入れ替わった直後 */
-    }
-  }, 1500);
+    void writeLateIconsNow();
+  }, delayMs);
 }
 
 /** @type {Array<() => void>} */
@@ -294,12 +313,9 @@ function pumpIcons() {
         const url = parseKickUserIcon(await getJson(kickChannelApiUrl(slug)));
         iconBySlug.set(slug, url);
         if (url) diag.iconFound += 1;
-        if (lateWanted.delete(slug) && url) {
-          delete lateIcons[slug];
-          lateIcons[slug] = url;
-          diag.iconLate += 1;
-          saveLateIconsSoon();
-        }
+        const late = lateWanted.delete(slug) && !!url;
+        if (late) diag.iconLate += 1;
+        if (rememberLiveIcon(lateIcons, slug, url)) saveLateIconsSoon(late ? LATE_SAVE_MS : KEEP_SAVE_MS);
         iconPauseMs = 0;
       } catch (e) {
         diag.apiFail += 1;
@@ -931,8 +947,10 @@ const resumeKickWatch = () => {
 };
 document.addEventListener('visibilitychange', () => {
   if (!isVenuePageHidden(document)) resumeKickWatch();
+  else void writeLateIconsNow(); // v0.1.2260: 隠す前に、まだ書いていない顔を置く(録画で使う)
 });
 window.addEventListener('pagehide', () => {
+  void writeLateIconsNow();
   kickWatchSched.stop();
   current?.stop();
   current = null;

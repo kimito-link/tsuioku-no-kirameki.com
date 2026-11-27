@@ -28,7 +28,8 @@ describe('v0.1.2253 Twitch 録画の顔を、ライブで覚えた顔(login ご�
     const tw = readFileSync(join(ROOT, 'extension-youtube/src/tw-content-entry.js'), 'utf8');
     expect(tw).toContain(`const TW_LATE_ICONS_KEY = '${TW_LIVE_ICONS_KEY}';`);
     const entry = readFileSync(join(ROOT, 'src/extension/vod-video-watch-entry.js'), 'utf8');
-    expect(entry).toContain('chrome.storage.local.get(TW_LIVE_ICONS_KEY)');
+    expect(entry).toContain('chrome.storage.local.get(LIVE_ICONS_KEY)');
+    expect(entry).toContain("vodLiveIconsKeyForPlatform('twitch')");
     expect(entry).not.toMatch(/fetch\(|XMLHttpRequest|MutationObserver|setInterval|setTimeout/);
   });
 });
