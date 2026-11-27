@@ -4,6 +4,7 @@
 
 import { deriveAvatarUrlFromUid } from './deriveAvatarUrlFromUid.js';
 import { anonymousIdenticonDataUrl } from './anonymousIdenticon.js';
+import { isSiteDefaultSilhouetteUrl, faceInsteadOfSilhouette } from './avatarFallbackFromUrl.js';
 
 /**
  * @param {unknown} url
@@ -156,12 +157,20 @@ export function pickSupportGrowthFallbackTileSrc(
   tvSrc
 ) {
   httpCandidate = dropNicoUserIconOffNico(httpCandidate);
+  // v0.1.2259: 公式の灰色の既定アイコンは「顔が無い」。数字 ID の人も推測の URL を組まず(通信しない)、その人ごとのゆっくり顔
+  if (isSiteDefaultSilhouetteUrl(httpCandidate)) {
+    return faceInsteadOfSilhouette(httpCandidate, userId);
+  }
   if (isHttpOrHttpsUrl(httpCandidate)) {
     return String(httpCandidate).trim();
   }
   const y = String(yukkuriSrc || '').trim();
   const t = String(tvSrc || '').trim();
   if (isAnonymousStyleNicoUserId(userId)) {
+    // v0.1.2259: 匿名の既定の絵が灰色の既定アイコンなら、その人ごとのゆっくり顔(無ければ y)
+    if (isSiteDefaultSilhouetteUrl(t)) {
+      return String(userId || '').trim() ? faceInsteadOfSilhouette(t, userId) : y || faceInsteadOfSilhouette(t, '');
+    }
     return t || y;
   }
   const syn = niconicoDefaultUserIconUrl(userId);
@@ -193,6 +202,14 @@ export function pickSupportGrowthTileWithOptionalIdenticon(
   identiconOpts
 ) {
   httpCandidate = dropNicoUserIconOffNico(httpCandidate);
+  if (isSiteDefaultSilhouetteUrl(httpCandidate)) {
+    // v0.1.2259: 灰色の既定アイコンは顔が無いのと同じ。匿名は下の識別アイコン、それ以外は pickSupportGrowthFallbackTileSrc が決める
+    httpCandidate = '';
+    const u0 = String(userId || '').trim();
+    if (u0 && !isAnonymousStyleNicoUserId(u0)) {
+      return faceInsteadOfSilhouette(NICONICO_OFFICIAL_DEFAULT_USERICON_HTTPS, u0);
+    }
+  }
   if (isHttpOrHttpsUrl(httpCandidate)) {
     return String(httpCandidate).trim();
   }
@@ -233,6 +250,10 @@ export function pickSupportGrowthTileWithOptionalIdenticon(
 export function resolveSupportGrowthTileSrc(p) {
   const def = String(p.defaultSrc || '');
   const entryAvatarUrl = dropNicoUserIconOffNico(p.entryAvatarUrl);
+  // v0.1.2259: 灰色の既定アイコンは、その人ごとのゆっくり顔(推測の URL は組まない)
+  if (isSiteDefaultSilhouetteUrl(entryAvatarUrl)) {
+    return faceInsteadOfSilhouette(entryAvatarUrl, p.userId);
+  }
   if (isHttpOrHttpsUrl(entryAvatarUrl)) {
     return String(entryAvatarUrl).trim();
   }

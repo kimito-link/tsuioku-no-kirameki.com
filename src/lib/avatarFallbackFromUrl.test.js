@@ -47,7 +47,7 @@ describe('配線: POP も会場も同じ代替顔を使う(二重に決めない
     const i = pop.indexOf('const storyAvatarLoadGuard = createSupportAvatarLoadGuard({');
     expect(i).toBeGreaterThan(0);
     expect(pop.slice(i, i + 700)).toMatch(/fallbackSrcFor: avatarFallbackFaceForUrl,/);
-    expect(pop).toMatch(/import \{ avatarFallbackFaceForUrl, identiconFallbackForAvatarUrl \} from '\.\.\/lib\/avatarFallbackFromUrl\.js';/);
+    expect(pop).toMatch(/import \{ avatarFallbackFaceForUrl, identiconFallbackForAvatarUrl, isSiteDefaultSilhouetteUrl, noAvatarFace \} from '\.\.\/lib\/avatarFallbackFromUrl\.js';/);
   });
 
   it('★会場の avatar guard も同じ関数を使う(ローカルに別実装を持たない)', () => {

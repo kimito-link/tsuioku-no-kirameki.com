@@ -3,7 +3,9 @@ import { describe, it, expect, vi, afterEach } from 'vitest';
 import { createSupportAvatarLoadGuard, isProbeRetryEligible } from './supportGrowthAvatarLoad.js';
 import { NICONICO_OFFICIAL_DEFAULT_USERICON_HTTPS } from './supportGrowthTileSrc.js';
 
-const FALLBACK = NICONICO_OFFICIAL_DEFAULT_USERICON_HTTPS;
+// v0.1.2259: 公式の灰色の既定アイコン(blank.jpg)はガードが代わりの顔に替えるので、仕組みの確かめには別の既定画像を使う
+void NICONICO_OFFICIAL_DEFAULT_USERICON_HTTPS;
+const FALLBACK = 'images/yukkuri-charactore-english/link/link-yukkuri-half-eyes-mouth-closed.png';
 const REMOTE = 'https://secure-dcdn.cdn.nimg.jp/nicoaccount/usericon/s/1/123456789.jpg';
 
 afterEach(() => {
@@ -41,7 +43,7 @@ describe('createSupportAvatarLoadGuard', () => {
     expect(probe).toBeInstanceOf(HTMLImageElement);
     probe.dispatchEvent(new Event('error'));
     expect(g.pickDisplaySrc(REMOTE)).toBe(FALLBACK);
-    expect(img.src).toContain('nicoaccount/usericon/defaults');
+    expect(img.src).toContain('link-yukkuri-half-eyes-mouth-closed.png'); // v0.1.2259: 既定画像(灰色の既定アイコンではない)
   });
 
   it('noteRemoteAttempt + probe load で img.src が差し替わり succeeded 登録', () => {

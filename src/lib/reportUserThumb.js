@@ -17,6 +17,7 @@
  */
 
 import { isHttpOrHttpsUrl } from './supportGrowthTileSrc.js';
+import { isSiteDefaultSilhouetteUrl, faceInsteadOfSilhouette } from './avatarFallbackFromUrl.js';
 
 const NICO_USER_ICON_CDN_BASE =
   'https://secure-dcdn.cdn.nimg.jp/nicoaccount/usericon';
@@ -47,6 +48,14 @@ export function buildNiconicoDefaultUserIconUrl(uid) {
 export function resolveReportUserThumbSrc(opts) {
   const userId = String(opts?.userId || '').trim();
   const avatarUrl = String(opts?.avatarUrl || '').trim();
+  // v0.1.2259: 公式の灰色の既定アイコンは顔が無いのと同じ。その人ごとのゆっくり顔(推測の URL も組まない)
+  if (isSiteDefaultSilhouetteUrl(avatarUrl)) {
+    if (userId && userId !== '__unknown__' && typeof opts?.identiconResolver === 'function') {
+      const r = opts.identiconResolver(userId);
+      if (typeof r === 'string' && r.length > 0) return r;
+    }
+    return faceInsteadOfSilhouette(avatarUrl, userId === '__unknown__' ? '' : userId);
+  }
   if (isHttpOrHttpsUrl(avatarUrl)) {
     return avatarUrl;
   }
