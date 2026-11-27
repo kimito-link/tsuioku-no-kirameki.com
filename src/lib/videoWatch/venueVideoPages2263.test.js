@@ -62,6 +62,14 @@ describe.each(PAGES)('%s の録画・動画のページ', (platform, url, wantKe
     expect(venueItemsForPlatform(platform, bag(s2.platformFacts))).toEqual([]);
   });
 
+  it('ページに総数が出ないサービスでも、帯のコメントは横の欄と同じ「いまページに出ているコメント」の数', () => {
+    // 実ページ(Twitch・Kick の録画)では再生数も総数も読めず、帯が空だった
+    const noTotal = buildVodVideoWatchCardModel({ platform, pageKey: key, title: 't', viewCount: null, videoAuthors: authors, nowMs: 1 });
+    const s3 = ytSummaryToNicoSnapshot({ contentKind: 'video', isLive: false }, key, '', {}, { videoId: key, card: noTotal });
+    expect(venueItemsForPlatform(platform, bag(s3.platformFacts))?.map((it) => `${it.label} ${it.text}${it.unit}`)).toEqual([`コメント ${noTotal?.behavior?.commentsTotal}件`]);
+    expect(Number(noTotal?.behavior?.commentsTotal)).toBeGreaterThan(0);
+  });
+
   it('ライブの帯は今まで通り(記録・同時接続・経過)', () => {
     const items = venueItemsForPlatform(platform, bag({ viewers: 120 })) || [];
     expect(items.some((it) => it.key === 'records')).toBe(true);

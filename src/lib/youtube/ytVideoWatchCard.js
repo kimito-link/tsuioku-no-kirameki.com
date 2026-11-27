@@ -247,7 +247,10 @@ export function videoCardCommentTotal(wrap, videoId) {
   const vid = String(videoId || '').trim();
   if (!vid || !wrap || typeof wrap !== 'object' || String(wrap.videoId || '') !== vid) return null;
   const v = wrap.card?.facts?.commentTotal;
-  if (v == null || v === '') return null;
-  const n = Number(v);
-  return Number.isFinite(n) && n >= 0 ? Math.floor(n) : null;
+  const n = v == null || v === '' ? NaN : Number(v);
+  if (Number.isFinite(n) && n >= 0) return Math.floor(n);
+  // 録画・動画のサービス(Twitch・Kick・ツイキャス・TikTok)はページに総数が出ないことが多い。
+  //   そのときは、横の欄と同じ「いまページに出ているコメント」の数(behavior.commentsTotal)。0 は「まだ読めていない」とみて出さない
+  const b = Number(wrap.card?.behavior?.commentsTotal);
+  return Number.isFinite(b) && b > 0 ? Math.floor(b) : null;
 }
