@@ -98,7 +98,8 @@ import { followerSamplesStorageKey, readStoredFollowerSamples } from '../lib/pla
  *   slotViewCount?: number,
  *   thumbnailUrl?: string,
  *   broadcasterPageUrl?: string,
- *   platformFacts?: { viewCount?: number, commentCount?: number, official?: Record<string, unknown>, contentKind?: string, isLive?: boolean }
+ *   videoId?: string,
+ *   platformFacts?: { viewCount?: number, commentCount?: number, official?: Record<string, unknown>, contentKind?: string, isLive?: boolean, videoId?: string }
  * }} WatchMetaSnapshot
  */
 
@@ -572,9 +573,11 @@ async function followerSamplesForExport(lid, snapshot) {
  * @param {WatchMetaSnapshot|null} snapshot
  */
 function videoIdFromWatchSnapshot(snapshot) {
-  const thumb = String(snapshot?.thumbnailUrl || '');
+  const thumb = String(snapshot?.thumbnailUrl || snapshot?.platformFacts?.videoId || '');
   const m = thumb.match(/\/vi\/([A-Za-z0-9_-]{11})\//);
-  return m ? m[1] : '';
+  if (m) return m[1];
+  const id = String(snapshot?.platformFacts?.videoId || snapshot?.videoId || '').trim();
+  return /^[A-Za-z0-9_-]{11}$/.test(id) ? id : '';
 }
 
 /** @param {unknown} tabUrl @param {string} videoId */
@@ -582,29 +585,39 @@ function youtubeTabMatchesVideo(tabUrl, videoId) {
   try {
     const u = new URL(String(tabUrl || ''));
     if (!/(^|\.)youtube\.com$/i.test(u.hostname)) return false;
+    const path = u.pathname || '';
+    const isWatch = path === '/watch' || path.startsWith('/watch/') || path.startsWith('/live/') || path.startsWith('/shorts/');
+    if (!isWatch) return false;
     const v = u.searchParams.get('v');
     if (videoId && v === videoId) return true;
-    if (videoId && new RegExp(`/(?:live|shorts)/${videoId}(?:/|$)`).test(u.pathname)) return true;
-    return false;
+    if (videoId && new RegExp(`/(?:live|shorts)/${videoId}(?:/|$)`).test(path)) return true;
+    return !videoId;
   } catch {
     return false;
   }
 }
 
-/** @param {WatchMetaSnapshot|null} snapshot */
-async function readYoutubePageExportSnapshot(snapshot) {
+/** @param {WatchMetaSnapshot|null} snapshot @param {string} [liveId] */
+async function readYoutubePageExportSnapshot(snapshot, liveId) {
   /** @type {{ relatedChip: object | null, commentThreads: object[] }} */
   const empty = { relatedChip: null, commentThreads: [] };
-  if (String(snapshot?.platform || '') !== 'youtube') return empty;
+  const platform = String(snapshot?.platform || '');
+  if (platform && platform !== 'youtube') return empty;
+  if (!platform && liveId && !isYtPseudoLvShape(liveId)) return empty;
   if (typeof chrome === 'undefined' || !chrome.tabs || typeof chrome.tabs.query !== 'function') return empty;
-  const videoId = videoIdFromWatchSnapshot(snapshot);
+  let videoId = videoIdFromWatchSnapshot(snapshot);
   const operatorChannelId = String(snapshot?.broadcasterPageUrl || '').match(/\/channel\/(UC[A-Za-z0-9_-]{22})/)?.[1] || '';
   try {
     const tabs = await chrome.tabs.query({
       url: ['*://www.youtube.com/*', '*://youtube.com/*', '*://m.youtube.com/*'],
     });
-    const match = (tabs || []).find((t) => youtubeTabMatchesVideo(t.url, videoId));
+    let match = (tabs || []).find((t) => videoId && youtubeTabMatchesVideo(t.url, videoId));
+    if (!match && !videoId) {
+      const open = (tabs || []).filter((t) => youtubeTabMatchesVideo(t.url, ''));
+      if (open.length === 1) match = open[0];
+    }
     if (!match || match.id == null) return empty;
+    if (!videoId) videoId = youtubeTabMatchesVideo(match.url, '') ? (String(match.url || '').match(/[?&]v=([A-Za-z0-9_-]{11})/) || [])[1] || '' : '';
     const res = await withTimeout(
       chrome.tabs.sendMessage(match.id, {
         type: 'YT_READ_PAGE_EXPORT_SNAPSHOT',
@@ -699,7 +712,7 @@ async function runExport(lid) {
     let comments = /** @type {import('../lib/commentRecord.js').StoredComment[]} */ (
       Array.isArray(commentsRaw) ? commentsRaw : []
     );
-    const pageExportSnap = await readYoutubePageExportSnapshot(snapshot);
+    const pageExportSnap = await readYoutubePageExportSnapshot(snapshot, lid);
     if (pageExportSnap.commentThreads.length) {
       comments = mergeYtThreadsOntoComments(comments, pageExportSnap.commentThreads, lid);
     }
@@ -716,7 +729,8 @@ async function runExport(lid) {
     mktProf.mark('read');
     const heavyMkt = comments.length > HTML_REPORT_HEAVY_COMMENT_THRESHOLD;
     const reportBroadcasterUid = String(snapshot?.broadcasterUserId || '').trim();
-    const marketingView = marketingViewFor(snapshot?.platform);
+    const platformHint = String(snapshot?.platform || (isYtPseudoLvShape(lid) ? 'youtube' : '')).trim();
+    const marketingView = marketingViewFor(platformHint || undefined);
     const pageCountRaw = Number(snapshot?.slotViewCount ?? snapshot?.platformFacts?.viewCount ?? snapshot?.platformFacts?.official?.totalViews);
     const marketingPageCount = marketingView && pageCountRaw > 0 && pageCountRaw <= 50_000_000 ? Math.floor(pageCountRaw) : 0;
     const facts = snapshot?.platformFacts;
@@ -919,7 +933,7 @@ async function runExport(lid) {
       streamAgeMin: typeof snapshot?.streamAgeMin === 'number' ? snapshot.streamAgeMin : undefined,
       yukkuriImageDataUrlMap: yukkuriImageMapForMkt,
       eventRanking: eventRankingForMkt,
-      contentKind: String(snapshot?.platformFacts?.contentKind || ''),
+      contentKind: String(snapshot?.platformFacts?.contentKind || (pageExportSnap.commentThreads.length ? 'video' : '')),
       relatedChip: pageExportSnap.relatedChip,
       videoThreads: pageExportSnap.commentThreads,
       slimForHeavyExport: heavyMkt
