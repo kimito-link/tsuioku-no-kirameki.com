@@ -163,3 +163,46 @@ describe('YouTube 動画のマーケHTML: 長い幅のコメントでも落ち�
     expect(yt.length).toBeLessThan(2_000_000);
   });
 });
+
+/** v0.1.2263 (りんく「すべてのサービスに」): 同じ1本の道(buildMarketingDashboardHtml)を、動画・録画のあるサービス全部で確かめる */
+const VIDEO_PLATFORMS = /** @type {const} */ ([
+  ['youtube', 'youtube'],
+  ['niconico', ''],
+  ['twitch', 'twitch'],
+  ['kick', 'kick'],
+  ['twitcasting', 'twitcasting'],
+  ['abema', 'abema'],
+  ['tiktok', 'tiktok'],
+]);
+
+describe.each(VIDEO_PLATFORMS)('%s: 動画・録画のマーケHTML(長い幅)とライブ(今までと同じ)', (platform, ytPlatform) => {
+  /** @param {any[]} list */
+  const tag = (list) => list.map((c) => ({ ...c, liveId: `${platform}-v`, ...(ytPlatform ? { ytPlatform } : { ytPlatform: undefined }) }));
+  /** @param {any[]} comments */
+  const build = (comments) => {
+    const t = performance.now();
+    const html = buildMarketingDashboardHtml(aggregateMarketingReport(comments, `${platform}-v`), { platform, commentsForAnalytics: comments });
+    return { html, ms: performance.now() - t };
+  };
+
+  it('4年・11年・18年にわたるコメントでも落ちず、速さ・気分のグラフはコメント全部で出る', () => {
+    for (const days of [4 * 365, 4014, 18 * 365]) {
+      const { html, ms } = build(tag(spreadComments(days, 60)));
+      expect(html.length).toBeLessThan(8_000_000);
+      expect(ms).toBeLessThan(5000);
+      expect(html).toContain('id="mkt-velocity"');
+      expect(html).toContain('id="mkt-sentiment"');
+      expect(html).toMatch(/速さ・笑い・気分はコメント全部を\d+(日|時間)ごとに、沈黙・疲れは新しい側7日分/);
+    }
+  });
+
+  it('ライブの長さ(3時間)は、1分・30秒ごとのまま・見出しに幅の説明なし', () => {
+    const t0 = NOW - 3 * 3_600_000;
+    const live = tag(Array.from({ length: 400 }, (_, i) => ({ id: `l${i}`, capturedAt: t0 + i * 27_000, text: i % 3 ? 'www' : 'すごい', userId: `u${i % 13}`, nickname: 'n' })));
+    const { html } = build(live);
+    expect(html).not.toContain('新しい側7日分');
+    expect(html).toContain('水色＝1分ごとのコメ件数 / オレンジ点線＝5分移動平均');
+    expect(html).toContain('30 秒粒度で');
+    expect(html).toContain('を 1 分粒度で時系列表示');
+  });
+});

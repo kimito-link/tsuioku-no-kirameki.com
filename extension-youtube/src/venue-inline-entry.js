@@ -24,7 +24,8 @@ import { createPageWatchScheduler } from '../../src/lib/pageWatchScheduler.js';
 import { isVenuePageHidden } from '../../src/lib/venuePaintSchedule.js';
 import { installLastStreamUrlRemember } from './pfLastStreamUrl.js';
 import { venueRootVisibilityAction } from '../../src/lib/venueWatchPageVisibility.js';
-import { KEY_YT_VIDEO_WATCH_CARD, KEY_VIEWER_BEHAVIOR_BOARD } from '../../src/lib/storageKeys.js';
+import { KEY_YT_VIDEO_WATCH_CARD, KEY_VOD_VIDEO_WATCH_CARD, KEY_VIEWER_BEHAVIOR_BOARD } from '../../src/lib/storageKeys.js';
+import { videoCardWrapForKey } from '../../src/lib/youtube/ytVideoWatchCard.js';
 
 /** Twitch/Kick の視聴ページで動いているか(council/twitch-support-PLAN.md・会場は YouTube と同じくニコ生版の venueBar をそのまま使う) */
 const PAGE_PLATFORM = platformOfHostname(location.hostname);
@@ -57,11 +58,13 @@ async function statCardsSource() {
   const vid = mountedVid;
   if (!vid) return null;
   // v0.1.2263: 再生数は動画のカード(横の欄と同じ正本)から。同じ1回の読みで一緒に取る(通常動画で帯に「再生」が出なかった)
-  const bag = await chrome.storage.local.get(['yt_stream_summaries', KEY_YT_VIDEO_WATCH_CARD]);
+  //   YouTube もほかのサービスの録画・動画も、同じ読み口(videoCardWrapForKey)で鍵の合うカードだけ使う
+  const bag = await chrome.storage.local.get(['yt_stream_summaries', KEY_YT_VIDEO_WATCH_CARD, KEY_VOD_VIDEO_WATCH_CARD]);
   const all = (bag && bag.yt_stream_summaries) || {};
   const sum = all[vid];
   if (!sum) return null;
-  return { snapshot: ytSummaryToNicoSnapshot(sum, vid, '', all, bag?.[KEY_YT_VIDEO_WATCH_CARD]) };
+  const card = videoCardWrapForKey([bag?.[KEY_YT_VIDEO_WATCH_CARD], bag?.[KEY_VOD_VIDEO_WATCH_CARD]], vid);
+  return { snapshot: ytSummaryToNicoSnapshot(sum, vid, '', all, card) };
 }
 /** 視聴キーが一瞬でも取れなくなった時刻。取れていれば 0 */
 let watchKeyMissingSince = 0;

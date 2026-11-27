@@ -224,3 +224,15 @@ export function videoCardViewCount(wrap, videoId) {
   const n = Number(v);
   return Number.isFinite(n) && n >= 0 ? Math.floor(n) : null;
 }
+
+/**
+ * v0.1.2263: 動画のカードの置き場(YouTube・録画/動画のサービス)のうち、この鍵のカード。無ければ null。
+ * @param {readonly any[]} wraps
+ * @param {string} key
+ */
+export function videoCardWrapForKey(wraps, key) {
+  const k = String(key || '').trim();
+  if (!k || !Array.isArray(wraps)) return null;
+  for (const w of wraps) if (w && typeof w === 'object' && String(w.videoId || '') === k) return w;
+  return null;
+}

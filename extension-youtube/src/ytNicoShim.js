@@ -49,8 +49,8 @@ import { createStaleFrameHold } from '../../src/lib/youtube/ytStaleFrameHold.js'
 import { ytFullRefreshIntervalMs } from '../../src/lib/youtube/ytFullRefreshInterval.js';
 import { dropPseudoLvCommentWrites } from '../../src/lib/youtube/ytShimCommentWrites.js';
 import { recordedRowsOrVideoRows } from '../../src/lib/videoWatch/videoCommentRows.js';
-import { KEY_YT_VIDEO_WATCH_CARD } from '../../src/lib/storageKeys.js';
-import { videoCardViewCount } from '../../src/lib/youtube/ytVideoWatchCard.js';
+import { KEY_YT_VIDEO_WATCH_CARD, KEY_VOD_VIDEO_WATCH_CARD } from '../../src/lib/storageKeys.js';
+import { videoCardViewCount, videoCardWrapForKey } from '../../src/lib/youtube/ytVideoWatchCard.js';
 import { shouldYieldForBigRecord, yieldToMainThread } from '../../src/lib/bigRecordYield.js';
 import {
   mergeLiveRowsByRecordedAt,
@@ -1786,8 +1786,8 @@ if (real && real.storage && real.storage.local && (real.tabs || YT_SHIM_IN_PAGE)
         // v0.1.2263: 動画(ライブでない)だけ、再生数の正本の動画のカードを読む(ライブは読まない=今までと同じ)
         const cardWrap = sum?.contentKind === 'live' || sum?.isLive === true
           ? null
-          : await Promise.resolve(real?.storage?.local?.get?.(KEY_YT_VIDEO_WATCH_CARD))
-              .then((/** @type {any} */ b) => b?.[KEY_YT_VIDEO_WATCH_CARD] || null)
+          : await Promise.resolve(real?.storage?.local?.get?.([KEY_YT_VIDEO_WATCH_CARD, KEY_VOD_VIDEO_WATCH_CARD]))
+              .then((/** @type {any} */ b) => videoCardWrapForKey([b?.[KEY_YT_VIDEO_WATCH_CARD], b?.[KEY_VOD_VIDEO_WATCH_CARD]], vid))
               .catch(() => null);
         // 先に記録を読む(アーカイブかどうか・配信者の UC… が記録から分かるため)
         const gifts = await buildGiftBagsForLv(pseudoLvForVideoId(vid), sum).catch(() => undefined);
