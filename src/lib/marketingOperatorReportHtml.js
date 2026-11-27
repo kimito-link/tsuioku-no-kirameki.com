@@ -4,6 +4,7 @@
  */
 
 import { escapeHtml, escapeAttr } from '../shared/html/escape.js';
+import { operatorDisplayName } from './marketingOperatorReport.js';
 import { isSiteDefaultSilhouetteUrl, faceForRowKey } from './avatarFallbackFromUrl.js';
 import { buildNiconicoDefaultUserIconUrl } from './reportUserThumb.js';
 import { faceForCommentRow } from './commentRecord.js';
@@ -194,7 +195,7 @@ export function renderOperatorReportHtml(model, opts = {}) {
     platformId: String(model.platformId || ''),
     liveId: String(model.liveId || ''),
   };
-  const displayName = (name) => (maskShare ? '視聴者' : String(name || ''));
+  const displayName = (person) => operatorDisplayName(person, { maskShare, platformId: String(model.platformId || '') });
   const kpis = (Array.isArray(model.kpis) ? model.kpis : [])
     .map(
       (k) =>
@@ -246,7 +247,7 @@ function renderThanks(data, ctx) {
       if (it.kind === 'first') tags.push(tag('この配信が初めて', 'teal'));
       if (it.returning) tags.push(tag('以前の配信でもコメント', 'teal'));
       return `<div class="mkt-op-comment"><div class="mkt-op-person">${avHtml(it, ctx)}<div>
-        <div class="mkt-op-name">${escapeHtml(ctx.displayName(it.name))}${it.timeText ? ` <span class="mkt-op-meta">・ ${escapeHtml(it.timeText)}</span>` : ''}</div>
+        <div class="mkt-op-name">${escapeHtml(ctx.displayName(it))}${it.timeText ? ` <span class="mkt-op-meta">・ ${escapeHtml(it.timeText)}</span>` : ''}</div>
         ${it.text ? `<div class="mkt-op-body">${escapeHtml(it.text)}</div>` : ''}
         ${tags.length ? `<div class="mkt-op-tags">${tags.join('')}</div>` : ''}
       </div></div></div>`;
@@ -266,7 +267,7 @@ function renderWho(data, ctx) {
         returning
           .map(
             (p) =>
-              `<div class="mkt-op-who">${avHtml(p, ctx)}<div><div class="mkt-op-name">${escapeHtml(ctx.displayName(p.name))}</div><div class="mkt-op-meta">過去 ${Number(p.pastBroadcasts || 0).toLocaleString('ja-JP')}配信・今回 ${Number(p.commentCount || 0).toLocaleString('ja-JP')}件</div></div></div>`,
+              `<div class="mkt-op-who">${avHtml(p, ctx)}<div><div class="mkt-op-name">${escapeHtml(ctx.displayName(p))}</div><div class="mkt-op-meta">過去 ${Number(p.pastBroadcasts || 0).toLocaleString('ja-JP')}配信・今回 ${Number(p.commentCount || 0).toLocaleString('ja-JP')}件</div></div></div>`,
           )
           .join('')
       }${Number(data.returningCount) > returning.length ? `<p class="mkt-note">ほか ${(Number(data.returningCount) - returning.length).toLocaleString('ja-JP')}人は表の続きにあります。</p>` : ''}</div>`
@@ -304,7 +305,7 @@ function renderTop(data, ctx) {
         ? `<td class="num">${p.likeTotal != null ? Number(p.likeTotal).toLocaleString('ja-JP') : ''}</td>`
         : '';
       const giftCell = hasGifts ? `<td>${escapeHtml(p.giftLabel || '')}</td>` : '';
-      return `<tr><td class="num">${i + 1}</td><td><div class="mkt-op-person">${avHtml(p, ctx)}<div class="mkt-op-name">${escapeHtml(ctx.displayName(p.name))}</div></div></td><td class="num">${Number(p.commentCount || 0).toLocaleString('ja-JP')}</td>${likeCell}${giftCell}<td class="mkt-op-meta">${escapeHtml(memo.join('・'))}</td></tr>`;
+      return `<tr><td class="num">${i + 1}</td><td><div class="mkt-op-person">${avHtml(p, ctx)}<div class="mkt-op-name">${escapeHtml(ctx.displayName(p))}</div></div></td><td class="num">${Number(p.commentCount || 0).toLocaleString('ja-JP')}</td>${likeCell}${giftCell}<td class="mkt-op-meta">${escapeHtml(memo.join('・'))}</td></tr>`;
     })
     .join('');
   return `<div class="mkt-table-scroll"><table class="mkt-op-table"><thead>${head}</thead><tbody>${body}</tbody></table></div>`;
@@ -322,18 +323,18 @@ function renderThreads(data, ctx) {
       if (creatorReplies.length) tags.push(tag('投稿者が返信', 'teal'));
       if (t.creatorHeart) tags.push(tag('ハートあり', 'gold'));
       if (viewerReplies.length) {
-        const names = viewerReplies.map((r) => ctx.displayName(r.name)).filter(Boolean).slice(0, 3).join('、');
+        const names = viewerReplies.map((r) => ctx.displayName(r)).filter(Boolean).slice(0, 3).join('、');
         tags.push(tag(`視聴者の返信 ${viewerReplies.length}${names ? `（${names}）` : ''}`, 'blue'));
       }
       if (t.pending) tags.push(tag('おへんじできる', 'mute'));
       const replyHtml = creatorReplies
         .map(
           (r) =>
-            `<div class="mkt-op-reply"><span class="mkt-op-name">${escapeHtml(ctx.displayName(r.name) || '投稿者')}</span> <span class="mkt-op-meta">（投稿者）${r.timeText ? `・ ${escapeHtml(r.timeText)}` : ''}</span>${r.text ? `<div class="mkt-op-body">${escapeHtml(r.text)}</div>` : ''}</div>`,
+            `<div class="mkt-op-reply"><span class="mkt-op-name">${escapeHtml(ctx.displayName(r) || '投稿者')}</span> <span class="mkt-op-meta">（投稿者）${r.timeText ? `・ ${escapeHtml(r.timeText)}` : ''}</span>${r.text ? `<div class="mkt-op-body">${escapeHtml(r.text)}</div>` : ''}</div>`,
         )
         .join('');
       return `<div class="mkt-op-comment"><div class="mkt-op-person">${avHtml(t, ctx)}<div>
-        <div class="mkt-op-name">${escapeHtml(ctx.displayName(t.name))}${t.timeText ? ` <span class="mkt-op-meta">・ ${escapeHtml(t.timeText)}</span>` : ''}</div>
+        <div class="mkt-op-name">${escapeHtml(ctx.displayName(t))}${t.timeText ? ` <span class="mkt-op-meta">・ ${escapeHtml(t.timeText)}</span>` : ''}</div>
         ${t.text ? `<div class="mkt-op-body">${escapeHtml(t.text)}</div>` : ''}
         ${tags.length ? `<div class="mkt-op-tags">${tags.join('')}</div>` : ''}
         ${replyHtml}
@@ -342,7 +343,7 @@ function renderThreads(data, ctx) {
     .join('');
 }
 
-function renderGifts(data) {
+function renderGifts(data, ctx = {}) {
   const cards = Array.isArray(data?.cards) ? data.cards : [];
   const kpi = cards.length
     ? `<div class="mkt-op-kpis" style="margin-bottom:1rem">${cards
@@ -355,7 +356,7 @@ function renderGifts(data) {
   const rows = Array.isArray(data?.rows) ? data.rows : [];
   const table = rows.length
     ? `<div class="mkt-table-scroll"><table class="mkt-op-table"><thead><tr><th>時刻</th><th>名前</th><th>内容</th><th class="num">数量</th></tr></thead><tbody>${rows
-        .map((r) => `<tr><td>${escapeHtml(r.timeText || '')}</td><td>${escapeHtml(r.name || '')}</td><td>${escapeHtml(r.label || '')}</td><td class="num">${escapeHtml(r.amount || '')}</td></tr>`)
+        .map((r) => `<tr><td>${escapeHtml(r.timeText || '')}</td><td>${escapeHtml(ctx.displayName ? ctx.displayName(r) : operatorDisplayName(r))}</td><td>${escapeHtml(r.label || '')}</td><td class="num">${escapeHtml(r.amount || '')}</td></tr>`)
         .join('')}</tbody></table></div>`
     : '';
   return kpi + table + estNotes;

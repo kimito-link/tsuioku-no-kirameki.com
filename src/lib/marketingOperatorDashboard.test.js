@@ -274,3 +274,91 @@ describe('控えアイコンの顔', () => {
     expect(html).not.toContain('usericon/defaults/');
   });
 });
+
+function operatorNameCells(html) {
+  const appendixAt = html.indexOf('id="mkt-appendix"');
+  const op = appendixAt >= 0 ? html.slice(0, appendixAt) : html;
+  /** @type {string[]} */
+  const names = [];
+  for (const m of op.matchAll(/class="mkt-op-name">([^<]*)/g)) {
+    names.push(String(m[1] || '').trim());
+  }
+  const gift = op.match(/id="mkt-op-gifts"[\s\S]*?<\/section>/);
+  if (gift) {
+    for (const row of gift[0].matchAll(/<tr><td>[^<]*<\/td><td>([^<]*)<\/td>/g)) {
+      names.push(String(row[1] || '').trim());
+    }
+  }
+  return names;
+}
+
+describe('名前セルは空欄にしない', () => {
+  it('どのサービスでも、名前セルを空欄にしない', () => {
+    const platforms = ['niconico', 'youtube', 'twitch', 'kick', 'twitcasting', 'showroom', 'mixch', 'abema', 'tiktok', 'whowatch'];
+    for (const platform of platforms) {
+      const liveId = platform === 'niconico' ? 'lv123' : 'lv900000000001';
+      const comments = [
+        {
+          id: `${platform}-anon`,
+          liveId,
+          commentNo: '1',
+          text: '匿名です',
+          userId: '',
+          nickname: '',
+          is184: true,
+          capturedAt: T0,
+          ytPlatform: platform === 'niconico' ? '' : platform,
+        },
+        {
+          id: `${platform}-idonly`,
+          liveId,
+          commentNo: '2',
+          text: 'IDだけ',
+          userId: platform === 'niconico' ? '4046119' : platform === 'youtube' ? 'UC1111111111111111111111' : '8123456789',
+          nickname: '',
+          login: platform === 'twitch' || platform === 'kick' ? 'lantern' : '',
+          capturedAt: T0 + 60_000,
+          ytPlatform: platform === 'niconico' ? '' : platform,
+        },
+        {
+          id: `${platform}-gift`,
+          liveId,
+          commentNo: '3',
+          text: 'gift',
+          userId: platform === 'niconico' ? '425541' : '8123456790',
+          nickname: '',
+          login: platform === 'twitch' || platform === 'kick' ? 'gifter' : '',
+          capturedAt: T0 + 120_000,
+          ytPlatform: platform === 'niconico' ? 'niconico' : platform,
+          ytKind: platform === 'niconico' ? 'niconico_gift' : platform === 'twitch' ? 'tw_sub' : 'text',
+          ytAmount: 100,
+          ytCurrency: platform === 'niconico' ? 'PT' : 'USD',
+        },
+      ];
+      const pastBroadcasts = [
+        {
+          liveId: 'lv-past',
+          comments: [{ userId: comments[1].userId, nickname: '', text: '前の回' }],
+        },
+      ];
+      const html = buildMarketingDashboardHtml(aggregateMarketingReport(comments, liveId), {
+        ...(platform === 'niconico' ? {} : { platform }),
+        commentsForAnalytics: comments,
+        pastBroadcasts,
+        contentKind: 'live',
+      });
+      const names = operatorNameCells(html);
+      expect(names.length, platform).toBeGreaterThan(0);
+      for (const name of names) {
+        expect(name, `${platform} empty name cell`).not.toBe('');
+      }
+      if (platform === 'niconico') {
+        expect(names).toContain('匿名');
+        expect(names).toContain('ID 4046119');
+      }
+      if (platform === 'twitch' || platform === 'kick') {
+        expect(names).toContain('lantern');
+      }
+    }
+  });
+});

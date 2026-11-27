@@ -7,6 +7,7 @@ import {
   resolveOperatorContentKind,
   operatorServiceLabel,
   operatorPublicId,
+  operatorDisplayName,
 } from './marketingOperatorReport.js';
 import { renderOperatorReportHtml, wrapLegacyAnalysisAppendix } from './marketingOperatorReportHtml.js';
 
@@ -316,6 +317,31 @@ describe('運営者レポートの顔', () => {
     expect(html).not.toMatch(/class="mkt-op-av"[^>]*background:/);
   });
 
+  it('声をかけてくれた人でも、公式の灰色の既定アイコンはゆっくり顔にする', () => {
+    const model = buildOperatorReportModel({
+      liveId: 'lv900000000003',
+      platformId: 'twitch',
+      comments: [
+        comment({
+          userId: '8123456789',
+          nickname: '歌は寺',
+          login: 'uta',
+          avatarUrl: 'https://secure-dcdn.cdn.nimg.jp/nicoaccount/usericon/defaults/blank.jpg',
+          text: 'subscribed',
+          ytKind: 'tw_sub',
+          ytPlatform: 'twitch',
+        }),
+      ],
+    });
+    expect(model.sectionKeys).toContain('thanks');
+    const html = renderOperatorReportHtml(model);
+    expect(html).toContain('声をかけてくれた人');
+    expect(html).not.toContain('usericon/defaults/');
+    const thanks = (html.split('id="mkt-op-thanks"')[1] || '').split('</section>')[0];
+    expect(thanks).toMatch(/src="data:image\//);
+    expect(thanks).not.toContain('usericon/defaults/');
+  });
+
   it('ニコニコの数値 ID は既定 CDN の顔を使う', () => {
     const model = buildOperatorReportModel({
       liveId: 'lv123',
@@ -324,5 +350,31 @@ describe('運営者レポートの顔', () => {
     });
     const html = renderOperatorReportHtml(model);
     expect(html).toContain('https://secure-dcdn.cdn.nimg.jp/nicoaccount/usericon/404/4046119.jpg');
+  });
+});
+
+describe('operatorDisplayName', () => {
+  it('マスク時は視聴者', () => {
+    expect(operatorDisplayName({ name: '灯台' }, { maskShare: true })).toBe('視聴者');
+  });
+
+  it('名前があればそのまま出す', () => {
+    expect(operatorDisplayName({ name: '灯台', comparable: true, uid: '4046119' }, { platformId: 'niconico' })).toBe('灯台');
+  });
+
+  it('照合できない人や匿名は「匿名」', () => {
+    expect(operatorDisplayName({ name: '', comparable: false }, { platformId: 'niconico' })).toBe('匿名');
+    expect(operatorDisplayName({ name: '', is184: true, userId: '4046119' }, { platformId: 'niconico' })).toBe('匿名');
+  });
+
+  it('Twitch と Kick は、名前が無くても login を出す', () => {
+    expect(operatorDisplayName({ name: '', comparable: true, login: 'lantern', uid: '8123456789' }, { platformId: 'twitch' })).toBe('lantern');
+    expect(operatorDisplayName({ name: '', comparable: true, login: 'slugger', uid: '8123456789' }, { platformId: 'kick' })).toBe('slugger');
+  });
+
+  it('ニコの数値 ID だけ「ID 123456」と出し、内部 ID は出さない', () => {
+    expect(operatorDisplayName({ name: '', comparable: true, uid: '4046119' }, { platformId: 'niconico' })).toBe('ID 4046119');
+    expect(operatorDisplayName({ name: '', comparable: true, uid: 'a:abcdefg' }, { platformId: 'niconico' })).toBe('名前未取得');
+    expect(operatorDisplayName({ name: '', comparable: true, uid: '8123456789' }, { platformId: 'twitch' })).toBe('名前未取得');
   });
 });

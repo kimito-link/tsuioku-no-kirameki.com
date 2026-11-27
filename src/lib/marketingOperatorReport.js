@@ -62,6 +62,53 @@ function capturedAtOf(c) {
  * @param {unknown} platformId
  * @param {unknown} contentKind
  */
+
+/**
+ * 運営者レポートに出す名前。空欄にはしない。
+ * 共有マスク時は「視聴者」。照合できない／匿名は「匿名」。
+ * 名前が無くても Twitch / Kick は login を使い、ニコの数値 ID だけ「ID 123456」と出す
+ * （a: やハッシュした内部 ID は出さない）。それ以外は「名前未取得」。
+ * @param {any} person
+ * @param {{ maskShare?: boolean, platformId?: string }} [opts]
+ * @returns {string}
+ */
+export function operatorDisplayName(person, opts = {}) {
+  if (opts.maskShare === true) return '視聴者';
+  const name = String(person?.name || person?.nickname || '').replace(/\s+/g, ' ').trim();
+  if (name) return name;
+  if (!isOperatorPersonComparable(person)) return '匿名';
+  const platformId = String(opts.platformId || person?.platformId || '').trim();
+  const login = String(person?.login || '').trim();
+  if (login && operatorLoginIsPublic(platformId, person)) return login;
+  const uid = String(person?.uid || person?.userId || '').trim();
+  if (/^\d{5,14}$/.test(uid) && operatorUidIsPublicNumericId(platformId)) return `ID ${uid}`;
+  return '名前未取得';
+}
+
+/** @param {any} person */
+function isOperatorPersonComparable(person) {
+  if (!person || typeof person !== 'object') return false;
+  if (person.comparable === true) return true;
+  if (person.comparable === false) return false;
+  if (person.is184 === true || person.isAnonymous === true) return false;
+  const uid = String(person.uid || person.userId || person.ytChannelId || person.channelId || '').trim();
+  return !!uid && !uid.startsWith('__row:');
+}
+
+/** @param {string} platformId @param {any} person */
+function operatorLoginIsPublic(platformId, person) {
+  const id = String(platformId || '').trim();
+  if (id === 'twitch' || id === 'kick') return true;
+  const ch = String(person?.channelId || person?.uid || '').trim();
+  return /^(tw:|kk:)/i.test(ch);
+}
+
+/** @param {string} platformId */
+function operatorUidIsPublicNumericId(platformId) {
+  const id = String(platformId || '').trim();
+  return !id || id === 'niconico';
+}
+
 export function operatorServiceLabel(platformId, contentKind) {
   const id = String(platformId || '').trim() || 'niconico';
   const video = contentKind === 'video' || contentKind === 'live_replay';
@@ -406,6 +453,7 @@ export function buildOperatorReportModel(input) {
         name: String(t.name || ''),
         uid: String(t.channelId || '').trim(),
         login: String(t.login || '').trim(),
+        comparable: Boolean(String(t.channelId || '').trim()),
         avatarUrl: liveIconUrlForComment(t, input?.liveIcons),
         text: String(t.text || ''),
         timeText: String(t.timeText || ''),
@@ -425,6 +473,7 @@ export function buildOperatorReportModel(input) {
         name: p.name,
         uid: p.uid,
         login: p.login,
+        comparable: p.comparable,
         avatarUrl: p.avatarUrl || liveIconUrlForComment(p, input?.liveIcons),
         text: String(last?.text || ''),
         timeText: capturedAtOf(last) ? formatClock(capturedAtOf(last)) : '',
@@ -443,6 +492,7 @@ export function buildOperatorReportModel(input) {
         name: p.name,
         uid: p.uid,
         login: p.login,
+        comparable: p.comparable,
         avatarUrl: p.avatarUrl || liveIconUrlForComment(p, input?.liveIcons),
         text: String(first?.text || ''),
         timeText: capturedAtOf(first) ? formatClock(capturedAtOf(first)) : '',
@@ -460,6 +510,7 @@ export function buildOperatorReportModel(input) {
       name: p.name,
       uid: p.uid,
       login: p.login,
+      comparable: p.comparable,
       avatarUrl: p.avatarUrl || liveIconUrlForComment(p, input?.liveIcons),
       commentCount: p.comments.filter((c) => !isMarketingSupportRow(c)).length,
       likeTotal: sumKnownLikes(p.comments),
@@ -616,6 +667,7 @@ export function buildOperatorReportModel(input) {
         name: p.name,
         uid: p.uid,
         login: p.login,
+        comparable: p.comparable,
         avatarUrl: p.avatarUrl || liveIconUrlForComment(p, input?.liveIcons),
         pastBroadcasts: p.pastBroadcasts,
         commentCount: p.comments.filter((c) => !isMarketingSupportRow(c)).length,
@@ -796,6 +848,9 @@ function giftLedgerRows(support, _view) {
     .map((r) => ({
       timeText: capturedAtOf(r) ? formatClock(capturedAtOf(r)) : '',
       name: nameOf(r),
+      login: String(r.login || '').trim(),
+      uid: uidOf(r),
+      comparable: !!uidOf(r),
       label: String(r.ytGiftName || r.text || '').trim() || String(r.ytKind || ''),
       amount: Number(r.ytAmount) > 0 ? `${Number(r.ytAmount).toLocaleString('ja-JP')}${currencyUnit(String(r.ytCurrency || ''))}` : (Number(r.ytGiftCount) > 0 ? `${Number(r.ytGiftCount)}件` : ''),
     }))
