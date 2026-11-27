@@ -1204,7 +1204,7 @@
   - `gift-coin-hq.wav`
   - `gift-register-hq.wav`
   - `gift-register.mp3`
-- 📁 **src/** (2745)
+- 📁 **src/** (2748)
   - 📁 **data/** (7)
     - 📁 **acquirers/** (2)
       - `laneFromStorage.js` — 応援レーン acquirer: chrome.storage.local(nls_comments) → laneStore の橋渡し。
@@ -1563,7 +1563,7 @@
         - `logo_funlink_white_RGB_link_black.png`
         - `logo_funlink_white_RGB_maru_black.png`
     - `hero-connect-hub.svg`
-  - 📁 **lib/** (2411)
+  - 📁 **lib/** (2414)
     - 📁 **__snapshots__/** (4)
       - `marketing-abema-baseline.html`
       - `marketing-niconico.html`
@@ -1702,7 +1702,11 @@
       - `ttParse.test.js`
       - `ttProto.js` — TikTok LIVE のソケットの中身(protobuf)を読む、小さな自前の読み取り(council/tiktok-support-PLAN.md)。
       - `ttProto.test.js`
-    - 📁 **twitcasting/** (4)
+    - 📁 **twitcasting/** (7)
+      - 📁 **__fixtures__/** (3)
+        - `anon-comments-5.html`
+        - `named-comments-5.html`
+        - `tc-anon-result.json`
       - `tcPageInfo.js` — ツイキャスの配信ページに出ている数と配信の情報を読む(ページの文字を読むだけ・通信しない)
       - `tcPageInfo.test.js`
       - `tcParse.js` — ツイキャス(twitcasting.tv)の配信・コメント・ギフトを、YouTube 版の記録と同じ形にする(純関数)
@@ -3236,7 +3240,7 @@
     - `recentBroadcastLiveIds.js` — 最近の放送 liveId を `broadcastSessionSummary_v1` IDB から取得する純粋関数群。
     - `recentTextRing.js` — 「その人の直近N件の発言」を保持する固定長リングの純関数(v0.1.1218)。
     - `recentTextRing.test.js`
-    - `recordBreakdownInStep.js` — v0.1.2242: 「記録」の下の「内訳: 通常 N …」を、記録の数字と同じ歩幅で動かす(純関数・状態は呼び出し側が1つ持つ)。
+    - `recordBreakdownInStep.js` — v0.1.2242 → v0.1.2256: 「記録」の下の「内訳: 通常 N …」を、記録と【同じ行・同じ重複の決まり】から数える(状態は呼び出し側が1つ持つ)。
     - `recordBreakdownInStep.test.js`
     - `recordPathUntouched.test.js`
     - `recordRate.js` — 取得スピード(records/sec)の算出と健康スコア化(純ロジック)。

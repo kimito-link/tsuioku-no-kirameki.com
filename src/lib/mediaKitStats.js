@@ -4,6 +4,7 @@
  */
 
 import { isGenericComeviewName } from './comeviewRows.js';
+import { isTcBroadcastScopedAnonComment } from './twitcasting/tcParse.js';
 import { followerKpiLabels, followerKpiTexts, getFollowerSeries } from './platform/followerCountSample.js';
 import { followerSeriesForPlatform } from './platform/followerSampleStore.js';
 
@@ -390,7 +391,7 @@ export function buildMediaKitSupporters(input = {}) {
       if (!event || typeof event !== 'object') continue;
       const record = /** @type {{ userId?: unknown, nickname?: unknown, point?: unknown }} */ (event);
       const uid = cleanText(record.userId);
-      if (!uid) continue;
+      if (!uid || isTcBroadcastScopedAnonComment(record)) continue;
       const entry =
         giftByUid.get(uid) || { userId: uid, name: '', points: 0, count: 0 };
       entry.points += finiteNonNegative(record.point) || 0;
@@ -415,7 +416,7 @@ export function buildMediaKitSupporters(input = {}) {
       if (!row || typeof row !== 'object') continue;
       const record = /** @type {{ userId?: unknown, nickname?: unknown, name?: unknown }} */ (row);
       const uid = cleanText(record.userId);
-      if (!uid) continue;
+      if (!uid || isTcBroadcastScopedAnonComment(record)) continue;
       const entry =
         commentByUid.get(uid) ||
         { userId: uid, name: '', count: 0, lives: new Set() };
