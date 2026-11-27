@@ -110,7 +110,6 @@ import {
 import { sanitizeRoomAvatarsForBroadcaster } from '../lib/sanitizeRoomAvatarsForBroadcaster.js';
 import { excludeBroadcasterFromRankedRooms } from '../lib/excludeBroadcasterFromRankedRooms.js';
 import { excludeBroadcasterFromCommentEntries } from '../lib/excludeBroadcasterFromCommentEntries.js';
-import { resolveBroadcasterCommentCount } from '../lib/broadcasterCommentCount.js';
 import { selectDisplayRecordedCount } from '../lib/displayRecordedCount.js';
 import { buildOfficialNicoStatsStripDigest } from '../lib/officialNicoStatsStripDigest.js';
 
@@ -829,7 +828,6 @@ import { readMergedTrendSeries, readTrendSeries } from '../lib/devMonitorTrendSe
 import { renderAcquisitionDashboard } from './popup/renderAcquisitionDashboard.js';
 import { publishReportPreviewThrottled, reportPreviewMinGapMs } from '../lib/reportPreviewPublish.js';
 import {
-  summarizeCommentRecordBreakdown,
   formatCommentRecordBreakdownLine
 } from '../lib/commentRecordBreakdown.js';
 import {
@@ -2894,8 +2892,8 @@ function syncLiveStatThreeCardsCharLoadingOverlays() {
 /**
  * @param {string|number} value 数値は toLocaleString('ja-JP') で表示。未取得時は明示文言。
  * @param {WatchPageSnapshot|null} [watchSnapshot] 公式コメント数の併記用
- * @param {import('../lib/commentRecordBreakdown.js').CommentRecordBreakdown|null|undefined} [breakdown]
- *   記録の内訳(通常/興味来場/システム)。undefined=前回表示を保持(引数なし呼び出しの DOM 消し副作用回避)・
+ * @param {import('../lib/recordBreakdownInStep.js').RecordRowsSeen|null|undefined} [breakdown]
+ *   内訳を数える記録の行(v0.1.2256)。undefined=前回表示を保持(引数なし呼び出しの DOM 消し副作用回避)・
  *   null=行を非表示。
  * @param {{ breakdownFollowsRecord?: boolean }} [countOpts]
  *   v0.1.2242: breakdownFollowsRecord=true(軽い見回り・行を読まない経路)は、内訳を渡さなくても、
@@ -2986,7 +2984,7 @@ function setCountDisplay(value, watchSnapshot = null, breakdown = undefined, cou
 
   // v0.1.627/628/685: 記録の内訳 sub 行。undefined=DOM 触らない(前回値保持)・_broadcasterCount で「配信者 N」。
   // v0.1.2242: 内訳は記録(上の単調ゲート後の recordedNum)と同じ数字を土台にする(lib/recordBreakdownInStep.js)。
-  //   通常 = 記録 − 通常以外の分類。同じ配信の中では減らさない。軽い見回りは breakdownFollowsRecord で記録に合わせる。
+  //   v0.1.2256: 記録と同じ行・同じ重複キーで数え、合計はいつも記録と同じ。軽い見回りは breakdownFollowsRecord で記録に合わせる。
   const breakdownToPaint = resolveRecordBreakdownInStep(
     _recordBreakdownInStepState,
     watchPopupLastPaintedLiveId,
@@ -16038,19 +16036,15 @@ async function refresh() {
     //   配信者カードは watchMetaCache.snapshot.broadcaster* で別途描画=情報は失われない。
     // v0.1.649 PR6: arr 参照・lv が前回 paint と一致なら displayEntries 構築を skip(参照等価メモ化)。
     let displayEntriesBase;
-    let _preExcludeLen = 0; // v0.1.838: 配信者除外【前】の件数。
     if (
       _displayEntriesMemo &&
       _displayEntriesMemo.arr === arr &&
       _displayEntriesMemo.lv === lv
     ) {
       displayEntriesBase = /** @type {PopupCommentEntry[]} */ (_displayEntriesMemo.displayEntries);
-      const memoPre = Number(_displayEntriesMemo.preExcludeLen);
-      _preExcludeLen = Number.isFinite(memoPre) ? memoPre : displayEntriesBase.length;
     } else {
       const bcUid = resolveBroadcasterUidSticky(lv, arr, watchMetaCache.snapshot || {});
       const _preExcludeEntries = buildDisplayCommentEntries(arr, lv); // v0.1.838: 除外前の件数
-      _preExcludeLen = _preExcludeEntries.length;
       displayEntriesBase = excludeBroadcasterFromCommentEntries(_preExcludeEntries, bcUid);
       _displayEntriesMemo = {
         arr,
@@ -16115,10 +16109,9 @@ async function refresh() {
     );
     // v0.1.838(記録0バグ根治): 配信者数=除外で減った件数。旧 `countToShow−除外後` は記録総数を
     //   丸ごと引き 0 に潰した(council/recorded-count-zero-bug.md)。
-    const recordedBreakdown = summarizeCommentRecordBreakdown(displayEntries);
-    const _broadcasterCount = resolveBroadcasterCommentCount(_preExcludeLen, displayEntriesBase.length);
-    if (_broadcasterCount > 0) recordedBreakdown._broadcasterCount = _broadcasterCount;
-    setCountDisplay(countToShow, snapForCards, recordedBreakdown);
+    // v0.1.2256: 内訳は表示用の配列(displayEntries)でなく、記録と同じ行(arr=保存した行+テール)を保存と同じ重複キーで数える(lib/recordBreakdownInStep.js)。
+    const recordedRows = { rows: arr, broadcasterUid: String(_displayEntriesMemo?.broadcasterUid || '') };
+    setCountDisplay(countToShow, snapForCards, recordedRows);
     markWatchPopupLoadPhase('count_card', {
       countToShow,
       heavySettled: watchPopupHeavyCommentsSettled

@@ -1,52 +1,59 @@
 /**
- * v0.1.2242: 「記録」の下の「内訳: 通常 N …」を、記録の数字と同じ歩幅で動かす(純関数・状態は呼び出し側が1つ持つ)。
+ * v0.1.2242 → v0.1.2256: 「記録」の下の「内訳: 通常 N …」を、記録と【同じ行・同じ重複の決まり】から数える(状態は呼び出し側が1つ持つ)。
  *
- * 症状(2026-11-26 実機・保存データを消した状態・Twitch 生放送):
- *   記録は 720 → 5,104 と増え続けるのに、内訳は 通常 2,001 で止まったまま戻らない(元の版 0.1.2229 でも同じ)。
- *   別の人の実機では、同じ配信の途中で内訳が 1,072 → 285 に減ったこともある。
+ * 症状:
+ *   - 0.1.2229: まとめ読み込み中、記録は増えるのに内訳だけが止まる / 同じ配信の途中で内訳が減る。
+ *   - 0.1.2242(実機 2026-11-27・ニコ生 lv351893456・過去コメント約2,000件の読み込み):
+ *     記録 2,071 → 2,218 と増えるのに「通常 1,707」で2分以上止まり、内訳の合計(2,324)が記録より多かった。
  *
- * 原因(数え方が2つに分かれていた):
- *   - 記録 = 保存した件数の数え(サマリの recordedCount / IndexedDB の件数)。軽い見回り(applyLightweightPanelSummaryCards)
- *     でも全件の読み直しでも、同じ数え・同じ単調ゲート(resolveMonotonicCommentCount)を通る。
- *   - 内訳 = 横の欄がそのとき手元に持っているコメント配列(displayEntries)を数えた結果だけ。
- *     配信を開いた直後の過去コメントのまとめ読み込み中は、重い全件読み直しが止まる/控えの配列を使い回す/
- *     新着の差分(テール)だけを足す、のどれかになり、手元の配列は記録の一部しか持たない。軽い見回りは
- *     内訳を書き換えない(setCountDisplay に内訳を渡さない)ので、内訳は止まったままになる。
- *     さらに内訳には単調ゲートが無く、後から短い配列で数え直すと減る。
+ * 原因(0.1.2242 の実機の保存データで確かめた):
+ *   - 記録 = 保存した行の数(チャンク+テール。サマリの recordedCount / 索引の total)。
+ *   - 0.1.2242 の内訳 = 横の欄がその時に持っていた表示用の配列を数えた分類 +「通常 = 記録 − 通常以外」+「見えた最大を保つ」。
+ *     まとめ読み込みの途中は、記録(サマリ)が先に 2,164 になるのに、手元の配列はまだ数十行で来場がほとんど入っていない。
+ *     そのとき「通常 = 2,164 − 19」と大きく出し、最大を保つ決まりで固定した。あとで全件を読むと来場が 653 件あり、
+ *     通常 + 来場 が記録を超える = 記録が追いつくまで通常が動けない(止まる)。保存データの本当の内訳は 通常 1,510 / 興味来場 653 / 配信者 1(=2,164)。
  *
- * 直し方(記録と同じ数字を土台にする):
- *   - 通常以外の分類(興味来場・フォロー通知・システム・配信者・二重に届いた来場の数え落とし)は、
- *     これまでどおり手元の行を見て数える。同じ配信の中では減らさない(見えた最大を覚える)。
- *   - 「通常」は、記録の数字(単調ゲートを通った、画面の記録と同じ値)から、通常以外の分類を引いた残り。
- *     手元の行で数えた通常のほうが大きいときはそちらを使い、前に出した通常より小さくはしない。
- *     → 内訳の合計は記録と同じ歩幅で増え、まとめ読み込み中も止まらず、途中で減らない。
- *   - 軽い見回り(行を読まない)でも、この覚えている分類と記録の数字だけで内訳を出せる=重い読み込みを足さない。
- *   - 配信が変わったら(lv が変わったら)覚えをやり直す(記録の単調ゲートと同じ決まり)。
- *   - 一度も行を数えていない配信では、軽い見回りから内訳を作らない(今までどおり、最初の全件読み直しを待つ)。
+ * 直し方(記録の正本と同じものから数える):
+ *   - 行の重複の決まりは、記録を保存するときの buildDedupeKey(commentRecord.js・保存の正本)をそのまま使う。
+ *     読んだ記録の行(全件・テール・直近)を、このキーで1回だけ数える台帳にする。同じ行を何度読んでも数は増えない。
+ *   - 分類は classifyRecordRow(commentRecordBreakdown.js・行ごとの正本)。配信者は表示から外すのと同じ userId の一致。
+ *   - 画面の内訳は、いつも【合計 = 記録の数字(単調ゲート後)】。
+ *       台帳が記録をほぼ覆っているとき(まだ読んでいない行が少し): 前に出した内訳から、増えた記録の分だけを
+ *         まず台帳で分かった通常以外へ、残りを通常へ足す。どの分類も減らず、合計は記録とぴったり同じ。
+ *         まだ読んでいない少しの行を通常に入れても、次に読んだときに記録の増えた分で追いつくので、止まるのは数行ぶんまで。
+ *       まとめ読み込みの途中(まだ読んでいない行が多い): 分かっている分類はそのまま、残りを通常に入れて合計を記録にそろえる。
+ *         この値は固定しない(読み終わったら台帳の正しい分類に直す)。= 0.1.2242 の「大きく出して固定して止まる」を起こさない。
+ *   - 軽い見回り(行を読まない)は、台帳と今の記録の数字だけで同じ計算をする(重い読み込みを足さない)。
+ *   - 配信が変わったら(lv が変わったら)台帳をやり直す。一度も行を読んでいない配信では、軽い見回りから内訳を作らない。
  *
- * 全サービス共通: ニコ生も、YouTube・Twitch・Kick・ツイキャス・SHOWROOM・ミクチャ・ABEMA・TikTok・17LIVE 等も
+ * 全サービス共通: ニコ生も、YouTube・Twitch・Kick・ツイキャス・SHOWROOM・ミクチャ・ABEMA・TikTok 等も
  *   同じ popup-entry.js の setCountDisplay を通る(他サービスは ytNicoShim.js で疑似 lv にして同じ画面を動かす)。
  *
  * @module recordBreakdownInStep
  */
 
 import { normalizeMonotonicLiveId } from './monotonicCommentCount.js';
+import { buildDedupeKey } from './commentRecord.js';
+import { classifyRecordRow } from './commentRecordBreakdown.js';
+
+/** 通常以外の分類(足す順番もこの順)。 */
+const OTHER_KINDS = /** @type {const} */ (['interestArrival', 'followNotice', 'otherSystem', 'broadcaster']);
 
 /**
+ * @typedef {{ normal: number, interestArrival: number, followNotice: number, otherSystem: number, broadcaster: number }} KindCounts
+ * @typedef {KindCounts & { record: number }} LockedBreakdown
  * @typedef {{
  *   lv: string,
- *   seen: boolean,
+ *   counted: boolean,
  *   hidden: boolean,
- *   normal: number,
- *   interestArrival: number,
- *   followNotice: number,
- *   otherSystem: number,
- *   broadcaster: number,
- *   uncounted: number
+ *   broadcasterUid: string,
+ *   kindByKey: Map<string, keyof KindCounts>,
+ *   rowsSeen: WeakSet<object>,
+ *   lastRows: unknown,
+ *   known: KindCounts,
+ *   locked: LockedBreakdown
  * }} RecordBreakdownInStepState
- */
-
-/**
+ * @typedef {{ rows: readonly unknown[], broadcasterUid?: string }} RecordRowsSeen
  * @typedef {{
  *   total: number,
  *   normal: number,
@@ -57,33 +64,96 @@ import { normalizeMonotonicLiveId } from './monotonicCommentCount.js';
  * }} InStepBreakdown
  */
 
+/** @returns {KindCounts} */
+function zeroCounts() {
+  return { normal: 0, interestArrival: 0, followNotice: 0, otherSystem: 0, broadcaster: 0 };
+}
+
 /** @returns {RecordBreakdownInStepState} */
 export function createRecordBreakdownInStepState() {
   return {
     lv: '',
-    seen: false,
+    counted: false,
     hidden: false,
-    normal: 0,
-    interestArrival: 0,
-    followNotice: 0,
-    otherSystem: 0,
-    broadcaster: 0,
-    uncounted: 0
+    broadcasterUid: '',
+    kindByKey: new Map(),
+    rowsSeen: new WeakSet(),
+    lastRows: null,
+    known: zeroCounts(),
+    locked: { ...zeroCounts(), record: 0 }
   };
 }
 
-/** @param {unknown} v */
-function nonNegInt(v) {
-  const n = Number(v);
-  return Number.isFinite(n) && n > 0 ? Math.floor(n) : 0;
+/**
+ * 「まだ読んでいない行が少し」とみなす幅。これ以下なら台帳が記録を覆っている(内訳を固定してよい)。
+ * @param {number} record
+ */
+export function breakdownCoverageSlack(record) {
+  return Math.max(30, Math.ceil(record * 0.02));
 }
 
 /**
  * @param {RecordBreakdownInStepState} state
- * @param {string} lv 正規化済み
+ * @param {string} lv
  */
 function resetFor(state, lv) {
   Object.assign(state, createRecordBreakdownInStepState(), { lv });
+}
+
+/**
+ * 読んだ記録の行を台帳へ(保存と同じ重複キーで1回だけ)。
+ * @param {RecordBreakdownInStepState} state
+ * @param {RecordRowsSeen} seen
+ */
+function ingestRows(state, seen) {
+  const rows = Array.isArray(seen.rows) ? seen.rows : [];
+  const bc = String(seen.broadcasterUid ?? '').trim();
+  if (bc !== state.broadcasterUid) {
+    // 配信者が分かった/変わった: 分類をやり直す(配信者の行を通常から外す)。
+    state.broadcasterUid = bc;
+    state.kindByKey = new Map();
+    state.rowsSeen = new WeakSet();
+    state.lastRows = null;
+    state.known = zeroCounts();
+  }
+  if (rows === state.lastRows) return; // 同じ配列(描き直しの使い回し)は数え直さない
+  state.lastRows = rows;
+  for (const row of rows) {
+    if (!row || typeof row !== 'object') continue;
+    if (state.rowsSeen.has(row)) continue;
+    state.rowsSeen.add(row);
+    const r = /** @type {any} */ (row);
+    if (!String(r.text ?? '').trim()) continue;
+    const key = buildDedupeKey(state.lv, r);
+    if (state.kindByKey.has(key)) continue;
+    /** @type {keyof KindCounts} */
+    const kind = bc && String(r.userId ?? '').trim() === bc ? 'broadcaster' : classifyRecordRow(r);
+    state.kindByKey.set(key, kind);
+    state.known[kind] += 1;
+  }
+}
+
+/** @param {unknown} v */
+function recordOrNull(v) {
+  return typeof v === 'number' && Number.isFinite(v) && v >= 0 ? Math.floor(v) : null;
+}
+
+/**
+ * @param {KindCounts} c
+ * @param {number} total
+ * @returns {InStepBreakdown}
+ */
+function toBreakdown(c, total) {
+  /** @type {InStepBreakdown} */
+  const out = {
+    total,
+    normal: c.normal,
+    interestArrival: c.interestArrival,
+    followNotice: c.followNotice,
+    otherSystem: c.otherSystem
+  };
+  if (c.broadcaster > 0) out._broadcasterCount = c.broadcaster;
+  return out;
 }
 
 /**
@@ -95,15 +165,20 @@ function resetFor(state, lv) {
  * @param {RecordBreakdownInStepState} state
  * @param {unknown} lv 画面が描いている配信(記録の単調ゲートと同じもの)
  * @param {number|null|undefined} recorded 画面に出した記録の数(単調ゲート後)。数字でなければ null
- * @param {import('./commentRecordBreakdown.js').CommentRecordBreakdown & { _broadcasterCount?: number } | null | undefined} seen
- *   手元の行を数えた内訳(全件の読み直しのとき)。null=隠す・undefined=行を数えていない(軽い見回り)
- * @param {{ followRecord?: boolean }} [opts] followRecord=true のとき、行を数えていなくても記録に合わせて内訳を出す
+ * @param {RecordRowsSeen | null | undefined} seen
+ *   読んだ記録の行(全件の読み直しのとき)。null=隠す・undefined=行を読んでいない(軽い見回り)
+ * @param {{ followRecord?: boolean }} [opts] followRecord=true のとき、行を読んでいなくても記録に合わせて内訳を出す
  * @returns {InStepBreakdown|null|undefined}
  */
 export function resolveRecordBreakdownInStep(state, lv, recorded, seen, opts = {}) {
   const normLv = normalizeMonotonicLiveId(lv);
-  // 配信が分からないときは今までどおり(覚えに触らない・素通し)
-  if (!normLv) return seen;
+  if (!normLv) {
+    // 配信が分からないとき: 覚えに触らず、その行だけを数える
+    if (!seen || typeof seen !== 'object') return seen === null ? null : undefined;
+    const tmp = createRecordBreakdownInStepState();
+    tmp.lv = '-';
+    return resolveRecordBreakdownInStep(tmp, 'lv0', recorded, seen, opts);
+  }
   if (state.lv !== normLv) resetFor(state, normLv);
 
   if (seen === null) {
@@ -112,43 +187,45 @@ export function resolveRecordBreakdownInStep(state, lv, recorded, seen, opts = {
   }
   if (seen === undefined) {
     if (!(opts && opts.followRecord === true)) return undefined;
-    if (!state.seen || state.hidden) return undefined;
-  } else if (seen && typeof seen === 'object') {
-    state.seen = true;
+    if (!state.counted || state.hidden) return undefined;
+  } else if (seen && typeof seen === 'object' && Array.isArray(seen.rows)) {
+    state.counted = true;
     state.hidden = false;
-    const n = nonNegInt(seen.normal);
-    const ia = nonNegInt(seen.interestArrival);
-    const fn = nonNegInt(seen.followNotice);
-    const os = nonNegInt(seen.otherSystem);
-    const bc = nonNegInt(/** @type {any} */ (seen)._broadcasterCount);
-    // 行はあるが分類に入らなかった分(来場の二重受信など)。記録には入っているので、通常から引く側に置く
-    const unc = Math.max(0, nonNegInt(seen.total) - (n + ia + fn + os));
-    state.normal = Math.max(state.normal, n);
-    state.interestArrival = Math.max(state.interestArrival, ia);
-    state.followNotice = Math.max(state.followNotice, fn);
-    state.otherSystem = Math.max(state.otherSystem, os);
-    state.broadcaster = Math.max(state.broadcaster, bc);
-    state.uncounted = Math.max(state.uncounted, unc);
+    ingestRows(state, seen);
   } else {
-    return seen;
+    return undefined;
   }
 
-  const rec = typeof recorded === 'number' && Number.isFinite(recorded) && recorded >= 0 ? Math.floor(recorded) : null;
-  if (rec != null) {
-    const others =
-      state.interestArrival + state.followNotice + state.otherSystem + state.broadcaster + state.uncounted;
-    const fromRecord = Math.max(0, rec - others);
-    if (fromRecord > state.normal) state.normal = fromRecord;
+  const K = state.known;
+  const knownTotal = K.normal + K.interestArrival + K.followNotice + K.otherSystem + K.broadcaster;
+  const L = state.locked;
+  // 記録が数字でないときは、読んだ行の数を記録とみなす。記録は同じ配信で減らない(単調ゲートの後)が、念のため前の値を下回らせない。
+  const record = Math.max(recordOrNull(recorded) ?? knownTotal, L.record);
+  const unread = record - knownTotal;
+
+  if (unread <= breakdownCoverageSlack(record)) {
+    // 台帳が記録を覆っている: 前に出した内訳へ、増えた記録の分だけを足す(どれも減らない・合計=記録)
+    let budget = record - L.record;
+    /** @type {LockedBreakdown} */
+    const next = { ...L, record };
+    for (const k of OTHER_KINDS) {
+      const add = Math.min(Math.max(0, K[k] - L[k]), budget);
+      next[k] = L[k] + add;
+      budget -= add;
+    }
+    next.normal = L.normal + budget;
+    state.locked = next;
+    return toBreakdown(next, record);
   }
-  const shownSum = state.normal + state.interestArrival + state.followNotice + state.otherSystem;
-  /** @type {InStepBreakdown} */
-  const out = {
-    total: Math.max(rec ?? 0, shownSum + state.uncounted),
-    normal: state.normal,
-    interestArrival: state.interestArrival,
-    followNotice: state.followNotice,
-    otherSystem: state.otherSystem
-  };
-  if (state.broadcaster > 0) out._broadcasterCount = state.broadcaster;
-  return out;
+
+  // まとめ読み込みの途中(まだ読んでいない行が多い): 分かっている分類はそのまま、残りを通常へ。固定しない。
+  /** @type {KindCounts} */
+  const provisional = zeroCounts();
+  let others = 0;
+  for (const k of OTHER_KINDS) {
+    provisional[k] = Math.max(K[k], L[k]);
+    others += provisional[k];
+  }
+  provisional.normal = Math.max(0, record - others);
+  return toBreakdown(provisional, record);
 }

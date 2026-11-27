@@ -427,7 +427,8 @@ export default [
     // v0.1.2008: 応援マスを分けて足し終えたときに実DOMを測り直す配線(+6)。分け方は lib の laneProgressiveFill.js と story/renderStoryUserLaneDom.js。
     // v0.1.2045: ニコ生以外では来場・本家コメ・広告pt・ギフトpt を公式チップに書かない(+10)。出し分けの正本は lib の platformMetrics.js。
     // v0.1.2255: 「内訳」を記録と同じ数字で動かす配線(+19: import4行・状態3行・引数の説明3行・描く直前の判定9行)。決まりは lib の recordBreakdownInStep.js。
-    rules: { 'max-lines': ['error', { max: 21945, skipBlankLines: false, skipComments: false }] }
+    // v0.1.2256: 内訳を表示用の配列でなく記録の行から数える(−10: 使わなくなった件数の計算と import を外した)。
+    rules: { 'max-lines': ['error', { max: 21935, skipBlankLines: false, skipComments: false }] }
   },
   {
     files: ['src/extension/popup/**/*.js'],
