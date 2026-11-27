@@ -68,6 +68,10 @@ function exportCommentFromStoredRow(row, index, liveId) {
     ? postedAt
     : at;
   const name = String(row?.name || row?.author || '');
+  const login = String(row?.login || '').trim();
+  const channelId = String(row?.channelId || '').trim();
+  const icon = String(row?.avatarUrl || row?.iconUrl || '').trim();
+  const avatarUrl = /^https:\/\//i.test(icon) ? icon : '';
   return {
     id: String(row?.id || `stored_${index}`),
     liveId,
@@ -76,6 +80,9 @@ function exportCommentFromStoredRow(row, index, liveId) {
     userId: exportUserId(exportPersonKey(row)),
     nickname: name,
     name,
+    ...(login ? { login } : {}),
+    ...(channelId ? { channelId } : {}),
+    ...(avatarUrl ? { avatarUrl } : {}),
     capturedAt,
     ytKind: String(row?.kind || row?.ytKind || ''),
     ytAmount: row?.amount ?? row?.ytAmount ?? '',

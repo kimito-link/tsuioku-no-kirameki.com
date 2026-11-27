@@ -48,6 +48,7 @@ import {
 } from '../lib/storageKeys.js';
 import { giftHistoryThrowsStorageKey } from '../lib/kokenGiftHistoryApi.js';
 import { adObservationStorageKey } from '../lib/adObservationLog.js';
+import { STREAM_PLATFORMS } from '../lib/platform/streamPlatform.js';
 import {
   buildGiftSubAppPayloadFromKokenJson,
   mergeGiftSubAppHistoryPayload,
@@ -339,6 +340,36 @@ function getCachedAnonymousIdenticonDataUrl(userId) {
     }
   }
   return gen;
+}
+
+
+/**
+ * 拡張がすでに控えている配信コメントの顔 URL（yt_tw_icons / yt_kk_icons など）。
+ * ネットへ取りに行かず、chrome.storage.local の控えだけを読む。
+ * @returns {Promise<Record<string, string>>}
+ */
+async function readLiveIconMap() {
+  try {
+    const keys = Object.values(STREAM_PLATFORMS)
+      .map((p) => p.lateIconsKey)
+      .filter((k) => typeof k === 'string' && k);
+    if (!keys.length) return {};
+    const bag = await chrome.storage.local.get(keys);
+    /** @type {Record<string, string>} */
+    const out = {};
+    for (const k of keys) {
+      const store = bag?.[k];
+      if (!store || typeof store !== 'object') continue;
+      for (const [name, url] of Object.entries(store)) {
+        const u = String(url || '').trim();
+        if (!name || !/^https:\/\//i.test(u) || out[name]) continue;
+        out[name] = u;
+      }
+    }
+    return out;
+  } catch {
+    return {};
+  }
 }
 
 const exportBlobRevokeQueue = createObjectUrlRevokeQueue({ timeoutMs: 120_000 });
@@ -912,6 +943,7 @@ async function runExport(lid) {
       }
     }
     mktProf.mark('html_report');
+    const liveIcons = await readLiveIconMap();
     const html = buildMarketingDashboardHtml(report, {
       ...(marketingView ? { platform: marketingView.id, pageCount: marketingPageCount, pageFacts: marketingPageFacts } : {}),
       mediaKitHtml,
@@ -920,6 +952,7 @@ async function runExport(lid) {
       followerSamples,
       maskShareLabels: maskShareLabels,
       anonymousIdenticonResolver: getCachedAnonymousIdenticonDataUrl,
+      liveIcons,
       broadcasterUserId: String(snapshot?.broadcasterUserId || '').trim(),
       sessionSummaryRows,
       // v0.1.1708: 分析の入力は全件(旧: heavy のとき2,500件の均等サンプル=速度・沈黙・笑い・疲労・離脱・出席などが無注記で縮んだ)。

@@ -6,6 +6,7 @@
 
 import { toEpochMs } from './timeAuthority.js';
 import { isYtPseudoLvShape } from './youtube/ytPseudoLv.js';
+import { isSiteDefaultSilhouetteUrl } from './avatarFallbackFromUrl.js';
 import { isMarketingSupportRow, speechCommentsForMarketing } from './marketingAggregate.js';
 import { indexPastUsers } from './commenterHistoricalAnalytics.js';
 import { judgeNewVsRepeatBasis } from './newVsRepeatBasis.js';
@@ -251,6 +252,35 @@ export function resolveOperatorContentKind(input) {
  * 記録行に付いているサービス名を優先する。仮 lv だけ見て YouTube と決めない。
  * @param {{ platformId?: string, comments?: readonly any[], liveId?: string }} input
  */
+
+/**
+ * コメントやアイコン控えから、その人の本物の顔 URL を取る。灰色の既定アイコンは使わない。
+ * @param {any} row
+ * @param {Record<string, string>|null|undefined} liveIcons
+ */
+export function liveIconUrlForComment(row, liveIcons) {
+  const direct = String(row?.avatarUrl || row?.iconUrl || '').trim();
+  if (/^https:\/\//i.test(direct) && !isSiteDefaultSilhouetteUrl(direct)) return direct;
+  if (!liveIcons || typeof liveIcons !== 'object') return '';
+  /** @type {string[]} */
+  const keys = [];
+  const login = String(row?.login || '').trim().toLowerCase();
+  if (login) keys.push(login);
+  const ch = String(row?.channelId || row?.ytChannelId || '').trim();
+  const tw = /^tw:(.+)$/i.exec(ch);
+  const kk = /^kk:@?(.+)$/i.exec(ch);
+  if (tw) keys.push(String(tw[1] || '').trim().toLowerCase());
+  if (kk) keys.push(String(kk[1] || '').trim().toLowerCase());
+  const name = String(row?.name || row?.nickname || '').trim().toLowerCase();
+  if (name) keys.push(name);
+  for (const k of keys) {
+    if (!k) continue;
+    const u = String(liveIcons[k] || '').trim();
+    if (/^https:\/\//i.test(u) && !isSiteDefaultSilhouetteUrl(u)) return u;
+  }
+  return '';
+}
+
 export function inferOperatorPlatform(input) {
   const fromRow = (row) => {
     if (!row || typeof row !== 'object') return '';
@@ -313,7 +343,8 @@ export function buildOperatorReportModel(input) {
       row = {
         uid,
         name: nameOf(c),
-        avatarUrl: String(c?.avatarUrl || ''),
+        login: String(c?.login || '').trim(),
+        avatarUrl: liveIconUrlForComment(c, input?.liveIcons),
         comments: [],
         comparable,
         returning: Boolean(pastRow),
@@ -326,7 +357,8 @@ export function buildOperatorReportModel(input) {
     row.comments.push(c);
     if (isMarketingSupportRow(c)) row.giftRows.push(c);
     if (nameOf(c) && !row.name) row.name = nameOf(c);
-    if (c?.avatarUrl && !row.avatarUrl) row.avatarUrl = String(c.avatarUrl);
+    if (!row.avatarUrl) row.avatarUrl = liveIconUrlForComment(c, input?.liveIcons);
+    if (c?.login && !row.login) row.login = String(c.login).trim();
   }
   // incomparable was incremented per comment; recount people
   incomparable = [...people.values()].filter((p) => !p.comparable).length;
@@ -372,7 +404,9 @@ export function buildOperatorReportModel(input) {
       thanksItems.push({
         kind: 'pending',
         name: String(t.name || ''),
-        avatarUrl: String(t.avatarUrl || ''),
+        uid: String(t.channelId || '').trim(),
+        login: String(t.login || '').trim(),
+        avatarUrl: liveIconUrlForComment(t, input?.liveIcons),
         text: String(t.text || ''),
         timeText: String(t.timeText || ''),
         likeCount: t.likeCount,
@@ -389,7 +423,9 @@ export function buildOperatorReportModel(input) {
       thanksItems.push({
         kind: 'gift',
         name: p.name,
-        avatarUrl: p.avatarUrl,
+        uid: p.uid,
+        login: p.login,
+        avatarUrl: p.avatarUrl || liveIconUrlForComment(p, input?.liveIcons),
         text: String(last?.text || ''),
         timeText: capturedAtOf(last) ? formatClock(capturedAtOf(last)) : '',
         giftLabel: p.giftLabel,
@@ -405,7 +441,9 @@ export function buildOperatorReportModel(input) {
       thanksItems.push({
         kind: 'first',
         name: p.name,
-        avatarUrl: p.avatarUrl,
+        uid: p.uid,
+        login: p.login,
+        avatarUrl: p.avatarUrl || liveIconUrlForComment(p, input?.liveIcons),
         text: String(first?.text || ''),
         timeText: capturedAtOf(first) ? formatClock(capturedAtOf(first)) : '',
         commentCount: p.comments.filter((c) => !isMarketingSupportRow(c)).length,
@@ -420,7 +458,9 @@ export function buildOperatorReportModel(input) {
     .slice(0, 20)
     .map((p) => ({
       name: p.name,
-      avatarUrl: p.avatarUrl,
+      uid: p.uid,
+      login: p.login,
+      avatarUrl: p.avatarUrl || liveIconUrlForComment(p, input?.liveIcons),
       commentCount: p.comments.filter((c) => !isMarketingSupportRow(c)).length,
       likeTotal: sumKnownLikes(p.comments),
       giftLabel: p.giftRows.length ? summarizeGiftRows(p.giftRows, giftWord, view) : '',
@@ -574,7 +614,9 @@ export function buildOperatorReportModel(input) {
     {
       returning: returningPeople.slice(0, 8).map((p) => ({
         name: p.name,
-        avatarUrl: p.avatarUrl,
+        uid: p.uid,
+        login: p.login,
+        avatarUrl: p.avatarUrl || liveIconUrlForComment(p, input?.liveIcons),
         pastBroadcasts: p.pastBroadcasts,
         commentCount: p.comments.filter((c) => !isMarketingSupportRow(c)).length,
       })),
@@ -588,7 +630,7 @@ export function buildOperatorReportModel(input) {
       basisOk: basis.ok,
       isVideo,
     },
-    commenterCount === 0,
+    commenterCount === 0 || !basis.ok,
   );
 
   push(

@@ -82,10 +82,12 @@ describe('buildOperatorReportModel', () => {
     expect(model.returningCount).toBeNull();
     expect(model.unmatchedCount).toBeNull();
     expect(inventedNumberViolations(model)).toEqual([]);
+    expect(model.sectionKeys).not.toContain('who');
     const html = renderOperatorReportHtml(model);
     expect(html).not.toMatch(/新規\s*100%/);
     expect(html).not.toMatch(/全員が.?新規/);
-    expect(html).toMatch(/過去の配信を読み込んでいない|突き合わせていない/);
+    expect(html).not.toContain('誰が来てくれたか');
+    expect(html).not.toMatch(/過去の配信を読み込んでいない|また来てくれた人の数は出していません/);
   });
 
   it('過去配信があるときだけ、また来てくれた人を出す', () => {
@@ -107,8 +109,10 @@ describe('buildOperatorReportModel', () => {
     expect(model.returningCount).toBe(1);
     expect(model.unmatchedCount).toBe(1);
     expect(inventedNumberViolations(model)).toEqual([]);
+    expect(model.sectionKeys).toContain('who');
     const html = renderOperatorReportHtml(model);
     expect(html).toMatch(/灯台/);
+    expect(html).toMatch(/誰が来てくれたか/);
     expect(html).toMatch(/以前の配信でも書いてくれた人/);
     expect(html).not.toMatch(/新しい人 1/);
   });
@@ -266,5 +270,59 @@ describe('operatorServiceLabel / operatorPublicId', () => {
     expect(operatorPublicId({ platformId: 'youtube', liveId: 'lv927058321372', watchId: 'kKl0E22tU78' })).toBe('kKl0E22tU78');
     expect(operatorPublicId({ platformId: 'youtube', liveId: 'lv927058321372' })).toBe('');
     expect(operatorPublicId({ platformId: 'niconico', liveId: 'lv351899008' })).toBe('lv351899008');
+  });
+});
+
+describe('運営者レポートの顔', () => {
+  it('Twitch の控えアイコンがあれば本物の URL を出す', () => {
+    const model = buildOperatorReportModel({
+      liveId: 'lv900000000003',
+      platformId: 'twitch',
+      comments: [
+        comment({
+          userId: '8123456789',
+          nickname: 'lantern',
+          login: 'lantern',
+          text: 'Hi',
+          ytPlatform: 'twitch',
+        }),
+      ],
+      liveIcons: { lantern: 'https://static-cdn.jtvnw.net/jtv_user_pictures/lantern-profile.png' },
+    });
+    const html = renderOperatorReportHtml(model);
+    expect(html).toContain('src="https://static-cdn.jtvnw.net/jtv_user_pictures/lantern-profile.png"');
+    expect(html).toContain('referrerpolicy="no-referrer"');
+    expect(html).toContain('data-mkt-av-fb=');
+  });
+
+  it('アイコンが無いときはゆっくり顔で、灰色の既定アイコンは出さない', () => {
+    const model = buildOperatorReportModel({
+      liveId: 'lv900000000003',
+      platformId: 'twitch',
+      comments: [
+        comment({
+          userId: '8123456789',
+          nickname: 'ghost',
+          login: 'ghost',
+          avatarUrl: 'https://secure-dcdn.cdn.nimg.jp/nicoaccount/usericon/defaults/blank.jpg',
+          text: 'Hi',
+          ytPlatform: 'twitch',
+        }),
+      ],
+    });
+    const html = renderOperatorReportHtml(model);
+    expect(html).not.toContain('usericon/defaults/');
+    expect(html).toMatch(/src="data:image\//);
+    expect(html).not.toMatch(/class="mkt-op-av"[^>]*background:/);
+  });
+
+  it('ニコニコの数値 ID は既定 CDN の顔を使う', () => {
+    const model = buildOperatorReportModel({
+      liveId: 'lv123',
+      platformId: 'niconico',
+      comments: [comment({ userId: '4046119', nickname: '灯台', text: 'わこつ' })],
+    });
+    const html = renderOperatorReportHtml(model);
+    expect(html).toContain('https://secure-dcdn.cdn.nimg.jp/nicoaccount/usericon/404/4046119.jpg');
   });
 });

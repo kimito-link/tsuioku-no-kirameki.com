@@ -3094,7 +3094,8 @@ function buildSectionRevealScriptHtml() {
  *   visitorCount?: number,
  *   officialGiftPts?: number,
  *   watchId?: string,
- *   publicId?: string
+ *   publicId?: string,
+ *   liveIcons?: Record<string, string>
  * }} [opts]
  * @returns {string}
  */
@@ -3655,6 +3656,7 @@ ${typeof opts.htmlReportHtml === 'string' ? sectionHtmlReportChapter(opts.htmlRe
     broadcastTitle: String(opts.broadcastTitle || ''),
     broadcasterUserId,
     broadcasterName: String(opts.broadcasterName || ''),
+    liveIcons: opts.liveIcons && typeof opts.liveIcons === 'object' ? opts.liveIcons : undefined,
   });
   const operatorHtml = renderOperatorReportHtml(operatorModel, { maskShare, identiconResolver });
   const appendixHtml = wrapLegacyAnalysisAppendix(
@@ -3690,8 +3692,8 @@ ${buildSectionRevealBootScriptHtml()}
 <p class="mkt-header__sub">${subId ? `${escapeHtml(subId)} — ` : ''}${new Date().toLocaleString('ja-JP')} 出力${escapeHtml(subSuffix)}</p>
 <p class="mkt-header__source">このレポートに出すのは、このPCに残っている記録と、書き出したときに画面に出ていたものだけです。分からない項目は載せていません。</p>
 </header>
-${broadcasterProfileCardHtml}
 <main class="mkt-main">
+${broadcasterProfileCardHtml}
 ${operatorHtml}
 ${appendixHtml}
 </main>

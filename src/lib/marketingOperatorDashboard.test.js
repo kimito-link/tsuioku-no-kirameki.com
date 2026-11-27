@@ -210,4 +210,67 @@ describe('暖色の配信者プロフィール', () => {
     expect(OPERATOR_REPORT_CSS).toMatch(/\.mkt-shell--warm \.mkt-bcaster__bio\{[^}]*background:#fff7ec/);
     expect(OPERATOR_REPORT_CSS).toMatch(/\.mkt-shell--warm \.mkt-bcaster__chip\{[^}]*background:#fff7ec/);
   });
+
+  it('プロフィールカードは他のカードと同じく main の幅に収める', () => {
+    const liveId = 'lv123';
+    const comments = commentsFor('niconico', liveId);
+    const html = buildMarketingDashboardHtml(aggregateMarketingReport(comments, liveId), {
+      commentsForAnalytics: comments,
+      contentKind: 'live',
+      broadcastTitle: '歌枠',
+      broadcasterProfile: {
+        userId: '4046119',
+        name: '灯台',
+        avatarUrl: 'https://secure-dcdn.cdn.nimg.jp/nicoaccount/usericon/404/4046119.jpg',
+        description: '歌います',
+      },
+    });
+    const mainAt = html.indexOf('<main class="mkt-main">');
+    const mainEnd = html.indexOf('</main>', mainAt);
+    const main = html.slice(mainAt, mainEnd);
+    expect(main).toContain('aria-label="配信者プロフィール"');
+    expect(main).toContain('<section class="mkt-section mkt-section--bcaster"');
+    const beforeMain = html.slice(0, mainAt);
+    expect(beforeMain).not.toContain('aria-label="配信者プロフィール"');
+    expect(beforeMain).not.toContain('<section class="mkt-section mkt-section--bcaster"');
+  });
+});
+
+describe('比較データが無いときの章立て', () => {
+  it('誰が来てくれたか は出さず、先頭を確認できずの文にしない', () => {
+    const liveId = 'lv123';
+    const comments = commentsFor('niconico', liveId);
+    const html = buildMarketingDashboardHtml(aggregateMarketingReport(comments, liveId), {
+      commentsForAnalytics: comments,
+      contentKind: 'live',
+    });
+    const appendixAt = html.indexOf('id="mkt-appendix"');
+    const operatorHtml = appendixAt >= 0 ? html.slice(0, appendixAt) : html;
+    expect(operatorHtml).not.toContain('誰が来てくれたか');
+    expect(operatorHtml).not.toMatch(/また来てくれた人の数は出していません|過去との照合/);
+    const keys = sectionKeysFromHtml(html);
+    expect(keys).not.toContain('who');
+    expect(keys[0]).toBe('top');
+  });
+});
+
+describe('控えアイコンの顔', () => {
+  it('Twitch の liveIcons をよく書いてくれた人に出す', () => {
+    const liveId = 'lv900000000003';
+    const comments = commentsFor('twitch', liveId).map((c, i) => ({
+      ...c,
+      login: `viewer${i}`,
+      ytPlatform: 'twitch',
+    }));
+    const html = buildMarketingDashboardHtml(aggregateMarketingReport(comments, liveId), {
+      platform: 'twitch',
+      commentsForAnalytics: comments,
+      contentKind: 'live',
+      liveIcons: {
+        viewer0: 'https://static-cdn.jtvnw.net/jtv_user_pictures/viewer0.png',
+      },
+    });
+    expect(html).toContain('src="https://static-cdn.jtvnw.net/jtv_user_pictures/viewer0.png"');
+    expect(html).not.toContain('usericon/defaults/');
+  });
 });

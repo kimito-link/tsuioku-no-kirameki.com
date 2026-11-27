@@ -4,6 +4,9 @@
  */
 
 import { escapeHtml, escapeAttr } from '../shared/html/escape.js';
+import { isSiteDefaultSilhouetteUrl, faceForRowKey } from './avatarFallbackFromUrl.js';
+import { buildNiconicoDefaultUserIconUrl } from './reportUserThumb.js';
+import { faceForCommentRow } from './commentRecord.js';
 
 export const OPERATOR_REPORT_CSS = `
 .mkt-shell--warm{background:#fff7ec;color:#4a3b34}
@@ -111,23 +114,65 @@ function avColor(name) {
 }
 
 /**
- * @param {{ name?: string, avatarUrl?: string }} p
- * @param {boolean} maskShare
- * @param {(id: string, size?: number) => string} [identiconResolver]
- * @param {string} [uid]
+ * @param {any} p
+ * @param {{ maskShare?: boolean, identiconResolver?: Function, platformId?: string, liveId?: string }} ctx
  */
-function avHtml(p, maskShare, identiconResolver, uid) {
-  const name = maskShare ? '' : String(p?.name || '');
-  const url = !maskShare && p?.avatarUrl && /^https?:\/\//i.test(p.avatarUrl) ? p.avatarUrl : '';
-  if (url) {
-    return `<img class="mkt-op-av" src="${escapeAttr(url)}" alt="" width="36" height="36">`;
+function avPersonKey(p) {
+  return String(p?.uid || p?.userId || p?.channelId || p?.login || p?.name || '').trim();
+}
+
+function avFallbackSrc(p, ctx) {
+  const uid = avPersonKey(p);
+  const identiconResolver = ctx?.identiconResolver;
+  if (typeof identiconResolver === 'function' && uid) {
+    const r = identiconResolver(uid, 36);
+    if (typeof r === 'string' && /^data:/i.test(r)) return r;
   }
-  const ident = !maskShare && uid && typeof identiconResolver === 'function' ? identiconResolver(uid, 36) : '';
-  if (ident && /^data:/.test(ident)) {
-    return `<img class="mkt-op-av" src="${escapeAttr(ident)}" alt="" width="36" height="36">`;
+  const liveId = String(ctx?.liveId || '').trim();
+  const comments = Array.isArray(p?.comments) ? p.comments : [];
+  if (liveId && comments[0]) {
+    const face = faceForCommentRow(liveId, comments[0]);
+    if (face && /^data:/i.test(face)) return face;
   }
-  const label = maskShare ? '?' : initialOf(name);
-  return `<div class="mkt-op-av" style="background:${avColor(name)}">${escapeHtml(label)}</div>`;
+  if (uid) {
+    const face = faceForRowKey(uid);
+    if (face && /^data:/i.test(face)) return face;
+  }
+  const name = String(p?.name || '').trim();
+  if (name) {
+    const face = faceForRowKey(name);
+    if (face && /^data:/i.test(face)) return face;
+  }
+  return '';
+}
+
+function avHttpSrc(p, platformId) {
+  const url = String(p?.avatarUrl || p?.iconUrl || '').trim();
+  if (/^https:\/\//i.test(url) && !isSiteDefaultSilhouetteUrl(url)) return url;
+  if (platformId === 'niconico') {
+    const nico = buildNiconicoDefaultUserIconUrl(String(p?.uid || p?.userId || '').trim());
+    if (nico) return nico;
+  }
+  return '';
+}
+
+function avImg(src, fallback) {
+  const fb = fallback && fallback !== src ? fallback : '';
+  const fbAttr = fb ? ` data-mkt-av-fb="${escapeAttr(fb)}"` : '';
+  const onerr = ` onerror="this.onerror=null;var f=this.getAttribute('data-mkt-av-fb');if(f){this.removeAttribute('data-mkt-av-fb');this.src=f;}else{this.remove();}"`;
+  return `<img class="mkt-op-av" src="${escapeAttr(src)}" alt="" width="36" height="36" referrerpolicy="no-referrer" decoding="async"${fbAttr}${onerr}>`;
+}
+
+function avHtml(p, ctx = {}) {
+  if (ctx.maskShare) {
+    return `<div class="mkt-op-av" style="background:${avColor('')}">?</div>`;
+  }
+  const fallback = avFallbackSrc(p, ctx);
+  const http = avHttpSrc(p, String(ctx.platformId || ''));
+  if (http) return avImg(http, fallback);
+  if (fallback) return avImg(fallback, '');
+  const name = String(p?.name || '');
+  return `<div class="mkt-op-av" style="background:${avColor(name)}">${escapeHtml(initialOf(name))}</div>`;
 }
 
 function tag(text, kind) {
@@ -143,6 +188,12 @@ export function renderOperatorReportHtml(model, opts = {}) {
   if (!model) return '';
   const maskShare = opts.maskShare === true;
   const identiconResolver = opts.identiconResolver;
+  const avCtxBase = {
+    maskShare,
+    identiconResolver,
+    platformId: String(model.platformId || ''),
+    liveId: String(model.liveId || ''),
+  };
   const displayName = (name) => (maskShare ? '視聴者' : String(name || ''));
   const kpis = (Array.isArray(model.kpis) ? model.kpis : [])
     .map(
@@ -166,7 +217,7 @@ export function renderOperatorReportHtml(model, opts = {}) {
       `<section class="mkt-section mkt-op-section" id="${escapeAttr(s.id)}">` +
         `<h2><span class="mkt-op-num">${num}</span>${escapeHtml(s.title)}</h2>` +
         (s.why ? `<p class="mkt-op-why">${escapeHtml(s.why)}</p>` : '') +
-        renderSectionBody(s, { maskShare, identiconResolver, displayName, programWord: model.programWord }) +
+        renderSectionBody(s, { ...avCtxBase, displayName, programWord: model.programWord }) +
         `</section>`,
     );
   }
@@ -194,7 +245,7 @@ function renderThanks(data, ctx) {
       if (it.giftLabel) tags.push(tag(it.giftLabel, 'gold'));
       if (it.kind === 'first') tags.push(tag('この配信が初めて', 'teal'));
       if (it.returning) tags.push(tag('以前の配信でもコメント', 'teal'));
-      return `<div class="mkt-op-comment"><div class="mkt-op-person">${avHtml(it, ctx.maskShare, ctx.identiconResolver)}<div>
+      return `<div class="mkt-op-comment"><div class="mkt-op-person">${avHtml(it, ctx)}<div>
         <div class="mkt-op-name">${escapeHtml(ctx.displayName(it.name))}${it.timeText ? ` <span class="mkt-op-meta">・ ${escapeHtml(it.timeText)}</span>` : ''}</div>
         ${it.text ? `<div class="mkt-op-body">${escapeHtml(it.text)}</div>` : ''}
         ${tags.length ? `<div class="mkt-op-tags">${tags.join('')}</div>` : ''}
@@ -215,7 +266,7 @@ function renderWho(data, ctx) {
         returning
           .map(
             (p) =>
-              `<div class="mkt-op-who">${avHtml(p, ctx.maskShare, ctx.identiconResolver)}<div><div class="mkt-op-name">${escapeHtml(ctx.displayName(p.name))}</div><div class="mkt-op-meta">過去 ${Number(p.pastBroadcasts || 0).toLocaleString('ja-JP')}配信・今回 ${Number(p.commentCount || 0).toLocaleString('ja-JP')}件</div></div></div>`,
+              `<div class="mkt-op-who">${avHtml(p, ctx)}<div><div class="mkt-op-name">${escapeHtml(ctx.displayName(p.name))}</div><div class="mkt-op-meta">過去 ${Number(p.pastBroadcasts || 0).toLocaleString('ja-JP')}配信・今回 ${Number(p.commentCount || 0).toLocaleString('ja-JP')}件</div></div></div>`,
           )
           .join('')
       }${Number(data.returningCount) > returning.length ? `<p class="mkt-note">ほか ${(Number(data.returningCount) - returning.length).toLocaleString('ja-JP')}人は表の続きにあります。</p>` : ''}</div>`
@@ -253,7 +304,7 @@ function renderTop(data, ctx) {
         ? `<td class="num">${p.likeTotal != null ? Number(p.likeTotal).toLocaleString('ja-JP') : ''}</td>`
         : '';
       const giftCell = hasGifts ? `<td>${escapeHtml(p.giftLabel || '')}</td>` : '';
-      return `<tr><td class="num">${i + 1}</td><td><div class="mkt-op-person">${avHtml(p, ctx.maskShare, ctx.identiconResolver)}<div class="mkt-op-name">${escapeHtml(ctx.displayName(p.name))}</div></div></td><td class="num">${Number(p.commentCount || 0).toLocaleString('ja-JP')}</td>${likeCell}${giftCell}<td class="mkt-op-meta">${escapeHtml(memo.join('・'))}</td></tr>`;
+      return `<tr><td class="num">${i + 1}</td><td><div class="mkt-op-person">${avHtml(p, ctx)}<div class="mkt-op-name">${escapeHtml(ctx.displayName(p.name))}</div></div></td><td class="num">${Number(p.commentCount || 0).toLocaleString('ja-JP')}</td>${likeCell}${giftCell}<td class="mkt-op-meta">${escapeHtml(memo.join('・'))}</td></tr>`;
     })
     .join('');
   return `<div class="mkt-table-scroll"><table class="mkt-op-table"><thead>${head}</thead><tbody>${body}</tbody></table></div>`;
@@ -281,7 +332,7 @@ function renderThreads(data, ctx) {
             `<div class="mkt-op-reply"><span class="mkt-op-name">${escapeHtml(ctx.displayName(r.name) || '投稿者')}</span> <span class="mkt-op-meta">（投稿者）${r.timeText ? `・ ${escapeHtml(r.timeText)}` : ''}</span>${r.text ? `<div class="mkt-op-body">${escapeHtml(r.text)}</div>` : ''}</div>`,
         )
         .join('');
-      return `<div class="mkt-op-comment"><div class="mkt-op-person">${avHtml(t, ctx.maskShare, ctx.identiconResolver)}<div>
+      return `<div class="mkt-op-comment"><div class="mkt-op-person">${avHtml(t, ctx)}<div>
         <div class="mkt-op-name">${escapeHtml(ctx.displayName(t.name))}${t.timeText ? ` <span class="mkt-op-meta">・ ${escapeHtml(t.timeText)}</span>` : ''}</div>
         ${t.text ? `<div class="mkt-op-body">${escapeHtml(t.text)}</div>` : ''}
         ${tags.length ? `<div class="mkt-op-tags">${tags.join('')}</div>` : ''}
