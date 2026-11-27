@@ -1205,7 +1205,7 @@
   - `gift-coin-hq.wav`
   - `gift-register-hq.wav`
   - `gift-register.mp3`
-- 📁 **src/** (2762)
+- 📁 **src/** (2763)
   - 📁 **data/** (7)
     - 📁 **acquirers/** (2)
       - `laneFromStorage.js` — 応援レーン acquirer: chrome.storage.local(nls_comments) → laneStore の橋渡し。
@@ -1565,7 +1565,7 @@
         - `logo_funlink_white_RGB_link_black.png`
         - `logo_funlink_white_RGB_maru_black.png`
     - `hero-connect-hub.svg`
-  - 📁 **lib/** (2427)
+  - 📁 **lib/** (2428)
     - 📁 **__snapshots__/** (4)
       - `marketing-abema-baseline.html`
       - `marketing-niconico.html`
@@ -1638,7 +1638,7 @@
       - `nicoVideoWatchMeta.js` — 【層】L0 判定層(純粋関数・I/O禁止)
       - `nicoVideoWatchMeta.test.js`
       - `nicoVideoWatchSm9RealDom.test.js`
-    - 📁 **platform/** (51)
+    - 📁 **platform/** (52)
       - 📁 **__fixtures__/** (1)
         - `eventStanding.2026-11-21.json`
       - `diagTabShare.js` — 計器(yt_diag_*_chat)は1つの置き場を全タブで分け合う。
@@ -1662,6 +1662,7 @@
       - `infoPollGate.test.js`
       - `liveIconStore.js` — v0.1.2254: ライブで分かった顔(名前 → 顔の URL)を storage(yt_tw_icons など)に置くときの、純粋な部品。
       - `liveIconStore2254.test.js`
+      - `liveStripAge2265.test.js`
       - `marketingExportBudget.test.js`
       - `marketingExportLongSpan.test.js`
       - `marketingPlatformChapters.js` — ニコ生以外のマーケHTMLに足す章。見た目のクラスは既存の mkt-* を使う。

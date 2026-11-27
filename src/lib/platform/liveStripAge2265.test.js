@@ -59,3 +59,18 @@ describe('YouTube のアーカイブ', () => {
     expect(s.streamAgeMin).toBe(90);
   });
 });
+
+describe('5,000万回を超える再生数(実ページ jfKfPfyJRdk は 651,847,121 回)', async () => {
+  const { mergeYtStreamSummary } = await import('../youtube/ytStreamStorePolicy.js');
+  it('まとめに残し、アーカイブの帯に「再生」を出す', () => {
+    const sum = mergeYtStreamSummary(null, { videoId: 'jfKfPfyJRdk', contentKind: 'live_replay', isLive: false, isLiveContent: true, slotViewCount: 651847121 }, 1);
+    expect(sum.slotViewCount).toBe(651847121);
+    const s = ytSummaryToNicoSnapshot(sum, 'jfKfPfyJRdk', '', {});
+    const items = venueItemsForPlatform('youtube', bag(s.platformFacts)) || [];
+    expect(items.find((it) => it.key === 'concurrent')?.text).toBe('651,847,121');
+  });
+  it('同時接続は今まで通り 5,000万人を超える数を捨てる', () => {
+    const sum = mergeYtStreamSummary(null, { videoId: 'abcdefghijk', contentKind: 'live', isLive: true, concurrentViewers: 60_000_000 }, 1);
+    expect(sum.concurrentViewers ?? null).toBe(null);
+  });
+});

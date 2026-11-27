@@ -122,7 +122,10 @@ export function mergeYtStreamSummary(existing, patch, nowMs = Date.now()) {
     concurrentViewers === null ? prevPeak : Math.max(prevPeak ?? 0, concurrentViewers);
   // ABEMA の番組詳細の視聴数（同時接続ではない）。無い配信の要約には欄を足さない。
   // 0 は「まだ読めていない」。視聴数 0 として残さない(2026-11-11 PC: 0 のまま残って「材料待ち」)。
-  const viewOk = (/** @type {unknown} */ v) => plausible(v) && /** @type {number} */ (v) > 0;
+  // v0.1.2265: 再生数(視聴数)は同時接続の上限(5,000万)では切らない。5,000万回を超える動画・アーカイブ(6億回のアーカイブ)で
+  //   会場の帯の「再生」が出なかった。再生数は整数で 1,000億回まで(それより大きい数は読み違い)
+  const viewOk = (/** @type {unknown} */ v) =>
+    typeof v === 'number' && Number.isSafeInteger(v) && v > 0 && v <= 100_000_000_000;
   const slotViewCount = viewOk(patch?.slotViewCount)
     ? Math.floor(/** @type {number} */ (patch.slotViewCount))
     : viewOk(prev.slotViewCount)

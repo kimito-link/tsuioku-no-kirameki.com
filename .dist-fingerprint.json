@@ -1,7 +1,7 @@
 {
   "schema": 1,
   "mode": "default",
-  "fingerprint": "f6c15578ca2077ceaddb49269676036f8ae4850459fc88831d89523b3f02c835",
+  "fingerprint": "8e22a1b2e4efde7d82a98d0230184cfb4ac72869e1f7b6463405c41de5028227",
   "inputs": [
     "app/app.js",
     "app/live-view-block.js",
@@ -1164,7 +1164,7 @@
     "app/dist/phone.js": "b8584722ba772174b0b0e344546de1692c1f8022a6a87105986247a07665b684",
     "app/dist/live-ranking.js": "dc0f7dea8148910f62dba65b79c560bba8ed1635b2e24c588ddd78f3a37cf514",
     "extension/dist/yt-content-chat.js": "734c690aad5261278c43852488e11b6011a37cc643924280d718ccde934c2bf1",
-    "extension/dist/yt-background.js": "954da398d6797e170869ff710af8739353b0b5246d422d5fc955e5a4aaff5b84",
+    "extension/dist/yt-background.js": "15b85efe0ad8b8b8ae132cee7b20018451625d5b9c969cd4f4fa8880a681e4e3",
     "extension/dist/yt-sidepanel.js": "fdffe74ff8119cf47e2b512cd208c9e59dd76648750912a1cc6c5bb2dfa109c2",
     "extension/dist/yt-marketing-export.js": "b3695e2adc4678ac155e4b240c5e34625858aa848efa35f594b8e570a9446cf9",
     "extension/dist/yt-comeview.js": "460dd7d0f597491feeaea5f33379cc706d16de0dcb866c11785d3cf977381850",
