@@ -22,6 +22,15 @@ export function wireVideoLanePersonDetail(box, opts = {}) {
   if (opts.board) box.__nlsbBoard = opts.board;
 
   // キャプチャ段階で止める。document の live 用リスナー（wireLaneUserDetailOpen）が窓を開かないようにする。
+  box.addEventListener('error', (/** @type {Event} */ ev) => {
+    const img = /** @type {HTMLImageElement|null} */ (ev.target);
+    if (!img?.matches?.('img.nlsb-person-detail__reply-face')) return;
+    const fallback = img.ownerDocument.createElement('span');
+    fallback.className = 'nlsb-person-detail__reply-face';
+    fallback.setAttribute('aria-hidden', 'true');
+    fallback.textContent = '?';
+    img.replaceWith(fallback);
+  }, true);
   box.addEventListener('click', (/** @type {any} */ ev) => {
     if (ev.button !== 0 || ev.ctrlKey || ev.metaKey || ev.shiftKey || ev.altKey) return;
     // instanceof Element は、happy-dom の Window と Node のグローバルが違うと外れる。closest の有無で見る。

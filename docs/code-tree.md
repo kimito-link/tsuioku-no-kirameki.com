@@ -1205,7 +1205,7 @@
   - `gift-coin-hq.wav`
   - `gift-register-hq.wav`
   - `gift-register.mp3`
-- 📁 **src/** (2759)
+- 📁 **src/** (2762)
   - 📁 **data/** (7)
     - 📁 **acquirers/** (2)
       - `laneFromStorage.js` — 応援レーン acquirer: chrome.storage.local(nls_comments) → laneStore の橋渡し。
@@ -1242,7 +1242,7 @@
       - `avatarResolver.test.js`
       - `identity.js` — ニコ生ユーザー ID の「匿名性」判定と関連アイデンティティ・ユーティリティ。
       - `nickname.js` — 表示名（ニックネーム）の「強弱」判定。
-  - 📁 **extension/** (136)
+  - 📁 **extension/** (137)
     - 📁 **popup/** (25)
       - 📁 **init/** (4)
         - `devMonitorExport.js` — devMonitorExport — 開発モニタの「エクスポート/ダウンロード/較正データ消去」一式。
@@ -1366,6 +1366,7 @@
     - `venueSpeechPanelRowsMax.wiring.test.js`
     - `venueSpeechPanelTailRead.test.js`
     - `venueSpeechPanelUserKey.wiring.test.js`
+    - `videoBoardSafety2263.test.js`
     - `viewerBehaviorBoardPaint.js` — 視聴者の行動ボードを、既にある storage の変化だけを見て塗る。
     - `viewerBehaviorLiveGate.test.js`
     - `viewerBehaviorLiveLayout.js` — 視聴者の行動を、配信モードと同じ数字の帯と、同じ応援アイコン列で描く。
@@ -1564,7 +1565,7 @@
         - `logo_funlink_white_RGB_link_black.png`
         - `logo_funlink_white_RGB_maru_black.png`
     - `hero-connect-hub.svg`
-  - 📁 **lib/** (2425)
+  - 📁 **lib/** (2427)
     - 📁 **__snapshots__/** (4)
       - `marketing-abema-baseline.html`
       - `marketing-niconico.html`
@@ -1722,7 +1723,7 @@
       - `twIrcParse.test.js`
       - `twShim.test.js`
       - `twStreamKey.js` — Twitch の「配信キー」(YouTube 版の videoId の位置に入る文字列)の作り方と読み方(純関数)
-    - 📁 **videoWatch/** (23)
+    - 📁 **videoWatch/** (24)
       - 📁 **fixtures/** (2)
         - `twitcasting-movie-843232645-comment-items.slim.html`
         - `twitch-vod-2940252213-replay-chat.slim.html`
@@ -1735,6 +1736,7 @@
       - `videoCommentDetail.js` — 【層】L0 判定層(純粋関数・I/O禁止)
       - `videoCommentRows.js` — 【層】L0 判定層(純粋関数・I/O禁止)
       - `videoFacts.js` — 【層】L0 判定層(純粋関数・I/O禁止)
+      - `videoFactsRegression2263.test.js`
       - `videoIdentity.js` — 【層】L0 判定層(純粋関数・I/O禁止)
       - `videoIdentity2241.test.js`
       - `videoMarketing2263.test.js`
@@ -1750,7 +1752,7 @@
     - 📁 **whowatch/** (2)
       - `wwParse.js` — ふわっち(whowatch.tv)の配信とコメントを、YouTube 版の記録と同じ形にする(純関数)
       - `wwParse.test.js`
-    - 📁 **youtube/** (128)
+    - 📁 **youtube/** (129)
       - 📁 **fixtures/** (9)
         - 📁 **real-dom/** (9)
           - `README.md`
@@ -1815,6 +1817,7 @@
       - `ytNicoShimPlaceholder.test.js`
       - `ytPageMeta.js` — YouTube 視聴ページの URL / 配信者アイコン URL を扱う純粋関数
       - `ytPageMeta.test.js`
+      - `ytPageViewerNavigation2263.test.js`
       - `ytPageViewerReader.js` — YouTube のページ自身の世界で、同時視聴者数を data 属性に置く。
       - `ytPanelExportTarget.js` — 【層】L0 判定層(純粋関数・I/O禁止)
       - `ytPanelExportTarget.test.js`

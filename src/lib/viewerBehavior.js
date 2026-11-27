@@ -1,3 +1,4 @@
+import { isSiteDefaultSilhouetteUrl, faceForRowKey, noAvatarFace } from './avatarFallbackFromUrl.js';
 import { pickAvatarUrlForUid } from './deriveAvatarUrlFromUid.js';
 import { mergeVideoCommentLists, videoCommentsDetailHtml } from './videoWatch/videoCommentDetail.js';
 /**
@@ -13,7 +14,7 @@ export const VIEWER_BEHAVIOR_ROW_CAP = 20;
 export const VIEWER_BEHAVIOR_GRID_CAP = 80;
 export const VIEWER_BEHAVIOR_TIME_ZONE = 'Asia/Tokyo';
 export const VIEWER_BEHAVIOR_ANON_ID = '__anon__';
-export const VIEWER_BEHAVIOR_FALLBACK_AVATAR = 'https://secure-dcdn.cdn.nimg.jp/nicoaccount/usericon/defaults/blank.jpg';
+export const VIEWER_BEHAVIOR_FALLBACK_AVATAR = noAvatarFace();
 
 /**
  * ニコ生の 184 / a: / 「匿名」「匿名938」など、一人ずつ並べない匿名か。
@@ -35,14 +36,15 @@ export function isAnonymousViewer(id, name) {
  * 配信モードの応援アイコン列と同じ解決。既にある URL を優先し、無ければ数値 ID から公開アイコン URL を作る。
  * @param {unknown} id
  * @param {unknown} [avatarUrl]
+ * @param {string} [platform]
  * @returns {string}
  */
-export function resolveViewerBehaviorAvatarUrl(id, avatarUrl) {
+export function resolveViewerBehaviorAvatarUrl(id, avatarUrl, platform = '') {
   const given = String(avatarUrl || '').trim();
-  const derived = pickAvatarUrlForUid(/** @type {string | number} */ (id), null);
-  if (given && /^https?:/i.test(given) && !/usericon\/defaults\/blank\.jpg/i.test(given)) return given;
-  if (derived) return derived;
-  return given || VIEWER_BEHAVIOR_FALLBACK_AVATAR;
+  if (/^https?:/i.test(given) && !isSiteDefaultSilhouetteUrl(given)) return given;
+  const derived = platform === 'niconico' && !isSiteDefaultSilhouetteUrl(given)
+    ? pickAvatarUrlForUid(/** @type {string | number} */ (id), null) : '';
+  return derived || (id ? faceForRowKey(platform + ':' + String(id)) : VIEWER_BEHAVIOR_FALLBACK_AVATAR);
 }
 
 /**
@@ -488,7 +490,7 @@ export function buildViewerBehaviorBoard(input) {
     const raw = histOf(person.id);
     const history = raw ? historyFromCommenterIndexEntry(raw) : null;
     const row = buildViewerBehaviorRow(person, history, { historyReady, nowMs: src.nowMs });
-    row.avatarUrl = resolveViewerBehaviorAvatarUrl(person.id, person.avatarUrl);
+    row.avatarUrl = resolveViewerBehaviorAvatarUrl(person.id, person.avatarUrl, String(src.platform || ''));
     row.commentAnchor = String(person.commentAnchor || '').trim();
     row.pending = person.pending === true;
     row.isAnonymous = false;

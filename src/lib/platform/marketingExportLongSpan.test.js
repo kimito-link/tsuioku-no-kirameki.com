@@ -227,3 +227,23 @@ describe.each(VIDEO_PLATFORMS)('%s: 動画・録画のマーケHTML(長い幅)�
     expect(html).not.toContain('コメントの期間');
   });
 });
+
+describe('live timeline matches master at inclusive boundaries', () => {
+  const minute = 60_000;
+  it.each([719.5, 720, 1439, 1440, 10079, 10080, 10081, 11520])('keeps master buckets at %s minutes', (minutes) => {
+    const comments = [0, minutes * minute].map((offsetMs, i) => ({
+      liveId: 'lv123456789', capturedAt: NOW + offsetMs, text: 'www', userId: String(i + 1),
+    }));
+    const opts = { contentKind: 'live' };
+    expect(aggregateMarketingReport(comments, 'lv123456789', opts).timeline.length).toBe(Math.round(minutes) + 1);
+    expect(buildCommentVelocityTimeline(comments, opts).buckets.length).toBe(Math.floor(minutes) + 1);
+    expect(buildLaughterDensityTimeline(comments, opts).buckets.length).toBe(Math.floor(minutes * 2) + 1);
+    expect(scoreSentimentTimeline(comments, opts).buckets.length).toBe(Math.floor(minutes) + 1);
+  });
+
+  it('keeps the established video window when one far-future row is present', async () => {
+    const { boundCommentsToTimeWindow } = await import('../marketingTimeSpan.js');
+    const rows = [0, 1, 2, 90 * 1440].map((min) => ({ capturedAt: NOW + min * minute }));
+    expect(boundCommentsToTimeWindow(rows).comments).toEqual(rows.slice(0, 3));
+  });
+});

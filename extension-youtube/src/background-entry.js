@@ -1307,14 +1307,14 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
     if (!sender || sender.id !== chrome.runtime.id) return false;
     const vid = String(message.videoId || '');
     const after = Number(message.afterRecordedAt || 0);
-    (after > 0 ? getYtStreamCommentsSince(vid, after) : getYtStreamCommentsByVideoId(vid))
-      .then(async (items) => {
-        // v0.1.2263: 記録の無い通常動画は、動画のカードの行(横の欄と同じページの行)を会場に渡す(videoCommentRows.js)
-        if (after > 0 || (Array.isArray(items) && items.length)) return items;
-        // 録画・動画のページ(Twitch・Kick・ツイキャス・TikTok)の会場は、録画のカードの行(鍵は pageKey)
-        const bag = await chrome.storage.local.get([KEY_YT_VIDEO_WATCH_CARD, KEY_VOD_VIDEO_WATCH_CARD]).catch(() => null);
-        return recordedRowsOrAnyVideoCardRows(items, [bag?.[KEY_YT_VIDEO_WATCH_CARD], bag?.[KEY_VOD_VIDEO_WATCH_CARD]], vid);
-      })
+    (async () => {
+      const kind = String((await ensureSummaryMem())?.[vid]?.contentKind || '');
+      if (after > 0) return kind === 'video' ? [] : getYtStreamCommentsSince(vid, after);
+      const items = kind === 'video' ? [] : await getYtStreamCommentsByVideoId(vid);
+      if (kind === 'live' || kind === 'live_replay' || (items.length && kind !== 'video')) return items;
+      const bag = await chrome.storage.local.get([KEY_YT_VIDEO_WATCH_CARD, KEY_VOD_VIDEO_WATCH_CARD]).catch(() => null);
+      return recordedRowsOrAnyVideoCardRows(items, [bag?.[KEY_YT_VIDEO_WATCH_CARD], bag?.[KEY_VOD_VIDEO_WATCH_CARD]], vid, kind);
+    })()
       .then((items) => sendResponse({ ok: true, items: Array.isArray(items) ? items : [] }))
       .catch((err) => sendResponse({ ok: false, items: [], error: String(err && err.message || err) }));
     return true;

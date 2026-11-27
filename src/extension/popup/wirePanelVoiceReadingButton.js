@@ -29,8 +29,13 @@ export function wirePanelVoiceReadingButton($) {
       });
     } catch { /* 拡張の外では何もしない */ }
   };
-  $('openComeviewVoiceBtn')?.addEventListener('click', () => {
+  const button = $('openComeviewVoiceBtn');
+  const canToggle = () => button && button.ownerDocument?.documentElement.getAttribute('data-nl-video-watch') !== '1'
+    && button.getAttribute('aria-disabled') !== 'true' && !button.hasAttribute('disabled');
+  button?.addEventListener('click', () => {
+    if (!canToggle()) return;
     read((/** @type {boolean} */ on) => {
+      if (!canToggle()) return;
       const next = !on;
       try {
         chrome.storage.local.set({ [KEY_VOICE_READING_ENABLED]: next }, () => {

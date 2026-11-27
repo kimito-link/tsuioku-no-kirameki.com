@@ -56,6 +56,7 @@ export function startYtPageViewerReader() {
    * @type {{ data: any, player: any } | null}
    */
   let navResponse = null;
+  let hasNavigated = false;
 
   const pageVideoId = () => {
     const fromUrl = parseYtVideoIdFromUrl(String(location.href || ''));
@@ -112,41 +113,27 @@ export function startYtPageViewerReader() {
     publish(pageId, count);
   };
 
-  /** @param {any} player @param {string} id */
-  const playerFor = (player, id) => {
-    const pid = player?.videoDetails?.videoId;
-    return player && typeof player === 'object' && (!isVid(pid) || !id || pid === id) ? player : null;
-  };
-
   const readInitial = () => {
     const pageId = pageVideoId();
-    /** @type {any} */
-    let data = /** @type {any} */ (window).ytInitialData;
-    /** @type {any} */
-    let player = /** @type {any} */ (window).ytInitialPlayerResponse;
-    if (navResponse && pageId) {
-      const navId = videoIdFromYtInitialData(navResponse.data) || String(navResponse.player?.videoDetails?.videoId || '');
-      if (navId === pageId) {
-        data = navResponse.data;
-        player = navResponse.player;
+    const w = /** @type {any} */ (window);
+    const matches = (/** @type {string} */ candidateId) =>
+      candidateId === pageId || (!candidateId && !hasNavigated);
+    let data = [navResponse?.data, w.ytInitialData].find((candidate) =>
+      candidate && matches(videoIdFromYtInitialData(candidate)));
+    const player = [navResponse?.player, w.ytInitialPlayerResponse].find((candidate) =>
+      candidate && matches(String(candidate.videoDetails?.videoId || '')));
+    if (!data) {
+      for (const script of document.querySelectorAll('script')) {
+        const source = String(script.textContent || '');
+        if (!source.includes('ytInitialData')) continue;
+        const candidate = parseYtInitialDataAssignment(source);
+        if (!candidate || !matches(videoIdFromYtInitialData(candidate))) continue;
+        data = candidate;
+        break;
       }
     }
-    if (!data || typeof data !== 'object') {
-      const scripts = document.querySelectorAll('script');
-      for (let i = 0; i < scripts.length; i += 1) {
-        const text = String(scripts[i].textContent || '');
-        if (!text.includes('ytInitialData')) continue;
-        data = parseYtInitialDataAssignment(text);
-        if (data) break;
-      }
-    }
-    if (!data || typeof data !== 'object') {
-      flushPending();
-      return;
-    }
-    const dataId = videoIdFromYtInitialData(data);
-    const id = pageId || dataId;
-    if (!id || (pageId && dataId && pageId !== dataId)) {
+    const id = pageId || videoIdFromYtInitialData(data);
+    if (!id || (!data && !player)) {
       flushPending();
       return;
     }
@@ -155,8 +142,7 @@ export function startYtPageViewerReader() {
     if (subText) document.documentElement?.setAttribute('data-nl-yt-subscribers', subText);
     if (count != null) publish(id, count);
     else flushPending();
-    // 最初に開いた動画の player を、移った先の動画に使わない(配信かどうかを取り違える)
-    publishVodSignals(data, playerFor(player, id), id);
+    publishVodSignals(data, player, id);
   };
 
   /**
@@ -169,7 +155,10 @@ export function startYtPageViewerReader() {
     const root = document.documentElement;
     if (!root || !id) return;
     const views = viewCountInInnertube(data, id) ?? viewCountInInnertube(player, id);
-    if (views != null) root.setAttribute('data-nl-yt-view-count', String(views));
+    if (views != null) {
+      root.setAttribute('data-nl-yt-view-count', String(views));
+      root.setAttribute('data-nl-yt-view-count-video-id', id);
+    }
     // v0.1.2263: 動画の投稿日と長さ(プレーヤーの応答に既にある値だけ)。この動画の player のときだけ(playerFor)
     const micro = player?.microformat?.playerMicroformatRenderer;
     const pub = String(micro?.publishDate || micro?.uploadDate || '');
@@ -283,6 +272,7 @@ export function startYtPageViewerReader() {
   arm();
   window.addEventListener('yt-navigate-finish', (/** @type {any} */ ev) => {
     pending = null;
+    hasNavigated = true;
     try {
       const r = ev && ev.detail && ev.detail.response;
       navResponse = r && typeof r === 'object' && (r.response || r.playerResponse)
@@ -295,6 +285,7 @@ export function startYtPageViewerReader() {
     root?.removeAttribute('data-nl-yt-viewers');
     root?.removeAttribute('data-nl-yt-video-id');
     root?.removeAttribute('data-nl-yt-view-count');
+    root?.removeAttribute('data-nl-yt-view-count-video-id');
     root?.removeAttribute('data-nl-yt-is-live');
     root?.removeAttribute('data-nl-yt-is-live-content');
     root?.removeAttribute('data-nl-yt-content-kind');

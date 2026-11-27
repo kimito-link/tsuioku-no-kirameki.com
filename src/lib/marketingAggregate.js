@@ -200,7 +200,7 @@ export function speechCommentsForMarketing(comments) {
  *
  * @param {StoredComment[]} comments
  * @param {string} liveId
- * @param {{ broadcasterUserId?: string, broadcasterIconUrl?: string }} [opts]
+ * @param {{ broadcasterUserId?: string, broadcasterIconUrl?: string, contentKind?: string }} [opts]
  * @returns {MarketingReport}
  */
 export function aggregateMarketingReport(comments, liveId, opts = {}) {
@@ -326,7 +326,7 @@ export function aggregateMarketingReport(comments, liveId, opts = {}) {
   let peakMinuteCount = 0;
   // v0.1.2263: 動画のコメント(何年にもわたる投稿日)を書き出すと、1分ごとの列が百万を超えて
   //   「Maximum call stack size exceeded」になった。7日を超える幅は、1分ごとの列を作らない(山の分は下で数える)。
-  const timelineMinutes = durationMinutes <= MARKETING_TIMELINE_MAX_MINUTES ? durationMinutes : -1;
+  const timelineMinutes = opts.contentKind === 'live' || durationMinutes <= MARKETING_TIMELINE_MAX_MINUTES ? durationMinutes : -1;
   if (timelineMinutes < 0) {
     for (const [m, b] of bucketMap) {
       if (b.count > peakMinuteCount || (b.count === peakMinuteCount && m < peakMinute)) {

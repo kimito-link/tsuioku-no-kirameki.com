@@ -1263,6 +1263,7 @@ function bindUiEvents() {
 
   const openVoiceBtn = document.getElementById('openComeviewVoiceBtn');
   openVoiceBtn?.addEventListener('click', () => {
+    if (document.documentElement.getAttribute('data-nl-video-watch') === '1') return;
     const settingsDetails = /** @type {HTMLDetailsElement | null} */ (
       document.getElementById('yt-settings-details')
     );

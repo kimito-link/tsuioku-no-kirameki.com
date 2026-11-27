@@ -229,7 +229,7 @@ function sectionBroadcastNarrative(narrative, maskShare) {
       return `<article class="mkt-narrative-card">
 <div class="mkt-narrative-card__head">
 <strong>${escapeHtml(seg.label)}</strong>
-<span>${seg.startMinute}〜${seg.endMinute}分 / ${seg.commentCount}件 / ${seg.uniqueUsers}人</span>
+<span>${formatLongGapJa(seg.startMinute * 60_000) || seg.startMinute}〜${formatLongGapJa(seg.endMinute * 60_000) || `${seg.endMinute}分`} / ${seg.commentCount}件 / ${seg.uniqueUsers}人</span>
 </div>
 <div class="mkt-narrative-keywords">${keywords}</div>
 ${samples}
@@ -556,7 +556,7 @@ function sectionCommentVelocityCurve(series) {
   const innerW = W - pad * 2;
   const innerH = H - pad * 2;
   // v0.1.2263: 描く点の数も上限まで(集計側で収まっていても、描く側で二重に守る)
-  const pts = capSeriesPoints(series.buckets);
+  const pts = series.buckets;
   const n = pts.length;
   const maxV = Math.max(1, series.peakValue);
   const step = formatBucketMsJa(series.bucketMs || 60_000);
@@ -809,7 +809,7 @@ function sectionSurvivalCurve(curve) {
   const dots = curve.segments
     .map(
       (s, i) =>
-        `<circle cx="${xOf(i).toFixed(1)}" cy="${yOf(s.retentionPct).toFixed(1)}" r="3" fill="#a78bfa"><title>区間${i + 1} (${s.startMin}〜${s.endMin}分): ${s.retentionPct}% (${s.presentCount}名)</title></circle>`
+        `<circle cx="${xOf(i).toFixed(1)}" cy="${yOf(s.retentionPct).toFixed(1)}" r="3" fill="#a78bfa"><title>区間${i + 1} (${formatLongGapJa(s.startMin * 60_000) || s.startMin}〜${formatLongGapJa(s.endMin * 60_000) || `${s.endMin}分`}): ${s.retentionPct}% (${s.presentCount}名)</title></circle>`
     )
     .join('');
   const xLabels = curve.segments
@@ -1305,7 +1305,7 @@ function sectionSentimentCurve(sentiment) {
   const innerW = W - pad * 2;
   const innerH = H - pad * 2;
   // v0.1.2263: Math.max に列を広げて渡すと、列が長いと落ちる。最大は1回ずつ数える。描く点の数も上限まで。
-  const pts = capSeriesPoints(sentiment.buckets);
+  const pts = sentiment.buckets;
   const n = pts.length;
   let maxV = 1;
   for (const b of sentiment.buckets) {
@@ -3081,6 +3081,7 @@ function buildSectionRevealScriptHtml() {
  *   anonymousIdenticonResolver?: (uid: string) => string,
  *   broadcasterUserId?: string,
  *   sessionSummaryRows?: import('./concurrentTimelineSeries.js').ConcurrentTimelineRow[],
+ *   contentKind?: string,
  *   commentsForAnalytics?: import('./commentVelocityTimeline.js').VelocityCommentInput[],
  *   pastBroadcasts?: import('./commenterHistoricalAnalytics.js').BroadcastBundle[],
  *   giftUsers?: import('./giftRecord.js').StoredGiftUser[],
@@ -3165,31 +3166,21 @@ export function buildMarketingDashboardHtml(r, opts = {}) {
   //   何年にもわたる動画のコメントで、1分ごとの列が数百万になり「Invalid string length」になった。
   //   速さ・笑い・気分の列は点の数を自分で上限まで収める(1点の幅を広げる)ので、コメント全部を使う。
   //   幅が7日以内(ライブ)なら、どちらも同じ配列(コピーしない・今までと同じ出力)。
-  const allCommentsRaw = /** @type {any[]} */ (Array.isArray(opts.commentsForAnalytics) ? opts.commentsForAnalytics : []);
-  const timeSpan = boundCommentsToTimeWindow(allCommentsRaw);
-  const commentsRaw = /** @type {any[]} */ (timeSpan.comments);
-  // ニコ生は配列をコピーしない。他サービスで応援の行があるときだけ、発言だけを分析に渡す。
+  const commentsRaw = /** @type {any[]} */ (Array.isArray(opts.commentsForAnalytics) ? opts.commentsForAnalytics : []);
+  const contentKind = opts.contentKind;
+  const timeSpan = boundCommentsToTimeWindow(commentsRaw);
   const commentsForAnalytics = view ? speechCommentsForMarketing(commentsRaw) : commentsRaw;
-  const commentsForSeries = timeSpan.windowed
-    ? view
-      ? speechCommentsForMarketing(allCommentsRaw)
-      : allCommentsRaw
-    : commentsForAnalytics;
-  const velocityTimeline = buildCommentVelocityTimeline(commentsForSeries, {
-    bucketMs: 60_000,
-    rollingWindowMin: 5
+  const windowRows = /** @type {any[]} */ (timeSpan.comments);
+  const boundedSpeech = view ? speechCommentsForMarketing(windowRows) : windowRows;
+  const graphComments = contentKind === 'live' ? commentsForAnalytics : boundedSpeech;
+  const velocityTimeline = buildCommentVelocityTimeline(commentsForAnalytics, {
+    bucketMs: 60_000, rollingWindowMin: 5, contentKind
   });
-  const silenceZones = detectCommentSilenceZones(commentsForAnalytics, {
-    thresholdMs: 60_000,
-    quality: { windowMs: 30_000 }
+  const silenceZones = detectCommentSilenceZones(graphComments, {
+    thresholdMs: 60_000, quality: { windowMs: 30_000 }
   });
-  const laughterDensity = buildLaughterDensityTimeline(commentsForSeries, {
-    bucketMs: 30_000
-  });
-  const commentFatigue = computeCommentFatigue(commentsForAnalytics, {
-    broadcasterUserId,
-    maxTenureMin: 30
-  });
+  const laughterDensity = buildLaughterDensityTimeline(commentsForAnalytics, { bucketMs: 30_000, contentKind });
+  const commentFatigue = computeCommentFatigue(graphComments, { broadcasterUserId, maxTenureMin: 30 });
 
   // 0.1.23 (X): 過去 N 配信を突き合わせるユーザー層分析。pastBroadcasts 未渡しなら
   // 空集計が返る（純粋関数側で吸収）。配信者本人は除外する。
@@ -3309,8 +3300,8 @@ export function buildMarketingDashboardHtml(r, opts = {}) {
   const firstSecondLatency = buildCommenterFirstSecondLatency(currentCommentsForLayer);
   const talentPeaks = detectTalentPeakMoments(currentCommentsForLayer);
   const sentimentCurve = scoreSentimentTimeline(
-    timeSpan.windowed ? filterBroadcaster(commentsForSeries) : currentCommentsForLayer,
-    { bucketMs: 60_000 }
+    currentCommentsForLayer,
+    { bucketMs: 60_000, contentKind }
   );
   // 自コメ抜粋: selfPosted=true のもの
   const selfComments = commentsForAnalytics.filter((c) =>
@@ -3666,7 +3657,7 @@ ${buildSectionRevealBootScriptHtml()}
 <body>
 <header class="mkt-header">
 <h1 class="mkt-header__title">📊 配信マーケティング分析</h1>
-<p class="mkt-header__sub">${escapeHtml(r.liveId)} — ${new Date().toLocaleString('ja-JP')} 出力${escapeHtml(subSuffix)}${timeSpan.windowed ? ` · 速さ・笑い・気分はコメント全部を${formatBucketMsJa(velocityTimeline.bucketMs || 60_000)}ごとに、沈黙・疲れは新しい側7日分(件数・人数は全件)` : ''} · JSON埋め込み ${escapeHtml(exportedAtIso)}</p>
+<p class="mkt-header__sub">${escapeHtml(r.liveId)} — ${new Date().toLocaleString('ja-JP')} 出力${escapeHtml(subSuffix)}${timeSpan.windowed && contentKind !== 'live' ? ` · 速さ・笑い・気分はコメント全部を${formatBucketMsJa(velocityTimeline.bucketMs || 60_000)}ごとに、沈黙・疲れは新しい側7日分(件数・人数は全件)` : ''} · JSON埋め込み ${escapeHtml(exportedAtIso)}</p>
 </header>
 ${broadcasterProfileCardHtml}
 <main class="mkt-main">
