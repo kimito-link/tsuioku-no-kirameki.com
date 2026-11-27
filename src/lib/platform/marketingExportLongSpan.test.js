@@ -230,7 +230,7 @@ describe.each(VIDEO_PLATFORMS)('%s: 動画・録画のマーケHTML(長い幅)�
 
 describe('live timeline matches master at inclusive boundaries', () => {
   const minute = 60_000;
-  it.each([719.5, 720, 1439, 1440, 10079, 10080, 10081, 11520])('keeps master buckets at %s minutes', (minutes) => {
+  it.each([719.5, 720, 1439, 1440, 10079, 10080])('keeps master buckets at %s minutes', (minutes) => {
     const comments = [0, minutes * minute].map((offsetMs, i) => ({
       liveId: 'lv123456789', capturedAt: NOW + offsetMs, text: 'www', userId: String(i + 1),
     }));
@@ -245,5 +245,44 @@ describe('live timeline matches master at inclusive boundaries', () => {
     const { boundCommentsToTimeWindow } = await import('../marketingTimeSpan.js');
     const rows = [0, 1, 2, 90 * 1440].map((min) => ({ capturedAt: NOW + min * minute }));
     expect(boundCommentsToTimeWindow(rows).comments).toEqual(rows.slice(0, 3));
+  });
+
+  // v0.1.2265: 7日を超えるライブ記録(同じ鍵に何週間もたまったとき)は、動画と同じく点の数を上限に収める
+  it.each([10081, 11520, 30 * 1440, 400 * 1440])('caps live series beyond 7 days (%s minutes)', (minutes) => {
+    const comments = [0, minutes * minute].map((offsetMs, i) => ({
+      liveId: 'lv123456789', capturedAt: NOW + offsetMs, text: 'www', userId: String(i + 1),
+    }));
+    const opts = { contentKind: 'live' };
+    expect(aggregateMarketingReport(comments, 'lv123456789', opts).timeline.length).toBe(0);
+    expect(buildCommentVelocityTimeline(comments, opts).buckets.length).toBeLessThanOrEqual(1440);
+    expect(buildLaughterDensityTimeline(comments, opts).buckets.length).toBeLessThanOrEqual(1440);
+    expect(scoreSentimentTimeline(comments, opts).buckets.length).toBeLessThanOrEqual(1440);
+  });
+});
+
+const LIVE_PLATFORMS = ['nicolive', 'youtube', 'twitch', 'kick', 'twitcasting', 'tiktok', 'abema', 'showroom'];
+/** @param {number} days @param {number} n */
+const liveRows = (days, n = 300) => Array.from({ length: n }, (_, i) => ({
+  id: `c${i}`, liveId: 'lv1', text: i % 3 ? 'w草' : 'すごい', userId: `u${i % 40}`, nickname: `n${i % 40}`,
+  capturedAt: NOW + Math.floor((i / (n - 1)) * days * 86_400_000),
+}));
+/** @param {any[]} comments @param {string} platform @param {string} [contentKind] */
+const liveHtml = (comments, platform, contentKind = 'live') => buildMarketingDashboardHtml(
+  aggregateMarketingReport(comments, 'lv1', { contentKind }), { platform, commentsForAnalytics: comments, contentKind },
+).replace(/\d{4}\/\d{1,2}\/\d{1,2} \d{1,2}:\d{2}:\d{2}/g, 'T').replace(/\d{4}-\d{2}-\d{2}T[\d:.]+Z/g, 'Z');
+
+describe.each(LIVE_PLATFORMS)('%s: 長いライブ記録のマーケHTML(v0.1.2265)', (platform) => {
+  it.each([30, 400])('%s日分のライブ記録でも小さく・NNNNN分を出さない', (days) => {
+    const html = liveHtml(liveRows(days), platform);
+    expect(html.length).toBeLessThan(2_000_000);
+    expect(html).not.toMatch(/\d{5,}\s*分/);
+    expect(html).toContain('コメントの期間');
+  });
+  it('ふつうのライブ(2時間)は、種類を渡さない(今までの)出力と同じ', () => {
+    const rows = Array.from({ length: 600 }, (_, i) => ({
+      id: `c${i}`, liveId: 'lv1', text: i % 3 ? 'w草' : 'すごい', userId: `u${i % 50}`, nickname: `n${i % 50}`,
+      capturedAt: NOW + ((i * 7919) % 7_200_000),
+    }));
+    expect(liveHtml(rows, platform, 'live')).toBe(liveHtml(rows, platform, undefined));
   });
 });

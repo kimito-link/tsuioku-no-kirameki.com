@@ -1208,6 +1208,12 @@ export function venueItemsForPlatform(platformId, bag) {
       title: age.isPlaceholder ? '' : streamAgeTitle(facts),
     },
   ];
+  // v0.1.2265: アーカイブ(live_replay)はいま配信中ではない。経過は出さず、読めない再生数も「読み込み中」で止めずに隠す(どのサービスも同じ)
+  if (facts.contentKind === 'live_replay') {
+    for (let i = items.length - 1; i >= 0; i -= 1) {
+      if (items[i].key === 'streamAge' || (items[i].key === 'concurrent' && items[i].isPlaceholder)) items.splice(i, 1);
+    }
+  }
   for (const chip of panelExtraChips(id, facts)) {
     items.push({
       key: chip.key,

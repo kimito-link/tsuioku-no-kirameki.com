@@ -8,7 +8,7 @@
  *     w / ｗ / 草 / 8888 / 笑 / 爆笑 / ワロタ などのパターンマッチ（簡易）。
  */
 
-import { seriesBucketMs } from './marketingTimeSpan.js';
+import { seriesBucketMsForKind } from './marketingTimeSpan.js';
 
 /**
  * @typedef {{ capturedAt?: any, text?: any }} VelocityCommentInput
@@ -76,7 +76,7 @@ export function buildCommentVelocityTimeline(comments, opts = {}) {
 
   const { valid, firstAt, lastAt } = collected;
   // v0.1.2263: 何年にもわたる動画のコメントでも点の数は上限まで(1点の幅を広げる。marketingTimeSpan.js)。
-  const bucketMs = opts.contentKind === 'live' ? baseBucketMs : seriesBucketMs(lastAt - firstAt, baseBucketMs);
+  const bucketMs = seriesBucketMsForKind(lastAt - firstAt, baseBucketMs, opts.contentKind);
   const totalBuckets = Math.max(1, Math.floor((lastAt - firstAt) / bucketMs) + 1);
   /** @type {VelocityBucket[]} */
   const buckets = [];
@@ -191,7 +191,7 @@ export function buildLaughterDensityTimeline(comments, opts = {}) {
   }
   const { valid, firstAt, lastAt } = collected;
   // v0.1.2263: 30秒ごとの列が何年分(数百万)にならないよう、点の数は上限まで(marketingTimeSpan.js)。
-  const bucketMs = opts.contentKind === 'live' ? baseBucketMs : seriesBucketMs(lastAt - firstAt, baseBucketMs);
+  const bucketMs = seriesBucketMsForKind(lastAt - firstAt, baseBucketMs, opts.contentKind);
   const totalBuckets = Math.max(1, Math.floor((lastAt - firstAt) / bucketMs) + 1);
   /** @type {LaughterBucket[]} */
   const buckets = [];

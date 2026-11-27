@@ -12,7 +12,8 @@ import {
   formatLongGapJa,
   formatSeriesOffsetJa,
   marketingSpanDisplay,
-  maxOfList
+  maxOfList,
+  MARKETING_LIVE_SERIES_MAX_BUCKETS
 } from './marketingTimeSpan.js';
 import { escapeAttr, escapeHtml } from './htmlEscape.js';
 import { maskLabelForShare } from './privacyDisplay.js';
@@ -556,7 +557,7 @@ function sectionCommentVelocityCurve(series) {
   const innerW = W - pad * 2;
   const innerH = H - pad * 2;
   // v0.1.2263: 描く点の数も上限まで(集計側で収まっていても、描く側で二重に守る)
-  const pts = series.buckets;
+  const pts = capSeriesPoints(series.buckets, MARKETING_LIVE_SERIES_MAX_BUCKETS);
   const n = pts.length;
   const maxV = Math.max(1, series.peakValue);
   const step = formatBucketMsJa(series.bucketMs || 60_000);
@@ -734,7 +735,7 @@ function sectionLaughterDensity(laugh) {
   const xOf = (i) => pad + (innerW * i) / Math.max(1, n - 1);
   const barW = Math.max(1, Math.min(8, innerW / n - 1));
   // ライブ(30秒ごとのまま)は今までと同じ出力。広げた列だけ、コメントの無い棒を省く。
-  const shown = bucketMs === 30_000 ? laugh.buckets : capSeriesPoints(laugh.buckets.filter((b) => b.total > 0));
+  const shown = bucketMs === 30_000 ? capSeriesPoints(laugh.buckets, MARKETING_LIVE_SERIES_MAX_BUCKETS) : capSeriesPoints(laugh.buckets.filter((b) => b.total > 0));
   const bars = shown
     .map((b) => {
       const x = xOf(b.minute);
@@ -1305,7 +1306,7 @@ function sectionSentimentCurve(sentiment) {
   const innerW = W - pad * 2;
   const innerH = H - pad * 2;
   // v0.1.2263: Math.max に列を広げて渡すと、列が長いと落ちる。最大は1回ずつ数える。描く点の数も上限まで。
-  const pts = sentiment.buckets;
+  const pts = capSeriesPoints(sentiment.buckets, MARKETING_LIVE_SERIES_MAX_BUCKETS);
   const n = pts.length;
   let maxV = 1;
   for (const b of sentiment.buckets) {
@@ -3172,7 +3173,8 @@ export function buildMarketingDashboardHtml(r, opts = {}) {
   const commentsForAnalytics = view ? speechCommentsForMarketing(commentsRaw) : commentsRaw;
   const windowRows = /** @type {any[]} */ (timeSpan.comments);
   const boundedSpeech = view ? speechCommentsForMarketing(windowRows) : windowRows;
-  const graphComments = contentKind === 'live' ? commentsForAnalytics : boundedSpeech;
+  // v0.1.2265: 沈黙・疲れはライブでも7日の窓(7日以内のライブは窓が全部なので今まで通り)
+  const graphComments = boundedSpeech;
   const velocityTimeline = buildCommentVelocityTimeline(commentsForAnalytics, {
     bucketMs: 60_000, rollingWindowMin: 5, contentKind
   });
@@ -3657,7 +3659,7 @@ ${buildSectionRevealBootScriptHtml()}
 <body>
 <header class="mkt-header">
 <h1 class="mkt-header__title">📊 配信マーケティング分析</h1>
-<p class="mkt-header__sub">${escapeHtml(r.liveId)} — ${new Date().toLocaleString('ja-JP')} 出力${escapeHtml(subSuffix)}${timeSpan.windowed && contentKind !== 'live' ? ` · 速さ・笑い・気分はコメント全部を${formatBucketMsJa(velocityTimeline.bucketMs || 60_000)}ごとに、沈黙・疲れは新しい側7日分(件数・人数は全件)` : ''} · JSON埋め込み ${escapeHtml(exportedAtIso)}</p>
+<p class="mkt-header__sub">${escapeHtml(r.liveId)} — ${new Date().toLocaleString('ja-JP')} 出力${escapeHtml(subSuffix)}${timeSpan.windowed ? ` · 速さ・笑い・気分はコメント全部を${formatBucketMsJa(velocityTimeline.bucketMs || 60_000)}ごとに、沈黙・疲れは新しい側7日分(件数・人数は全件)` : ''} · JSON埋め込み ${escapeHtml(exportedAtIso)}</p>
 </header>
 ${broadcasterProfileCardHtml}
 <main class="mkt-main">

@@ -589,7 +589,8 @@ export function ytSummaryToNicoSnapshot(sum, videoId, tabTitle, all, videoCardWr
     // アーカイブ(チャットのリプレイで記録した配信)は今も配信中ではないので、開始からの経過は出さない(2週間前の配信が「372時間」になる)
     //   配信が終わっていたら(endedAt)、終わった時刻までで止める
     streamAgeMin:
-      startedAt > 0 && !replayVideoIds.has(videoId)
+      // v0.1.2265: アーカイブ(live_replay)を見ているときも、終わった時刻が無ければ出さない(2022年に始まった配信が「38380時間」になった)
+      startedAt > 0 && !replayVideoIds.has(videoId) && (sum?.contentKind !== 'live_replay' || Number(sum?.endedAt) > startedAt)
         ? Math.max(0, Math.round(((Number(sum?.endedAt) > startedAt ? Number(sum.endedAt) : Date.now()) - startedAt) / 60000))
         : null,
     // ニコ生の来場・広告pt・ギフトpt を、このサービスの数字として出さない(src/lib/platform/platformMetrics.js)。

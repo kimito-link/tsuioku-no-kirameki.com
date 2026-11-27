@@ -730,7 +730,8 @@ function setupWatchPageMetaObserver() {
         contentKind,
         isLive: isLiveFlag,
         isLiveContent: isLiveContentFlag,
-        ...(contentKind === 'video' && viewCount != null ? { slotViewCount: viewCount } : {}),
+        // v0.1.2265: アーカイブ(live_replay)も再生数を渡す(会場の帯が「再生 読み込み中」のまま止まった)
+        ...((contentKind === 'video' || contentKind === 'live_replay') && viewCount != null ? { slotViewCount: viewCount } : {}),
         ...(contentKind === 'video' && commentCount != null ? { slotCommentCount: commentCount } : {}),
         ...(contentKind === 'video' ? { videoAuthors, videoComments } : {}),
         // v0.1.2263: 動画の投稿日・長さ(ページの世界が player から写した値。いまの動画の印のときだけ)

@@ -9,7 +9,7 @@
  *   - L15 computeReachCoefficient         … 同接 / 5 分内ユニーク = "リーチ係数"
  */
 
-import { seriesBucketMs } from './marketingTimeSpan.js';
+import { seriesBucketMsForKind } from './marketingTimeSpan.js';
 
 /**
  * @typedef {{ capturedAt?: any, userId?: any, text?: any, selfPosted?: any }} CulturalCommentInput
@@ -183,7 +183,7 @@ export function scoreSentimentTimeline(comments, opts = {}) {
   const first = valid[0].at;
   const last = valid[valid.length - 1].at;
   // v0.1.2263: 何年にもわたる動画のコメントでも点の数は上限まで(1点の幅を広げる。marketingTimeSpan.js)。
-  const bucketMs = opts?.contentKind === 'live' ? baseBucketMs : seriesBucketMs(last - first, baseBucketMs);
+  const bucketMs = seriesBucketMsForKind(last - first, baseBucketMs, opts?.contentKind);
   const total = Math.max(1, Math.floor((last - first) / bucketMs) + 1);
   /** @type {SentimentBucket[]} */
   const buckets = Array.from({ length: total }, (_, m) => ({
