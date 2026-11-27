@@ -39,10 +39,11 @@ export function buildNiconicoDefaultUserIconUrl(uid) {
 
 /**
  * @param {{
- *   userId: unknown,
- *   avatarUrl: unknown,
- *   identiconResolver?: (uid: string) => string
- * }} opts
+ *   userId?: unknown,
+ *   avatarUrl?: unknown,
+ *   identiconResolver?: (uid: string, size?: number) => string,
+ *   platformId?: string
+ * }} [opts]
  * @returns {string}
  */
 export function resolveReportUserThumbSrc(opts) {

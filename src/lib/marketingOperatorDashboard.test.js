@@ -487,7 +487,7 @@ describe('appendix の顔と名前の契約', () => {
       if (platform !== 'niconico') {
         expect(visibleOp, platform).not.toContain('ID 8123456789');
       }
-      expect(html, platform).not.toMatch(/onerror="this\.onerror=null;this\.src='https:\/\/secure-dcdn\.cdn\.nimg\.jp\/nicoaccount\/usericon\/defaults/);
+      expect(html, platform).not.toContain('usericon/defaults/blank.jpg');
       expect(appendix, platform).toMatch(/data-search="/);
     }
   });

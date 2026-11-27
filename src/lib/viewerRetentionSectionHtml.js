@@ -5,10 +5,10 @@
 
 import { escapeAttr, escapeHtml } from '../shared/html/escape.js';
 import { maskLabelForShare } from './privacyDisplay.js';
-import { displayUserLabel } from './userRooms.js';
+import { operatorDisplayName } from './marketingOperatorReport.js';
+import { faceForRowKey } from './avatarFallbackFromUrl.js';
 import { buildUserProfileLinkedLabelHtml } from './userProfileLinkHtml.js';
 import { resolveReportUserThumbSrc } from './reportUserThumb.js';
-import { NICONICO_OFFICIAL_DEFAULT_USERICON_HTTPS } from './supportGrowthTileSrc.js';
 
 export const VIEWER_RETENTION_SECTION_ID = 'mkt-viewer-retention';
 /** 表に出す人数の上限（重い配信で HTML が膨らみすぎないように）。超えた分は件数だけ書く。 */
@@ -51,7 +51,7 @@ export function viewerRetentionBasisHtml(est, opts = {}) {
 
 /**
  * @param {import('./viewerRetentionEstimate.js').ViewerRetentionEstimate} est
- * @param {{ maskShare?: boolean, identiconResolver?: (uid: string) => string, retentionExcludeNote?: string }} [opts]
+ * @param {{ maskShare?: boolean, identiconResolver?: (uid: string, size?: number) => string, retentionExcludeNote?: string, platformId?: string }} [opts]
  * @returns {string}
  */
 export function buildViewerRetentionSectionHtml(est, opts = {}) {
@@ -82,15 +82,25 @@ export function buildViewerRetentionSectionHtml(est, opts = {}) {
   const shown = est.users.slice(0, VIEWER_RETENTION_TABLE_CAP);
   const rowHtml = shown
     .map((u, i) => {
-      const rawLabel = displayUserLabel(u.userId, u.nickname || '');
+      const platformId = String(opts.platformId || '').trim();
+      const rawLabel = operatorDisplayName(
+        { name: u.nickname, nickname: u.nickname, uid: u.userId, userId: u.userId, platformId },
+        { platformId, maskShare },
+      );
       const nameHtml = maskShare
         ? escapeHtml(maskLabelForShare(rawLabel))
         : buildUserProfileLinkedLabelHtml(u.userId, rawLabel);
       const thumb = maskShare
         ? ''
-        : resolveReportUserThumbSrc({ userId: u.userId, avatarUrl: u.avatarUrl || '', identiconResolver: opts.identiconResolver });
+        : resolveReportUserThumbSrc({ userId: u.userId, avatarUrl: u.avatarUrl || '', identiconResolver: opts.identiconResolver, platformId })
+          || (typeof opts.identiconResolver === 'function' ? opts.identiconResolver(u.userId, 24) : '')
+          || faceForRowKey(String(u.userId || ''));
+      const identicon = (typeof opts.identiconResolver === 'function' ? opts.identiconResolver(u.userId, 24) : '') || faceForRowKey(String(u.userId || 'unknown')) || '';
+      const fb = identicon && /^data:/i.test(identicon) && identicon !== thumb
+        ? ` onerror="this.onerror=null;this.src='${escapeAttr(identicon)}'"`
+        : ' onerror="this.onerror=null;this.style.visibility=\'hidden\'"';
       const thumbHtml = thumb
-        ? `<img class="mkt-vr__av" src="${escapeAttr(thumb)}" alt="" loading="lazy" decoding="async" referrerpolicy="no-referrer" onerror="this.onerror=null;this.src='${escapeAttr(NICONICO_OFFICIAL_DEFAULT_USERICON_HTTPS)}'">`
+        ? `<img class="mkt-vr__av" src="${escapeAttr(thumb)}" alt="" loading="lazy" decoding="async" referrerpolicy="no-referrer"${fb}>`
         : '<span class="mkt-vr__av mkt-vr__av--empty"></span>';
       const verdict = u.stayedToEnd
         ? '<span class="mkt-vr__tag mkt-vr__tag--stay">最後まで</span>'

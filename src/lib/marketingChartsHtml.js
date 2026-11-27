@@ -111,8 +111,10 @@ import {
 import { buildSupporterChikuranRows } from './supporterChikuranScore.js';
 
 /** マーケ HTML 組み立て中だけ使う（表示ラベル・顔の控え）。popup / 会場モードは触らない。 */
+/** @type {{ platformId: string, maskShare: boolean, identiconResolver?: (uid: string, size?: number) => string }} */
 const marketingRenderCtx = { platformId: '', maskShare: false, identiconResolver: undefined };
 
+/** @param {unknown} userId @param {unknown} [nickname] */
 function marketingVisibleName(userId, nickname) {
   if (marketingRenderCtx.maskShare) return '視聴者';
   return operatorDisplayName(
@@ -121,6 +123,7 @@ function marketingVisibleName(userId, nickname) {
   );
 }
 
+/** @param {unknown} userId */
 function marketingIdenticonSrc(userId) {
   const uid = String(userId || '').trim();
   const resolver = marketingRenderCtx.identiconResolver;
@@ -137,6 +140,7 @@ function marketingIdenticonSrc(userId) {
 }
 
 /** ユーザー顔が壊れたときの控え。ニコの灰色既定アイコンは使わない。 */
+/** @param {unknown} userId */
 function marketingUserFaceOnerrorAttr(userId) {
   const fb = marketingIdenticonSrc(userId);
   if (!fb) return `onerror="this.onerror=null;this.style.visibility='hidden'"`;
@@ -146,6 +150,7 @@ function marketingUserFaceOnerrorAttr(userId) {
 /** ギフト商品サムネなど、人の顔ではない画像。 */
 const MARKETING_ITEM_ONERROR_ATTR = `onerror="this.onerror=null;this.remove()"`;
 
+/** @param {{ userId?: unknown, avatarUrl?: unknown, identiconResolver?: (uid: string, size?: number) => string, platformId?: string }} [opts] */
 function resolveReportUserThumbSrc(opts) {
   const src = resolveReportUserThumbSrcBase({
     ...opts,
@@ -3105,7 +3110,7 @@ function buildSectionRevealScriptHtml() {
  * @param {MarketingReport} r
  * @param {{
  *   maskShareLabels?: boolean,
- *   anonymousIdenticonResolver?: (uid: string) => string,
+ *   anonymousIdenticonResolver?: (uid: string, size?: number) => string,
  *   broadcasterUserId?: string,
  *   sessionSummaryRows?: import('./concurrentTimelineSeries.js').ConcurrentTimelineRow[],
  *   commentsForAnalytics?: import('./commentVelocityTimeline.js').VelocityCommentInput[],
@@ -3130,6 +3135,7 @@ function buildSectionRevealScriptHtml() {
  *   followerSamples?: unknown[],
  *   slimForHeavyExport?: boolean,
  *   platform?: string,
+ *   platformId?: string,
  *   pageCount?: number,
  *   pageFacts?: object | null,
  *   contentKind?: string,
@@ -3139,7 +3145,7 @@ function buildSectionRevealScriptHtml() {
  *   officialGiftPts?: number,
  *   watchId?: string,
  *   publicId?: string,
- *   liveIcons?: Record<string, string>
+ *   liveIcons?: Record<string, Record<string, string>>
  * }} [opts]
  * @returns {string}
  */
@@ -3622,7 +3628,7 @@ ${idWrap('mkt-kpi', sectionKpi(r, view ? null : audienceGap, followerSeries, vie
 ${view ? sectionPlatformSummaryHtml(r, view, concurrentSeries, concurrentPeak, pageCount) : sectionMarketingDataSummary(marketingDataSummary)}
 ${view ? sectionParticipationForPlatform(r, view, pageCount) : sectionAudienceParticipationLead(audienceGap, r, supportParticipation)}
 ${view && view.hide.has('mkt-audience-gap') ? '' : sectionAudienceEngagementGap(audienceGap, r)}
-${buildViewerRetentionSectionHtml(viewerRetention, { maskShare, identiconResolver, retentionExcludeNote: view ? view.retentionExcludeNote : '' })}
+${buildViewerRetentionSectionHtml(viewerRetention, { maskShare, identiconResolver, retentionExcludeNote: view ? view.retentionExcludeNote : '', platformId: marketingRenderCtx.platformId })}
 ${sectionSurvivalCurve(survivalCurve)}
 ${idWrap('mkt-quarter', sectionQuarterEngagement(r))}
 ${newVsRepeatBasis.ok ? sectionNewVsRepeat(newVsRepeat) : sectionNewVsRepeatUnavailable(newVsRepeatBasis.note)}

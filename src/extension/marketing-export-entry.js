@@ -347,7 +347,7 @@ function getCachedAnonymousIdenticonDataUrl(userId) {
 /**
  * 拡張がすでに控えている配信コメントの顔 URL（yt_tw_icons / yt_kk_icons など）。
  * ネットへ取りに行かず、chrome.storage.local の控えだけを読む。
- * @returns {Promise<Record<string, string>>}
+ * @returns {Promise<Record<string, Record<string, string>>>}
  */
 async function readLiveIconMap() {
   try {

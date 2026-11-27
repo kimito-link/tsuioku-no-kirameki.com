@@ -114,7 +114,10 @@ function exportPersonKey(row) {
   return '';
 }
 
-/** 画面のスレッドと同じ人キー（channelId / login）を優先し、無いときだけ内部ハッシュ。 */
+/**
+ * 画面のスレッドと同じ人キー（channelId / login）を優先し、無いときだけ内部ハッシュ。
+ * @param {Record<string, unknown> | null | undefined} row
+ */
 function exportPublicUserId(row) {
   const channel = String(row?.channelId || '').trim();
   if (channel) return channel;
