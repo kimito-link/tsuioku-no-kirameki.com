@@ -1115,6 +1115,11 @@ export function panelExtraChips(platformId, facts) {
       title: OFFICIAL,
     });
   }
+  // v0.1.2265: アーカイブ(live_replay)の再生数。読めたときだけ(同時の札は横の欄で隠す)。どのサービスも同じ
+  if (facts?.contentKind === 'live_replay') {
+    const v = num(facts?.viewCount);
+    if (v != null) chips.unshift({ key: 'views', label: '再生', text: formatInt(v), unit: '回', placeholder: false, title: OFFICIAL });
+  }
   if (id === 'youtube' && facts?.contentKind === 'video') {
     const n = num(facts?.commentCount ?? facts?.slotCommentCount);
     if (n != null) {
@@ -1215,6 +1220,7 @@ export function venueItemsForPlatform(platformId, bag) {
     }
   }
   for (const chip of panelExtraChips(id, facts)) {
+    if (chip.key === 'views') continue; // 会場の帯では再生は「再生」の欄(concurrent)に出す(二重にしない)
     items.push({
       key: chip.key,
       label: chip.label,
