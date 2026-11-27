@@ -1149,6 +1149,9 @@ export function venueItemsForPlatform(platformId, bag) {
   if (id === 'niconico') return null;
   const plan = platformSectionPlan(id);
   const facts = bag?.facts && typeof bag.facts === 'object' ? bag.facts : {};
+  // v0.1.2263(りんく「全部のサービスで」): 動画・録画のページの会場は、どのサービスも同じ形(再生・コメントだけ・動画のカードの数)。
+  //   ライブ・アーカイブは下の今までの形のまま。
+  if (facts.contentKind === 'video') return videoVenueItems(facts);
   const cap = platformCapability(id);
   // 視聴数のサービスは、同時接続(viewers)で視聴数の欄を埋めない。
   // YouTube の通常動画だけ、同じ欄を「再生」にして総再生を出す（ライブの同時視聴者数は変えない）。
@@ -1216,11 +1219,33 @@ export function venueItemsForPlatform(platformId, bag) {
       title: chip.title || '',
     });
   }
-  // v0.1.2263(りんく 11-27「会場モードでもコメント確認できるようにしたい」): YouTube の通常動画の会場は、ライブだけの数
-  //   (経過・推定・受取・数え始め・このPCの記録)を出さない。再生とページのコメント数だけ。ライブ・アーカイブは変えない。
-  if (id === 'youtube' && facts.contentKind === 'video') {
-    // 再生数が読めないあいだは「再生 読み込み中」を出し続けない(動画の再生数は1回読めば変わらないので、待っても埋まらないことがある)
-    return items.filter((it) => (it.key === 'concurrent' && !it.isPlaceholder) || it.key === 'comments');
+  return items;
+}
+
+/**
+ * v0.1.2263(りんく 11-27「会場モードでもコメント確認できるようにしたい」・11-28「全部のサービスで」): 動画・録画のページの会場の帯。
+ *   ライブだけの数(経過・推定・受取・数え始め・このPCの記録)は出さない。再生とページのコメント数だけ(動画のカードの数)。
+ *   読めない数は出さない(「再生 読み込み中」のまま止めない・動画の再生数は1回読めば変わらないので、待っても埋まらないことがある)。
+ * @param {any} facts
+ */
+export function videoVenueItems(facts) {
+  /** @type {Array<{ key: string, label: string, text: string, unit: string, isPlaceholder: boolean, face: ''|'link'|'konta'|'tanu', title: string }>} */
+  const items = [];
+  const views = num(facts?.viewCount);
+  if (views != null) {
+    items.push({ key: 'concurrent', label: '再生', text: formatInt(views), unit: '回', isPlaceholder: false, face: 'konta', title: OFFICIAL });
+  }
+  const n = num(facts?.commentCount ?? facts?.slotCommentCount);
+  if (n != null) {
+    items.push({
+      key: 'comments',
+      label: 'コメント',
+      text: formatInt(n),
+      unit: '件',
+      isPlaceholder: false,
+      face: '',
+      title: 'いまページに出ているコメントの件数です（このPCの記録ではありません）。',
+    });
   }
   return items;
 }

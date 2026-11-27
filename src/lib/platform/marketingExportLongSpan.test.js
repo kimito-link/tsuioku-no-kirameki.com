@@ -11,6 +11,7 @@ import { buildMarketingDashboardHtml } from '../marketingChartsHtml.js';
 import { buildCommentVelocityTimeline, buildLaughterDensityTimeline } from '../commentVelocityTimeline.js';
 import { scoreSentimentTimeline } from '../commenterCulturalAnalytics.js';
 import {
+  marketingSpanDisplay,
   MARKETING_SERIES_MAX_BUCKETS,
   capSeriesPoints,
   maxOfList,
@@ -53,6 +54,12 @@ function exportHtml(comments) {
 }
 
 describe('時間の流れの列の点の数の上限 (marketingTimeSpan.js)', () => {
+  it('配信の長さの見せ方: 7日以内は「N分」、それより長いと「コメントの期間 X年Y日」', () => {
+    expect(marketingSpanDisplay(185)).toEqual({ long: false, text: '185分', value: '185', label: '分' });
+    expect(marketingSpanDisplay(7 * 24 * 60).long).toBe(false);
+    expect(marketingSpanDisplay(9_856_800)).toEqual({ long: true, text: 'コメントの期間 18年275日', value: '18年275日', label: 'コメントの期間' });
+    expect(marketingSpanDisplay(30 * 24 * 60).value).toBe('30日');
+  });
   it('ライブ(24時間まで・1分ごと / 12時間まで・30秒ごと)は今までと同じ細かさ', () => {
     expect(seriesBucketMs(6 * 3_600_000, 60_000)).toBe(60_000);
     expect(seriesBucketMs(23.9 * 3_600_000, 60_000)).toBe(60_000);
@@ -196,6 +203,17 @@ describe.each(VIDEO_PLATFORMS)('%s: 動画・録画のマーケHTML(長い幅)�
     }
   });
 
+  it('古い動画(11年)の見出し・カードに、何百万分・何万時間のような数を出さない(コメントの期間は年・日)', () => {
+    const { html } = build(tag(spreadComments(4014, 60)));
+    const text = html.replace(/<script[\s\S]*?<\/script>/g, '').replace(/<style[\s\S]*?<\/style>/g, '').replace(/<[^>]+>/g, ' ');
+    const absurd = [...text.matchAll(/([\d,]+)\s*(分|時間)/g)].filter((m) => {
+      const n = Number(m[1].replace(/,/g, ''));
+      return m[2] === '分' ? n > 7 * 24 * 60 : n > 7 * 24;
+    });
+    expect(absurd.map((m) => m[0])).toEqual([]);
+    expect(html).toMatch(/<span class="mkt-hero-stat__val">10年\d+日<\/span><span class="mkt-hero-stat__label">コメントの期間<\/span>/);
+  });
+
   it('ライブの長さ(3時間)は、1分・30秒ごとのまま・見出しに幅の説明なし', () => {
     const t0 = NOW - 3 * 3_600_000;
     const live = tag(Array.from({ length: 400 }, (_, i) => ({ id: `l${i}`, capturedAt: t0 + i * 27_000, text: i % 3 ? 'www' : 'すごい', userId: `u${i % 13}`, nickname: 'n' })));
@@ -204,5 +222,8 @@ describe.each(VIDEO_PLATFORMS)('%s: 動画・録画のマーケHTML(長い幅)�
     expect(html).toContain('水色＝1分ごとのコメ件数 / オレンジ点線＝5分移動平均');
     expect(html).toContain('30 秒粒度で');
     expect(html).toContain('を 1 分粒度で時系列表示');
+    // 見出しの長さは今まで通り「N分」
+    expect(html).toMatch(/<span class="mkt-hero-stat__val">\d+<\/span><span class="mkt-hero-stat__label">分<\/span>/);
+    expect(html).not.toContain('コメントの期間');
   });
 });

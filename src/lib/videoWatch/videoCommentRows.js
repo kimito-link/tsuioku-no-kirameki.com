@@ -82,3 +82,23 @@ export function recordedRowsOrVideoRows(recorded, cardWrap, videoId) {
   const vr = cardWrap.card && Array.isArray(cardWrap.card.videoRows) ? cardWrap.card.videoRows : [];
   return vr.length ? vr : rows;
 }
+
+/**
+ * v0.1.2263: 記録の行が無いとき、置き場にあるどの動画のカード(YouTube・録画/動画のサービス)でも、鍵の合うカードの行を使う。
+ *   background(会場の頼み)と横の欄・書き出し(shim)が同じこの1つを使う。
+ * @param {readonly any[] | null | undefined} recorded
+ * @param {readonly any[]} cardWraps 置き場の値の並び(無いものは null)
+ * @param {string} videoId 配信・録画・動画の鍵
+ * @returns {any[]}
+ */
+export function recordedRowsOrAnyVideoCardRows(recorded, cardWraps, videoId) {
+  const rows = Array.isArray(recorded) ? recorded : [];
+  if (rows.length) return rows;
+  const vid = String(videoId || '').trim();
+  const list = Array.isArray(cardWraps) ? cardWraps : [];
+  for (const w of list) {
+    const got = recordedRowsOrVideoRows(rows, w, vid);
+    if (got.length) return got;
+  }
+  return rows;
+}

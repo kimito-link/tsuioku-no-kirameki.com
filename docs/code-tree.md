@@ -1205,7 +1205,7 @@
   - `gift-coin-hq.wav`
   - `gift-register-hq.wav`
   - `gift-register.mp3`
-- 📁 **src/** (2758)
+- 📁 **src/** (2759)
   - 📁 **data/** (7)
     - 📁 **acquirers/** (2)
       - `laneFromStorage.js` — 応援レーン acquirer: chrome.storage.local(nls_comments) → laneStore の橋渡し。
@@ -1564,7 +1564,7 @@
         - `logo_funlink_white_RGB_link_black.png`
         - `logo_funlink_white_RGB_maru_black.png`
     - `hero-connect-hub.svg`
-  - 📁 **lib/** (2424)
+  - 📁 **lib/** (2425)
     - 📁 **__snapshots__/** (4)
       - `marketing-abema-baseline.html`
       - `marketing-niconico.html`
@@ -1722,7 +1722,7 @@
       - `twIrcParse.test.js`
       - `twShim.test.js`
       - `twStreamKey.js` — Twitch の「配信キー」(YouTube 版の videoId の位置に入る文字列)の作り方と読み方(純関数)
-    - 📁 **videoWatch/** (22)
+    - 📁 **videoWatch/** (23)
       - 📁 **fixtures/** (2)
         - `twitcasting-movie-843232645-comment-items.slim.html`
         - `twitch-vod-2940252213-replay-chat.slim.html`
@@ -1730,6 +1730,7 @@
       - `kickVodReplay2247.test.js`
       - `twVodLiveIcons.js` — v0.1.2253: Twitch の録画チャットには顔の画像が無い(実測 DOM)。ライブの Twitch でこの PC が覚えた顔
       - `twVodLiveIcons2253.test.js`
+      - `venueVideoPages2263.test.js`
       - `videoBoardContract2263.test.js`
       - `videoCommentDetail.js` — 【層】L0 判定層(純粋関数・I/O禁止)
       - `videoCommentRows.js` — 【層】L0 判定層(純粋関数・I/O禁止)

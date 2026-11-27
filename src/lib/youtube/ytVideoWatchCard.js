@@ -236,3 +236,18 @@ export function videoCardWrapForKey(wraps, key) {
   for (const w of wraps) if (w && typeof w === 'object' && String(w.videoId || '') === k) return w;
   return null;
 }
+
+/**
+ * v0.1.2263: 動画のカードの「ページに出ているコメント数」(facts.commentTotal)。別の動画・読めていないなら null。
+ * @param {any} wrap
+ * @param {string} videoId
+ * @returns {number | null}
+ */
+export function videoCardCommentTotal(wrap, videoId) {
+  const vid = String(videoId || '').trim();
+  if (!vid || !wrap || typeof wrap !== 'object' || String(wrap.videoId || '') !== vid) return null;
+  const v = wrap.card?.facts?.commentTotal;
+  if (v == null || v === '') return null;
+  const n = Number(v);
+  return Number.isFinite(n) && n >= 0 ? Math.floor(n) : null;
+}

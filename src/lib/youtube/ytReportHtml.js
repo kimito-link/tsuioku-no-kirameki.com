@@ -12,7 +12,7 @@ import {
   buildLaughterDensityTimeline,
 } from '../commentVelocityTimeline.js';
 import { detectCommentSilenceZones } from '../commentSilenceZones.js';
-import { formatBucketMsJa, maxOfList } from '../marketingTimeSpan.js';
+import { formatBucketMsJa, formatLongGapJa, maxOfList } from '../marketingTimeSpan.js';
 import { aggregateYtSupportRanking, buildYtChannelUrl } from './ytSupportRanking.js';
 
 /**
@@ -85,6 +85,8 @@ function formatClock(ms) {
 /** @param {number} ms */
 function formatDurationJa(ms) {
   if (!Number.isFinite(ms) || ms <= 0) return '0分';
+  // v0.1.2263: 7日を超える幅(動画のコメント)は「何万時間」にせず年・日で(marketingTimeSpan.js)
+  if (ms > 7 * 86_400_000) return formatLongGapJa(ms) || '';
   const min = Math.round(ms / 60000);
   if (min < 60) return `${min}分`;
   return `${Math.floor(min / 60)}時間${min % 60}分`;

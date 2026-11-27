@@ -284,8 +284,10 @@ describe('④ サイトの中のリンクで録画へ移っても(SPA・文書�
       const wrap = e.set.mock.calls[0][0].nls_vod_video_watch_card_v1;
       expect(wrap.videoId).toBe('twvod:2940252213');
       expect(wrap.card.videoAuthorCount).toBeGreaterThan(0);
-      expect(e.win.document.getElementById('nlsb-venue-root')?.hidden).toBe(true);
-      // 録画からライブへ戻れば、自分が隠した会場だけ戻す
+      // v0.1.2263(りんく 11-28「会場モードは全部のサービスで」): Twitch の録画でも会場を隠さない(YouTube の動画と同じ会場)
+      expect(e.win.document.getElementById('nlsb-venue-root')?.hidden).toBe(false);
+      expect(wrap.card.videoRows.length).toBeGreaterThan(0);
+      // 録画からライブへ戻っても、会場は出たまま
       e.win.history.pushState({}, '', '/kenki521');
       for (const fn of e.onMessage) fn({ type: VIDEO_WATCH_REREAD_MESSAGE, key: '' });
       expect(e.win.document.getElementById('nlsb-venue-root')?.hidden).toBe(false);

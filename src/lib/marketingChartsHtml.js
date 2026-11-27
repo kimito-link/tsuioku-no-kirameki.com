@@ -9,7 +9,9 @@ import {
   boundCommentsToTimeWindow,
   capSeriesPoints,
   formatBucketMsJa,
+  formatLongGapJa,
   formatSeriesOffsetJa,
+  marketingSpanDisplay,
   maxOfList
 } from './marketingTimeSpan.js';
 import { escapeAttr, escapeHtml } from './htmlEscape.js';
@@ -124,6 +126,9 @@ const DEFAULT_USERICON_ONERROR_ATTR = `onerror="this.onerror=null;this.src='${es
 /** @param {number} ms */
 function formatSilenceMs(ms) {
   if (ms <= 0) return '—';
+  // v0.1.2263: 1日以上(動画のコメントの間)は「97968分」にせず日・年で
+  const long = formatLongGapJa(ms);
+  if (long) return long;
   const s = Math.floor(ms / 1000);
   if (s < 60) return `${s}秒`;
   const m = Math.floor(s / 60);
@@ -688,7 +693,7 @@ function sectionSilenceZones(zones) {
       const sec = Math.round(z.durationMs / 1000);
       const m = Math.floor(sec / 60);
       const s = sec % 60;
-      const dur = m > 0 ? `${m}分${s}秒` : `${s}秒`;
+      const dur = formatLongGapJa(z.durationMs) || (m > 0 ? `${m}分${s}秒` : `${s}秒`);
       const color = qualityColor(z.quality);
       return `<tr>
 <td>${escapeHtml(dur)}</td>
@@ -4028,7 +4033,9 @@ function sectionHeroCard(r, summaryLine, maskShare, gap) {
       ? `来場${participation.totalVisitors.toLocaleString()}人中${participation.uniqueCommenters.toLocaleString()}人がコメント（${participation.commentParticipationPct}%）`
       : '';
   const participantPeople = resolveParticipantPeople(r);
-  const baseLine = `${r.totalComments.toLocaleString()}件 / ${participantPeople.people.toLocaleString()}人 / ${r.durationMinutes}分`;
+  // v0.1.2263: 7日を超える幅(動画のコメント)は「何百万分」にせず「コメントの期間 11年3日」(marketingTimeSpan.js)
+  const span = marketingSpanDisplay(r.durationMinutes);
+  const baseLine = `${r.totalComments.toLocaleString()}件 / ${participantPeople.people.toLocaleString()}人 / ${span.text}`;
   const copyText = maskShare
     ? participationLine ? `${participationLine} · ${baseLine}` : baseLine
     : (summaryLine || (participationLine ? `${participationLine} · ${baseLine}` : baseLine));
@@ -4055,7 +4062,7 @@ ${participationStat}<span class="mkt-hero-stat"><span class="mkt-hero-stat__val"
 <span class="mkt-hero-stat__sep">·</span>
 <span class="mkt-hero-stat"><span class="mkt-hero-stat__val">${escapeHtml(participantPeople.people.toLocaleString())}</span><span class="mkt-hero-stat__label">参加者</span></span>
 <span class="mkt-hero-stat__sep">·</span>
-<span class="mkt-hero-stat"><span class="mkt-hero-stat__val">${escapeHtml(String(r.durationMinutes))}</span><span class="mkt-hero-stat__label">分</span></span>
+<span class="mkt-hero-stat"><span class="mkt-hero-stat__val">${escapeHtml(span.value)}</span><span class="mkt-hero-stat__label">${escapeHtml(span.label)}</span></span>
 </div>
 ${participantPeople.unattributed > 0 ? `<div class="mkt-hero-note">※ID不明のコメント ${escapeHtml(participantPeople.unattributed.toLocaleString())}件は、誰の発言か分からないため参加者の人数に含めていません</div>` : ''}
 <button id="${copyId}" class="mkt-hero-copy">📋 一言まとめをコピー</button>
@@ -4068,6 +4075,7 @@ function sectionKpi(r, gap, followerSeries, estimatedSpends) {
   const participation = gap ? resolveCommentParticipation(r, gap) : null;
   /** @type {{ label: string, value: string, icon: string }[]} */
   const cards = [];
+  const spanKpi = marketingSpanDisplay(r.durationMinutes);
   if (followerSeries) {
     const texts = followerKpiTexts(followerSeries);
     cards.push(
@@ -4099,11 +4107,14 @@ function sectionKpi(r, gap, followerSeries, estimatedSpends) {
   cards.push(
     { label: '総コメント数', value: r.totalComments.toLocaleString(), icon: '💬' },
     { label: 'ユニークユーザー', value: resolveParticipantPeople(r).people.toLocaleString(), icon: '👥' },
-    { label: 'コメント/分', value: String(r.commentsPerMinute), icon: '⚡' },
+    ...(spanKpi.long ? [] : [{ label: 'コメント/分', value: String(r.commentsPerMinute), icon: '⚡' }]),
     { label: '平均コメント/人', value: String(r.avgCommentsPerUser), icon: '📈' },
     { label: '中央値/人', value: String(r.medianCommentsPerUser), icon: '📊' },
-    { label: '配信時間', value: `${r.durationMinutes} 分`, icon: '⏱️' },
-    { label: 'ピーク分', value: `${r.peakMinute} 分目（${r.peakMinuteCount} コメ）`, icon: '🔥' }
+    // v0.1.2263: 7日を超える幅は「配信時間 N分」「ピーク分 N分目」を出さない(何百万分になる)。期間を年・日で
+    spanKpi.long
+      ? { label: 'コメントの期間', value: spanKpi.value, icon: '⏱️' }
+      : { label: '配信時間', value: `${r.durationMinutes} 分`, icon: '⏱️' },
+    ...(spanKpi.long ? [] : [{ label: 'ピーク分', value: `${r.peakMinute} 分目（${r.peakMinuteCount} コメ）`, icon: '🔥' }])
   );
   const inner = cards
     .map(

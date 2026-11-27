@@ -8,6 +8,7 @@
  */
 
 import { normalizeVideoFacts, videoFactsLineHtml } from './videoFacts.js';
+import { videoCommentRowsForStore } from './videoCommentRows.js';
 import { attachRepliesToPeople, buildViewerBehaviorBoard, viewerBehaviorBoardInnerHtml } from '../viewerBehavior.js';
 import { videoPageWordFor } from '../platform/marketingPlatformPlan.js';
 
@@ -89,7 +90,43 @@ export function buildVodVideoWatchCardModel(input) {
     recordedSummary,
     facts: normalizeVideoFacts(src.facts),
     behavior,
+    // v0.1.2263: 会場が読む行(YouTube の動画のカードと同じ形・videoCommentRows.js)。読めた本文だけ
+    videoRows: videoCommentRowsForStore(vodCommentsInPageOrder(authors), {
+      videoId: String(src.pageKey || src.videoId || '').trim(),
+      platform,
+      nowMs: src.nowMs,
+    }),
   };
+}
+
+/**
+ * 録画・動画の読み取り(人ごとに本文がまとまっている)を、会場の行のもと(新しい順の1コメントずつ)にする。
+ *   人の並びはページの新しい順(時刻→DOM の順)、同じ人の本文は新しい順のまま。本文の無い人は行にしない(作らない)。
+ * @param {readonly any[]} authors
+ * @returns {any[]}
+ */
+export function vodCommentsInPageOrder(authors) {
+  const list = Array.isArray(authors) ? authors.slice() : [];
+  list.sort((a, b) => (Number(b?.postedAtMs) || 0) - (Number(a?.postedAtMs) || 0) || (Number(b?.seq) || 0) - (Number(a?.seq) || 0));
+  /** @type {any[]} */
+  const out = [];
+  for (const a of list) {
+    const id = String(a?.id || a?.userId || '').trim();
+    if (!id || !Array.isArray(a?.comments)) continue;
+    for (const c of a.comments) {
+      const text = String(c?.text || '').trim();
+      if (!text) continue;
+      out.push({
+        commentId: String(c?.id || ''),
+        text,
+        channelId: id,
+        name: String(a?.name || '').trim(),
+        avatarUrl: String(a?.avatarUrl || '').trim(),
+        postedAtMs: Number(a?.postedAtMs) > 0 ? Math.floor(Number(a.postedAtMs)) : 0,
+      });
+    }
+  }
+  return out;
 }
 
 /**

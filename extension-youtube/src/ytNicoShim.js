@@ -48,9 +48,9 @@ import { callerNameFromStack, createPanelStreamDiag, panelStreamDiagContext, ser
 import { createStaleFrameHold } from '../../src/lib/youtube/ytStaleFrameHold.js';
 import { ytFullRefreshIntervalMs } from '../../src/lib/youtube/ytFullRefreshInterval.js';
 import { dropPseudoLvCommentWrites } from '../../src/lib/youtube/ytShimCommentWrites.js';
-import { recordedRowsOrVideoRows } from '../../src/lib/videoWatch/videoCommentRows.js';
+import { recordedRowsOrAnyVideoCardRows } from '../../src/lib/videoWatch/videoCommentRows.js';
 import { KEY_YT_VIDEO_WATCH_CARD, KEY_VOD_VIDEO_WATCH_CARD } from '../../src/lib/storageKeys.js';
-import { videoCardViewCount, videoCardWrapForKey } from '../../src/lib/youtube/ytVideoWatchCard.js';
+import { videoCardCommentTotal, videoCardViewCount, videoCardWrapForKey } from '../../src/lib/youtube/ytVideoWatchCard.js';
 import { shouldYieldForBigRecord, yieldToMainThread } from '../../src/lib/bigRecordYield.js';
 import {
   mergeLiveRowsByRecordedAt,
@@ -603,10 +603,12 @@ export function ytSummaryToNicoSnapshot(sum, videoId, tabTitle, all, videoCardWr
       // v0.1.2263: YouTube の動画は、動画のカードの再生数を先に使う(横の欄と会場の帯で同じ数・通常動画で帯に「再生」が出なかった)
       viewCount: videoCardViewCount(videoCardWrap, videoId)
         ?? (typeof sum?.slotViewCount === 'number' && sum.slotViewCount >= 0 ? sum.slotViewCount : null),
-      commentCount: typeof sum?.slotCommentCount === 'number' && sum.slotCommentCount >= 0 ? sum.slotCommentCount : null,
+      // v0.1.2263: コメント数も、同じ動画のカードの「ページのコメント数」を先に(横の欄と同じ正本)
+      commentCount: videoCardCommentTotal(videoCardWrap, videoId)
+        ?? (typeof sum?.slotCommentCount === 'number' && sum.slotCommentCount >= 0 ? sum.slotCommentCount : null),
       ...(sum?.contentKind === 'video' || sum?.contentKind === 'live' || sum?.contentKind === 'live_replay'
         ? { contentKind: sum.contentKind }
-        : {}),
+        : (videoCardWrapForKey([videoCardWrap], videoId)?.card?.kind === 'video' ? { contentKind: 'video' } : {})),
       // そのサービス特有の公式の数字(SHOWROOM のイベント順位・ミクチャのレベル等・src/lib/platform/platformStats.js)
       official: sum?.platformStats && typeof sum.platformStats === 'object' ? sum.platformStats : null,
     },
@@ -1114,8 +1116,8 @@ async function getCommentsViaBackground(vid) {
 async function withVideoRows(rows, vid) {
   if (Array.isArray(rows) && rows.length) return rows;
   try {
-    const bag = await real?.storage?.local?.get?.(KEY_YT_VIDEO_WATCH_CARD);
-    return recordedRowsOrVideoRows(rows, bag?.[KEY_YT_VIDEO_WATCH_CARD], vid);
+    const bag = await real?.storage?.local?.get?.([KEY_YT_VIDEO_WATCH_CARD, KEY_VOD_VIDEO_WATCH_CARD]);
+    return recordedRowsOrAnyVideoCardRows(rows, [bag?.[KEY_YT_VIDEO_WATCH_CARD], bag?.[KEY_VOD_VIDEO_WATCH_CARD]], vid);
   } catch {
     return Array.isArray(rows) ? rows : [];
   }

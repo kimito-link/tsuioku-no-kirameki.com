@@ -20,14 +20,14 @@ import { mergeYtStreamSummary, prepareYtCommentsForIdb } from '../../src/lib/you
 import { classifyYtWatchContentKind, summarizeChannelRecordedLives } from '../../src/lib/youtube/ytVideoWatchMeta.js';
 import { peopleInChannelCommenterIndex } from '../../src/lib/youtube/ytChannelCommenterIndex.js';
 import { buildYtVideoWatchCardModel } from '../../src/lib/youtube/ytVideoWatchCard.js';
-import { recordedRowsOrVideoRows } from '../../src/lib/videoWatch/videoCommentRows.js';
+import { recordedRowsOrAnyVideoCardRows } from '../../src/lib/videoWatch/videoCommentRows.js';
 import {
   estimateYoutubeSupportSpendJpy,
   estimateStreamerTakeHomeJpy,
   formatEstimatedViewerSpendDisplay,
   formatStreamerTakeHomeDisplay,
 } from '../../src/lib/estimatedViewerSpend.js';
-import { KEY_YT_CHANNEL_COMMENTERS, KEY_YT_VIDEO_WATCH_CARD } from '../../src/lib/storageKeys.js';
+import { KEY_YT_CHANNEL_COMMENTERS, KEY_YT_VIDEO_WATCH_CARD, KEY_VOD_VIDEO_WATCH_CARD } from '../../src/lib/storageKeys.js';
 import { YT_CHAT_STORAGE_FLUSH_MS } from '../../src/lib/youtube/ytLiveRowOrder.js';
 import {
   appendYtStreamCommentsIdb,
@@ -1311,8 +1311,9 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
       .then(async (items) => {
         // v0.1.2263: 記録の無い通常動画は、動画のカードの行(横の欄と同じページの行)を会場に渡す(videoCommentRows.js)
         if (after > 0 || (Array.isArray(items) && items.length)) return items;
-        const bag = await chrome.storage.local.get(KEY_YT_VIDEO_WATCH_CARD).catch(() => null);
-        return recordedRowsOrVideoRows(items, bag?.[KEY_YT_VIDEO_WATCH_CARD], vid);
+        // 録画・動画のページ(Twitch・Kick・ツイキャス・TikTok)の会場は、録画のカードの行(鍵は pageKey)
+        const bag = await chrome.storage.local.get([KEY_YT_VIDEO_WATCH_CARD, KEY_VOD_VIDEO_WATCH_CARD]).catch(() => null);
+        return recordedRowsOrAnyVideoCardRows(items, [bag?.[KEY_YT_VIDEO_WATCH_CARD], bag?.[KEY_VOD_VIDEO_WATCH_CARD]], vid);
       })
       .then((items) => sendResponse({ ok: true, items: Array.isArray(items) ? items : [] }))
       .catch((err) => sendResponse({ ok: false, items: [], error: String(err && err.message || err) }));

@@ -139,3 +139,34 @@ export function capSeriesPoints(list, maxPoints = MARKETING_SERIES_MAX_BUCKETS) 
   for (let i = 0; i < cap; i += 1) out.push(arr[Math.round(i * step)]);
   return out;
 }
+
+/**
+ * v0.1.2263(りんく 11-28「古い動画のマーケHTMLの見出しが 9856800 分」): 配信の長さ(分)を、見出し・カードに出す形にする。
+ *   7日以内(ライブ)は今までと同じ「N分」。それより長い幅(動画のコメントは何年にもわたる)は「コメントの期間 11年3日」。
+ *   どのサービスでも、何百万分のような数を出さない。
+ * @param {unknown} durationMinutes
+ * @returns {{ long: boolean, text: string, value: string, label: string }}
+ */
+export function marketingSpanDisplay(durationMinutes) {
+  const m = Math.max(0, Math.floor(Number(durationMinutes) || 0));
+  if (m <= MARKETING_TIMELINE_MAX_MINUTES) return { long: false, text: `${m}分`, value: String(m), label: '分' };
+  const days = Math.floor(m / (24 * 60));
+  const years = Math.floor(days / 365);
+  const rest = days % 365;
+  const value = years > 0 ? `${years}年${rest > 0 ? `${rest}日` : ''}` : `${days}日`;
+  return { long: true, text: `コメントの期間 ${value}`, value, label: 'コメントの期間' };
+}
+
+/**
+ * 1日以上の間(動画のコメントの間など)を「68日」「11年3日」に。1日未満は null(呼び出し側の今までの書き方のまま)。
+ * @param {unknown} ms
+ * @returns {string | null}
+ */
+export function formatLongGapJa(ms) {
+  const v = Number(ms) || 0;
+  if (v < 86_400_000) return null;
+  const days = Math.floor(v / 86_400_000);
+  const years = Math.floor(days / 365);
+  const rest = days % 365;
+  return years > 0 ? `${years}年${rest > 0 ? `${rest}日` : ''}` : `${days}日`;
+}

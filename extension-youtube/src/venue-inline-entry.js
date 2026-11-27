@@ -26,6 +26,7 @@ import { installLastStreamUrlRemember } from './pfLastStreamUrl.js';
 import { venueRootVisibilityAction } from '../../src/lib/venueWatchPageVisibility.js';
 import { KEY_YT_VIDEO_WATCH_CARD, KEY_VOD_VIDEO_WATCH_CARD, KEY_VIEWER_BEHAVIOR_BOARD } from '../../src/lib/storageKeys.js';
 import { videoCardWrapForKey } from '../../src/lib/youtube/ytVideoWatchCard.js';
+import { venueVideoPageFromUrl } from '../../src/lib/videoWatch/vodWatchUrl.js';
 
 /** Twitch/Kick の視聴ページで動いているか(council/twitch-support-PLAN.md・会場は YouTube と同じくニコ生版の venueBar をそのまま使う) */
 const PAGE_PLATFORM = platformOfHostname(location.hostname);
@@ -35,7 +36,12 @@ const STAT_PLATFORM = PAGE_PLATFORM?.id || 'youtube';
 
 /** @returns {string} 視聴ページの配信キー(YouTube は動画 id・Twitch は記録のある配信キー)。視聴ページでなければ '' */
 function currentVideoId() {
-  return streamKeyForWatchUrl(String(location.href || ''));
+  const href = String(location.href || '');
+  // v0.1.2263: 録画・動画のページ(Twitch・Kick・ツイキャス・TikTok)は、チャンネルの配信の鍵でなく録画・動画の鍵(pageKey)。
+  //   会場のコメント・帯の再生数が、そのチャンネルのライブでなく開いている録画のものになる(videoCardWrapForKey と同じ鍵)
+  const vod = venueVideoPageFromUrl(href);
+  if (vod) return vod.pageKey;
+  return streamKeyForWatchUrl(href);
 }
 
 // ニコ生版の会場は、ニコ生の視聴ページの文字の大きさ(16px)を受け継ぐ前提で作られている(例: 人の札の幅 26ch)。
@@ -61,9 +67,10 @@ async function statCardsSource() {
   //   YouTube もほかのサービスの録画・動画も、同じ読み口(videoCardWrapForKey)で鍵の合うカードだけ使う
   const bag = await chrome.storage.local.get(['yt_stream_summaries', KEY_YT_VIDEO_WATCH_CARD, KEY_VOD_VIDEO_WATCH_CARD]);
   const all = (bag && bag.yt_stream_summaries) || {};
-  const sum = all[vid];
-  if (!sum) return null;
   const card = videoCardWrapForKey([bag?.[KEY_YT_VIDEO_WATCH_CARD], bag?.[KEY_VOD_VIDEO_WATCH_CARD]], vid);
+  // 録画・動画のページはまとめが無い(記録していない)ことが多い。動画のカードがあれば、それだけで帯を作る(再生・コメント)
+  const sum = all[vid] || (card?.card?.kind === 'video' ? { contentKind: 'video', isLive: false } : null);
+  if (!sum) return null;
   return { snapshot: ytSummaryToNicoSnapshot(sum, vid, '', all, card) };
 }
 /** 視聴キーが一瞬でも取れなくなった時刻。取れていれば 0 */

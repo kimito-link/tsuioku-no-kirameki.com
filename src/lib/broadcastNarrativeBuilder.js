@@ -7,6 +7,8 @@
  *   - Gemini Nano へ渡せる prompt も純関数で作る（AI 呼び出しはしない）。
  */
 
+import { marketingSpanDisplay } from './marketingTimeSpan.js';
+
 /**
  * @typedef {import('./marketingAggregate.js').MarketingReport} MarketingReport
  */
@@ -382,7 +384,7 @@ export function buildBroadcastNarrativePrompt(narrative) {
   const hints = n.improvementHints.length ? n.improvementHints.join('\n- ') : 'なし';
   const user = [
     `配信ID: ${n.liveId || '未取得'}`,
-    `全体: ${n.totalComments}件 / 約${n.durationMinutes}分`,
+    `全体: ${n.totalComments}件 / ${marketingSpanDisplay(n.durationMinutes).long ? marketingSpanDisplay(n.durationMinutes).text : `約${n.durationMinutes}分`}`,
     `要約: ${n.summaryLine}`,
     '時間帯別:',
     segmentLines || '- 時系列データなし',
