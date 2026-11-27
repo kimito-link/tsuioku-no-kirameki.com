@@ -22,6 +22,8 @@ import {
 } from './platform/marketingPlatformChapters.js';
 import { followerKpiTexts } from './platform/followerCountSample.js';
 import { followerSeriesForPlatform } from './platform/followerSampleStore.js';
+import { buildOperatorReportModel } from './marketingOperatorReport.js';
+import { OPERATOR_REPORT_CSS, renderOperatorReportHtml, wrapLegacyAnalysisAppendix } from './marketingOperatorReportHtml.js';
 import {
   estimateNiconicoGiftSpendJpy,
   estimateViewerSpendFromComments,
@@ -3085,7 +3087,12 @@ function buildSectionRevealScriptHtml() {
  *   slimForHeavyExport?: boolean,
  *   platform?: string,
  *   pageCount?: number,
- *   pageFacts?: object | null
+ *   pageFacts?: object | null,
+ *   contentKind?: string,
+ *   relatedChip?: object | null,
+ *   videoThreads?: readonly object[],
+ *   visitorCount?: number,
+ *   officialGiftPts?: number
  * }} [opts]
  * @returns {string}
  */
@@ -3625,26 +3632,60 @@ ${typeof opts.htmlReportHtml === 'string' ? sectionHtmlReportChapter(opts.htmlRe
     opts?.broadcasterProfile ?? null
   );
 
+  const contentKind = String(opts.contentKind || /** @type {{ contentKind?: string }|null} */ (pageFacts)?.contentKind || '').trim();
+  const officialGiftPtsRaw = !view
+    ? (positiveMarketingNumber(opts.officialEventDomBundle?.programStats?.giftPoints) ||
+      positiveMarketingNumber(opts.officialGiftPts))
+    : positiveMarketingNumber(opts.officialGiftPts);
+  const operatorModel = buildOperatorReportModel({
+    liveId: r.liveId,
+    platformId: view ? view.id : 'niconico',
+    contentKind,
+    comments: commentsRaw,
+    pastBroadcasts,
+    pageFacts,
+    pageCount,
+    visitorCount: view ? undefined : (audienceGap && audienceGap.totalVisitors > 0 ? audienceGap.totalVisitors : opts.visitorCount),
+    concurrentPeak: concurrentPeak && Number(concurrentPeak.peakValue) > 0 ? concurrentPeak.peakValue : undefined,
+    officialGiftPts: officialGiftPtsRaw || undefined,
+    relatedChip: opts.relatedChip || null,
+    videoThreads: Array.isArray(opts.videoThreads) ? opts.videoThreads : [],
+    broadcastTitle: String(opts.broadcastTitle || ''),
+    broadcasterUserId,
+    broadcasterName: String(opts.broadcasterName || ''),
+  });
+  const operatorHtml = renderOperatorReportHtml(operatorModel, { maskShare, identiconResolver });
+  const appendixHtml = wrapLegacyAnalysisAppendix(
+    `${finalBody}\n${idWrap('mkt-json', sectionMachineReadableJson(embedJson, maskShare))}`
+  );
+  const programWord = operatorModel.programWord || '配信';
+  const pageTitle = operatorModel.title
+    ? `${operatorModel.title} — この${programWord}の記録`
+    : `この${programWord}の記録 — ${r.liveId}`;
+  const headerTitle = operatorModel.title || `この${programWord}の記録`;
+
   return eagerInlineImages(`<!DOCTYPE html>
 <html lang="ja">
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
-<title>配信マーケ分析 — ${escapeHtml(r.liveId)}</title>
+<title>${escapeHtml(pageTitle)}</title>
 ${buildSectionRevealBootScriptHtml()}
-<style>${CSS_BODY}${SUPPORTERS_GIFTS_CSS}${BROADCASTER_PROFILE_MARKETING_CSS}${yukkuriBroadcastSummaryEmbeddedCss()}${mangaBroadcastSummaryEmbeddedCss()}</style>
+<style>${CSS_BODY}${OPERATOR_REPORT_CSS}${SUPPORTERS_GIFTS_CSS}${BROADCASTER_PROFILE_MARKETING_CSS}${yukkuriBroadcastSummaryEmbeddedCss()}${mangaBroadcastSummaryEmbeddedCss()}</style>
 </head>
-<body>
+<body class="mkt-shell--warm">
 <header class="mkt-header">
-<h1 class="mkt-header__title">📊 配信マーケティング分析</h1>
-<p class="mkt-header__sub">${escapeHtml(r.liveId)} — ${new Date().toLocaleString('ja-JP')} 出力${escapeHtml(subSuffix)} · JSON埋め込み ${escapeHtml(exportedAtIso)}</p>
+<p class="mkt-header__kicker">${escapeHtml((view && view.id) ? view.id : 'ニコニコ生放送')} の記録 ・ 運営者向け</p>
+<h1 class="mkt-header__title">${escapeHtml(headerTitle)}</h1>
+<p class="mkt-header__sub">${escapeHtml(r.liveId)} — ${new Date().toLocaleString('ja-JP')} 出力${escapeHtml(subSuffix)}</p>
+<p class="mkt-header__source">このレポートに出すのは、このPCに残っている記録と、書き出したときに画面に出ていたものだけです。分からない項目は載せていません。</p>
 </header>
 ${broadcasterProfileCardHtml}
 <main class="mkt-main">
-${finalBody}
+${operatorHtml}
+${appendixHtml}
 </main>
-<footer class="mkt-footer">追憶のきらめき · マーケ分析（手元用） — ${escapeHtml(exportedAtIso)}</footer>
-${idWrap('mkt-json', sectionMachineReadableJson(embedJson, maskShare))}
+<footer class="mkt-footer">追憶のきらめき · この${escapeHtml(programWord)}の記録（手元用） — ${escapeHtml(exportedAtIso)}</footer>
 ${buildSectionRevealScriptHtml()}
 ${MARKETING_RENDER_IDLE_SCRIPT_HTML}
 </body></html>`);

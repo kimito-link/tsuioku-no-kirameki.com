@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
-<title>配信マーケ分析 — lv351735139</title>
+<title>テスト放送 — この配信の記録</title>
 
 <style>
 *,*::before,*::after{box-sizing:border-box}
@@ -496,6 +496,72 @@ html.mkt-section-reveal-done .mkt-section{will-change:auto}
   .mkt-chart-wrap{overflow:visible}
 }
 
+.mkt-shell--warm{background:#fff7ec;color:#4a3b34}
+.mkt-shell--warm .mkt-header{background:linear-gradient(180deg,#fff4e4,#fff7ec);border-bottom:1px solid #e3c9b5;padding:1.6rem 1.5rem 1rem}
+.mkt-shell--warm .mkt-header__title{color:#4a3b34;font-size:1.55rem;letter-spacing:-.02em}
+.mkt-shell--warm .mkt-header__kicker{margin:0 0 .35rem;font-size:.75rem;font-weight:700;letter-spacing:.08em;color:#e85a8a}
+.mkt-shell--warm .mkt-header__sub,.mkt-shell--warm .mkt-header__source{color:#7a6458;font-size:.85rem;margin:.25rem 0 0}
+.mkt-shell--warm .mkt-header__source{font-size:.75rem;color:#9c8678}
+.mkt-shell--warm .mkt-main{max-width:1120px}
+.mkt-shell--warm .mkt-footer{color:#9c8678;background:transparent;border:0;text-align:center;padding:1rem}
+.mkt-shell--warm .mkt-section{background:#fffdf9;border:1px solid #e3c9b5;box-shadow:0 10px 30px rgba(74,59,52,.06);color:#4a3b34}
+.mkt-shell--warm .mkt-section h2{color:#4a3b34;border-left-color:#e85a8a}
+.mkt-shell--warm .mkt-note,.mkt-shell--warm .mkt-op-why{color:#7a6458;font-size:.84rem;margin:0 0 1rem}
+.mkt-op-lead{background:#fffdf9;border:1px solid #e3c9b5;border-radius:16px;box-shadow:0 10px 30px rgba(74,59,52,.06);padding:1.3rem 1.5rem 1.2rem;margin:0 0 1.2rem}
+.mkt-op-lead p{font-size:1.15rem;line-height:1.7;font-weight:700;margin:0 0 1rem;letter-spacing:-.01em}
+.mkt-op-kpis{display:grid;grid-template-columns:repeat(auto-fit,minmax(10rem,1fr));gap:.75rem}
+.mkt-op-kpi{background:#fff7ec;border:1px solid #e3c9b5;border-radius:12px;padding:.7rem .8rem}
+.mkt-op-kpi b{display:block;font-size:1.45rem;line-height:1.15;letter-spacing:-.03em}
+.mkt-op-kpi span{display:block;font-size:.72rem;color:#7a6458;margin-top:.2rem}
+.mkt-op-kpi em{display:block;font-style:normal;font-size:.68rem;color:#9c8678}
+.mkt-op-num{font-size:.72rem;font-weight:800;color:#e85a8a;letter-spacing:.08em;margin-right:.45rem}
+.mkt-op-comment{background:#fff7ec;border:1px solid #e3c9b5;border-radius:12px;padding:.75rem .9rem;margin:0 0 .65rem}
+.mkt-op-person{display:flex;gap:.7rem;align-items:flex-start}
+.mkt-op-av{flex:0 0 36px;width:36px;height:36px;border-radius:50%;object-fit:cover;background:#e3c9b5;display:grid;place-items:center;color:#fff;font-weight:800;font-size:.8rem}
+.mkt-op-name{font-weight:700}
+.mkt-op-meta{font-size:.75rem;color:#9c8678}
+.mkt-op-body{margin:.3rem 0 .4rem;font-size:.92rem}
+.mkt-op-tags{display:flex;flex-wrap:wrap;gap:.35rem}
+.mkt-op-tag{font-size:.68rem;font-weight:700;border-radius:999px;padding:1px 8px;background:#fff1f4;color:#b83b68}
+.mkt-op-tag--teal{background:#e7f6f3;color:#1c6f65}
+.mkt-op-tag--gold{background:#fff4df;color:#8a5a12}
+.mkt-op-tag--blue{background:#e8f0f8;color:#3b6ea5}
+.mkt-op-tag--mute{background:#f3eee8;color:#9c8678}
+.mkt-op-split{display:grid;grid-template-columns:repeat(auto-fit,minmax(16rem,1fr));gap:1rem}
+.mkt-op-who{display:flex;align-items:center;gap:.6rem;background:#fff7ec;border:1px solid #e3c9b5;border-radius:12px;padding:.45rem .6rem;margin:0 0 .45rem}
+.mkt-op-bars{display:flex;align-items:flex-end;gap:6px;height:120px;margin:.4rem 0 .3rem}
+.mkt-op-bar-col{flex:1;display:flex;flex-direction:column;align-items:center;height:100%;justify-content:flex-end;min-width:0}
+.mkt-op-bar{width:100%;border-radius:6px 6px 2px 2px;background:linear-gradient(180deg,#f06aa0,#e85a8a);min-height:4px}
+.mkt-op-bar.is-peak{background:linear-gradient(180deg,#2bbbad,#2a9d8f)}
+.mkt-op-bar-col span{font-size:.62rem;color:#9c8678;margin-top:4px;white-space:nowrap}
+.mkt-op-table{width:100%;border-collapse:collapse;font-size:.88rem}
+.mkt-op-table th,.mkt-op-table td{text-align:left;padding:.45rem .4rem;border-bottom:1px solid #f0e2d4;vertical-align:top}
+.mkt-op-table th{font-size:.7rem;color:#9c8678;font-weight:700}
+.mkt-op-table .num{text-align:right;font-variant-numeric:tabular-nums;white-space:nowrap}
+.mkt-op-reply{margin-top:.5rem;padding-left:.75rem;border-left:3px solid #c9e8e3}
+.mkt-op-vids{display:grid;grid-template-columns:repeat(auto-fill,minmax(11rem,1fr));gap:.65rem}
+.mkt-op-vid{background:#fff7ec;border:1px solid #e3c9b5;border-radius:12px;padding:.7rem .75rem}
+.mkt-op-vid.is-own{outline:2px solid #e85a8a;outline-offset:-2px}
+.mkt-op-vid b{display:block;font-size:.82rem;line-height:1.35;margin:0 0 .2rem}
+.mkt-op-vid span{font-size:.7rem;color:#9c8678}
+.mkt-op-own{display:inline-block;margin-top:.25rem;font-size:.65rem;font-weight:800;color:#e85a8a}
+.mkt-op-chip{display:inline-block;border:1px solid #e3c9b5;background:#fff;color:#7a6458;border-radius:999px;padding:.3rem .7rem;font-size:.8rem;font-weight:700;margin:0 .3rem .4rem 0}
+.mkt-op-chip.is-on{background:#4a3b34;color:#fff;border-color:#4a3b34}
+.mkt-appendix{background:#fffdf9;border:1px solid #e3c9b5;border-radius:16px;padding:.4rem 1rem 1rem;margin:1.5rem 0 0}
+.mkt-appendix>summary{cursor:pointer;font-weight:700;padding:.9rem .2rem;color:#4a3b34;list-style:revert}
+.mkt-appendix[open]>summary{border-bottom:1px solid #f0e2d4;margin-bottom:1rem}
+.mkt-shell--warm .mkt-kpi{background:#fff7ec;border-color:#e3c9b5}
+.mkt-shell--warm .mkt-kpi__val,.mkt-shell--warm .mkt-rank td,.mkt-shell--warm .mkt-subhead{color:#4a3b34}
+.mkt-shell--warm .mkt-kpi__label,.mkt-shell--warm .mkt-rank th,.mkt-shell--warm .mkt-axis{color:#9c8678;fill:#9c8678}
+.mkt-shell--warm .mkt-rank th{background:#fff4e4}
+.mkt-shell--warm .mkt-rank th,.mkt-shell--warm .mkt-rank td{border-bottom-color:#f0e2d4}
+.mkt-shell--warm .mkt-toc__link{background:#fff7ec;border-color:#e3c9b5;color:#3b6ea5}
+.mkt-shell--warm .mkt-section--toc{background:#fff7ec}
+.mkt-shell--warm .mkt-participation-lead-card{background:#fff7ec;border-color:#e3c9b5}
+.mkt-shell--warm .mkt-participation-lead-card__value,.mkt-shell--warm .mkt-hero-stat__val{color:#4a3b34}
+.mkt-shell--warm .mkt-hero-card{background:#fffdf9;border-color:#e3c9b5;box-shadow:0 10px 30px rgba(74,59,52,.06)}
+.mkt-shell--warm .mkt-bar{background:#f3e4d4}
+
 .mkt-sg-list{display:flex;flex-direction:column;gap:6px}
 .mkt-sg{border:1px solid #334155;border-radius:8px;background:#0f172a;color:#e2e8f0}
 .mkt-sg>summary{cursor:pointer;padding:8px 10px;display:flex;flex-wrap:wrap;align-items:center;gap:8px}
@@ -591,13 +657,20 @@ html.mkt-section-reveal-done .mkt-section{will-change:auto}
 @media (prefers-reduced-motion:reduce){.nl-manga-onomatopoeia{transform:none;}}
 @media (prefers-color-scheme:dark){.nl-manga-summary__heading{color:#e5e7eb;}.nl-manga-bubble__text{color:#111827;}}</style>
 </head>
-<body>
+<body class="mkt-shell--warm">
 <header class="mkt-header">
-<h1 class="mkt-header__title">📊 配信マーケティング分析</h1>
-<p class="mkt-header__sub">lv351735139 — 2026/3/1 6:00:00 出力 · JSON埋め込み 2026-03-01T06:00:00.000Z</p>
+<p class="mkt-header__kicker">ニコニコ生放送 の記録 ・ 運営者向け</p>
+<h1 class="mkt-header__title">テスト放送</h1>
+<p class="mkt-header__sub">lv351735139 — 2026/3/1 6:00:00 出力</p>
+<p class="mkt-header__source">このレポートに出すのは、このPCに残っている記録と、書き出したときに画面に出ていたものだけです。分からない項目は載せていません。</p>
 </header>
 
 <main class="mkt-main">
+<div class="mkt-op-lead" id="mkt-op-lead"><p>この配信にコメントした 14人。いちばん多いのは 03:00ごろ（27件）です。 次は 03:15ごろ（9件）です。</p><div class="mkt-op-kpis"><div class="mkt-op-kpi"><b>14人</b><span>コメントした人</span><em>このPCの記録 36件から</em></div><div class="mkt-op-kpi"><b>800人</b><span>来場者</span><em>ページの来場者（取れていたとき）</em></div></div></div>
+<section class="mkt-section mkt-op-section" id="mkt-op-who"><h2><span class="mkt-op-num">01</span>誰が来てくれたか</h2><p class="mkt-op-why">過去の配信を突き合わせていないので、新しい人／また来てくれた人の数は出していません。</p><div class="mkt-op-split"><div><h3 class="mkt-subhead">過去との照合</h3><p class="mkt-note">過去の配信を読み込んでいないため、また来てくれた人の数は出していません。</p></div><div><h3 class="mkt-subhead">数の読み方</h3><p class="mkt-note">来場 800人のうち、コメントしたのは 14人です。</p></div></div></section>
+<section class="mkt-section mkt-op-section" id="mkt-op-top"><h2><span class="mkt-op-num">02</span>よく書いてくれた人</h2><p class="mkt-op-why">このPCが受け取ったコメントの件数です。配信者本人は除いています。</p><div class="mkt-table-scroll"><table class="mkt-op-table"><thead><tr><th></th><th>名前</th><th class="num">コメント</th><th>メモ</th></tr></thead><tbody><tr><td class="num">1</td><td><div class="mkt-op-person"><div class="mkt-op-av" style="background:#3b6ea5">v</div><div class="mkt-op-name">viewer-1</div></div></td><td class="num">5</td><td class="mkt-op-meta"></td></tr><tr><td class="num">2</td><td><div class="mkt-op-person"><div class="mkt-op-av" style="background:#3b6ea5">v</div><div class="mkt-op-name">viewer-3</div></div></td><td class="num">5</td><td class="mkt-op-meta"></td></tr><tr><td class="num">3</td><td><div class="mkt-op-person"><div class="mkt-op-av" style="background:#3b6ea5">v</div><div class="mkt-op-name">viewer-2</div></div></td><td class="num">4</td><td class="mkt-op-meta"></td></tr><tr><td class="num">4</td><td><div class="mkt-op-person"><div class="mkt-op-av" style="background:#3b6ea5">v</div><div class="mkt-op-name">viewer-5</div></div></td><td class="num">4</td><td class="mkt-op-meta"></td></tr><tr><td class="num">5</td><td><div class="mkt-op-person"><div class="mkt-op-av" style="background:#3b6ea5">v</div><div class="mkt-op-name">viewer-7</div></div></td><td class="num">4</td><td class="mkt-op-meta"></td></tr><tr><td class="num">6</td><td><div class="mkt-op-person"><div class="mkt-op-av" style="background:#3b6ea5">v</div><div class="mkt-op-name">viewer-4</div></div></td><td class="num">3</td><td class="mkt-op-meta"></td></tr><tr><td class="num">7</td><td><div class="mkt-op-person"><div class="mkt-op-av" style="background:#3b6ea5">v</div><div class="mkt-op-name">viewer-0</div></div></td><td class="num">3</td><td class="mkt-op-meta"></td></tr><tr><td class="num">8</td><td><div class="mkt-op-person"><div class="mkt-op-av" style="background:#3b6ea5">v</div><div class="mkt-op-name">viewer-6</div></div></td><td class="num">2</td><td class="mkt-op-meta"></td></tr><tr><td class="num">9</td><td><div class="mkt-op-person"><div class="mkt-op-av" style="background:#e85a8a">?</div><div class="mkt-op-name"></div></div></td><td class="num">1</td><td class="mkt-op-meta"></td></tr><tr><td class="num">10</td><td><div class="mkt-op-person"><div class="mkt-op-av" style="background:#3b6ea5">v</div><div class="mkt-op-name">viewer-6</div></div></td><td class="num">1</td><td class="mkt-op-meta"></td></tr><tr><td class="num">11</td><td><div class="mkt-op-person"><div class="mkt-op-av" style="background:#3b6ea5">v</div><div class="mkt-op-name">viewer-4</div></div></td><td class="num">1</td><td class="mkt-op-meta"></td></tr><tr><td class="num">12</td><td><div class="mkt-op-person"><div class="mkt-op-av" style="background:#3b6ea5">v</div><div class="mkt-op-name">viewer-2</div></div></td><td class="num">1</td><td class="mkt-op-meta"></td></tr><tr><td class="num">13</td><td><div class="mkt-op-person"><div class="mkt-op-av" style="background:#3b6ea5">v</div><div class="mkt-op-name">viewer-0</div></div></td><td class="num">1</td><td class="mkt-op-meta"></td></tr><tr><td class="num">14</td><td><div class="mkt-op-person"><div class="mkt-op-av" style="background:#e85a8a">?</div><div class="mkt-op-name"></div></div></td><td class="num">1</td><td class="mkt-op-meta"></td></tr></tbody></table></div></section>
+<section class="mkt-section mkt-op-section" id="mkt-op-peaks"><h2><span class="mkt-op-num">03</span>コメントが集まった時間</h2><p class="mkt-op-why">このPCがコメントを受け取った時刻です。</p><div class="mkt-op-bars"><div class="mkt-op-bar-col"><div class="mkt-op-bar is-peak" style="height:100%"></div><span>03:00</span></div><div class="mkt-op-bar-col"><div class="mkt-op-bar" style="height:33%"></div><span>03:15</span></div></div><p class="mkt-note">いちばん多いのは 03:00ごろ（27件）です。 次は 03:15ごろ（9件）です。</p><p class="mkt-note">推定同時接続の山は 165 です。</p></section>
+<details class="mkt-appendix" id="mkt-appendix"><summary>詳しい分析（従来のグラフと表）</summary>
 <nav class="mkt-section mkt-section--toc" aria-label="目次">
 <h2>目次</h2>
 <p class="mkt-note">各セクションへ飛べます（PRO 印は将来有料）</p>
@@ -2002,13 +2075,14 @@ html.mkt-section-reveal-done .mkt-section{will-change:auto}
 
 
 
-</main>
-<footer class="mkt-footer">追憶のきらめき · マーケ分析（手元用） — 2026-03-01T06:00:00.000Z</footer>
 <section id="mkt-json" class="mkt-section mkt-section--embed" aria-label="JSON データ">
 <h2>表計算・ツール向け JSON</h2>
 <p class="mkt-note">手元用のため ID がそのまま入ります。第三者に渡すときは拡張の「伏せ字」チェック付きで書き出してください。 中身は <code>id="nl-marketing-export-v1"</code> の <code>script</code> 要素にあります（<code>schemaVersion</code>・<code>report</code> 形式）。</p>
 <script type="application/json" id="nl-marketing-export-v1">{"schemaVersion":1,"exportedAt":"2026-03-01T06:00:00.000Z","maskShareLabels":false,"slimForHeavyExport":false,"liveId":"lv351735139","report":{"liveId":"lv351735139","totalComments":31,"uniqueUsers":7,"identifiedUsers":7,"unattributedComments":0,"avgCommentsPerUser":4.4,"medianCommentsPerUser":4,"peakMinute":2,"peakMinuteCount":3,"durationMinutes":22,"commentsPerMinute":1.4,"topUsers":[{"userId":"100001","nickname":"viewer-1","avatarUrl":"","count":5,"firstAt":1772334061000,"lastAt":1772335023000,"accountStatus":1},{"userId":"100002","nickname":"viewer-2","avatarUrl":"","count":5,"firstAt":1772334122000,"lastAt":1772335084000,"accountStatus":1},{"userId":"100003","nickname":"viewer-3","avatarUrl":"","count":5,"firstAt":1772334183000,"lastAt":1772335145000,"accountStatus":1},{"userId":"100004","nickname":"viewer-4","avatarUrl":"","count":4,"firstAt":1772334240000,"lastAt":1772335206000,"accountStatus":2},{"userId":"100005","nickname":"viewer-5","avatarUrl":"","count":4,"firstAt":1772334301000,"lastAt":1772335260000,"accountStatus":1},{"userId":"100006","nickname":"viewer-6","avatarUrl":"","count":4,"firstAt":1772334362000,"lastAt":1772335321000,"accountStatus":1},{"userId":"100007","nickname":"viewer-7","avatarUrl":"","count":4,"firstAt":1772334420000,"lastAt":1772335382000,"accountStatus":1}],"allNumericCommenters":[{"userId":"100001","nickname":"viewer-1","avatarUrl":"","count":5,"firstAt":1772334061000,"lastAt":1772335023000,"accountStatus":1},{"userId":"100002","nickname":"viewer-2","avatarUrl":"","count":5,"firstAt":1772334122000,"lastAt":1772335084000,"accountStatus":1},{"userId":"100003","nickname":"viewer-3","avatarUrl":"","count":5,"firstAt":1772334183000,"lastAt":1772335145000,"accountStatus":1},{"userId":"100004","nickname":"viewer-4","avatarUrl":"","count":4,"firstAt":1772334240000,"lastAt":1772335206000,"accountStatus":2},{"userId":"100005","nickname":"viewer-5","avatarUrl":"","count":4,"firstAt":1772334301000,"lastAt":1772335260000,"accountStatus":1},{"userId":"100006","nickname":"viewer-6","avatarUrl":"","count":4,"firstAt":1772334362000,"lastAt":1772335321000,"accountStatus":1},{"userId":"100007","nickname":"viewer-7","avatarUrl":"","count":4,"firstAt":1772334420000,"lastAt":1772335382000,"accountStatus":1}],"timeline":[{"minute":0,"count":2,"uniqueUsers":1},{"minute":1,"count":2,"uniqueUsers":1},{"minute":2,"count":3,"uniqueUsers":2},{"minute":3,"count":1,"uniqueUsers":1},{"minute":4,"count":2,"uniqueUsers":1},{"minute":5,"count":3,"uniqueUsers":2},{"minute":6,"count":1,"uniqueUsers":1},{"minute":7,"count":0,"uniqueUsers":0},{"minute":8,"count":2,"uniqueUsers":1},{"minute":9,"count":3,"uniqueUsers":2},{"minute":10,"count":1,"uniqueUsers":1},{"minute":11,"count":1,"uniqueUsers":1},{"minute":12,"count":2,"uniqueUsers":2},{"minute":13,"count":0,"uniqueUsers":0},{"minute":14,"count":1,"uniqueUsers":1},{"minute":15,"count":0,"uniqueUsers":0},{"minute":16,"count":1,"uniqueUsers":1},{"minute":17,"count":1,"uniqueUsers":1},{"minute":18,"count":1,"uniqueUsers":1},{"minute":19,"count":2,"uniqueUsers":2},{"minute":20,"count":0,"uniqueUsers":0},{"minute":21,"count":1,"uniqueUsers":1},{"minute":22,"count":1,"uniqueUsers":1}],"segmentCounts":{"heavy":0,"mid":7,"light":0,"once":0},"segmentPcts":{"heavy":0,"mid":100,"light":0,"once":0},"hourDistribution":[0,0,0,31,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0],"textStats":{"avgChars":8.1,"medianChars":8,"withUrlCount":1,"withEmojiCount":1,"pctWithUrl":3.2,"pctWithEmoji":3.2},"selfPostedCount":0,"selfPostedPct":0,"is184":{"count184":4,"knownCount":31,"pctOfKnown":12.9},"premium":{"premiumCount":4,"standardCount":27,"knownCount":31,"pctPremiumOfKnown":12.9},"timelineCumulative":[2,4,7,8,10,13,14,14,16,19,20,21,23,23,24,24,25,26,27,29,29,30,31],"timelineRolling5Min":[2,4,7,8,10,11,10,7,8,9,7,7,9,7,5,4,4,3,4,5,5,5,5],"maxSilenceGapMs":122000,"vposThirds":{"early":8,"mid":12,"late":11},"quarterEngagement":{"uniqueCommentersFirstQuarter":6,"uniqueCommentersLastQuarter":6,"uniqueCommentersBothQuarters":5,"skippedShortSpan":false},"interestArrivalSummary":{"totalArrivals":0,"uniqueTags":0,"messageCount":0,"topTags":[]}}}</script>
 </section>
+</details>
+</main>
+<footer class="mkt-footer">追憶のきらめき · この配信の記録（手元用） — 2026-03-01T06:00:00.000Z</footer>
 
 <script>(function(){var q=[].slice.call(document.querySelectorAll('.mkt-section'));var idle=window.requestIdleCallback||function(cb){return setTimeout(function(){cb({timeRemaining:function(){return 8}})},50)};function step(d){while(q.length&&d.timeRemaining()>4){q.shift().style.contentVisibility='visible'}if(q.length)idle(step)}function go(){idle(step)}if(document.readyState==='complete')go();else window.addEventListener('load',go)})();</script>
 </body></html>

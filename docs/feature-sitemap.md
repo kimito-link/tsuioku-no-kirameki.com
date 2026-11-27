@@ -802,7 +802,7 @@
   - `app/supporter.html`
   - `app/referral-passthrough.js`
   - `tsuioku-no-kirameki/tokushoho.html`
-<details><summary>🗂 このカテゴリの全担当ファイル(自動分類) 60</summary>
+<details><summary>🗂 このカテゴリの全担当ファイル(自動分類) 62</summary>
 
 - `extension-youtube/marketing-export-guard.js` — マーケ分析タブ(marketing-export.html)の「何があっても開く」保険。
 - `extension-youtube/marketing-export.js` — ニコ生版 marketing-export-entry.js(本物)+ YouTube の記録を読む入口のバンドル
@@ -834,6 +834,8 @@
 - `src/lib/liveviewErrorReport.js` — 純Web③(app.tsuioku-no-kirameki.com)専用の最小エラーレポータ(v0.1.1130)。
 - `src/lib/marketingDynamicAdvice.js` — 0.1.33 (AH): マーケ分析の各セクションに「内容に応じて変わる」キャラ解説を出す
 - `src/lib/marketingExportTabState.js` — マーケ分析タブ(marketing-export.html?lv=<lid>)の「状態」を URL に残し、
+- `src/lib/marketingOperatorReport.js` — 運営者向けマーケHTMLの章立て（純関数）。
+- `src/lib/marketingOperatorReportHtml.js` — 運営者向けマーケHTMLの見た目（暖色）。章の中身は buildOperatorReportModel の結果だけを描く。
 - `src/lib/marketingReportEmbed.js` — マーケ分析 HTML に埋め込む JSON（表計算・ツール連携用）。
 - `src/lib/marketingSupportParticipationCounts.js` — マーケ分析・HTMLレポート先頭 KPI: ギフト投げ主・広告した人の人数。
 - `src/lib/mediaKitEmbed.js` — メディアキットを分析レポートの1章として埋め込むときの、CSS の囲い(id)。
@@ -1258,7 +1260,7 @@
   - `src/extension/live-ranking-entry.js`
   - `tsuioku-no-kirameki/live/index.html`
   - `.github/workflows/live-ranking.yml`
-<details><summary>🗂 このカテゴリの全担当ファイル(自動分類) 384</summary>
+<details><summary>🗂 このカテゴリの全担当ファイル(自動分類) 386</summary>
 
 - `app/app.js` — スマホ閲覧用 status Web 版。
 - `app/live-view-block.js` — iPhone アプリの「🚩 見たくない人を隠す・報告する」(App Store の審査 1.2: ほかの人の書き込みを見せるアプリの決まり)。
@@ -1620,12 +1622,14 @@
 - `src/lib/youtube/ytPageMeta.js` — YouTube 視聴ページの URL / 配信者アイコン URL を扱う純粋関数
 - `src/lib/youtube/ytPageViewerReader.js` — YouTube のページ自身の世界で、同時視聴者数を data 属性に置く。
 - `src/lib/youtube/ytPseudoLv.js` — YouTube の videoId から決まった疑似 lv(lv9 + 11桁)を作る純粋関数。
+- `src/lib/youtube/ytRelatedChipSnapshot.js` — YouTube 動画ページの右側チップと、いま画面に出ている関連動画を、
 - `src/lib/youtube/ytReplayChatJson.js` — アーカイブのチャットのリプレイ(get_live_chat_replay の返事)を、
 - `src/lib/youtube/ytShimCommentWrites.js` — YouTube 系(YouTube・Twitch・Kick ほか)の画面で、ニコ生版の部品がコメントの控え(nls_comments_<疑似lv> /
 - `src/lib/youtube/ytStaleFrameHold.js` — 0.1.1958: 横の欄の「切り替わる直前の古い画面」が、次の配信を描いてしまわないよう少し待つ。
 - `src/lib/youtube/ytStreamStart.js` — 配信ページの「いつ始まったか」を時刻にする純粋関数。
 - `src/lib/youtube/ytSuperChatTier.js` — YouTube のスーパーチャットは金額で色が決まる(青→水色→緑→黄→橙→赤紫→赤)。
 - `src/lib/youtube/ytSwitchLeakCleanup.js` — 配信を切り替えた瞬間に、前の配信のチャット欄に残っていたコメントが
+- `src/lib/youtube/ytVideoCommentThreadSnapshot.js` — YouTube 動画ページのコメント欄を、呼んだ瞬間の DOM だけから読む。
 - `src/lib/youtube/ytVideoWatchCard.js` — 【層】L0 判定層(純粋関数・I/O禁止)
 - `src/lib/youtube/ytVideoWatchMeta.js` — 【層】L0 判定層(純粋関数・I/O禁止)
 - `src/lib/youtube/ytWording.js` — ニコ生版の画面をそのまま使う YouTube 版で、画面に出る「ニコニコの言葉」を YouTube の言葉に直す。
@@ -1651,6 +1655,9 @@
 
 > changelog 全 20 版を「バグ系統」で束ねた枝。同系統をまた触るとき、過去の修正と「なぜ毎回触るか」を辿る(再発防止)。新しい順。
 
+### 💾 記録件数 (1版)
+- `v0.1.2264` 2026-11-27 — マーケHTMLを、運営者が知りたい順にした
+
 ### 📥 コメント取得 (2版)
 - `v0.1.2261` 2026-11-27 — 広告ランキングの名無しを、灰色の「未取得」札にしない
 - `v0.1.2257` 2026-11-27 — ツイキャスの番号付き匿名コメントを人ごとに分ける
@@ -1658,7 +1665,7 @@
 ### 🙂 匿名(184) (1版)
 - `v0.1.2257` 2026-11-27 — ツイキャスの番号付き匿名コメントを人ごとに分ける
 
-### 🏟 会場・席 (8版)
+### 🏟 会場・席 (7版)
 - `v0.1.2259` 2026-11-27 — ニコ生で、アイコン未設定の人も灰色の丸にしない
 - `v0.1.2258` 2026-11-27 — 内訳を足した数が、いつも記録と同じになるように
 - `v0.1.2257` 2026-11-27 — ツイキャスの番号付き匿名コメントを人ごとに分ける
@@ -1666,12 +1673,11 @@
 - `v0.1.2248` 2026-11-26 — ライブの横の欄でも、顔が出ない人を白い丸にしない
 - `v0.1.2239` 2026-11-26 — 実測の録画コメントを拾って顔を出す
 - `v0.1.2238` 2026-11-26 — 動画でも会場を出さず、コメントがあれば顔を出す
-- `v0.1.2237` 2026-11-26 — 動画では顔を押すと、横の欄にその人の行動が出る
 
 ### 🎁 ギフト (3版)
+- `v0.1.2264` 2026-11-27 — マーケHTMLを、運営者が知りたい順にした
 - `v0.1.2261` 2026-11-27 — 広告ランキングの名無しを、灰色の「未取得」札にしない
 - `v0.1.2259` 2026-11-27 — ニコ生で、アイコン未設定の人も灰色の丸にしない
-- `v0.1.2237` 2026-11-26 — 動画では顔を押すと、横の欄にその人の行動が出る
 
 ### その他 (11版)
 - `v0.1.2262` 2026-11-27 — Kick の録画で、ライブで見た人の顔が出るようにした

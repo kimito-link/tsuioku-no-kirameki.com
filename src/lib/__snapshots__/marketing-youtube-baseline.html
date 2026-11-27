@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
-<title>配信マーケ分析 — lv900000000001</title>
+<title>この配信の記録 — lv900000000001</title>
 
 <style>
 *,*::before,*::after{box-sizing:border-box}
@@ -496,6 +496,72 @@ html.mkt-section-reveal-done .mkt-section{will-change:auto}
   .mkt-chart-wrap{overflow:visible}
 }
 
+.mkt-shell--warm{background:#fff7ec;color:#4a3b34}
+.mkt-shell--warm .mkt-header{background:linear-gradient(180deg,#fff4e4,#fff7ec);border-bottom:1px solid #e3c9b5;padding:1.6rem 1.5rem 1rem}
+.mkt-shell--warm .mkt-header__title{color:#4a3b34;font-size:1.55rem;letter-spacing:-.02em}
+.mkt-shell--warm .mkt-header__kicker{margin:0 0 .35rem;font-size:.75rem;font-weight:700;letter-spacing:.08em;color:#e85a8a}
+.mkt-shell--warm .mkt-header__sub,.mkt-shell--warm .mkt-header__source{color:#7a6458;font-size:.85rem;margin:.25rem 0 0}
+.mkt-shell--warm .mkt-header__source{font-size:.75rem;color:#9c8678}
+.mkt-shell--warm .mkt-main{max-width:1120px}
+.mkt-shell--warm .mkt-footer{color:#9c8678;background:transparent;border:0;text-align:center;padding:1rem}
+.mkt-shell--warm .mkt-section{background:#fffdf9;border:1px solid #e3c9b5;box-shadow:0 10px 30px rgba(74,59,52,.06);color:#4a3b34}
+.mkt-shell--warm .mkt-section h2{color:#4a3b34;border-left-color:#e85a8a}
+.mkt-shell--warm .mkt-note,.mkt-shell--warm .mkt-op-why{color:#7a6458;font-size:.84rem;margin:0 0 1rem}
+.mkt-op-lead{background:#fffdf9;border:1px solid #e3c9b5;border-radius:16px;box-shadow:0 10px 30px rgba(74,59,52,.06);padding:1.3rem 1.5rem 1.2rem;margin:0 0 1.2rem}
+.mkt-op-lead p{font-size:1.15rem;line-height:1.7;font-weight:700;margin:0 0 1rem;letter-spacing:-.01em}
+.mkt-op-kpis{display:grid;grid-template-columns:repeat(auto-fit,minmax(10rem,1fr));gap:.75rem}
+.mkt-op-kpi{background:#fff7ec;border:1px solid #e3c9b5;border-radius:12px;padding:.7rem .8rem}
+.mkt-op-kpi b{display:block;font-size:1.45rem;line-height:1.15;letter-spacing:-.03em}
+.mkt-op-kpi span{display:block;font-size:.72rem;color:#7a6458;margin-top:.2rem}
+.mkt-op-kpi em{display:block;font-style:normal;font-size:.68rem;color:#9c8678}
+.mkt-op-num{font-size:.72rem;font-weight:800;color:#e85a8a;letter-spacing:.08em;margin-right:.45rem}
+.mkt-op-comment{background:#fff7ec;border:1px solid #e3c9b5;border-radius:12px;padding:.75rem .9rem;margin:0 0 .65rem}
+.mkt-op-person{display:flex;gap:.7rem;align-items:flex-start}
+.mkt-op-av{flex:0 0 36px;width:36px;height:36px;border-radius:50%;object-fit:cover;background:#e3c9b5;display:grid;place-items:center;color:#fff;font-weight:800;font-size:.8rem}
+.mkt-op-name{font-weight:700}
+.mkt-op-meta{font-size:.75rem;color:#9c8678}
+.mkt-op-body{margin:.3rem 0 .4rem;font-size:.92rem}
+.mkt-op-tags{display:flex;flex-wrap:wrap;gap:.35rem}
+.mkt-op-tag{font-size:.68rem;font-weight:700;border-radius:999px;padding:1px 8px;background:#fff1f4;color:#b83b68}
+.mkt-op-tag--teal{background:#e7f6f3;color:#1c6f65}
+.mkt-op-tag--gold{background:#fff4df;color:#8a5a12}
+.mkt-op-tag--blue{background:#e8f0f8;color:#3b6ea5}
+.mkt-op-tag--mute{background:#f3eee8;color:#9c8678}
+.mkt-op-split{display:grid;grid-template-columns:repeat(auto-fit,minmax(16rem,1fr));gap:1rem}
+.mkt-op-who{display:flex;align-items:center;gap:.6rem;background:#fff7ec;border:1px solid #e3c9b5;border-radius:12px;padding:.45rem .6rem;margin:0 0 .45rem}
+.mkt-op-bars{display:flex;align-items:flex-end;gap:6px;height:120px;margin:.4rem 0 .3rem}
+.mkt-op-bar-col{flex:1;display:flex;flex-direction:column;align-items:center;height:100%;justify-content:flex-end;min-width:0}
+.mkt-op-bar{width:100%;border-radius:6px 6px 2px 2px;background:linear-gradient(180deg,#f06aa0,#e85a8a);min-height:4px}
+.mkt-op-bar.is-peak{background:linear-gradient(180deg,#2bbbad,#2a9d8f)}
+.mkt-op-bar-col span{font-size:.62rem;color:#9c8678;margin-top:4px;white-space:nowrap}
+.mkt-op-table{width:100%;border-collapse:collapse;font-size:.88rem}
+.mkt-op-table th,.mkt-op-table td{text-align:left;padding:.45rem .4rem;border-bottom:1px solid #f0e2d4;vertical-align:top}
+.mkt-op-table th{font-size:.7rem;color:#9c8678;font-weight:700}
+.mkt-op-table .num{text-align:right;font-variant-numeric:tabular-nums;white-space:nowrap}
+.mkt-op-reply{margin-top:.5rem;padding-left:.75rem;border-left:3px solid #c9e8e3}
+.mkt-op-vids{display:grid;grid-template-columns:repeat(auto-fill,minmax(11rem,1fr));gap:.65rem}
+.mkt-op-vid{background:#fff7ec;border:1px solid #e3c9b5;border-radius:12px;padding:.7rem .75rem}
+.mkt-op-vid.is-own{outline:2px solid #e85a8a;outline-offset:-2px}
+.mkt-op-vid b{display:block;font-size:.82rem;line-height:1.35;margin:0 0 .2rem}
+.mkt-op-vid span{font-size:.7rem;color:#9c8678}
+.mkt-op-own{display:inline-block;margin-top:.25rem;font-size:.65rem;font-weight:800;color:#e85a8a}
+.mkt-op-chip{display:inline-block;border:1px solid #e3c9b5;background:#fff;color:#7a6458;border-radius:999px;padding:.3rem .7rem;font-size:.8rem;font-weight:700;margin:0 .3rem .4rem 0}
+.mkt-op-chip.is-on{background:#4a3b34;color:#fff;border-color:#4a3b34}
+.mkt-appendix{background:#fffdf9;border:1px solid #e3c9b5;border-radius:16px;padding:.4rem 1rem 1rem;margin:1.5rem 0 0}
+.mkt-appendix>summary{cursor:pointer;font-weight:700;padding:.9rem .2rem;color:#4a3b34;list-style:revert}
+.mkt-appendix[open]>summary{border-bottom:1px solid #f0e2d4;margin-bottom:1rem}
+.mkt-shell--warm .mkt-kpi{background:#fff7ec;border-color:#e3c9b5}
+.mkt-shell--warm .mkt-kpi__val,.mkt-shell--warm .mkt-rank td,.mkt-shell--warm .mkt-subhead{color:#4a3b34}
+.mkt-shell--warm .mkt-kpi__label,.mkt-shell--warm .mkt-rank th,.mkt-shell--warm .mkt-axis{color:#9c8678;fill:#9c8678}
+.mkt-shell--warm .mkt-rank th{background:#fff4e4}
+.mkt-shell--warm .mkt-rank th,.mkt-shell--warm .mkt-rank td{border-bottom-color:#f0e2d4}
+.mkt-shell--warm .mkt-toc__link{background:#fff7ec;border-color:#e3c9b5;color:#3b6ea5}
+.mkt-shell--warm .mkt-section--toc{background:#fff7ec}
+.mkt-shell--warm .mkt-participation-lead-card{background:#fff7ec;border-color:#e3c9b5}
+.mkt-shell--warm .mkt-participation-lead-card__value,.mkt-shell--warm .mkt-hero-stat__val{color:#4a3b34}
+.mkt-shell--warm .mkt-hero-card{background:#fffdf9;border-color:#e3c9b5;box-shadow:0 10px 30px rgba(74,59,52,.06)}
+.mkt-shell--warm .mkt-bar{background:#f3e4d4}
+
 .mkt-sg-list{display:flex;flex-direction:column;gap:6px}
 .mkt-sg{border:1px solid #334155;border-radius:8px;background:#0f172a;color:#e2e8f0}
 .mkt-sg>summary{cursor:pointer;padding:8px 10px;display:flex;flex-wrap:wrap;align-items:center;gap:8px}
@@ -591,13 +657,26 @@ html.mkt-section-reveal-done .mkt-section{will-change:auto}
 @media (prefers-reduced-motion:reduce){.nl-manga-onomatopoeia{transform:none;}}
 @media (prefers-color-scheme:dark){.nl-manga-summary__heading{color:#e5e7eb;}.nl-manga-bubble__text{color:#111827;}}</style>
 </head>
-<body>
+<body class="mkt-shell--warm">
 <header class="mkt-header">
-<h1 class="mkt-header__title">📊 配信マーケティング分析</h1>
-<p class="mkt-header__sub">lv900000000001 — 2026/3/1 6:00:00 出力 · JSON埋め込み 2026-03-01T06:00:00.000Z</p>
+<p class="mkt-header__kicker">youtube の記録 ・ 運営者向け</p>
+<h1 class="mkt-header__title">この配信の記録</h1>
+<p class="mkt-header__sub">lv900000000001 — 2026/3/1 6:00:00 出力</p>
+<p class="mkt-header__source">このレポートに出すのは、このPCに残っている記録と、書き出したときに画面に出ていたものだけです。分からない項目は載せていません。</p>
 </header>
 
 <main class="mkt-main">
+<div class="mkt-op-lead" id="mkt-op-lead"><p>この配信にコメントした 3人。スーパーチャット・メンバーは 1件あります。いちばん多いのは 03:00ごろ（5件）です。</p><div class="mkt-op-kpis"><div class="mkt-op-kpi"><b>3人</b><span>コメントした人</span><em>このPCの記録 5件から</em></div><div class="mkt-op-kpi"><b>1件</b><span>スーパーチャット・メンバー</span><em>このPCの記録</em></div><div class="mkt-op-kpi"><b>0</b><span>ページの数</span><em>ページの表示</em></div></div></div>
+<section class="mkt-section mkt-op-section" id="mkt-op-thanks"><h2><span class="mkt-op-num">01</span>声をかけてくれた人</h2><p class="mkt-op-why">スーパーチャット・メンバーを贈ってくれた人と、この配信で初めて書いてくれた人です。お礼や名前呼びの手がかりとして並べています。</p><div class="mkt-op-comment"><div class="mkt-op-person"><div class="mkt-op-av" style="background:#3b6ea5">v</div><div>
+        <div class="mkt-op-name">viewer-2 <span class="mkt-op-meta">・ 03:05</span></div>
+        <div class="mkt-op-body">スーパーチャット</div>
+        <div class="mkt-op-tags"><span class="mkt-op-tag mkt-op-tag--gold">スーパーチャット・メンバー 5 USD</span></div>
+      </div></div></div><p class="mkt-note">過去の配信を読み込んでいないため、初めてかどうかは出ていません。</p></section>
+<section class="mkt-section mkt-op-section" id="mkt-op-who"><h2><span class="mkt-op-num">02</span>誰が来てくれたか</h2><p class="mkt-op-why">過去の配信を突き合わせていないので、新しい人／また来てくれた人の数は出していません。</p><div class="mkt-op-split"><div><h3 class="mkt-subhead">過去との照合</h3><p class="mkt-note">過去の配信を読み込んでいないため、また来てくれた人の数は出していません。</p></div><div><h3 class="mkt-subhead">数の読み方</h3></div></div></section>
+<section class="mkt-section mkt-op-section" id="mkt-op-top"><h2><span class="mkt-op-num">03</span>よく書いてくれた人</h2><p class="mkt-op-why">このPCが受け取ったコメントの件数です。配信者本人は除いています。</p><div class="mkt-table-scroll"><table class="mkt-op-table"><thead><tr><th></th><th>名前</th><th class="num">コメント</th><th>応援</th><th>メモ</th></tr></thead><tbody><tr><td class="num">1</td><td><div class="mkt-op-person"><div class="mkt-op-av" style="background:#3b6ea5">v</div><div class="mkt-op-name">viewer-0</div></div></td><td class="num">2</td><td></td><td class="mkt-op-meta"></td></tr><tr><td class="num">2</td><td><div class="mkt-op-person"><div class="mkt-op-av" style="background:#3b6ea5">v</div><div class="mkt-op-name">viewer-1</div></div></td><td class="num">2</td><td></td><td class="mkt-op-meta"></td></tr><tr><td class="num">3</td><td><div class="mkt-op-person"><div class="mkt-op-av" style="background:#3b6ea5">v</div><div class="mkt-op-name">viewer-2</div></div></td><td class="num">1</td><td>スーパーチャット・メンバー 5 USD</td><td class="mkt-op-meta"></td></tr></tbody></table></div></section>
+<section class="mkt-section mkt-op-section" id="mkt-op-gifts"><h2><span class="mkt-op-num">04</span>スーパーチャット・メンバー</h2><p class="mkt-op-why">YouTube の言葉のままです。チャットに書いてあった金額と、公式の単価で出せる推定だけを載せています。</p><div class="mkt-op-kpis" style="margin-bottom:1rem"><div class="mkt-op-kpi"><b>1件</b><span>スーパーチャット・メンバーの件数</span><em>このPCの記録</em></div><div class="mkt-op-kpi"><b>1人</b><span>贈ってくれた人</span><em>記録に名前があった人</em></div><div class="mkt-op-kpi"><b>約¥793</b><span>推定 視聴者の購入額</span><em>公式の単価による推定</em></div><div class="mkt-op-kpi"><b>約¥555</b><span>推定 配信者の受取</span><em>公式の単価による推定</em></div></div><div class="mkt-table-scroll"><table class="mkt-op-table"><thead><tr><th>時刻</th><th>名前</th><th>内容</th><th class="num">数量</th></tr></thead><tbody><tr><td>03:05</td><td>viewer-2</td><td>スーパーチャット</td><td class="num">5 USD</td></tr></tbody></table></div><p class="mkt-note">YouTube スーパーチャット・スーパーステッカーの記録から算出した視聴者購入額の推定です。円以外の通貨は ECB 基準為替（2026-11-20 確定値）で円換算しています。配信者の受取額ではありません。（出典: https://www.ecb.europa.eu/stats/policy_and_exchange_rates/euro_reference_exchange_rates/html/index.en.html）</p><p class="mkt-note">スーパーチャット・スーパーステッカー・スーパーサンクスの純収益の 70%（公式は地方消費税・iOS の手数料を引いた後の 70%。確認日 2026-11-26、https://support.google.com/youtube/answer/72902?hl=ja ）。為替は ECB 基準（2026-11-20）。手数料・税差引前の目安です。事務所・MCN との契約、iOS の手数料、地方消費税、源泉徴収などで実際の額は変わります。出典: YouTube ヘルプ（パートナーの収益の概要・課金型製品モジュール）（2026-11-26 確認）（出典: https://support.google.com/youtube/answer/7288782?hl=ja）</p></section>
+<section class="mkt-section mkt-op-section" id="mkt-op-peaks"><h2><span class="mkt-op-num">05</span>コメントが集まった時間</h2><p class="mkt-op-why">このPCがコメントを受け取った時刻です。</p><div class="mkt-op-bars"><div class="mkt-op-bar-col"><div class="mkt-op-bar is-peak" style="height:100%"></div><span>03:00</span></div></div><p class="mkt-note">いちばん多いのは 03:00ごろ（5件）です。</p><p class="mkt-note">同時視聴者数の山は 55 です。</p></section>
+<details class="mkt-appendix" id="mkt-appendix"><summary>詳しい分析（従来のグラフと表）</summary>
 <section class="mkt-section" id="mkt-support-arrival">
 <style>
 .mkt-arrival-summary{margin:.2rem 0 .7rem;color:#e2e8f0;font-size:.92rem;line-height:1.5}
@@ -1248,13 +1327,14 @@ html.mkt-section-reveal-done .mkt-section{will-change:auto}
 
 
 
-</main>
-<footer class="mkt-footer">追憶のきらめき · マーケ分析（手元用） — 2026-03-01T06:00:00.000Z</footer>
 <section id="mkt-json" class="mkt-section mkt-section--embed" aria-label="JSON データ">
 <h2>表計算・ツール向け JSON</h2>
 <p class="mkt-note">手元用のため ID がそのまま入ります。第三者に渡すときは拡張の「伏せ字」チェック付きで書き出してください。 中身は <code>id="nl-marketing-export-v1"</code> の <code>script</code> 要素にあります（<code>schemaVersion</code>・<code>report</code> 形式）。</p>
 <script type="application/json" id="nl-marketing-export-v1">{"schemaVersion":1,"exportedAt":"2026-03-01T06:00:00.000Z","maskShareLabels":false,"slimForHeavyExport":false,"liveId":"lv900000000001","report":{"liveId":"lv900000000001","totalComments":5,"uniqueUsers":3,"identifiedUsers":3,"unattributedComments":0,"avgCommentsPerUser":1.7,"medianCommentsPerUser":2,"peakMinute":0,"peakMinuteCount":1,"durationMinutes":4,"commentsPerMinute":1.3,"topUsers":[{"userId":"8000000000","nickname":"viewer-0","avatarUrl":"","count":2,"firstAt":1772334000000,"lastAt":1772334180000,"accountStatus":0},{"userId":"8000000001","nickname":"viewer-1","avatarUrl":"","count":2,"firstAt":1772334060000,"lastAt":1772334240000,"accountStatus":0},{"userId":"8000000002","nickname":"viewer-2","avatarUrl":"","count":1,"firstAt":1772334120000,"lastAt":1772334120000,"accountStatus":0}],"allNumericCommenters":[{"userId":"8000000000","nickname":"viewer-0","avatarUrl":"","count":2,"firstAt":1772334000000,"lastAt":1772334180000,"accountStatus":0},{"userId":"8000000001","nickname":"viewer-1","avatarUrl":"","count":2,"firstAt":1772334060000,"lastAt":1772334240000,"accountStatus":0},{"userId":"8000000002","nickname":"viewer-2","avatarUrl":"","count":1,"firstAt":1772334120000,"lastAt":1772334120000,"accountStatus":0}],"timeline":[{"minute":0,"count":1,"uniqueUsers":1},{"minute":1,"count":1,"uniqueUsers":1},{"minute":2,"count":1,"uniqueUsers":1},{"minute":3,"count":1,"uniqueUsers":1},{"minute":4,"count":1,"uniqueUsers":1}],"segmentCounts":{"heavy":0,"mid":0,"light":2,"once":1},"segmentPcts":{"heavy":0,"mid":0,"light":66.7,"once":33.3},"hourDistribution":[0,0,0,5,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0],"textStats":{"avgChars":7,"medianChars":7,"withUrlCount":0,"withEmojiCount":0,"pctWithUrl":0,"pctWithEmoji":0},"selfPostedCount":0,"selfPostedPct":0,"is184":{"count184":0,"knownCount":0,"pctOfKnown":0},"premium":{"premiumCount":0,"standardCount":0,"knownCount":0,"pctPremiumOfKnown":0},"timelineCumulative":[1,2,3,4,5],"timelineRolling5Min":[1,2,3,4,5],"maxSilenceGapMs":60000,"vposThirds":null,"quarterEngagement":{"uniqueCommentersFirstQuarter":2,"uniqueCommentersLastQuarter":2,"uniqueCommentersBothQuarters":2,"skippedShortSpan":false},"interestArrivalSummary":{"totalArrivals":0,"uniqueTags":0,"messageCount":0,"topTags":[]},"supportRows":[{"id":"o5","liveId":"lv900000000001","commentNo":"6","text":"スーパーチャット","userId":"8000000002","nickname":"viewer-2","avatarUrl":"","capturedAt":1772334300000,"ytKind":"superchat","ytPlatform":"youtube","ytAmount":5,"ytCurrency":"USD","ytChannelId":"UCsample0001"}]},"platform":"youtube","idAliases":[{"userId":"8000000002","serviceId":"UCsample0001"}]}</script>
 </section>
+</details>
+</main>
+<footer class="mkt-footer">追憶のきらめき · この配信の記録（手元用） — 2026-03-01T06:00:00.000Z</footer>
 
 <script>(function(){var q=[].slice.call(document.querySelectorAll('.mkt-section'));var idle=window.requestIdleCallback||function(cb){return setTimeout(function(){cb({timeRemaining:function(){return 8}})},50)};function step(d){while(q.length&&d.timeRemaining()>4){q.shift().style.contentVisibility='visible'}if(q.length)idle(step)}function go(){idle(step)}if(document.readyState==='complete')go();else window.addEventListener('load',go)})();</script>
 </body></html>

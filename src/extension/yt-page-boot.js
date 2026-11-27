@@ -2,6 +2,45 @@
 // ホームや検索で解析すると、タブが多い低スペックの PC でインストール直後に固まる。
 import { needsYtVenue, shouldPollYtVenue } from '../lib/youtube/ytVenueBoot.js';
 import { startPageStallWatch } from '../lib/stallTrace.js';
+import { readYtRelatedChipSnapshot } from '../lib/youtube/ytRelatedChipSnapshot.js';
+import { readYtVideoCommentThreadSnapshot } from '../lib/youtube/ytVideoCommentThreadSnapshot.js';
+
+/** @param {string} [href] */
+function isYoutubeWatchPage(href) {
+  try {
+    const u = new URL(String(href || (typeof location !== 'undefined' ? location.href : '') || ''));
+    if (!/(^|\.)youtube\.com$/i.test(u.hostname)) return false;
+    const path = u.pathname || '';
+    return path === '/watch' || path.startsWith('/watch/') || path.startsWith('/live/') || path.startsWith('/shorts/');
+  } catch {
+    return false;
+  }
+}
+
+// 書き出しタブからの一度きりの読み取り。新しい Observer・タイマー・通信は足さない。
+if (typeof chrome !== 'undefined' && chrome.runtime && chrome.runtime.onMessage) {
+  chrome.runtime.onMessage.addListener((msg, _sender, sendResponse) => {
+    if (!msg || msg.type !== 'YT_READ_PAGE_EXPORT_SNAPSHOT') return undefined;
+    if (!isYoutubeWatchPage()) {
+      try { sendResponse({ ok: false, reason: 'not-watch' }); } catch { /* 閉じたタブ */ }
+      return false;
+    }
+    try {
+      const relatedChip = readYtRelatedChipSnapshot(document, {
+        operatorChannelId: String(msg.operatorChannelId || ''),
+        operatorChannelName: String(msg.operatorChannelName || ''),
+        operatorHandle: String(msg.operatorHandle || ''),
+        videoId: String(msg.videoId || ''),
+      });
+      const commentThreads = readYtVideoCommentThreadSnapshot(document);
+      sendResponse({ ok: true, relatedChip, commentThreads });
+    } catch (err) {
+      try { sendResponse({ ok: false, reason: String(err && err.message || err) }); } catch { /* 閉じたタブ */ }
+    }
+    return false;
+  });
+}
+
 
 const root = /** @type {any} */ (typeof globalThis !== 'undefined' ? globalThis : window);
 if (!root.__NLS_YT_VENUE_BOOT_ASKED__) {

@@ -79,6 +79,7 @@ import { exportWaitLinesForKind, resolveHtmlReportBuildTimeoutMs } from '../lib/
 import { EXPORT_COMMENT_READ_TIMEOUT_MS, readCommentsForExport } from '../lib/readAllCommentsForLive.js';
 import { isYtPseudoLvShape } from '../lib/youtube/ytPseudoLv.js';
 import { readStoredExportComments } from '../lib/youtube/exportStoredComments.js';
+import { mergeYtThreadsOntoComments } from '../lib/youtube/ytVideoCommentThreadSnapshot.js';
 import { MARKETING_EXPORT_STATE_PARAM, withMarketingExportState } from '../lib/marketingExportTabState.js';
 import { followerSamplesStorageKey, readStoredFollowerSamples } from '../lib/platform/followerSampleStore.js';
 
@@ -95,7 +96,9 @@ import { followerSamplesStorageKey, readStoredFollowerSamples } from '../lib/pla
  *   programStartAtMs?: number,
  *   platform?: string,
  *   slotViewCount?: number,
- *   platformFacts?: { viewCount?: number, commentCount?: number, official?: Record<string, unknown> }
+ *   thumbnailUrl?: string,
+ *   broadcasterPageUrl?: string,
+ *   platformFacts?: { viewCount?: number, commentCount?: number, official?: Record<string, unknown>, contentKind?: string, isLive?: boolean }
  * }} WatchMetaSnapshot
  */
 
@@ -562,6 +565,67 @@ async function followerSamplesForExport(lid, snapshot) {
   }
 }
 
+
+/**
+ * 書き出し時に、開いている YouTube 動画タブの DOM を一度だけ読む（チップ・コメントスレッド）。
+ * 新しい通信・Observer・タイマーは使わない。失敗しても報告は出す。
+ * @param {WatchMetaSnapshot|null} snapshot
+ */
+function videoIdFromWatchSnapshot(snapshot) {
+  const thumb = String(snapshot?.thumbnailUrl || '');
+  const m = thumb.match(/\/vi\/([A-Za-z0-9_-]{11})\//);
+  return m ? m[1] : '';
+}
+
+/** @param {unknown} tabUrl @param {string} videoId */
+function youtubeTabMatchesVideo(tabUrl, videoId) {
+  try {
+    const u = new URL(String(tabUrl || ''));
+    if (!/(^|\.)youtube\.com$/i.test(u.hostname)) return false;
+    const v = u.searchParams.get('v');
+    if (videoId && v === videoId) return true;
+    if (videoId && new RegExp(`/(?:live|shorts)/${videoId}(?:/|$)`).test(u.pathname)) return true;
+    return false;
+  } catch {
+    return false;
+  }
+}
+
+/** @param {WatchMetaSnapshot|null} snapshot */
+async function readYoutubePageExportSnapshot(snapshot) {
+  /** @type {{ relatedChip: object | null, commentThreads: object[] }} */
+  const empty = { relatedChip: null, commentThreads: [] };
+  if (String(snapshot?.platform || '') !== 'youtube') return empty;
+  if (typeof chrome === 'undefined' || !chrome.tabs || typeof chrome.tabs.query !== 'function') return empty;
+  const videoId = videoIdFromWatchSnapshot(snapshot);
+  const operatorChannelId = String(snapshot?.broadcasterPageUrl || '').match(/\/channel\/(UC[A-Za-z0-9_-]{22})/)?.[1] || '';
+  try {
+    const tabs = await chrome.tabs.query({
+      url: ['*://www.youtube.com/*', '*://youtube.com/*', '*://m.youtube.com/*'],
+    });
+    const match = (tabs || []).find((t) => youtubeTabMatchesVideo(t.url, videoId));
+    if (!match || match.id == null) return empty;
+    const res = await withTimeout(
+      chrome.tabs.sendMessage(match.id, {
+        type: 'YT_READ_PAGE_EXPORT_SNAPSHOT',
+        videoId,
+        operatorChannelId,
+        operatorChannelName: String(snapshot?.broadcasterName || ''),
+        operatorHandle: '',
+      }),
+      2500,
+      'yt_page_export_snapshot_timeout'
+    );
+    if (!res || res.ok !== true) return empty;
+    return {
+      relatedChip: res.relatedChip && typeof res.relatedChip === 'object' ? res.relatedChip : null,
+      commentThreads: Array.isArray(res.commentThreads) ? res.commentThreads : [],
+    };
+  } catch {
+    return empty;
+  }
+}
+
 /** @param {string} lid */
 async function runExport(lid) {
   if (!lid) {
@@ -632,9 +696,13 @@ async function runExport(lid) {
     } catch {
       data = {};
     }
-    const comments = /** @type {import('../lib/commentRecord.js').StoredComment[]} */ (
+    let comments = /** @type {import('../lib/commentRecord.js').StoredComment[]} */ (
       Array.isArray(commentsRaw) ? commentsRaw : []
     );
+    const pageExportSnap = await readYoutubePageExportSnapshot(snapshot);
+    if (pageExportSnap.commentThreads.length) {
+      comments = mergeYtThreadsOntoComments(comments, pageExportSnap.commentThreads, lid);
+    }
     const giftUsersForMarketing = Array.isArray(data[gKey]) ? data[gKey] : [];
     const giftEventsForMarketing = Array.isArray(data[giftEventsKey]) ? data[giftEventsKey] : [];
     const giftHistoryThrowsForMarketing = Array.isArray(data[giftThrowsKey]) ? data[giftThrowsKey] : [];
@@ -653,7 +721,12 @@ async function runExport(lid) {
     const marketingPageCount = marketingView && pageCountRaw > 0 && pageCountRaw <= 50_000_000 ? Math.floor(pageCountRaw) : 0;
     const facts = snapshot?.platformFacts;
     const marketingPageFacts = marketingView && facts && typeof facts === 'object'
-      ? { official: facts.official, commentCount: facts.commentCount }
+      ? {
+          official: facts.official,
+          commentCount: facts.commentCount,
+          ...(facts.contentKind ? { contentKind: facts.contentKind } : {}),
+          ...(facts.viewCount != null ? { viewCount: facts.viewCount } : {}),
+        }
       : null;
     setWaitStageText('分析中… (2/3) 集計・画像準備', 35);
     await yieldToBrowserPaint();
@@ -846,6 +919,9 @@ async function runExport(lid) {
       streamAgeMin: typeof snapshot?.streamAgeMin === 'number' ? snapshot.streamAgeMin : undefined,
       yukkuriImageDataUrlMap: yukkuriImageMapForMkt,
       eventRanking: eventRankingForMkt,
+      contentKind: String(snapshot?.platformFacts?.contentKind || ''),
+      relatedChip: pageExportSnap.relatedChip,
+      videoThreads: pageExportSnap.commentThreads,
       slimForHeavyExport: heavyMkt
     });
     mktProf.mark('build_html');
