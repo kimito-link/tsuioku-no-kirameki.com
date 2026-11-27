@@ -105,13 +105,18 @@ import { followerSamplesStorageKey, readStoredFollowerSamples } from '../lib/pla
 
 // ── stage 1: URL からの liveId 取得(live-view-entry.js の liveIdFromUrl と同型) ──
 
-/** @returns {string} 不正なら '' */
+/** @param {unknown} id @returns {boolean} */
+function isExportProgramId(id) {
+  const lv = String(id || '').trim().toLowerCase();
+  return /^lv\d{1,15}$/.test(lv) || /^(sm|so|nm)\d+$/.test(lv);
+}
+
 function liveIdFromUrl() {
   try {
     const lv = String(new URLSearchParams(location.search).get('lv') || '')
       .trim()
       .toLowerCase();
-    return /^lv\d{1,15}$/.test(lv) ? lv : '';
+    return isExportProgramId(lv) ? lv : '';
   } catch {
     return '';
   }
