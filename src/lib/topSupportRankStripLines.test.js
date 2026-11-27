@@ -5,6 +5,7 @@ import {
 } from './userSupportGridAccent.js';
 import { UNKNOWN_USER_KEY } from './userRooms.js';
 import { niconicoDefaultUserIconUrl } from './supportGrowthTileSrc.js';
+import { faceForRowKey } from './avatarFallbackFromUrl.js';
 import { topSupportRankLineModels } from './topSupportRankStripLines.js';
 
 const DEF_THUMB = 'images/yukkuri-default.png';
@@ -451,20 +452,21 @@ describe('公式DOMランキング サムネかぶり対策（v0.1.282）', () =
       avatarUrl: ''
     }));
 
-  it('cond3 一意性: 空サムネ広告5行が全行ユニークな中立バッジ（Set=行数）', () => {
+  it('cond3 一意性: 空サムネ広告5行が全行ユニークなゆっくり顔（Set=行数）', () => {
     const models = topSupportRankLineModels(adRows(5), {
       defaultThumbSrc: DEF_THUMB
       // anonymousIdenticonResolver 無し（トグル OFF 相当）
     });
     const thumbs = models.map((m) => m.thumbSrc);
     expect(new Set(thumbs).size).toBe(5);
-    for (const t of thumbs) {
-      expect(t.startsWith('data:image/svg+xml,')).toBe(true);
-      expect(t).not.toBe(DEF_THUMB);
+    for (const [i, thumb] of thumbs.entries()) {
+      expect(thumb).toBe(faceForRowKey(`__ad_${i}_advertiser${i}`));
+      expect(thumb.includes('%E6%9C%AA%E5%8F%96%E5%BE%97')).toBe(false);
+      expect(thumb).not.toBe(DEF_THUMB);
     }
   });
 
-  it('cond1 トグル分離: resolver 有無で結果が同一（トグル非依存の中立バッジ）', () => {
+  it('cond1 トグル分離: resolver 有無で結果が同一（トグル非依存のゆっくり顔）', () => {
     const off = topSupportRankLineModels(adRows(4), {
       defaultThumbSrc: DEF_THUMB
     }).map((m) => m.thumbSrc);
@@ -472,8 +474,11 @@ describe('公式DOMランキング サムネかぶり対策（v0.1.282）', () =
       defaultThumbSrc: DEF_THUMB,
       anonymousIdenticonResolver: (uid) => `data:identicon/${uid}`
     }).map((m) => m.thumbSrc);
-    expect(on).toEqual(off); // identicon に化けず、トグル ON/OFF で不変
-    expect(on.every((t) => t.startsWith('data:image/svg+xml,'))).toBe(true);
+    expect(on).toEqual(off); // 公式ランク行はトグル ON/OFF で不変
+    expect(on.every((thumb) => !thumb.includes('%E6%9C%AA%E5%8F%96%E5%BE%97'))).toBe(
+      true
+    );
+    expect(off[0]).toBe(faceForRowKey('__ad_0_advertiser0'));
   });
 
   it('cond2a 退行ゼロ: 実 http サムネ行は最優先で不変', () => {
@@ -506,7 +511,7 @@ describe('公式DOMランキング サムネかぶり対策（v0.1.282）', () =
     expect(unk.thumbSrc.startsWith('data:image/svg+xml,')).toBe(false);
   });
 
-  it('貢献度 __contrib_ も同様に行別中立バッジ（旧かぶり→解消）', () => {
+  it('貢献度 __contrib_ も同様に行別のゆっくり顔（旧かぶり→解消）', () => {
     const rows = Array.from({ length: 3 }, (_, i) => ({
       userKey: `__contrib_${i}_user${i}`,
       nickname: `user${i}`,
@@ -517,10 +522,13 @@ describe('公式DOMランキング サムネかぶり対策（v0.1.282）', () =
       defaultThumbSrc: DEF_THUMB
     }).map((m) => m.thumbSrc);
     expect(new Set(thumbs).size).toBe(3);
-    expect(thumbs.every((t) => t.startsWith('data:image/svg+xml,'))).toBe(true);
+    expect(thumbs[0]).toBe(faceForRowKey('__contrib_0_user0'));
+    expect(thumbs.every((thumb) => !thumb.includes('%E6%9C%AA%E5%8F%96%E5%BE%97'))).toBe(
+      true
+    );
   });
 
-  it('順位番号が同値でも userKey ハッシュで byte 一意（匿名広告行）', () => {
+  it('順位番号が同値でも userKey ごとのゆっくり顔で byte 一意（匿名広告行）', () => {
     const rows = [
       { userKey: '__anon_ad_0', nickname: '', count: 10, avatarUrl: '' },
       { userKey: '__anon_ad_1', nickname: '', count: 10, avatarUrl: '' }
@@ -528,7 +536,12 @@ describe('公式DOMランキング サムネかぶり対策（v0.1.282）', () =
     const thumbs = topSupportRankLineModels(rows, {
       defaultThumbSrc: DEF_THUMB
     }).map((m) => m.thumbSrc);
+    expect(thumbs[0]).toBe(faceForRowKey('__anon_ad_0'));
+    expect(thumbs[1]).toBe(faceForRowKey('__anon_ad_1'));
     expect(thumbs[0]).not.toBe(thumbs[1]);
+    expect(thumbs.every((thumb) => !thumb.includes('%E6%9C%AA%E5%8F%96%E5%BE%97'))).toBe(
+      true
+    );
     expect(new Set(thumbs).size).toBe(2);
   });
 });
@@ -536,7 +549,7 @@ describe('公式DOMランキング サムネかぶり対策（v0.1.282）', () =
 describe('公式DOMランキング 同一実URL重複の解消（v0.1.282 実機 1-3位かぶり）', () => {
   const DUP = 'https://example.com/scrape-artifact.jpg';
 
-  it('上位3行が同一実URL（scrapeアーティファクト）→ 全て中立バッジ・実URL不採用', () => {
+  it('上位3行が同一実URL（scrapeアーティファクト）→ 全てゆっくり顔・実URL不採用', () => {
     const rows = [
       { userKey: '__ad_0_a', nickname: 'a', count: 21200, avatarUrl: DUP },
       { userKey: '__ad_1_b', nickname: 'b', count: 6600, avatarUrl: DUP },
@@ -548,9 +561,13 @@ describe('公式DOMランキング 同一実URL重複の解消（v0.1.282 実機
       defaultThumbSrc: DEF_THUMB
     }).map((m) => m.thumbSrc);
     // 重複実URLは1つも採用されない
-    for (const t of thumbs) expect(t).not.toBe(DUP);
-    // 全行が中立バッジ（data URL）かつ全行ユニーク（かぶり解消）
-    expect(thumbs.every((t) => t.startsWith('data:image/svg+xml,'))).toBe(true);
+    for (const thumb of thumbs) expect(thumb).not.toBe(DUP);
+    // 全行が行ごとのゆっくり顔（灰色の未取得札ではない）かつ全行ユニーク
+    expect(thumbs[0]).toBe(faceForRowKey('__ad_0_a'));
+    expect(thumbs[3]).toBe(faceForRowKey('__ad_3_d'));
+    expect(thumbs.every((thumb) => !thumb.includes('%E6%9C%AA%E5%8F%96%E5%BE%97'))).toBe(
+      true
+    );
     expect(new Set(thumbs).size).toBe(5);
   });
 
@@ -568,8 +585,8 @@ describe('公式DOMランキング 同一実URL重複の解消（v0.1.282 実機
     const thumbs = topSupportRankLineModels(rows, {
       defaultThumbSrc: DEF_THUMB
     }).map((m) => m.thumbSrc);
-    expect(thumbs[0]).not.toBe(DUP); // 重複は中立バッジ
-    expect(thumbs[1]).not.toBe(DUP);
+    expect(thumbs[0]).toBe(faceForRowKey('__ad_0_a')); // 重複はゆっくり顔
+    expect(thumbs[1]).toBe(faceForRowKey('__ad_1_b'));
     expect(thumbs[2]).toBe('https://example.com/unique-real.jpg'); // 一意は実URL維持
   });
 

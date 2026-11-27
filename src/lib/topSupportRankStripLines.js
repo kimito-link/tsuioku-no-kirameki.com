@@ -14,7 +14,7 @@ import {
   shortUserKeyDisplay,
   displayUserLabel
 } from './userRooms.js';
-import { isSiteDefaultSilhouetteUrl, faceInsteadOfSilhouette } from './avatarFallbackFromUrl.js';
+import { isSiteDefaultSilhouetteUrl, faceInsteadOfSilhouette, faceForRowKey } from './avatarFallbackFromUrl.js';
 import { anonymousNicknameFallback } from './nicoAnonymousDisplay.js';
 import {
   formatNicknameWithUidFallback,
@@ -236,13 +236,11 @@ export function topSupportRankLineModels(stripRooms, opts) {
     } else if (isHttpOrHttpsUrl(rawAv) && !rawAvDuplicatedOfficial) {
       thumbSrc = String(rawAv).trim();
     } else if (isOfficialRank) {
-      // v0.1.282: 公式DOMランキング（広告/貢献度）で実サムネが取れない or
-      // 重複アーティファクトの行は、匿名 identicon トグルに依存せず行ごとに
-      // 必ず異なる「順位バッジ風 中立プレースホルダ」にする（旧: idnResolver
-      // =undefined 時に共有プレースホルダ1枚へ全行が潰れ「サムネかぶり」、
-      // および scrape が上位行へ同一実URLを入れる「サムネかぶり」両方を解消）。
-      // 一意な実 http サムネは上の分岐で最優先のまま不変。
-      thumbSrc = officialDomRankBadgeThumb(placeNumber, userKey);
+      // v0.1.2261: 実サムネが無い／重複アーティファクトの公式ランク行（広告・貢献度の
+      // 名無しで URL が空の行を含む）は、灰色の「未取得」順位札ではなく、ほかの行と
+      // 同じ共有の顔（faceForRowKey＝行ごとのゆっくり顔）。一意な実 http サムネと、
+      // 灰色ではない公式の既定アイコンは上の分岐のまま。トグルには依存しない。
+      thumbSrc = faceForRowKey(uidForThumb || userKey);
     } else if (
       idnResolver &&
       uidForThumb &&

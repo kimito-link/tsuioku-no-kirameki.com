@@ -145,6 +145,24 @@ describe('ID の無い行・ギフト/広告の 名無し', () => {
     expect(models[0].thumbSrc).not.toBe(models[1].thumbSrc);
     expect(models[0].thumbSrc).not.toContain('%E6%9C%AA%E5%8F%96%E5%BE%97'); // 「未取得」の灰色の順位札ではない
   });
+  it('v0.1.2261: アイコン URL が空の広告ランキング名無しも灰色の順位札でなく行ごとのゆっくり顔', () => {
+    const models = topSupportRankLineModels(
+      [
+        { userKey: '__anon_ad_0', count: 10, avatarUrl: '', nickname: '' },
+        { userKey: '__anon_ad_1', count: 8, avatarUrl: '', nickname: '' },
+        { userKey: '__anon_contrib_0', count: 7, avatarUrl: '', nickname: '' }
+      ],
+      { defaultThumbSrc: 'y.png', anonymousFallbackThumbSrc: BLANK_A }
+    );
+    expect(models[0].thumbSrc).toBe(faceForRowKey('__anon_ad_0'));
+    expect(models[1].thumbSrc).toBe(faceForRowKey('__anon_ad_1'));
+    expect(models[2].thumbSrc).toBe(faceForRowKey('__anon_contrib_0'));
+    expect(models[0].thumbSrc).not.toBe(models[1].thumbSrc);
+    for (const m of models) {
+      expect(isGrey(m.thumbSrc)).toBe(false);
+      expect(m.thumbSrc).not.toContain('%E6%9C%AA%E5%8F%96%E5%BE%97');
+    }
+  });
   it('広告・ギフト列: 公式が blank.jpg を返した人はその人ごとのゆっくり顔', () => {
     const picks = adLanePicksFromRooms(
       [{ userKey: '95696250', nickname: 'つゆ', count: 100, avatarUrl: BLANK_B, hasNoIcon: true }],
