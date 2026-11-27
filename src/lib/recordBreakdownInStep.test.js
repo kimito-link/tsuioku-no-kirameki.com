@@ -245,3 +245,30 @@ describe('popup-entry の配線(内訳が記録と同じ行から数える)', ()
     expect(src).not.toContain('summarizeCommentRecordBreakdown(displayEntries)');
   });
 });
+
+describe('resolveRecordBreakdownInStep(実機 v0.1.2256 初回: 配信者が通常に入ったまま)', () => {
+  it('同じ行に後から配信者の userId が付いても、配信者に移る(合計は記録のまま)', () => {
+    const s = makeScreen();
+    const lv = 'lv351883073';
+    const base = nicoRecord(60);
+    const bcRow = { commentNo: '61', text: 'こんばんは' };
+    s.setCountDisplay(lv, 61, { rows: [...base, bcRow], broadcasterUid: 'owner' });
+    expect(s.view.b._broadcasterCount).toBeUndefined();
+    const later = [...base, { ...bcRow, userId: 'owner' }, normalRow(62), normalRow(63)];
+    s.setCountDisplay(lv, 63, { rows: later, broadcasterUid: 'owner' });
+    expect(s.view.b._broadcasterCount).toBe(1);
+    expect(sumOf(s.view.b)).toBe(63);
+  });
+});
+
+describe('resolveRecordBreakdownInStep(同じ行の写しに userId が無い)', () => {
+  it('配信者の行と、userId の無い同じ行(テールの写し)が混ざっても、配信者のまま', () => {
+    const st = createRecordBreakdownInStepState();
+    const bcRow = { commentNo: '5', text: 'やあ', userId: 'owner' };
+    const rows = [...Array.from({ length: 4 }, (_, i) => normalRow(i + 1)), bcRow];
+    resolveRecordBreakdownInStep(st, 'lv1', 5, { rows, broadcasterUid: 'owner' });
+    const b = resolveRecordBreakdownInStep(st, 'lv1', 6, { rows: [...rows, { commentNo: '5', text: 'やあ' }, normalRow(6)], broadcasterUid: 'owner' });
+    expect(b).toMatchObject({ normal: 5, _broadcasterCount: 1 });
+    expect(st.known.broadcaster).toBe(1);
+  });
+});

@@ -23,6 +23,8 @@
  *         まだ読んでいない少しの行を通常に入れても、次に読んだときに記録の増えた分で追いつくので、止まるのは数行ぶんまで。
  *       まとめ読み込みの途中(まだ読んでいない行が多い): 分かっている分類はそのまま、残りを通常に入れて合計を記録にそろえる。
  *         この値は固定しない(読み終わったら台帳の正しい分類に直す)。= 0.1.2242 の「大きく出して固定して止まる」を起こさない。
+ *   - 同じ行が後から書き足されたとき(配信者の userId が付いた等)は今の分け方に移す。配信者と分かった行は、
+ *     userId の無い写し(テール等)が混ざっても配信者のまま(実機 2026-11-27・lv351883073 で「配信者 1」が通常に入ったままだった)。
  *   - 軽い見回り(行を読まない)は、台帳と今の記録の数字だけで同じ計算をする(重い読み込みを足さない)。
  *   - 配信が変わったら(lv が変わったら)台帳をやり直す。一度も行を読んでいない配信では、軽い見回りから内訳を作らない。
  *
@@ -36,8 +38,8 @@ import { normalizeMonotonicLiveId } from './monotonicCommentCount.js';
 import { buildDedupeKey } from './commentRecord.js';
 import { classifyRecordRow } from './commentRecordBreakdown.js';
 
-/** 通常以外の分類(足す順番もこの順)。 */
-const OTHER_KINDS = /** @type {const} */ (['interestArrival', 'followNotice', 'otherSystem', 'broadcaster']);
+/** 通常以外の分類(足す順番もこの順。数の少ない分類から先に追いつかせる)。 */
+const OTHER_KINDS = /** @type {const} */ (['broadcaster', 'followNotice', 'otherSystem', 'interestArrival']);
 
 /**
  * @typedef {{ normal: number, interestArrival: number, followNotice: number, otherSystem: number, broadcaster: number }} KindCounts
@@ -48,7 +50,6 @@ const OTHER_KINDS = /** @type {const} */ (['interestArrival', 'followNotice', 'o
  *   hidden: boolean,
  *   broadcasterUid: string,
  *   kindByKey: Map<string, keyof KindCounts>,
- *   rowsSeen: WeakSet<object>,
  *   lastRows: unknown,
  *   known: KindCounts,
  *   locked: LockedBreakdown
@@ -77,7 +78,6 @@ export function createRecordBreakdownInStepState() {
     hidden: false,
     broadcasterUid: '',
     kindByKey: new Map(),
-    rowsSeen: new WeakSet(),
     lastRows: null,
     known: zeroCounts(),
     locked: { ...zeroCounts(), record: 0 }
@@ -112,7 +112,6 @@ function ingestRows(state, seen) {
     // 配信者が分かった/変わった: 分類をやり直す(配信者の行を通常から外す)。
     state.broadcasterUid = bc;
     state.kindByKey = new Map();
-    state.rowsSeen = new WeakSet();
     state.lastRows = null;
     state.known = zeroCounts();
   }
@@ -120,14 +119,17 @@ function ingestRows(state, seen) {
   state.lastRows = rows;
   for (const row of rows) {
     if (!row || typeof row !== 'object') continue;
-    if (state.rowsSeen.has(row)) continue;
-    state.rowsSeen.add(row);
     const r = /** @type {any} */ (row);
     if (!String(r.text ?? '').trim()) continue;
     const key = buildDedupeKey(state.lv, r);
-    if (state.kindByKey.has(key)) continue;
     /** @type {keyof KindCounts} */
     const kind = bc && String(r.userId ?? '').trim() === bc ? 'broadcaster' : classifyRecordRow(r);
+    const prev = state.kindByKey.get(key);
+    if (prev === kind) continue;
+    // 同じ行の写し(テール等)に userId が無いだけのときは、配信者のまま(配信者の uid が変わったら台帳ごとやり直す)
+    if (prev === 'broadcaster') continue;
+    // 同じ行が後から書き足された(配信者の userId が付いた等)ときは、今の分け方に移す(数は1のまま)
+    if (prev) state.known[prev] -= 1;
     state.kindByKey.set(key, kind);
     state.known[kind] += 1;
   }
