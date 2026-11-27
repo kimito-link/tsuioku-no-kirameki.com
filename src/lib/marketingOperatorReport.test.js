@@ -378,3 +378,78 @@ describe('operatorDisplayName', () => {
     expect(operatorDisplayName({ name: '', comparable: true, uid: '8123456789' }, { platformId: 'twitch' })).toBe('名前未取得');
   });
 });
+
+function kpiMainNumber(value) {
+  const m = String(value || '').replace(/,/g, '').match(/-?\d+(?:\.\d+)?/);
+  return m ? Number(m[0]) : null;
+}
+
+describe('測れていない 0 はサマリーに出さない', () => {
+  const platforms = ['niconico', 'youtube', 'twitch', 'kick', 'twitcasting', 'showroom', 'mixch', 'abema', 'tiktok', 'whowatch'];
+
+  it('測れていないページの数 0 は出さず、視聴者数の山があればそちらを出す', () => {
+    for (const platformId of platforms) {
+      const model = buildOperatorReportModel({
+        liveId: platformId === 'niconico' ? 'lv123' : 'lv900000000001',
+        platformId,
+        contentKind: 'live',
+        comments: [comment({ userId: 'u1', nickname: '灯台', ytPlatform: platformId === 'niconico' ? '' : platformId })],
+        pageCount: 0,
+        visitorCount: 0,
+        pageFacts: { viewCount: 0, commentCount: 0 },
+        concurrentPeak: 4975,
+      });
+      for (const kpi of model.kpis) {
+        const n = kpiMainNumber(kpi.value);
+        expect(n, `${platformId} ${kpi.label}=${kpi.value}`).not.toBe(0);
+        if (n != null) expect(n, `${platformId} ${kpi.label}`).toBeGreaterThan(0);
+        expect(kpi.label, platformId).not.toBe('ページの数');
+      }
+      const peak = model.kpis.find((k) => k.key === 'concurrent');
+      expect(peak, platformId).toBeTruthy();
+      expect(peak.value).toBe('4,975人');
+      expect(peak.label).toMatch(/の山$/);
+    }
+  });
+
+  it('測れているページの数は、そのサービスの言葉のまま出す', () => {
+    const model = buildOperatorReportModel({
+      liveId: 'lv900000000001',
+      platformId: 'abema',
+      contentKind: 'live',
+      comments: [comment({ userId: 'u1', nickname: '灯台', ytPlatform: 'abema' })],
+      pageCount: 1200,
+      concurrentPeak: 4975,
+    });
+    const views = model.kpis.find((k) => k.key === 'views');
+    expect(views?.value).toBe('1,200');
+    expect(views?.label).toBe('視聴数（ページの数）');
+    expect(model.kpis.some((k) => k.key === 'concurrent')).toBe(false);
+  });
+
+  it('動画の再生数が測れていれば再生数を出し、0 なら出さない', () => {
+    const withViews = buildOperatorReportModel({
+      liveId: 'vid1',
+      platformId: 'youtube',
+      contentKind: 'video',
+      comments: [comment({ userId: 'u1', nickname: '灯台', ytPlatform: 'youtube' })],
+      pageCount: 12345,
+    });
+    expect(withViews.kpis.find((k) => k.key === 'views')?.label).toBe('再生数');
+    expect(withViews.kpis.find((k) => k.key === 'views')?.value).toBe('12,345');
+
+    const zero = buildOperatorReportModel({
+      liveId: 'vid1',
+      platformId: 'youtube',
+      contentKind: 'video',
+      comments: [comment({ userId: 'u1', nickname: '灯台', ytPlatform: 'youtube' })],
+      pageCount: 0,
+    });
+    expect(zero.kpis.some((k) => k.key === 'views' || k.label === '再生数' || k.label === 'ページの数')).toBe(false);
+    for (const kpi of zero.kpis) {
+      const n = kpiMainNumber(kpi.value);
+      expect(n).not.toBe(0);
+    }
+  });
+});
+

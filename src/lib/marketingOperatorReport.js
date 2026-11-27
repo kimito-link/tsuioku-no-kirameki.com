@@ -539,10 +539,11 @@ export function buildOperatorReportModel(input) {
     ? input.relatedChip
     : null;
 
-  const pageCommentCount = numOrNull(input?.pageFacts?.commentCount ?? input?.pageFacts?.slotCommentCount);
-  const pageViews = numOrNull(input?.pageCount ?? input?.pageFacts?.viewCount);
-  const visitors = numOrNull(input?.visitorCount);
-  const concurrentPeak = numOrNull(input?.concurrentPeak);
+  const pageCommentCount = measuredPositiveCount(input?.pageFacts?.commentCount ?? input?.pageFacts?.slotCommentCount);
+  const pageViews = measuredPositiveCount(input?.pageCount ?? input?.pageFacts?.viewCount);
+  const visitors = measuredPositiveCount(input?.visitorCount);
+  const concurrentPeak = measuredPositiveCount(input?.concurrentPeak);
+  const viewsLabel = isVideo ? '再生数' : String(view?.pageCountLabel || '').trim();
 
   /** @type {Array<{ key: string, value: string, label: string, hint: string }>} */
   const kpis = [];
@@ -583,11 +584,11 @@ export function buildOperatorReportModel(input) {
   }
   if (visitors != null) {
     kpis.push({ key: 'visitors', value: `${visitors.toLocaleString('ja-JP')}人`, label: '来場者', hint: 'ページの来場者（取れていたとき）' });
-  } else if (pageViews != null) {
+  } else if (pageViews != null && viewsLabel) {
     kpis.push({
       key: 'views',
       value: pageViews.toLocaleString('ja-JP'),
-      label: isVideo ? '再生数' : (view?.pageCountLabel || 'ページの数'),
+      label: viewsLabel,
       hint: 'ページの表示',
     });
   } else if (pageCommentCount != null && isVideo) {
@@ -598,10 +599,11 @@ export function buildOperatorReportModel(input) {
       hint: '見出しの表示。全部は読んでいません',
     });
   } else if (concurrentPeak != null) {
+    const concurrentLabel = String(view?.concurrentLabel || (platformId === 'niconico' || !view ? '推定同時接続' : '視聴者数')).trim() || '視聴者数';
     kpis.push({
       key: 'concurrent',
-      value: concurrentPeak.toLocaleString('ja-JP'),
-      label: view?.concurrentLabel || '推定同時接続',
+      value: `${concurrentPeak.toLocaleString('ja-JP')}人`,
+      label: `${concurrentLabel}の山`,
       hint: 'このPCの記録の山',
     });
   }
@@ -860,6 +862,12 @@ function giftLedgerRows(support, _view) {
 function numOrNull(v) {
   const n = Number(v);
   return Number.isFinite(n) && n >= 0 ? Math.floor(n) : null;
+}
+
+/** 測れていない 0 は「無い」とみなす。サマリーに 0 を出さないための判定。 */
+function measuredPositiveCount(v) {
+  const n = Number(v);
+  return Number.isFinite(n) && n > 0 ? Math.floor(n) : null;
 }
 
 function daySpan(comments) {

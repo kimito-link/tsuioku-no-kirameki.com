@@ -362,3 +362,76 @@ describe('名前セルは空欄にしない', () => {
     }
   });
 });
+
+function operatorKpiCards(html) {
+  const appendixAt = html.indexOf('id="mkt-appendix"');
+  const op = appendixAt >= 0 ? html.slice(0, appendixAt) : html;
+  /** @type {Array<{ value: string, label: string, hint: string }>} */
+  const cards = [];
+  const re = /class="mkt-op-kpi"><b>([^<]*)<\/b><span>([^<]*)<\/span><em>([^<]*)<\/em>/g;
+  let m;
+  while ((m = re.exec(op))) {
+    cards.push({ value: m[1], label: m[2], hint: m[3] });
+  }
+  return cards;
+}
+
+function kpiMainNumber(value) {
+  const m = String(value || '').replace(/,/g, '').match(/-?\d+(?:\.\d+)?/);
+  return m ? Number(m[0]) : null;
+}
+
+describe('測れていない 0 はサマリーに出さない', () => {
+  const platforms = ['niconico', 'youtube', 'twitch', 'kick', 'twitcasting', 'showroom', 'mixch', 'abema', 'tiktok', 'whowatch'];
+
+  it('どのサービスでも、測れていない 0 のカードは出さず、視聴者数の山があればそれを出す', () => {
+    for (const platform of platforms) {
+      const liveId = platform === 'niconico' ? 'lv123' : 'lv900000000001';
+      const comments = commentsFor(platform, liveId);
+      const html = buildMarketingDashboardHtml(aggregateMarketingReport(comments, liveId), {
+        ...(platform === 'niconico' ? {} : { platform }),
+        commentsForAnalytics: comments,
+        contentKind: 'live',
+        pageCount: 0,
+        visitorCount: 0,
+        pageFacts: { viewCount: 0, commentCount: 0 },
+        sessionSummaryRows: [
+          { liveId, capturedAt: T0, officialViewerCount: 2100, source: 'official' },
+          { liveId, capturedAt: T0 + 10 * 60_000, officialViewerCount: 4975, source: 'official' },
+        ],
+      });
+      const cards = operatorKpiCards(html);
+      expect(cards.length, platform).toBeGreaterThan(0);
+      for (const card of cards) {
+        const n = kpiMainNumber(card.value);
+        expect(n, `${platform} ${card.label}=${card.value}`).not.toBe(0);
+        if (n != null) expect(n, `${platform} ${card.label}`).toBeGreaterThan(0);
+        expect(card.label, platform).not.toBe('ページの数');
+        expect(`${card.label}${card.hint}`, platform).not.toMatch(/^ページの数ページの表示$/);
+      }
+      expect(cards.some((c) => c.value === '4,975人' && /の山$/.test(c.label)), platform).toBe(true);
+    }
+  });
+
+  it('測れているページの数（ABEMA など）は残し、測れていない 0 だけを隠す', () => {
+    const liveId = 'lv900000000001';
+    const comments = commentsFor('abema', liveId);
+    const html = buildMarketingDashboardHtml(aggregateMarketingReport(comments, liveId), {
+      platform: 'abema',
+      commentsForAnalytics: comments,
+      contentKind: 'live',
+      pageCount: 1200,
+      sessionSummaryRows: [
+        { liveId, capturedAt: T0, officialViewerCount: 4975, source: 'official' },
+      ],
+    });
+    const cards = operatorKpiCards(html);
+    expect(cards.some((c) => c.label === '視聴数（ページの数）' && c.value === '1,200')).toBe(true);
+    expect(cards.some((c) => /の山$/.test(c.label))).toBe(false);
+    for (const card of cards) {
+      const n = kpiMainNumber(card.value);
+      expect(n).not.toBe(0);
+    }
+  });
+});
+
