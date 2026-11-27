@@ -24,13 +24,14 @@ const laneAvatarGuard = createSupportAvatarLoadGuard({
 /**
  * 顔の URL が無い人(公式の既定アイコンしか無い人を含む)は、ライブと同じ その人ごとのゆっくり顔にする。
  * @param {any} row
+ * @param {string} [platform]
  * @returns {string}
  */
-export function viewerBehaviorLaneFaceSrc(row) {
-  const resolved = resolveViewerBehaviorAvatarUrl(row?.isAnonymous ? '' : row?.id, row?.avatarUrl);
+export function viewerBehaviorLaneFaceSrc(row, platform = '') {
+  const resolved = resolveViewerBehaviorAvatarUrl(row?.isAnonymous ? '' : row?.id, row?.avatarUrl, platform);
   if (resolved && /^https?:/i.test(resolved) && !isSiteDefaultSilhouetteUrl(resolved)) return resolved;
   const key = String((row?.isAnonymous ? '' : row?.id) || row?.name || '').trim();
-  return anonymousIdenticonDataUrl(key, 64) || VIEWER_BEHAVIOR_FALLBACK_AVATAR;
+  return anonymousIdenticonDataUrl(key && platform ? platform + ':' + key : key, 64) || VIEWER_BEHAVIOR_FALLBACK_AVATAR;
 }
 
 const LANE_IO = {
@@ -72,7 +73,7 @@ export function viewerBehaviorRowsToLaneBuckets(board, opts = {}) {
     const idLine = videoOrder
       ? (badges.length ? badges.join('・') : relLabel)
       : String(row.relationLabel || '');
-    const src = viewerBehaviorLaneFaceSrc(row);
+    const src = viewerBehaviorLaneFaceSrc(row, board?.platform);
     const item = {
       displaySrc: src || VIEWER_BEHAVIOR_FALLBACK_AVATAR,
       title: String(row.name || ''),
