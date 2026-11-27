@@ -68,14 +68,24 @@ function exportCommentFromStoredRow(row, index, liveId) {
     ? postedAt
     : at;
   const name = String(row?.name || row?.author || '');
+  const login = String(row?.login || '').trim();
+  const channelId = String(row?.channelId || '').trim();
+  const icon = String(row?.avatarUrl || row?.iconUrl || '').trim();
+  const avatarUrl = /^https:\/\//i.test(icon) ? icon : '';
+  const rawId = String(row?.commentId || row?.id || '').trim();
+  const commentId = rawId && !/^stored_\d+$/i.test(rawId) ? rawId : '';
   return {
-    id: String(row?.id || `stored_${index}`),
+    id: commentId || String(row?.id || `stored_${index}`),
+    ...(commentId ? { commentId } : {}),
     liveId,
     commentNo: String(row?.commentNo || index + 1),
     text: String(row?.text ?? row?.message ?? ''),
-    userId: exportUserId(exportPersonKey(row)),
+    userId: exportPublicUserId(row),
     nickname: name,
     name,
+    ...(login ? { login } : {}),
+    ...(channelId ? { channelId } : {}),
+    ...(avatarUrl ? { avatarUrl } : {}),
     capturedAt,
     ytKind: String(row?.kind || row?.ytKind || ''),
     ytAmount: row?.amount ?? row?.ytAmount ?? '',
@@ -102,6 +112,18 @@ function exportPersonKey(row) {
   const name = String(row?.name || '').trim();
   if (name) return `name:${name}`;
   return '';
+}
+
+/**
+ * 画面のスレッドと同じ人キー（channelId / login）を優先し、無いときだけ内部ハッシュ。
+ * @param {Record<string, unknown> | null | undefined} row
+ */
+function exportPublicUserId(row) {
+  const channel = String(row?.channelId || '').trim();
+  if (channel) return channel;
+  const login = String(row?.login || '').trim();
+  if (login) return `login:${login.toLowerCase()}`;
+  return exportUserId(exportPersonKey(row));
 }
 
 /**

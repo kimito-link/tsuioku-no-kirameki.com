@@ -159,11 +159,11 @@ export const PLATFORM_CAPABILITIES = Object.freeze({
     visitorCard: false,
     chips: Object.freeze(['streamAge', 'kicks', 'subs', 'gifts']),
     officialSubBoard: true,
-    paidLabel: 'Kicks',
-    timelineLabel: '応援タイムライン（コメント＋Kicks・ギフトサブ）',
-    giftUsersLabel: 'Kicks・ギフトサブのユーザー（簡易）',
+    paidLabel: 'KICKs',
+    timelineLabel: '応援タイムライン（コメント＋KICKs・ギフトサブ）',
+    giftUsersLabel: 'KICKs・ギフトサブのユーザー（簡易）',
     supportArrival: Object.freeze([
-      arrivalSpec('kicks', ['superchat'], 'Kicks', 'money', { currency: 'KICKS' }),
+      arrivalSpec('kicks', ['superchat'], 'KICKs', 'money', { currency: 'KICKS' }),
       arrivalSpec('sub', ['membership'], 'サブスク', 'none'),
       arrivalSpec('gift', ['membership_gift'], 'ギフトサブ', 'pieces'),
     ]),
@@ -192,11 +192,11 @@ export const PLATFORM_CAPABILITIES = Object.freeze({
     // eventInfo.point は 2026-11-11 の実ページで 0 なのに画面には別の数が出ていた(どの値か未確定)→ イベントpt は出さない。
     //   「スーパーファン」は画面の言葉「ガチファン」、streamerRank.score はランク記号(B1 等)の横のポイント。
     chips: Object.freeze(['streamAge', 'level', 'fans', 'superfans', 'liverRank', 'eventRank']),
-    paidLabel: 'ギフト',
-    timelineLabel: '応援タイムライン（コメント＋ギフト）',
-    giftUsersLabel: 'ギフトユーザー（簡易）',
+    paidLabel: 'アイテム',
+    timelineLabel: '応援タイムライン（コメント＋アイテム）',
+    giftUsersLabel: 'アイテムユーザー（簡易）',
     supportArrival: Object.freeze([
-      arrivalSpec('gift', ['superchat'], 'ギフト', 'money', { currency: 'MXCOIN' }),
+      arrivalSpec('gift', ['superchat'], 'アイテム', 'money', { currency: 'MXCOIN' }),
       arrivalSpec('fan', ['mx_fan'], 'ファン登録', 'none'),
     ]),
   }),
@@ -238,11 +238,11 @@ export const PLATFORM_CAPABILITIES = Object.freeze({
     concurrentLabel: '視聴者数',
     visitorCard: false,
     chips: Object.freeze(['streamAge', 'totalViews', 'commentTotal']),
-    paidLabel: 'ギフト',
-    timelineLabel: '応援タイムライン（コメント＋ギフト）',
-    giftUsersLabel: 'ギフトユーザー（簡易）',
+    paidLabel: 'アイテム',
+    timelineLabel: '応援タイムライン（コメント＋アイテム）',
+    giftUsersLabel: 'アイテムユーザー（簡易）',
     supportArrival: Object.freeze([
-      arrivalSpec('gift', ['superchat'], 'ギフト', 'point', { currency: 'TCSCORE' }),
+      arrivalSpec('gift', ['superchat'], 'アイテム', 'point', { currency: 'TCSCORE' }),
     ]),
   }),
   // headlineCount:views = 大きな数字はページの視聴数（同時接続では埋めない）。countUnit 空 = 「人」と書かない。
@@ -507,7 +507,7 @@ function formatInt(n) {
 }
 
 /**
- * 通貨は換算しない。円は ¥、Bits と Kicks は単位を分ける。
+ * 通貨は換算しない。円は ¥、Bits と KICKs は単位を分ける。
  * @param {number} amount
  * @param {string} currency
  * @returns {{ text: string, unit: string }}
@@ -521,7 +521,7 @@ function formatMoney(amount, currency) {
   const text = rounded.toLocaleString('ja-JP');
   if (code === 'JPY') return { text: `¥${text}`, unit: '' };
   if (code === 'BITS') return { text, unit: 'Bits' };
-  if (code === 'KICKS') return { text, unit: 'Kicks' };
+  if (code === 'KICKS') return { text, unit: 'KICKs' };
   return { text: code ? `${code} ${text}` : text, unit: '' };
 }
 
@@ -702,13 +702,13 @@ export function resolvePlatformId(input) {
 }
 
 /**
- * 「ギフト貢献度」の欄に、そのサービス公式の順位表(トップファン・Bits/Kicks ランキング)を入れているときの見出し。
+ * 「ギフト貢献度」の欄に、そのサービス公式の順位表(トップファン・Bits/KICKs ランキング)を入れているときの見出し。
  *   入れていないとき(アーカイブ等)は、このPCの記録から数えた「合計順」の見出しのまま。
  */
 const OFFICIAL_MAIN_LABEL = Object.freeze({
   youtube: 'トップファン',
   twitch: 'Twitch 公式の Bits ランキング',
-  kick: 'Kick 公式の Kicks ランキング',
+  kick: 'Kick 公式の KICKs ランキング',
 });
 
 /**
@@ -787,14 +787,14 @@ export function platformSectionPlan(platformId, opts) {
   } else if (id === 'kick') {
     sections.contributionRanking = {
       show: true,
-      label: official ? OFFICIAL_MAIN_LABEL.kick : 'Kicks・ギフトサブの合計順',
+      label: official ? OFFICIAL_MAIN_LABEL.kick : 'KICKs・ギフトサブの合計順',
     };
     sections.giftHistory = {
       show: true,
       label: 'ギフトサブ',
       sub: 'このPCの記録です。',
     };
-    trio = { rink: 'りんく（Kicks・ギフトサブ）', konta: 'こん太（サブスク）', tanu: 'たぬ姉（ギフトサブ）' };
+    trio = { rink: 'りんく（KICKs・ギフトサブ）', konta: 'こん太（サブスク）', tanu: 'たぬ姉（ギフトサブ）' };
   } else if (id === 'abema') {
     note = '公式の視聴数とコメント数だけを出します。';
     sections.contributionRanking = { show: false };
@@ -989,14 +989,14 @@ function supportChipsBase(id, support) {
     return out.concat(countSinceChip(id, support));
   }
   if (id === 'kick') {
-    const kicks = money('KICKS', 'Kicks');
+    const kicks = money('KICKS', 'KICKs');
     const out = estimateChips(
       id,
       estimateKickSubSpendJpy({ subCount: support.membershipCount, giftSubCount: support.membershipGiftCount }),
-      'Kicks は円にしていません。',
+      'KICKs は円にしていません。',
     );
     out.push(
-      chip('kicks', 'Kicks', kicks.text, '', `${RECORDED}Kicks は円にしていません。${kicks.extra}`.trim()),
+      chip('kicks', 'KICKs', kicks.text, '', `${RECORDED}KICKs は円にしていません。${kicks.extra}`.trim()),
       chip('subs', 'サブスク', formatInt(num(support.membershipCount) || 0), '人', RECORDED),
       chip('gifts', 'ギフトサブ', formatInt(num(support.membershipGiftCount) || 0), '人', RECORDED),
       chip(

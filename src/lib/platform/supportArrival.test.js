@@ -125,7 +125,7 @@ describe('応援が届いた瞬間', () => {
         { capturedAt: at + 1, ytKind: 'membership', subEvent: 'resub', nickname: '再' },
         { capturedAt: at + 2, ytKind: 'membership_gift', ytGiftCount: 1, nickname: 'G' },
       ],
-    })?.rows.map((r) => r.kindLabel)).toEqual(['Kicks', 'サブスク', 'ギフトサブ']);
+    })?.rows.map((r) => r.kindLabel)).toEqual(['KICKs', 'サブスク', 'ギフトサブ']);
     expect(analyzeSupportArrivals({
       platformId: 'showroom',
       comments: [{ capturedAt: at, ytKind: 'superchat', ytCurrency: 'SRPT', ytAmount: 10, ytGiftName: '花', nickname: 'S' }],
@@ -136,7 +136,7 @@ describe('応援が届いた瞬間', () => {
         { capturedAt: at, ytKind: 'superchat', ytCurrency: 'MXCOIN', ytAmount: 7, nickname: 'M' },
         { capturedAt: at + 1, ytKind: 'mx_fan', nickname: 'ファン' },
       ],
-    })?.rows.map((r) => r.kindLabel)).toEqual(['ギフト', 'ファン登録']);
+    })?.rows.map((r) => r.kindLabel)).toEqual(['アイテム', 'ファン登録']);
     expect(analyzeSupportArrivals({
       platformId: 'whowatch',
       comments: [{ capturedAt: at, ytKind: 'superchat', ytCurrency: 'WWITEM', ytAmount: 2, nickname: 'W' }],

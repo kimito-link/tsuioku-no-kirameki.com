@@ -48,6 +48,7 @@ import {
 } from '../lib/storageKeys.js';
 import { giftHistoryThrowsStorageKey } from '../lib/kokenGiftHistoryApi.js';
 import { adObservationStorageKey } from '../lib/adObservationLog.js';
+import { STREAM_PLATFORMS } from '../lib/platform/streamPlatform.js';
 import {
   buildGiftSubAppPayloadFromKokenJson,
   mergeGiftSubAppHistoryPayload,
@@ -79,6 +80,8 @@ import { exportWaitLinesForKind, resolveHtmlReportBuildTimeoutMs } from '../lib/
 import { EXPORT_COMMENT_READ_TIMEOUT_MS, readCommentsForExport } from '../lib/readAllCommentsForLive.js';
 import { isYtPseudoLvShape } from '../lib/youtube/ytPseudoLv.js';
 import { readStoredExportComments } from '../lib/youtube/exportStoredComments.js';
+import { mergeYtThreadsOntoComments } from '../lib/youtube/ytVideoCommentThreadSnapshot.js';
+import { youtubeTabMatchesVideo } from '../lib/youtube/youtubeExportTabMatch.js';
 import { MARKETING_EXPORT_STATE_PARAM, withMarketingExportState } from '../lib/marketingExportTabState.js';
 import { followerSamplesStorageKey, readStoredFollowerSamples } from '../lib/platform/followerSampleStore.js';
 
@@ -95,19 +98,27 @@ import { followerSamplesStorageKey, readStoredFollowerSamples } from '../lib/pla
  *   programStartAtMs?: number,
  *   platform?: string,
  *   slotViewCount?: number,
- *   platformFacts?: { viewCount?: number, commentCount?: number, official?: Record<string, unknown> }
+ *   thumbnailUrl?: string,
+ *   broadcasterPageUrl?: string,
+ *   videoId?: string,
+ *   platformFacts?: { viewCount?: number, commentCount?: number, official?: Record<string, unknown>, contentKind?: string, isLive?: boolean, videoId?: string }
  * }} WatchMetaSnapshot
  */
 
 // ── stage 1: URL からの liveId 取得(live-view-entry.js の liveIdFromUrl と同型) ──
 
-/** @returns {string} 不正なら '' */
+/** @param {unknown} id @returns {boolean} */
+function isExportProgramId(id) {
+  const lv = String(id || '').trim().toLowerCase();
+  return /^lv\d{1,15}$/.test(lv) || /^(sm|so|nm)\d+$/.test(lv);
+}
+
 function liveIdFromUrl() {
   try {
     const lv = String(new URLSearchParams(location.search).get('lv') || '')
       .trim()
       .toLowerCase();
-    return /^lv\d{1,15}$/.test(lv) ? lv : '';
+    return isExportProgramId(lv) ? lv : '';
   } catch {
     return '';
   }
@@ -330,6 +341,40 @@ function getCachedAnonymousIdenticonDataUrl(userId) {
     }
   }
   return gen;
+}
+
+
+/**
+ * 拡張がすでに控えている配信コメントの顔 URL（yt_tw_icons / yt_kk_icons など）。
+ * ネットへ取りに行かず、chrome.storage.local の控えだけを読む。
+ * @returns {Promise<Record<string, Record<string, string>>>}
+ */
+async function readLiveIconMap() {
+  try {
+    const platforms = Object.values(STREAM_PLATFORMS).filter((p) => p && typeof p.lateIconsKey === 'string' && p.lateIconsKey);
+    if (!platforms.length) return {};
+    const bag = await chrome.storage.local.get(platforms.map((p) => p.lateIconsKey));
+    /** @type {Record<string, Record<string, string>>} */
+    const out = {};
+    for (const p of platforms) {
+      const store = bag?.[p.lateIconsKey];
+      if (!store || typeof store !== 'object') continue;
+      /** @type {Record<string, string>} */
+      const dict = {};
+      for (const [key, url] of Object.entries(store)) {
+        const u = String(url || '').trim();
+        const k = String(key || '').trim();
+        if (!k || !/^https:\/\//i.test(u) || dict[k]) continue;
+        dict[k] = u;
+        const lower = k.toLowerCase();
+        if (lower !== k && !dict[lower]) dict[lower] = u;
+      }
+      if (Object.keys(dict).length) out[p.id] = dict;
+    }
+    return out;
+  } catch {
+    return {};
+  }
 }
 
 const exportBlobRevokeQueue = createObjectUrlRevokeQueue({ timeoutMs: 120_000 });
@@ -562,6 +607,67 @@ async function followerSamplesForExport(lid, snapshot) {
   }
 }
 
+
+/**
+ * 書き出し時に、開いている YouTube 動画タブの DOM を一度だけ読む（チップ・コメントスレッド）。
+ * 新しい通信・Observer・タイマーは使わない。失敗しても報告は出す。
+ * @param {WatchMetaSnapshot|null} snapshot
+ */
+function videoIdFromWatchSnapshot(snapshot) {
+  const thumb = String(snapshot?.thumbnailUrl || snapshot?.platformFacts?.videoId || '');
+  const m = thumb.match(/\/vi\/([A-Za-z0-9_-]{11})\//);
+  if (m) return m[1];
+  const id = String(snapshot?.platformFacts?.videoId || snapshot?.videoId || '').trim();
+  return /^[A-Za-z0-9_-]{11}$/.test(id) ? id : '';
+}
+
+/** @param {WatchMetaSnapshot|null} snapshot @param {string} [liveId] */
+async function readYoutubePageExportSnapshot(snapshot, liveId) {
+  /** @type {{ relatedChip: object | null, commentThreads: object[], videoId: string }} */
+  const empty = { relatedChip: null, commentThreads: [], videoId: '' };
+  const platform = String(snapshot?.platform || '');
+  if (platform && platform !== 'youtube') return empty;
+  if (!platform && liveId && !isYtPseudoLvShape(liveId)) return empty;
+  if (typeof chrome === 'undefined' || !chrome.tabs || typeof chrome.tabs.query !== 'function') return empty;
+  const videoId = videoIdFromWatchSnapshot(snapshot);
+  const operatorChannelId = String(snapshot?.broadcasterPageUrl || '').match(/\/channel\/(UC[A-Za-z0-9_-]{22})/)?.[1] || '';
+  try {
+    const tabs = await chrome.tabs.query({
+      url: ['*://www.youtube.com/*', '*://youtube.com/*', '*://m.youtube.com/*'],
+    });
+    // 同じ videoId のタブだけ読む。ID が無いときは、ただ一つ開いている視聴タブでも拾わない。
+    if (!videoId) return empty;
+    let match = (tabs || []).find((t) => youtubeTabMatchesVideo(t.url, videoId));
+    if (!match || match.id == null) return empty;
+    try {
+      const fresh = await chrome.tabs.get(match.id);
+      if (!youtubeTabMatchesVideo(fresh?.url, videoId)) return empty;
+      match = fresh && fresh.id != null ? fresh : match;
+    } catch {
+      if (!youtubeTabMatchesVideo(match.url, videoId)) return empty;
+    }
+    const res = await withTimeout(
+      chrome.tabs.sendMessage(match.id, {
+        type: 'YT_READ_PAGE_EXPORT_SNAPSHOT',
+        videoId,
+        operatorChannelId,
+        operatorChannelName: String(snapshot?.broadcasterName || ''),
+        operatorHandle: '',
+      }),
+      2500,
+      'yt_page_export_snapshot_timeout'
+    );
+    if (!res || res.ok !== true) return empty;
+    return {
+      relatedChip: res.relatedChip && typeof res.relatedChip === 'object' ? res.relatedChip : null,
+      commentThreads: Array.isArray(res.commentThreads) ? res.commentThreads : [],
+      videoId,
+    };
+  } catch {
+    return empty;
+  }
+}
+
 /** @param {string} lid */
 async function runExport(lid) {
   if (!lid) {
@@ -632,9 +738,13 @@ async function runExport(lid) {
     } catch {
       data = {};
     }
-    const comments = /** @type {import('../lib/commentRecord.js').StoredComment[]} */ (
+    let comments = /** @type {import('../lib/commentRecord.js').StoredComment[]} */ (
       Array.isArray(commentsRaw) ? commentsRaw : []
     );
+    const pageExportSnap = await readYoutubePageExportSnapshot(snapshot, lid);
+    if (pageExportSnap.commentThreads.length) {
+      comments = mergeYtThreadsOntoComments(comments, pageExportSnap.commentThreads, lid);
+    }
     const giftUsersForMarketing = Array.isArray(data[gKey]) ? data[gKey] : [];
     const giftEventsForMarketing = Array.isArray(data[giftEventsKey]) ? data[giftEventsKey] : [];
     const giftHistoryThrowsForMarketing = Array.isArray(data[giftThrowsKey]) ? data[giftThrowsKey] : [];
@@ -648,12 +758,24 @@ async function runExport(lid) {
     mktProf.mark('read');
     const heavyMkt = comments.length > HTML_REPORT_HEAVY_COMMENT_THRESHOLD;
     const reportBroadcasterUid = String(snapshot?.broadcasterUserId || '').trim();
-    const marketingView = marketingViewFor(snapshot?.platform);
+    const platformHint = String(snapshot?.platform || (isYtPseudoLvShape(lid) ? 'youtube' : '')).trim();
+    const marketingView = marketingViewFor(platformHint || undefined);
     const pageCountRaw = Number(snapshot?.slotViewCount ?? snapshot?.platformFacts?.viewCount ?? snapshot?.platformFacts?.official?.totalViews);
-    const marketingPageCount = marketingView && pageCountRaw > 0 && pageCountRaw <= 50_000_000 ? Math.floor(pageCountRaw) : 0;
+    const marketingPageCount = marketingView && pageCountRaw > 0 && pageCountRaw <= 50_000_000 ? Math.floor(pageCountRaw) : undefined;
     const facts = snapshot?.platformFacts;
-    const marketingPageFacts = marketingView && facts && typeof facts === 'object'
-      ? { official: facts.official, commentCount: facts.commentCount }
+    const loadedFromPage = pageExportSnap.commentThreads.length > 0 ? pageExportSnap.commentThreads.length : undefined;
+    const marketingPageFacts = (marketingView && facts && typeof facts === 'object') || loadedFromPage
+      ? {
+          ...(facts && typeof facts === 'object'
+            ? {
+                official: facts.official,
+                commentCount: facts.commentCount,
+                ...(facts.contentKind ? { contentKind: facts.contentKind } : {}),
+                ...(facts.viewCount != null ? { viewCount: facts.viewCount } : {}),
+              }
+            : {}),
+          ...(loadedFromPage ? { loadedCommentCount: loadedFromPage } : {}),
+        }
       : null;
     setWaitStageText('分析中… (2/3) 集計・画像準備', 35);
     await yieldToBrowserPaint();
@@ -822,19 +944,22 @@ async function runExport(lid) {
       }
     }
     mktProf.mark('html_report');
+    const liveIcons = await readLiveIconMap();
     const html = buildMarketingDashboardHtml(report, {
-      ...(marketingView ? { platform: marketingView.id, pageCount: marketingPageCount, pageFacts: marketingPageFacts } : {}),
       mediaKitHtml,
       htmlReportHtml,
+      ...(marketingView ? { platform: marketingView.id, pageCount: marketingPageCount, pageFacts: marketingPageFacts } : (marketingPageFacts ? { pageFacts: marketingPageFacts } : {})),
       programStartAtMs: Number(snapshot?.programStartAtMs || snapshot?.startAtMs) || undefined,
       followerSamples,
       maskShareLabels: maskShareLabels,
       anonymousIdenticonResolver: getCachedAnonymousIdenticonDataUrl,
+      liveIcons,
       broadcasterUserId: String(snapshot?.broadcasterUserId || '').trim(),
       sessionSummaryRows,
       // v0.1.1708: 分析の入力は全件(旧: heavy のとき2,500件の均等サンプル=速度・沈黙・笑い・疲労・離脱・出席などが無注記で縮んだ)。
       commentsForAnalytics: comments,
-      contentKind,
+      // 点の幅を決める種類(ライブ/アーカイブは 'live')。下の contentKind はページの種類そのもの(運営者向けの並び)
+      seriesContentKind: contentKind,
       pastBroadcasts,
       giftUsers: giftUsersForMarketing,
       giftEvents: giftEventsForMarketing,
@@ -850,6 +975,10 @@ async function runExport(lid) {
       streamAgeMin: typeof snapshot?.streamAgeMin === 'number' ? snapshot.streamAgeMin : undefined,
       yukkuriImageDataUrlMap: yukkuriImageMapForMkt,
       eventRanking: eventRankingForMkt,
+      contentKind: String(snapshot?.platformFacts?.contentKind || (pageExportSnap.commentThreads.length ? 'video' : '')),
+      relatedChip: pageExportSnap.relatedChip,
+      videoThreads: pageExportSnap.commentThreads,
+      watchId: String(pageExportSnap.videoId || videoIdFromWatchSnapshot(snapshot) || ''),
       slimForHeavyExport: heavyMkt
     });
     mktProf.mark('build_html');

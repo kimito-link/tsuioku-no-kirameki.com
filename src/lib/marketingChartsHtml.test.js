@@ -743,8 +743,8 @@ describe('buildMarketingDashboardHtml', () => {
     expect(html).toContain('href="https://www.nicovideo.jp/user/88210441"');
     expect(html).toContain('target="_blank"');
     expect(html).toContain('rel="noopener noreferrer"');
-    // displayUserLabel により「のら（88210441）」形式で表示されリンクで包まれる。
-    expect(html).toContain('>のら（88210441）</a>');
+    // 表示名は「のら」。内部ではない公式の数字 ID はリンク先に残す。
+    expect(html).toContain('>のら</a>');
   });
 
   it('複数の匿名 (a:xxxx) ユーザーを TOP に載せると、shortId 付きラベルで識別できる', () => {
@@ -782,11 +782,12 @@ describe('buildMarketingDashboardHtml', () => {
       }
     ];
     const html = buildMarketingDashboardHtml(aggregateMarketingReport(comments, 'lv123'));
-    // 2 人とも nickname は「匿名」だが、ラベルに shortId が付くので識別できる。
-    // a:AbCdEfGhIjKlMnOp はちょうど 18 文字なのでそのまま表示される。
-    expect(html).toContain('匿名（a:AbCdEfGhIjKlMnOp）');
-    expect(html).toContain('匿名（a:ZyWvUtSrQpOnMlKj）');
-    // リンクにはなっていない（匿名はプロフィールページが無い）
+    // 表示名に内部 ID (a:...) は出さない。検索用の data-search と顔で見分ける。
+    expect(html).toContain('匿名');
+    expect(html).not.toContain('匿名（a:');
+    // 埋め込み JSON の userId は残し、表示名には出さない。
+    expect(html).toContain('a:AbCdEfGhIjKlMnOp');
+    expect(html).toContain('a:ZyWvUtSrQpOnMlKj');
     expect(html).not.toContain('href="https://www.nicovideo.jp/user/a:');
   });
 
@@ -962,9 +963,8 @@ describe('buildMarketingDashboardHtml', () => {
     expect(html).toContain('class="mkt-rank-av"');
     expect(html).toContain('mkt-section--thumb-grid');
     expect(html).toContain('class="mkt-thumb-grid__avatar"');
-    expect(html).toContain(
-      'onerror="this.onerror=null;this.src=\'https://secure-dcdn.cdn.nimg.jp/nicoaccount/usericon/defaults/blank.jpg\'"'
-    );
+    expect(html).toMatch(/onerror="this\.onerror=null;this\.src='data:image\//);
+    expect(html).not.toContain('usericon/defaults/blank.jpg');
   });
 
   it('匿名 a: には identiconResolver の戻りを最低サムネとして当てる', () => {

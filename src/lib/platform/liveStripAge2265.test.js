@@ -17,7 +17,7 @@ const bag = (/** @type {any} */ facts, concurrent = { text: '—', isPlaceholder
 });
 
 describe('経過の文字(どのサービスも同じ読み口)', () => {
-  it.each([[0, '0分'], [59, '59分'], [61, '1時間1分'], [1440, '24時間'], [10080, '168時間']])('7日以内は今まで通り %s分 → %s', (m, want) => {
+  it.each([[0, '0分'], [59, '59分'], [61, '1時間1分'], [1440, '24時間'], [10079, '167時間59分']])('7日未満は今まで通り %s分 → %s', (m, want) => {
     expect(formatOfficialStreamAgeMinutes(m)).toBe(want);
   });
   it('7日を超える経過は日・年で(NNNNN時間にしない)', () => {
@@ -25,6 +25,9 @@ describe('経過の文字(どのサービスも同じ読み口)', () => {
     expect(t).toBe('4年139日');
     expect(t).not.toMatch(/\d{4,}時間/);
     expect(formatOfficialStreamAgeMinutes(10081)).toBe('7日');
+  });
+  it.each([[10080, '7日'], [10081, '7日'], [38380 * 60, '4年139日'], [38380 * 60 + 9, '4年139日']])('7日ちょうど以上は日・年 %s分 → %s', (m, want) => {
+    expect(formatOfficialStreamAgeMinutes(m)).toBe(want);
   });
 });
 
