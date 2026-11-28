@@ -724,6 +724,12 @@ function ytCommentHostElements(root) {
 
 /**
  * コメントの「3 時間前」「2 days ago」などから、おおよその投稿時刻を出す。並び用であり、記録の正式な時刻ではない。
+ *
+ * v0.1.2269: 「いま − 2 週間」をそのまま返すと、読んだ瞬間(ミリ秒)ごとに値が変わり、同じ「2 週間前」の人どうしが
+ *   読んだ順・読む回(返信を開いたあとの読み直し・ページのデータと画面の読み)で 1ms 違いの「新しい・古い」になっていた
+ *   (CKcv9q8A30A 実測: 同じ「2 週間前」の 1 人が先頭から末尾へ飛ぶ)。単位(秒・分・時間・日・週・月・年)ごとの区切りに
+ *   そろえて(いまから数えた「n 単位前」の範囲の中の、その単位の区切り)返す。同じ表示の人は同じ値になり、並びはページの順で安定する。
+ *   「3 日前」と読める値は 3 日以上 4 日未満の古さのままなので、画面の「◯日前」の表示は変わらない。
  * @param {unknown} text
  * @param {number} [nowMs]
  * @returns {number | null}
@@ -735,18 +741,18 @@ export function parseYtCommentPublishedAtMs(text, nowMs = Date.now()) {
   const n = Number(m[1]);
   if (!Number.isFinite(n) || n < 0) return null;
   const unit = m[2].toLowerCase();
-  let ms = 0;
-  if (/秒|second/.test(unit)) ms = n * 1000;
-  else if (/分|minute/.test(unit)) ms = n * 60_000;
-  else if (/時間|hour/.test(unit)) ms = n * 3_600_000;
-  else if (/週|week/.test(unit)) ms = n * 7 * 86_400_000;
-  else if (/日|day/.test(unit)) ms = n * 86_400_000;
-  else if (/月|month/.test(unit)) ms = n * 30 * 86_400_000;
-  else if (/年|year/.test(unit)) ms = n * 365 * 86_400_000;
+  let unitMs = 0;
+  if (/秒|second/.test(unit)) unitMs = 1000;
+  else if (/分|minute/.test(unit)) unitMs = 60_000;
+  else if (/時間|hour/.test(unit)) unitMs = 3_600_000;
+  else if (/週|week/.test(unit)) unitMs = 7 * 86_400_000;
+  else if (/日|day/.test(unit)) unitMs = 86_400_000;
+  else if (/月|month/.test(unit)) unitMs = 30 * 86_400_000;
+  else if (/年|year/.test(unit)) unitMs = 365 * 86_400_000;
   else return null;
   const now = Number(nowMs);
   const base = Number.isFinite(now) && now > 0 ? now : Date.now();
-  return Math.floor(base - ms);
+  return Math.floor((base - n * unitMs) / unitMs) * unitMs;
 }
 
 /**
