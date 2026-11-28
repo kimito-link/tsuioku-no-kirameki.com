@@ -1192,12 +1192,33 @@ export function tallyVisibleSuperThanks(authors) {
   return { count, amounts };
 }
 
+/**
+ * v0.1.2265: 画面(DOM)の数を、いまの動画のものとして読んでよいか。ミックスで A→B と移った直後は、
+ *   画面の枠(ytd-watch-flexy の video-id)や再生数の印がまだ A のことがある。そのときは読まない(未測定のまま待つ)。
+ *   印も枠の id も無いときは今まで通り(判断できないページで数を消さない)。
+ * @param {Document} doc
+ * @param {string} videoId
+ */
+export function ytWatchDomIsFor(doc, videoId) {
+  if (!videoId) return false;
+  const root = doc?.documentElement;
+  const tag = String(root?.getAttribute?.('data-nl-yt-view-count-video-id') || '');
+  if (tag && tag !== videoId) return false;
+  const flexy = typeof doc?.querySelector === 'function' ? doc.querySelector('ytd-watch-flexy[video-id]') : null;
+  const fid = String(flexy?.getAttribute('video-id') || '');
+  if (fid && fid !== videoId) return false;
+  return true;
+}
+
 /** @param {Document} doc @param {string} videoId */
 export function readYtWatchIndicators(doc, videoId) {
   const root = doc.documentElement;
   const raw = root?.getAttribute('data-nl-yt-view-count') || '';
   const tagged = root?.getAttribute('data-nl-yt-view-count-video-id') === videoId;
-  const viewCount = tagged && /^\d+$/.test(raw) ? Number(raw) : ytViewCountFromDom(doc);
+  // v0.1.2265: 印が別の動画・画面の枠が前の動画なら、古い画面の数を新しい動画に付けない(null = 未測定)
+  const viewCount = tagged && /^\d+$/.test(raw)
+    ? Number(raw)
+    : (ytWatchDomIsFor(doc, videoId) ? ytViewCountFromDom(doc) : null);
   let hasLiveChat = false;
   let hasLiveChatReplay = false;
   for (const frame of doc.querySelectorAll('iframe[src]')) {

@@ -38,6 +38,29 @@ function replayHide(el, hide) {
   }
 }
 
+/**
+ * v0.1.2265: アーカイブのあいだは横の欄の「読み上げ」を押せなくする(動画と同じ・いま届くコメントが無い)。自分の印だけ付け外す。
+ *   動画の印(data-nl-video-voice-disabled)が付いているボタンは、動画の側に任せる。
+ * @param {ParentNode} root
+ * @param {boolean} replay
+ */
+function replayVoiceOff(root, replay) {
+  const btn = /** @type {HTMLButtonElement|null} */ (root.querySelector?.('#openComeviewVoiceBtn') || null);
+  if (!btn || btn.tagName !== 'BUTTON') return;
+  const marked = btn.getAttribute('data-nl-replay-voice-disabled') === '1';
+  if (replay) {
+    if (marked || btn.disabled) return;
+    btn.disabled = true;
+    btn.setAttribute('aria-disabled', 'true');
+    btn.setAttribute('data-nl-replay-voice-disabled', '1');
+  } else if (marked) {
+    btn.removeAttribute('data-nl-replay-voice-disabled');
+    if (btn.hasAttribute('data-nl-video-voice-disabled')) return;
+    btn.disabled = false;
+    btn.removeAttribute('aria-disabled');
+  }
+}
+
 /** 同じ値の setAttribute も変化の記録になるので、違う時だけ書く。 @param {Element} el @param {string} name @param {string} value */
 function setAttrIfDiff(el, name, value) {
   if (el.getAttribute(name) !== value) el.setAttribute(name, value);
@@ -363,6 +386,7 @@ export function applyPlatformMetricChrome(root, state) {
   const concCard = root.querySelector('#watchConcurrentCard');
   if (concCard) setAttrIfDiff(concCard, 'title', '配信ページが出している公式の数です。');
   replayHide(concCard, replay);
+  replayVoiceOff(root, replay);
   const concIcon = root.querySelector('#watchConcurrentCard .nl-live-stat-icon');
   if (concIcon) {
     setAttrIfDiff(concIcon, 'title', plan.concurrentLabel);

@@ -958,8 +958,6 @@ async function runExport(lid) {
       sessionSummaryRows,
       // v0.1.1708: 分析の入力は全件(旧: heavy のとき2,500件の均等サンプル=速度・沈黙・笑い・疲労・離脱・出席などが無注記で縮んだ)。
       commentsForAnalytics: comments,
-      // 点の幅を決める種類(ライブ/アーカイブは 'live')。下の contentKind はページの種類そのもの(運営者向けの並び)
-      seriesContentKind: contentKind,
       pastBroadcasts,
       giftUsers: giftUsersForMarketing,
       giftEvents: giftEventsForMarketing,

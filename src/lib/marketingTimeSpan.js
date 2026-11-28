@@ -88,28 +88,6 @@ export function seriesBucketMs(spanMs, baseMs, maxBuckets = MARKETING_SERIES_MAX
 }
 
 /**
- * v0.1.2265: ライブの列の点の数の上限(7日を30秒ごと=20161点)。7日以内のライブは今までの細かさ(1分・30秒)のまま。
- *   描く側の守り(capSeriesPoints)もこの数まで。動画の列は MARKETING_SERIES_MAX_BUCKETS 以下なので変わらない。
- */
-export const MARKETING_LIVE_SERIES_MAX_BUCKETS = MARKETING_TIMELINE_MAX_MINUTES * 2 + 1;
-
-/**
- * v0.1.2265: 種類つきの1点の幅。ライブで幅が7日以内なら baseMs のまま(今までと同じ出力)。
- *   7日を超える幅(ライブでも、同じ鍵に何週間も記録がたまったとき)は、動画と同じく点の数を上限に収める。
- *   0.1.2263 の一時版はライブを上限から外していて、30日分のライブ記録で HTML が 23MB・400日分で 307MB になった。
- * @param {number} spanMs
- * @param {number} baseMs
- * @param {string} [contentKind]
- * @returns {number}
- */
-export function seriesBucketMsForKind(spanMs, baseMs, contentKind) {
-  const base = Number.isFinite(baseMs) && baseMs > 0 ? baseMs : 60_000;
-  const span = Number.isFinite(spanMs) && spanMs > 0 ? spanMs : 0;
-  if (contentKind === 'live' && span <= MARKETING_TIMELINE_MAX_MINUTES * 60_000) return base;
-  return seriesBucketMs(span, base);
-}
-
-/**
  * 1点の幅を短い日本語に(「30秒」「1分」「6時間」「7日」)。
  * @param {number} ms
  */
@@ -183,6 +161,17 @@ export function marketingSpanDisplay(durationMinutes) {
   const rest = days % 365;
   const value = years > 0 ? `${years}年${rest > 0 ? `${rest}日` : ''}` : `${days}日`;
   return { long: true, text: `コメントの期間 ${value}`, value, label: 'コメントの期間' };
+}
+
+/**
+ * v0.1.2265: 7日を超える経過だけ「30日」「4年139日」に。7日以内は null(呼び出し側の今までの「N分」「H時間M分」のまま)。
+ *   マーケHTMLのラベルは、7日以内のライブで master と同じ文字にする(「24時間0分」を「1日」にしない)。
+ * @param {unknown} ms
+ * @returns {string | null}
+ */
+export function formatBeyondWeekJa(ms) {
+  const v = Number(ms) || 0;
+  return v > MARKETING_TIMELINE_MAX_MINUTES * 60_000 ? formatLongGapJa(v) : null;
 }
 
 /**

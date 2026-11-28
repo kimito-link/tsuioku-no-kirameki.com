@@ -3,6 +3,7 @@
  * 動画のコメントは投稿日が「1日前」〜「19年前」にわたる。時間の流れの列(速さ・笑い・気分)が
  * 30秒/1分ごとに何百万点にもなり、笑い密度の SVG が 15億文字を作って落ちていた。
  */
+import { createHash } from 'node:crypto';
 import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { describe, expect, it } from 'vitest';
@@ -228,17 +229,37 @@ describe.each(VIDEO_PLATFORMS)('%s: 動画・録画のマーケHTML(長い幅)�
   });
 });
 
-describe('live timeline matches master at inclusive boundaries', () => {
+describe('7日以内のライブは master(58ca7e488 と同じ列の作り)と同じ出力 (v0.1.2265)', () => {
   const minute = 60_000;
-  it.each([719.5, 720, 1439, 1440, 10079, 10080])('keeps master buckets at %s minutes', (minutes) => {
-    const comments = [0, minutes * minute].map((offsetMs, i) => ({
-      liveId: 'lv123456789', capturedAt: NOW + offsetMs, text: 'www', userId: String(i + 1),
-    }));
-    const opts = { contentKind: 'live' };
-    expect(aggregateMarketingReport(comments, 'lv123456789', opts).timeline.length).toBe(Math.round(minutes) + 1);
-    expect(buildCommentVelocityTimeline(comments, opts).buckets.length).toBe(Math.floor(minutes) + 1);
-    expect(buildLaughterDensityTimeline(comments, opts).buckets.length).toBe(Math.floor(minutes * 2) + 1);
-    expect(scoreSentimentTimeline(comments, opts).buckets.length).toBe(Math.floor(minutes) + 1);
+  // 期待値は master (aeefb7ab1 = 58ca7e488 と同じ列の作り) で同じ入力から作った値(marketingLiveMaster2265.snapshot.json)。
+  //   ライブ同士を比べると、どちらも同じように変わったときに気づけない(Codex 指摘)ので、master の実出力と比べる。
+  const snapshot = JSON.parse(readFileSync(join(process.cwd(), 'src/lib/platform/marketingLiveMaster2265.snapshot.json'), 'utf8'));
+  const hash = (/** @type {string} */ s) => createHash('sha256').update(s).digest('hex').slice(0, 16);
+  const rows = (/** @type {number} */ minutes, n = 400) => Array.from({ length: n }, (_, i) => ({
+    id: `c${i}`, liveId: 'lv1', text: i % 3 ? 'w草' : 'すごい', userId: `u${i % 40}`, nickname: `n${i % 40}`,
+    capturedAt: NOW + Math.floor((i / (n - 1)) * minutes * minute),
+  }));
+  it.each([120, 720, 1440, 10080])('%s分: 速さ・笑い・気分の1点の幅と点の数が master と同じ', (minutes) => {
+    const c = rows(minutes);
+    const v = buildCommentVelocityTimeline(c, { bucketMs: 60_000, rollingWindowMin: 5, contentKind: 'live' });
+    const l = buildLaughterDensityTimeline(c, { bucketMs: 30_000, contentKind: 'live' });
+    const s = scoreSentimentTimeline(c, { bucketMs: 60_000, contentKind: 'live' });
+    const want = snapshot[String(minutes)];
+    expect([v.bucketMs, v.buckets.length, hash(JSON.stringify(v))]).toEqual(want.v);
+    expect([l.bucketMs, l.buckets.length, hash(JSON.stringify(l))]).toEqual(want.l);
+    expect([s.bucketMs, s.buckets.length, hash(JSON.stringify(s))]).toEqual(want.s);
+  });
+  it.each(['nicolive', 'youtube', 'twitch', 'kick', 'twitcasting', 'tiktok', 'abema', 'showroom'].flatMap(
+    (p) => [120, 720, 1440, 10080].map((m) => /** @type {[string, number]} */ ([p, m])),
+  ))('%s %s分: マーケHTML が master と1文字も変わらない(大きさ・ラベルも)', (platform, minutes) => {
+    const c = rows(minutes);
+    const html = buildMarketingDashboardHtml(aggregateMarketingReport(c, 'lv1', { contentKind: 'live' }), {
+      platform, commentsForAnalytics: c, contentKind: 'live',
+    }).replace(/\d{4}\/\d{1,2}\/\d{1,2} \d{1,2}:\d{2}:\d{2}/g, 'T').replace(/\d{4}-\d{2}-\d{2}T[\d:.]+Z/g, 'Z');
+    expect([html.length, hash(html)]).toEqual(snapshot[String(minutes)][platform]);
+  });
+  it('7日ちょうどのライブの HTML は master と同じ大きさ(5MB を超えない)', () => {
+    expect(snapshot['10080'].nicolive[0]).toBeLessThan(3_000_000);
   });
 
   it('keeps the established video window when one far-future row is present', async () => {
@@ -277,12 +298,5 @@ describe.each(LIVE_PLATFORMS)('%s: 長いライブ記録のマーケHTML(v0.1.22
     expect(html.length).toBeLessThan(2_000_000);
     expect(html).not.toMatch(/\d{5,}\s*分/);
     expect(html).toContain('コメントの期間');
-  });
-  it('ふつうのライブ(2時間)は、種類を渡さない(今までの)出力と同じ', () => {
-    const rows = Array.from({ length: 600 }, (_, i) => ({
-      id: `c${i}`, liveId: 'lv1', text: i % 3 ? 'w草' : 'すごい', userId: `u${i % 50}`, nickname: `n${i % 50}`,
-      capturedAt: NOW + ((i * 7919) % 7_200_000),
-    }));
-    expect(liveHtml(rows, platform, 'live')).toBe(liveHtml(rows, platform, undefined));
   });
 });

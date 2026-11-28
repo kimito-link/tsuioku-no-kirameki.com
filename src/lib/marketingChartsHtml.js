@@ -10,10 +10,10 @@ import {
   capSeriesPoints,
   formatBucketMsJa,
   formatLongGapJa,
+  formatBeyondWeekJa,
   formatSeriesOffsetJa,
   marketingSpanDisplay,
-  maxOfList,
-  MARKETING_LIVE_SERIES_MAX_BUCKETS
+  maxOfList
 } from './marketingTimeSpan.js';
 import { escapeAttr, escapeHtml } from './htmlEscape.js';
 import { maskLabelForShare } from './privacyDisplay.js';
@@ -281,7 +281,7 @@ function sectionBroadcastNarrative(narrative, maskShare) {
       return `<article class="mkt-narrative-card">
 <div class="mkt-narrative-card__head">
 <strong>${escapeHtml(seg.label)}</strong>
-<span>${formatLongGapJa(seg.startMinute * 60_000) || seg.startMinute}〜${formatLongGapJa(seg.endMinute * 60_000) || `${seg.endMinute}分`} / ${seg.commentCount}件 / ${seg.uniqueUsers}人</span>
+<span>${formatBeyondWeekJa(seg.startMinute * 60_000) || seg.startMinute}〜${formatBeyondWeekJa(seg.endMinute * 60_000) || `${seg.endMinute}分`} / ${seg.commentCount}件 / ${seg.uniqueUsers}人</span>
 </div>
 <div class="mkt-narrative-keywords">${keywords}</div>
 ${samples}
@@ -608,7 +608,7 @@ function sectionCommentVelocityCurve(series) {
   const innerW = W - pad * 2;
   const innerH = H - pad * 2;
   // v0.1.2263: 描く点の数も上限まで(集計側で収まっていても、描く側で二重に守る)
-  const pts = capSeriesPoints(series.buckets, MARKETING_LIVE_SERIES_MAX_BUCKETS);
+  const pts = capSeriesPoints(series.buckets);
   const n = pts.length;
   const maxV = Math.max(1, series.peakValue);
   const step = formatBucketMsJa(series.bucketMs || 60_000);
@@ -786,7 +786,7 @@ function sectionLaughterDensity(laugh) {
   const xOf = (i) => pad + (innerW * i) / Math.max(1, n - 1);
   const barW = Math.max(1, Math.min(8, innerW / n - 1));
   // ライブ(30秒ごとのまま)は今までと同じ出力。広げた列だけ、コメントの無い棒を省く。
-  const shown = bucketMs === 30_000 ? capSeriesPoints(laugh.buckets, MARKETING_LIVE_SERIES_MAX_BUCKETS) : capSeriesPoints(laugh.buckets.filter((b) => b.total > 0));
+  const shown = bucketMs === 30_000 ? laugh.buckets : capSeriesPoints(laugh.buckets.filter((b) => b.total > 0));
   const bars = shown
     .map((b) => {
       const x = xOf(b.minute);
@@ -861,7 +861,7 @@ function sectionSurvivalCurve(curve) {
   const dots = curve.segments
     .map(
       (s, i) =>
-        `<circle cx="${xOf(i).toFixed(1)}" cy="${yOf(s.retentionPct).toFixed(1)}" r="3" fill="#a78bfa"><title>区間${i + 1} (${formatLongGapJa(s.startMin * 60_000) || s.startMin}〜${formatLongGapJa(s.endMin * 60_000) || `${s.endMin}分`}): ${s.retentionPct}% (${s.presentCount}名)</title></circle>`
+        `<circle cx="${xOf(i).toFixed(1)}" cy="${yOf(s.retentionPct).toFixed(1)}" r="3" fill="#a78bfa"><title>区間${i + 1} (${formatBeyondWeekJa(s.startMin * 60_000) || s.startMin}〜${formatBeyondWeekJa(s.endMin * 60_000) || `${s.endMin}分`}): ${s.retentionPct}% (${s.presentCount}名)</title></circle>`
     )
     .join('');
   const xLabels = curve.segments
@@ -1357,7 +1357,7 @@ function sectionSentimentCurve(sentiment) {
   const innerW = W - pad * 2;
   const innerH = H - pad * 2;
   // v0.1.2263: Math.max に列を広げて渡すと、列が長いと落ちる。最大は1回ずつ数える。描く点の数も上限まで。
-  const pts = capSeriesPoints(sentiment.buckets, MARKETING_LIVE_SERIES_MAX_BUCKETS);
+  const pts = capSeriesPoints(sentiment.buckets);
   const n = pts.length;
   let maxV = 1;
   for (const b of sentiment.buckets) {
@@ -3133,7 +3133,6 @@ function buildSectionRevealScriptHtml() {
  *   anonymousIdenticonResolver?: (uid: string, size?: number) => string,
  *   broadcasterUserId?: string,
  *   sessionSummaryRows?: import('./concurrentTimelineSeries.js').ConcurrentTimelineRow[],
- *   seriesContentKind?: string,
  *   commentsForAnalytics?: import('./commentVelocityTimeline.js').VelocityCommentInput[],
  *   pastBroadcasts?: import('./commenterHistoricalAnalytics.js').BroadcastBundle[],
  *   giftUsers?: import('./giftRecord.js').StoredGiftUser[],
@@ -3230,22 +3229,31 @@ export function buildMarketingDashboardHtml(r, opts = {}) {
   //   何年にもわたる動画のコメントで、1分ごとの列が数百万になり「Invalid string length」になった。
   //   速さ・笑い・気分の列は点の数を自分で上限まで収める(1点の幅を広げる)ので、コメント全部を使う。
   //   幅が7日以内(ライブ)なら、どちらも同じ配列(コピーしない・今までと同じ出力)。
-  const commentsRaw = /** @type {any[]} */ (Array.isArray(opts.commentsForAnalytics) ? opts.commentsForAnalytics : []);
-  const seriesContentKind = opts.seriesContentKind ?? opts.contentKind; // 速さ・笑い・気分の列の点の幅(7日以内のライブは細かいまま)
-  const timeSpan = boundCommentsToTimeWindow(commentsRaw);
+  const allCommentsRaw = /** @type {any[]} */ (Array.isArray(opts.commentsForAnalytics) ? opts.commentsForAnalytics : []);
+  const timeSpan = boundCommentsToTimeWindow(allCommentsRaw);
+  const commentsRaw = /** @type {any[]} */ (timeSpan.comments);
+  // ニコ生は配列をコピーしない。他サービスで応援の行があるときだけ、発言だけを分析に渡す。
   const commentsForAnalytics = view ? speechCommentsForMarketing(commentsRaw) : commentsRaw;
-  const windowRows = /** @type {any[]} */ (timeSpan.comments);
-  const boundedSpeech = view ? speechCommentsForMarketing(windowRows) : windowRows;
-  // v0.1.2265: 沈黙・疲れはライブでも7日の窓(7日以内のライブは窓が全部なので今まで通り)
-  const graphComments = boundedSpeech;
-  const velocityTimeline = buildCommentVelocityTimeline(commentsForAnalytics, {
-    bucketMs: 60_000, rollingWindowMin: 5, contentKind: seriesContentKind
+  const commentsForSeries = timeSpan.windowed
+    ? view
+      ? speechCommentsForMarketing(allCommentsRaw)
+      : allCommentsRaw
+    : commentsForAnalytics;
+  const velocityTimeline = buildCommentVelocityTimeline(commentsForSeries, {
+    bucketMs: 60_000,
+    rollingWindowMin: 5
   });
-  const silenceZones = detectCommentSilenceZones(graphComments, {
-    thresholdMs: 60_000, quality: { windowMs: 30_000 }
+  const silenceZones = detectCommentSilenceZones(commentsForAnalytics, {
+    thresholdMs: 60_000,
+    quality: { windowMs: 30_000 }
   });
-  const laughterDensity = buildLaughterDensityTimeline(commentsForAnalytics, { bucketMs: 30_000, contentKind: seriesContentKind });
-  const commentFatigue = computeCommentFatigue(graphComments, { broadcasterUserId, maxTenureMin: 30 });
+  const laughterDensity = buildLaughterDensityTimeline(commentsForSeries, {
+    bucketMs: 30_000
+  });
+  const commentFatigue = computeCommentFatigue(commentsForAnalytics, {
+    broadcasterUserId,
+    maxTenureMin: 30
+  });
 
   // 0.1.23 (X): 過去 N 配信を突き合わせるユーザー層分析。pastBroadcasts 未渡しなら
   // 空集計が返る（純粋関数側で吸収）。配信者本人は除外する。
@@ -3365,8 +3373,8 @@ export function buildMarketingDashboardHtml(r, opts = {}) {
   const firstSecondLatency = buildCommenterFirstSecondLatency(currentCommentsForLayer);
   const talentPeaks = detectTalentPeakMoments(currentCommentsForLayer);
   const sentimentCurve = scoreSentimentTimeline(
-    currentCommentsForLayer,
-    { bucketMs: 60_000, contentKind: seriesContentKind }
+    timeSpan.windowed ? filterBroadcaster(commentsForSeries) : currentCommentsForLayer,
+    { bucketMs: 60_000 }
   );
   // 自コメ抜粋: selfPosted=true のもの
   const selfComments = commentsForAnalytics.filter((c) =>

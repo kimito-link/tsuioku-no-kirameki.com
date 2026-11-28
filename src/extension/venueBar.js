@@ -394,7 +394,7 @@ import { clearVenueComposerPass, venueToggleShouldUntuck } from '../lib/venueTuc
 import { createVenueBubbleVoiceSyncState, startVenueSpeechBubbleVoice, summarizeBubbleVoiceSync } from '../lib/venueBubbleVoiceSync.js';
 // 2026-11-09 りんく「これを会場モードでもいれたほうが利便性たかい」: パネルの数字カード(記録・推定同時接続ほか)を会場のヘッダーにも出す。
 import { KEY_STAT_CARDS_MIRROR } from '../lib/statCardsMirrorKey.js';
-import { buildVenueStatStripModel, createVenueStatStrip, VENUE_STAT_STRIP_CSS, VENUE_STAT_STRIP_FACE_PATHS } from '../lib/venueStatStrip.js';
+import { buildVenueStatStripModel, createVenueStatStrip, VENUE_STAT_STRIP_CSS, VENUE_STAT_STRIP_FACE_PATHS, venueVoiceSuspendedKind } from '../lib/venueStatStrip.js';
 import { createVenueStatSelfPoller, createStatMirrorLiveness, requestWatchSnapshotViaTabs } from '../lib/venueStatCardsSelf.js';
 
 const ROOT_ID = 'nlsb-venue-root';
@@ -3379,7 +3379,7 @@ export function mountVenueBarButton(options = {}) {
       if (!open) voicePlayer.diag.venueGate = enabled ? 'headless' : (voicePlayer.readingWanted ? 'headless-waiting-engine' : 'panel-closed');
       if (!enabled) updatePickupBanner(null);
       if (!voicePlayer.readingWanted) hiddenSpeechBuf.clear();
-      voiceBtn.disabled = false; voiceBtn.setAttribute('aria-busy', toggleBusy ? 'true' : 'false');
+      voiceBtn.disabled = voicePlayer.pageAllowed === false; voiceBtn.setAttribute('aria-busy', toggleBusy ? 'true' : 'false');
       voiceBtn.classList.toggle('is-on', enabled);
       voiceBtn.textContent = enabled ? '🔊 読み上げ: ON' : '🔈 読み上げ: OFF';
     },
@@ -3426,7 +3426,6 @@ export function mountVenueBarButton(options = {}) {
       voicePlayer.enable();
     }
   });
-  
   // 会場モードは開いたら「いきなり読み上げ上がる」のがユーザー期待(comeview の ?voice=1 相当)。
   //   保存状態に関わらず自動 ON。OBS 透過モードは VoicePlayer 内で isObsMode により enable を
   //   スキップするので forceOn を渡しても安全(無音オーバーレイのまま)。
@@ -3708,6 +3707,7 @@ export function mountVenueBarButton(options = {}) {
       statMirrorLiveness.observe(statCardsMirrorSnap); // 隠れた欄が1回書いたきりの鏡を「動いている」と扱わない
       const model = buildVenueStatStripModel(statCardsMirrorSnap, { liveId, nowMs: Date.now(), recordedCount, selfSnap: statCardsSelfSnap, mirrorLive: statMirrorLiveness.isLive(Date.now(), liveId), platform: options.statPlatform });
       statStrip.paint(model);
+      voicePlayer.setPageAllowed(!venueVoiceSuspendedKind(model.contentKind)); // v0.1.2265: 動画・アーカイブでは声を出さない(意思と保存はそのまま・ライブで再開)
       if (open) statSelfPoller.tick(Date.now(), { liveId, mirrorFresh: model.source === 'mirror' && statMirrorLiveness.isLive(Date.now(), liveId), recordedCount });
     } catch { /* 帯の失敗で会場を止めない */ }
   };

@@ -1119,6 +1119,8 @@ export function panelExtraChips(platformId, facts) {
   if (facts?.contentKind === 'live_replay') {
     const v = num(facts?.viewCount);
     if (v != null) chips.unshift({ key: 'views', label: '再生', text: formatInt(v), unit: '回', placeholder: false, title: OFFICIAL });
+    // 終わった配信では、読めない数は待っても埋まらない。「読み込み中」のまま止めずに出さない
+    for (let i = chips.length - 1; i >= 0; i -= 1) if (chips[i].placeholder === true) chips.splice(i, 1);
   }
   if (id === 'youtube' && facts?.contentKind === 'video') {
     const n = num(facts?.commentCount ?? facts?.slotCommentCount);
@@ -1167,7 +1169,10 @@ export function venueItemsForPlatform(platformId, bag) {
     facts.isLive === false ||
     viewLeak
   );
-  const pageViews = ('headlineCount' in cap && cap.headlineCount === 'views') || youtubeVideo;
+  // v0.1.2265: アーカイブ(live_replay)はどのサービスも「再生 N回」= ページの再生数だけ(前の同時視聴者数・画面の数で埋めない)
+  const replay = facts.contentKind === 'live_replay';
+  const playback = youtubeVideo || replay;
+  const pageViews = ('headlineCount' in cap && cap.headlineCount === 'views') || playback;
   const fromFacts = pageViews ? num(facts.viewCount) : num(facts.viewers);
   const concText = String(bag?.concurrent?.text || '').trim();
   // ページに出ている数だけを出す。数でない文字(—・推定中・接続中・読み込み中 等)や推定(~)は「読み込み中」にまとめる。
@@ -1196,9 +1201,9 @@ export function venueItemsForPlatform(platformId, bag) {
     },
     {
       key: 'concurrent',
-      label: youtubeVideo ? '再生' : plan.concurrentLabel,
+      label: playback ? '再生' : plan.concurrentLabel,
       text: viewer.text,
-      unit: viewer.isPlaceholder ? '' : (youtubeVideo ? '回' : ('countUnit' in cap ? cap.countUnit : '人')),
+      unit: viewer.isPlaceholder ? '' : (playback ? '回' : ('countUnit' in cap ? cap.countUnit : '人')),
       isPlaceholder: viewer.isPlaceholder,
       face: 'konta',
       title: OFFICIAL,
@@ -1214,7 +1219,7 @@ export function venueItemsForPlatform(platformId, bag) {
     },
   ];
   // v0.1.2265: アーカイブ(live_replay)はいま配信中ではない。経過は出さず、読めない再生数も「読み込み中」で止めずに隠す(どのサービスも同じ)
-  if (facts.contentKind === 'live_replay') {
+  if (replay) {
     for (let i = items.length - 1; i >= 0; i -= 1) {
       if (items[i].key === 'streamAge' || (items[i].key === 'concurrent' && items[i].isPlaceholder)) items.splice(i, 1);
     }
