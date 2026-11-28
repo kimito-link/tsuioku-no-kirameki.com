@@ -71,7 +71,7 @@ describe('ニコ生以外(ytNicoShim が決め手を登録している)', () => 
     const el = tile(uid, { title: `名前（${uid}）`, meta: { idLine: uid, nameLine: '名前' } });
     expect(el.tagName).toBe('A');
     expect(el.getAttribute('href')).toBe(`https://www.youtube.com/channel/${uc}`);
-    expect(el.title).toBe('名前');
+    expect(el.title).toBe('名前（UCabcdef…qrstuv）'); // 内部IDは公開してよい UC の短い形に置き換える(今までの画面の直しと同じ)
     NO_8(el); NO_NICO(el);
   });
   it('YouTube @ハンドル: /@handle へ', () => {
@@ -105,7 +105,7 @@ describe('ニコ生以外(ytNicoShim が決め手を登録している)', () => 
   it('mirror の title が「名前（8004919137）」でも出ない / idLine≠uid の「 | uid」ケースも付けない', () => {
     const uid = numericUidForYtKey('UCzzzzzzzzzzzzzzzzzzzzzz');
     const el = tile(uid, { title: `名前（${uid}）`, meta: { idLine: 'ID:別の表示', nameLine: '名前' } });
-    expect(el.title).toBe('名前');
+    expect(el.title).toBe('名前（UCzzzzzz…zzzzzz）');
     expect(el.querySelector('.nl-story-userlane-meta__id').textContent).toBe('ID:別の表示');
     NO_8(el);
   });
@@ -156,7 +156,7 @@ describe('ニコ生以外(ytNicoShim が決め手を登録している)', () => 
   it('席: 内部IDの人は title から数字が消え、リンク扱いは「出せるページがあるか」だけ', () => {
     const uc = numericUidForYtKey('UCqqqqqqqqqqqqqqqqqqqqqq');
     const nm = numericUidForYtKey('name:だれ');
-    expect(seatTitleFor(uc, '名前（' + uc + '）')).toBe('名前');
+    expect(seatTitleFor(uc, '名前（' + uc + '）')).toBe('名前（UCqqqqqq…qqqqqq）');
     expect(seatTitleFor(nm, `だれ（${nm}）`)).toBe('だれ');
     expect(seatLinkFor(uc, true)).toBe(true);
     expect(seatLinkFor(nm, true)).toBe(false);
@@ -169,7 +169,7 @@ describe('ニコ生以外(ytNicoShim が決め手を登録している)', () => 
     const uid = numericUidForYtKey('handle:@SK-dt8bb');
     const m = buildVenueHoverCardModel({ uid, displayName: `SK（${uid}）`, platformId: 'youtube', count: 1 });
     expect(JSON.stringify(m)).not.toContain(uid);
-    expect(m.displayName).toBe('SK');
+    expect(m.displayName).toBe('SK（@SK-dt8bb）');
     expect(m.idLine).toBe('ID:@SK-dt8bb');
     expect(m.idKind).toBe('public');
     const nm = numericUidForYtKey('name:ただ');
@@ -181,9 +181,27 @@ describe('ニコ生以外(ytNicoShim が決め手を登録している)', () => 
   });
 });
 
+describe('人物タイルの 1 行目=名前・2 行目=公開ラベル(今までの画面の直しと同じ形をタイルを作る時点で)', () => {
+  it('idLine が内部IDで、名前と公開ラベルが分かる人は 名前 / @ハンドル', () => {
+    const uid = numericUidForYtKey('handle:@SK-dt8bb');
+    const el = tile(uid, { title: 'SK-dt8bb', meta: { idLine: uid, nameLine: 'SK-dt8bb' } });
+    expect(el.querySelector('.nl-story-userlane-meta__id').textContent).toBe('SK-dt8bb');
+    expect(el.querySelector('.nl-story-userlane-meta__name').textContent).toBe('@SK-dt8bb');
+    expect(el.title).toBe('SK-dt8bb');
+  });
+  it('公開ラベルが無い人は 1 行目を空にして内部IDを出さない', () => {
+    const uid = numericUidForYtKey('name:ただの人2');
+    const el = tile(uid, { title: 'ただの人2', meta: { idLine: uid, nameLine: 'ただの人2' } });
+    expect(el.querySelector('.nl-story-userlane-meta__id').textContent).toBe('');
+    expect(el.querySelector('.nl-story-userlane-meta__name').textContent).toBe('ただの人2');
+  });
+});
+
 describe('純関数', () => {
   it('stripInternalNumericId', () => {
     expect(stripInternalNumericId('名前（8004919137）')).toBe('名前');
+    expect(stripInternalNumericId('名前（8004919137）', '@h')).toBe('名前（@h）');
+    expect(stripInternalNumericId('名前 ・ ID:8004919137', '@h')).toBe('名前 ・ ID:@h');
     expect(stripInternalNumericId('名前 | 8004919137')).toBe('名前');
     expect(stripInternalNumericId('名前 ID:8004919137')).toBe('名前');
     expect(stripInternalNumericId('12345678901')).toBe('12345678901'); // 11桁は内部IDではない

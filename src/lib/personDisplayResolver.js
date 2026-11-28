@@ -48,14 +48,17 @@ export function resolvePersonDisplay(uid, ctx) {
 export const INTERNAL_UID_RE = /(?<!\d)8\d{9}(?!\d)/g;
 
 /**
- * 文字から内部の疑似ID を取り除く。「名前（8004919137）」→「名前」、「名前 | 8004919137」→「名前」。
+ * 文字の中の内部の疑似ID を、出してよい公開ラベル(@ハンドル等)に置き換える。無ければ取り除く。
+ *   「名前（8004919137）」→「名前（@handle）」/ ラベルなしなら「名前」。「名前 | 8004919137」→「名前」(付け足しはしない)。
  * @param {unknown} text
+ * @param {string} [label] その人の公開ラベル(分からなければ空)
  */
-export function stripInternalNumericId(text) {
+export function stripInternalNumericId(text, label = '') {
+  const l = String(label || '');
   return String(text ?? '')
     .replace(/\s*[|｜]\s*(?<!\d)8\d{9}(?!\d)/g, '')
-    .replace(/\s*[（(]\s*(?<!\d)8\d{9}(?!\d)\s*[)）]/g, '')
-    .replace(/(?:ID[:：]\s?)?(?<!\d)8\d{9}(?!\d)/g, '')
+    .replace(/\s*[（(]\s*(?<!\d)8\d{9}(?!\d)\s*[)）]/g, l ? `（${l}）` : '')
+    .replace(/(ID[:：]\s?)?(?<!\d)8\d{9}(?!\d)/g, (_all, idTag) => (l ? `${idTag || ''}${l}` : ''))
     .replace(/\s{2,}/g, ' ')
     .trim();
 }
@@ -97,10 +100,22 @@ export function isSafeForeignProfileUrl(url, platformId) {
  * @returns {PersonDisplay}
  */
 export function foreignPersonDisplay(i) {
-  const title = stripInternalNumericId(i.title).replace(/[（(]\s*[)）]/g, '').trim();
-  const nameLine = stripInternalNumericId(i.nameLine);
+  const label = String(i.publicLabel || '');
+  const title = stripInternalNumericId(i.title, label).replace(/[（(]\s*[)）]/g, '').trim();
+  let nameLine = stripInternalNumericId(i.nameLine, label);
   const rawId = String(i.idLine ?? '');
-  const idLine = /(?<!\d)8\d{9}(?!\d)/.test(rawId) ? String(i.publicLabel || '') : rawId;
+  let idLine = rawId;
+  if (/(?<!\d)8\d{9}(?!\d)/.test(rawId)) {
+    // 人物タイルは 1 行目=名前・2 行目=公開ラベル(@ハンドル)。1 行目が内部ID で、名前と公開ラベルが分かるときは入れ替えて出す
+    //   (今まで ytNicoShim の画面の直しが後から同じ形にしていたのを、タイルを作る時点で決める)。
+    const nm = stripInternalNumericId(i.nameLine, '');
+    if (label && nm && nm !== label) {
+      idLine = nm;
+      nameLine = label;
+    } else {
+      idLine = stripInternalNumericId(rawId, label).replace(/^ID[:：]\s?/, '');
+    }
+  }
   const pid = String(i.platformId || '');
   return {
     title: title || nameLine || '名前未取得',
