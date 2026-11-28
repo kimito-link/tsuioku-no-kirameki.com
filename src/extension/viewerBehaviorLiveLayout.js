@@ -4,7 +4,7 @@
  */
 import { paintStoryUserLaneDomFilled } from './story/renderStoryUserLaneDom.js';
 import { createVenueStatStrip } from '../lib/venueStatStrip.js';
-import { VIEWER_BEHAVIOR_FALLBACK_AVATAR, resolveViewerBehaviorAvatarUrl, viewerRelationLabel } from '../lib/viewerBehavior.js';
+import { VIEWER_BEHAVIOR_FALLBACK_AVATAR, compareVideoPageAge, resolveViewerBehaviorAvatarUrl, viewerRelationLabel } from '../lib/viewerBehavior.js';
 import { createSupportAvatarLoadGuard } from '../lib/supportGrowthAvatarLoad.js';
 import { avatarFallbackFaceForUrl, isSiteDefaultSilhouetteUrl } from '../lib/avatarFallbackFromUrl.js';
 import { anonymousIdenticonDataUrl } from '../lib/anonymousIdenticon.js';
@@ -84,6 +84,7 @@ export function viewerBehaviorRowsToLaneBuckets(board, opts = {}) {
       factLine: String(row.factLine || ''),
       commentAnchor: String(row.commentAnchor || ''),
       pageAt: Number(row.pageAt) > 0 ? Math.floor(Number(row.pageAt)) : 0,
+      pageAgeMs: row.pageAgeMs != null ? row.pageAgeMs : null,
     };
     if (videoOrder) videoItems.push(item);
     else if (row.relation === 'regular') buckets.link.push(item);
@@ -91,7 +92,8 @@ export function viewerBehaviorRowsToLaneBuckets(board, opts = {}) {
     else buckets.tanu.push(item);
   }
   if (videoOrder) {
-    videoItems.sort((a, b) => (b.pageAt || 0) - (a.pageAt || 0));
+    // v0.1.2269: 同じ「◯週間前」は同点(並べ替えは安定なので、もとの順 = ページの順のまま)
+    videoItems.sort(compareVideoPageAge);
     buckets.tanu.push(...videoItems);
   }
   return buckets;

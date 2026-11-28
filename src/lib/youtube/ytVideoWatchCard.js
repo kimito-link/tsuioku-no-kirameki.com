@@ -13,7 +13,7 @@ import {
   formatStreamerTakeHomeDisplay,
 } from '../estimatedViewerSpend.js';
 import { attachRepliesToPeople, buildViewerBehaviorBoard, viewerBehaviorBoardInnerHtml } from '../viewerBehavior.js';
-import { matchVideoCommentersToLive, tallyVisibleSuperThanks } from './ytVideoWatchMeta.js';
+import { matchVideoCommentersToLive, tallyVisibleSuperThanks, ytUnreadReplyCount } from './ytVideoWatchMeta.js';
 import { attachVideoCommentsToPeople } from '../videoWatch/videoCommentDetail.js';
 import { normalizeVideoFacts, videoFactsLineHtml } from '../videoWatch/videoFacts.js';
 import { videoCommentRowsForStore } from '../videoWatch/videoCommentRows.js';
@@ -34,6 +34,7 @@ export const YT_VIDEO_WATCH_CARD_TITLE = 'この動画のデータ';
  *   videoAuthorCount: number,
  *   matchedCount: number,
  *   matchSummary: string,
+ *   unreadReplies: number,
  *   matchedNames: string[],
  *   superThanksCount: number,
  *   spend: ReturnType<typeof formatEstimatedViewerSpendDisplay> | null,
@@ -114,6 +115,8 @@ export function buildYtVideoWatchCardModel(input) {
       giftCount: Number(a?.amount) > 0 ? 1 : null,
       knownAmountJpy: String(a?.currency || '').toUpperCase() === 'JPY' && Number(a?.amount) > 0 ? Math.floor(Number(a.amount)) : null,
       at: Number(a?.postedAtMs || a?.at) > 0 ? Math.floor(Number(a.postedAtMs || a.at)) : 0,
+      // v0.1.2269: 並びだけに使う「表示の古さ」(記録の時刻ではない)
+      ageMs: a?.pageAgeMs != null && Number.isFinite(Number(a.pageAgeMs)) ? Number(a.pageAgeMs) : null,
       pending: a?.pending === true,
       commentAnchor: String(a?.commentId || '').trim(),
       creatorReplies: a?.creatorReplies,
@@ -149,6 +152,8 @@ export function buildYtVideoWatchCardModel(input) {
     videoAuthorCount,
     matchedCount: overlap.matchedCount,
     matchSummary,
+    // v0.1.2269: たたまれた返信のうち、まだ読めていない数(0 なら行を出さない)
+    unreadReplies: ytUnreadReplyCount(src.videoComments),
     matchedNames,
     superThanksCount: thanks.count,
     spend,
@@ -202,6 +207,7 @@ export function ytVideoWatchCardInnerHtml(model) {
     videoFactsLineHtml(model.facts) +
     (model.recordedSummary ? `<p class="nlsb-video-watch-card__recorded">${esc(model.recordedSummary)}</p>` : '') +
     (model.matchSummary ? `<p class="nlsb-video-watch-card__match">${esc(model.matchSummary)}</p>` : '') +
+    (Number(model.unreadReplies) > 0 ? `<p class="nlsb-video-watch-card__unread" data-unread-replies="${esc(Math.floor(Number(model.unreadReplies)))}">たたまれた返信 ${esc(Math.floor(Number(model.unreadReplies)).toLocaleString('ja-JP'))} 件は未読み込み。開くと読み込みます</p>` : '') +
     names +
     thanks.join('') +
     `</section>`

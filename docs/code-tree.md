@@ -1205,7 +1205,7 @@
   - `gift-coin-hq.wav`
   - `gift-register-hq.wav`
   - `gift-register.mp3`
-- 📁 **src/** (2791)
+- 📁 **src/** (2792)
   - 📁 **data/** (7)
     - 📁 **acquirers/** (2)
       - `laneFromStorage.js` — 応援レーン acquirer: chrome.storage.local(nls_comments) → laneStore の橋渡し。
@@ -1565,7 +1565,7 @@
         - `logo_funlink_white_RGB_link_black.png`
         - `logo_funlink_white_RGB_maru_black.png`
     - `hero-connect-hub.svg`
-  - 📁 **lib/** (2456)
+  - 📁 **lib/** (2457)
     - 📁 **__snapshots__/** (4)
       - `marketing-abema-baseline.html`
       - `marketing-niconico.html`
@@ -1757,7 +1757,7 @@
     - 📁 **whowatch/** (2)
       - `wwParse.js` — ふわっち(whowatch.tv)の配信とコメントを、YouTube 版の記録と同じ形にする(純関数)
       - `wwParse.test.js`
-    - 📁 **youtube/** (142)
+    - 📁 **youtube/** (143)
       - 📁 **fixtures/** (9)
         - 📁 **real-dom/** (9)
           - `README.md`
@@ -1788,6 +1788,7 @@
       - `ytChunkedRead.js` — 配信の記録を「少しずつ」読む(v0.1.1977)。
       - `ytChunkedRead.test.js`
       - `ytCommentEntities2252.test.js`
+      - `ytCommentOrderStable2269.test.js`
       - `ytCommentPhotoTag.js` — 【この箱の仕事】YouTube 動画のコメント欄で、まだ画面に出ていない投稿者の顔の URL を、ページの世界から属性に写す。
       - `ytCommentPhotoTag2247.test.js`
       - `ytCommentScanGate.js` — v0.1.2249: YouTube 動画のコメント欄の読み直し(既存の 5 秒ごとの sendMeta)を、変わっていないときは省く。
