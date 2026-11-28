@@ -703,10 +703,12 @@ function setupWatchPageMetaObserver() {
     const scan = contentKind === 'video' && domIsThisVideo
       ? ytCommentScanGate.read(document, videoId, () => {
         askPageToTagYtCommentPhotos(document);
+        // v0.1.2269: 1回の読み取りの「いま」を1つにして、ページのデータ・画面の投稿者・画面のコメントで同じ「◯週間前」が同じ時刻になるようにする
+        const nowMs = Date.now();
         // v0.1.2252: ページのデータ(UC… ID・顔)を正に、DOM で補う(ytCommentPhotoTag.js が同じ合図で写す)
-        const fromPage = ytVideoCommentAuthorsFromInnertube(readYtCommentEntities(document) || []);
-        const videoAuthors = mergeYtVideoCommentAuthors(fromPage, ytVideoCommentAuthorsFromDom(document, { videoId }));
-        return { videoAuthors, videoComments: ytVideoCommentsFromDom(document, { videoId }) };
+        const fromPage = ytVideoCommentAuthorsFromInnertube(readYtCommentEntities(document) || [], { nowMs });
+        const videoAuthors = mergeYtVideoCommentAuthors(fromPage, ytVideoCommentAuthorsFromDom(document, { videoId, nowMs }));
+        return { videoAuthors, videoComments: ytVideoCommentsFromDom(document, { videoId, nowMs }) };
       })
       : null;
     const videoAuthors = scan ? scan.videoAuthors : [];

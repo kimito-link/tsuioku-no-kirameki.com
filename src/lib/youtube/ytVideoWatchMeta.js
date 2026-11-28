@@ -8,6 +8,8 @@
  * ライブの同時視聴者数は ytConcurrentViewers.js の正本のまま。こちらは総再生回数だけを扱う。
  */
 
+import { countUnreadReplies, parseYtReplyCountLabel } from './ytReplyCount.js';
+
 const VIDEO_ID_RE = /^[A-Za-z0-9_-]{11}$/;
 const UC_RE = /^UC[A-Za-z0-9_-]{22}$/;
 const MAX_NODES = 80_000;
@@ -325,7 +327,7 @@ export function classifyYtWatchContentKind(signals) {
 }
 
 /**
- * @typedef {{ channelId: string, handle: string, name: string, amount: number | null, currency: string, avatarUrl?: string, commentId?: string, commentCount?: number, creatorHeart?: boolean, creatorReply?: boolean, pending?: boolean, postedAtMs?: number | null }} YtVideoCommentAuthor
+ * @typedef {{ channelId: string, handle: string, name: string, amount: number | null, currency: string, avatarUrl?: string, commentId?: string, commentCount?: number, creatorHeart?: boolean, creatorReply?: boolean, pending?: boolean, postedAtMs?: number | null, pageAgeMs?: number | null }} YtVideoCommentAuthor
  */
 
 /**
@@ -410,11 +412,12 @@ export function mergeYtVideoCommentAuthors(fromPage, fromDom, limit = 80) {
         handle: d.handle || hit.handle,
         ...(d.avatarUrl || hit.avatarUrl ? { avatarUrl: d.avatarUrl || hit.avatarUrl } : {}),
         ...(d.postedAtMs || hit.postedAtMs ? { postedAtMs: d.postedAtMs || hit.postedAtMs } : {}),
+        ...(d.pageAgeMs != null || hit.pageAgeMs != null ? { pageAgeMs: d.pageAgeMs != null ? d.pageAgeMs : hit.pageAgeMs } : {}),
       });
     } else out.push(d);
   }
   for (const a of page) if (!used.has(a)) out.push(a);
-  out.sort((a, b) => (Number(b.postedAtMs) || 0) - (Number(a.postedAtMs) || 0));
+  out.sort(compareYtAuthorNewest);
   return out.slice(0, Math.max(1, limit));
 }
 
@@ -433,7 +436,7 @@ export function ytVideoCommentAuthorsFromInnertube(data, opts = {}) {
   /** @type {{ n: number }} */
   const budget = { n: 0 };
   walkComments(data, out, seen, budget, 0, limit, nowMs);
-  out.sort((a, b) => (Number(b.postedAtMs) || 0) - (Number(a.postedAtMs) || 0));
+  out.sort(compareYtAuthorNewest);
   return out;
 }
 
@@ -501,11 +504,13 @@ function takeCommentEntityAuthor(entity, out, seen, nowMs) {
   if (!key) return;
   const avatarUrl = String(author.avatarThumbnailUrl || '').trim();
   const postedAtMs = parseYtCommentPublishedAtMs(props.publishedTime, nowMs);
+  const pageAgeMs = parseYtCommentAgeMs(props.publishedTime);
   if (seen.has(key)) {
     const prev = out.find((row) => (row.channelId && row.channelId === channelId) || (!channelId && `name:${row.name}` === key));
     if (prev) {
       if (avatarUrl && !prev.avatarUrl) prev.avatarUrl = avatarUrl;
       if (postedAtMs && (!prev.postedAtMs || postedAtMs > prev.postedAtMs)) prev.postedAtMs = postedAtMs;
+      if (pageAgeMs != null && (prev.pageAgeMs == null || pageAgeMs < prev.pageAgeMs)) prev.pageAgeMs = pageAgeMs;
     }
     return;
   }
@@ -519,6 +524,7 @@ function takeCommentEntityAuthor(entity, out, seen, nowMs) {
     ...(avatarUrl ? { avatarUrl } : {}),
     ...(props.commentId ? { commentId: String(props.commentId) } : {}),
     ...(postedAtMs ? { postedAtMs } : {}),
+    ...(pageAgeMs != null ? { pageAgeMs } : {}),
   });
 }
 
@@ -723,12 +729,13 @@ function ytCommentHostElements(root) {
 }
 
 /**
- * コメントの「3 時間前」「2 days ago」などから、おおよその投稿時刻を出す。並び用であり、記録の正式な時刻ではない。
+ * コメントの「3 時間前」「2 days ago」などの「何単位前」を、ミリ秒の古さ(n × 単位)で返す。いまの時刻には依存しない。
+ *   同じ表示(「2 週間前」)なら、いつ・どの経路で読んでも同じ値になる。並びだけに使う(記録の時刻には入れない)。
+ *   「7 日前」と「1 週間前」は同じ古さ。読めなければ null。
  * @param {unknown} text
- * @param {number} [nowMs]
  * @returns {number | null}
  */
-export function parseYtCommentPublishedAtMs(text, nowMs = Date.now()) {
+export function parseYtCommentAgeMs(text) {
   const s = String(text || '').replace(/\s+/g, ' ').trim();
   const m = s.match(/(\d+)\s*(秒|seconds?|分|minutes?|時間|hours?|日|days?|週間|週|weeks?|(?:か|ヵ|ヶ|ケ|カ)?月|months?|年|years?)\s*(前|ago)/i);
   if (!m) return null;
@@ -744,9 +751,37 @@ export function parseYtCommentPublishedAtMs(text, nowMs = Date.now()) {
   else if (/月|month/.test(unit)) ms = n * 30 * 86_400_000;
   else if (/年|year/.test(unit)) ms = n * 365 * 86_400_000;
   else return null;
+  return ms;
+}
+
+/**
+ * コメントの「3 時間前」「2 days ago」などから、おおよその投稿時刻を出す。並び用であり、記録の正式な時刻ではない。
+ *   (v0.1.2269: 記録・マーケHTMLに入る値の意味は変えない = いま − 古さ。同じ表示の人どうしの並びは、時刻ではなく
+ *   parseYtCommentAgeMs の古さで決める)
+ * @param {unknown} text
+ * @param {number} [nowMs]
+ * @returns {number | null}
+ */
+export function parseYtCommentPublishedAtMs(text, nowMs = Date.now()) {
+  const ms = parseYtCommentAgeMs(text);
+  if (ms == null) return null;
   const now = Number(nowMs);
   const base = Number.isFinite(now) && now > 0 ? now : Date.now();
   return Math.floor(base - ms);
+}
+
+/**
+ * v0.1.2269: 投稿者の「新しい順」の比べ方。両方に表示の古さ(pageAgeMs)があれば、それだけで比べる(同じ表示は同点 = 呼び出し順のまま)。
+ *   どちらかに無ければ、従来どおり推定の投稿時刻(postedAtMs)の新しい順。
+ * @param {{ pageAgeMs?: number | null, postedAtMs?: number | null }} a
+ * @param {{ pageAgeMs?: number | null, postedAtMs?: number | null }} b
+ * @returns {number}
+ */
+export function compareYtAuthorNewest(a, b) {
+  const ageA = a && a.pageAgeMs != null && Number.isFinite(Number(a.pageAgeMs)) ? Number(a.pageAgeMs) : null;
+  const ageB = b && b.pageAgeMs != null && Number.isFinite(Number(b.pageAgeMs)) ? Number(b.pageAgeMs) : null;
+  if (ageA != null && ageB != null) return ageA - ageB;
+  return (Number(b?.postedAtMs) || 0) - (Number(a?.postedAtMs) || 0);
 }
 
 /**
@@ -772,6 +807,8 @@ function ytCommentRowIsOtherVideo(el, videoId) {
 export function ytVideoCommentAuthorsFromDom(root, opts = {}) {
   const limit = Number.isFinite(Number(opts.limit)) ? Math.max(1, Math.floor(Number(opts.limit))) : 80;
   if (!root || typeof root.querySelectorAll !== 'function') return [];
+  // v0.1.2269: 1回の読み取りの全行で「いま」を1つにそろえる(行ごとに Date.now() を読むと、単位の境目をまたいだ行だけ時刻がずれる)
+  const nowMs = Number.isFinite(Number(opts.nowMs)) && Number(opts.nowMs) > 0 ? Number(opts.nowMs) : Date.now();
   /** @type {Map<string, YtVideoCommentAuthor>} */
   const byKey = new Map();
   const threads = ytCommentHostElements(root);
@@ -816,7 +853,8 @@ export function ytVideoCommentAuthorsFromDom(root, opts = {}) {
     const pending = !creatorHeart && !creatorReply;
     const publishedEl = queryDeep(el, '#published-time-text, #published-time-text a, .published-time-text, yt-formatted-string#published-time-text');
     const publishedText = String(publishedEl?.getAttribute?.('aria-label') || publishedEl?.getAttribute?.('title') || publishedEl?.textContent || '').trim();
-    const postedAtMs = parseYtCommentPublishedAtMs(publishedText, opts.nowMs);
+    const postedAtMs = parseYtCommentPublishedAtMs(publishedText, nowMs);
+    const pageAgeMs = parseYtCommentAgeMs(publishedText);
     const key = channelId || handle || (name ? `name:${name}` : '');
     if (!key) continue;
     const prev = byKey.get(key);
@@ -834,6 +872,7 @@ export function ytVideoCommentAuthorsFromDom(root, opts = {}) {
         creatorReply,
         pending,
         postedAtMs,
+        pageAgeMs,
       });
     } else {
       prev.commentCount = (Number(prev.commentCount) || 1) + 1;
@@ -853,11 +892,12 @@ export function ytVideoCommentAuthorsFromDom(root, opts = {}) {
       }
       if (!pending && !prev.pending && commentId && !prev.commentId) prev.commentId = commentId;
       if (postedAtMs && (!prev.postedAtMs || postedAtMs > prev.postedAtMs)) prev.postedAtMs = postedAtMs;
+      if (pageAgeMs != null && (prev.pageAgeMs == null || pageAgeMs < prev.pageAgeMs)) prev.pageAgeMs = pageAgeMs;
     }
     if (byKey.size >= limit && !prev) break;
   }
   const rows = [...byKey.values()];
-  rows.sort((a, b) => (Number(b.postedAtMs) || 0) - (Number(a.postedAtMs) || 0));
+  rows.sort(compareYtAuthorNewest);
   return rows;
 }
 
@@ -993,6 +1033,29 @@ function ytCommentRecordFromViewModel(el, opts = {}) {
   };
 }
 
+/**
+ * v0.1.2269: たたまれた(まだ読めていない)返信の数。画面の「N 件の返信」(各スレッドの先頭の replyCount)から、
+ *   そのスレッドで読めた返信(replyLevel 1)の数を引いた合計。読めた返信のほうが多いスレッドは 0 とみなす。
+ *   行はページの並び(先頭 → その返信たち → 次の先頭)のまま渡す。通信も DOM の再走査もしない純粋関数。
+ * @param {readonly any[] | null | undefined} comments ytVideoCommentsFromDom の行
+ * @returns {number}
+ */
+export function ytUnreadReplyCount(comments) {
+  if (!Array.isArray(comments)) return 0;
+  /** @type {{ label: string, loadedReplies: number }[]} */
+  const threads = [];
+  for (const c of comments) {
+    if (!c || typeof c !== 'object') continue;
+    if (Number(c.replyLevel) > 0) {
+      if (threads.length) threads[threads.length - 1].loadedReplies += 1;
+      continue;
+    }
+    const n = Math.floor(Number(c.replyCount));
+    threads.push({ label: Number.isFinite(n) && n > 0 ? `${n} 件の返信` : '', loadedReplies: 0 });
+  }
+  return countUnreadReplies(threads);
+}
+
 /** 本文の長さの上限(横の欄に出す分・保存の大きさを抑える) */
 export const YT_COMMENT_TEXT_MAX = 600;
 
@@ -1045,11 +1108,9 @@ export function ytCommentExtrasFromViewModel(el, publishedText) {
     if (thread && !(typeof el.closest === 'function' && el.closest('ytd-comment-replies-renderer'))) {
       const more = thread.querySelector?.('ytd-comment-replies-renderer #more-replies button[aria-label], ytd-comment-replies-renderer #more-replies [aria-label]');
       const label = String(more?.getAttribute?.('aria-label') || more?.textContent || '');
-      const m = label.match(/([\d,]+)\s*件の返信/) || label.match(/([\d,]+)\s*repl/i);
-      if (m) {
-        const n = Number(m[1].replace(/,/g, ''));
-        if (Number.isFinite(n) && n > 0) out.replyCount = n;
-      }
+      // v0.1.2269: 「1.2万 件の返信」「1.2K replies」「View reply」も読む(ytReplyCount.js)
+      const n = parseYtReplyCountLabel(label);
+      if (n != null && n > 0) out.replyCount = n;
     }
   } catch {
     /* 読めない項目は出さない */

@@ -61,6 +61,7 @@ export function resolveViewerBehaviorAvatarUrl(id, avatarUrl, platform = '') {
  *   handle?: string,
  *   channelUrl?: string,
  *   pageOrder?: number,
+ *   ageMs?: number | null,
  * }} ViewerBehaviorVisiblePerson
  *
  * @typedef {{
@@ -97,6 +98,7 @@ export function resolveViewerBehaviorAvatarUrl(id, avatarUrl, platform = '') {
  *   anonymousCount?: number,
  *   pending?: boolean,
  *   pageAt?: number | null,
+ *   pageAgeMs?: number | null,
  *   avatarUrl?: string,
  *   commentAnchor?: string,
  *   creatorReplies?: ViewerBehaviorReply[],
@@ -376,7 +378,24 @@ function compareBehaviorRows(a, b) {
 }
 
 /**
+ * 動画の顔2つの「新しさ」の比べ方(負なら a が先)。両方に pageAgeMs があればそれ(小さい=新しい)、無ければ pageAt の新しい順。
+ * @param {{ pageAgeMs?: number | null, pageAt?: number | null }} a
+ * @param {{ pageAgeMs?: number | null, pageAt?: number | null }} b
+ * @returns {number}
+ */
+export function compareVideoPageAge(a, b) {
+  const ageA = a && a.pageAgeMs != null && Number.isFinite(Number(a.pageAgeMs)) && Number(a.pageAgeMs) >= 0 ? Number(a.pageAgeMs) : null;
+  const ageB = b && b.pageAgeMs != null && Number.isFinite(Number(b.pageAgeMs)) && Number(b.pageAgeMs) >= 0 ? Number(b.pageAgeMs) : null;
+  if (ageA != null && ageB != null) return ageA - ageB;
+  const tA = Number(a?.pageAt) || 0;
+  const tB = Number(b?.pageAt) || 0;
+  return tB - tA;
+}
+
+/**
  * 通常動画の並び: 新しいコメントの人が先・同じ時刻はページの順・匿名の1枚は最後。
+ * v0.1.2269: 両方に「表示の古さ」(pageAgeMs = 「2 週間前」の n × 単位。YouTube の相対表示)があれば、推定の時刻ではなくそれで比べる。
+ *   同じ表示(「2 週間前」どうし・「7 日前」と「1 週間前」)は同点で、ページの順のまま。読んだ時刻・経路・読み直しで入れ替わらない。
  * @param {any} a
  * @param {any} b
  * @returns {number}
@@ -385,9 +404,8 @@ export function compareVideoRows(a, b) {
   const anonA = a.isAnonymous ? 1 : 0;
   const anonB = b.isAnonymous ? 1 : 0;
   if (anonA !== anonB) return anonA - anonB;
-  const tA = Number(a.pageAt) || 0;
-  const tB = Number(b.pageAt) || 0;
-  if (tA !== tB) return tB - tA;
+  const byAge = compareVideoPageAge(a, b);
+  if (byAge !== 0) return byAge;
   return (Number(a.pageOrder) || 0) - (Number(b.pageOrder) || 0);
 }
 
@@ -436,6 +454,7 @@ export function buildViewerBehaviorBoard(input) {
     const giftCount = nonNegIntOrNull(p?.giftCount);
     const knownAmountJpy = nonNegIntOrNull(p?.knownAmountJpy);
     const at = positiveMsOrNull(p?.at);
+    const ageMs = p?.ageMs != null && Number.isFinite(Number(p.ageMs)) && Number(p.ageMs) >= 0 ? Number(p.ageMs) : null;
     const pending = p?.pending === true ? true : p?.pending === false ? false : null;
     if (pending != null) pendingKnown = true;
     if (isAnonymousViewer(rawId, name)) {
@@ -468,6 +487,7 @@ export function buildViewerBehaviorBoard(input) {
         handle: String(p?.handle || '').trim(),
         channelUrl: String(p?.channelUrl || '').trim(),
         pageOrder: byId.size,
+        ageMs,
       });
       continue;
     }
@@ -477,6 +497,7 @@ export function buildViewerBehaviorBoard(input) {
     if (giftCount != null) prev.giftCount = (prev.giftCount || 0) + giftCount;
     if (knownAmountJpy != null) prev.knownAmountJpy = (prev.knownAmountJpy || 0) + knownAmountJpy;
     if (at != null && (prev.at == null || at > prev.at)) prev.at = at;
+    if (ageMs != null && (prev.ageMs == null || ageMs < prev.ageMs)) prev.ageMs = ageMs;
     if (name && name.length > String(prev.name || '').length) prev.name = name;
     if (!prev.avatarUrl && p?.avatarUrl) prev.avatarUrl = String(p.avatarUrl).trim();
     if (!prev.commentAnchor && p?.commentAnchor) prev.commentAnchor = String(p.commentAnchor).trim();
@@ -496,6 +517,7 @@ export function buildViewerBehaviorBoard(input) {
     row.isAnonymous = false;
     row.anonymousCount = 0;
     row.pageAt = Number(person.at) > 0 ? Math.floor(Number(person.at)) : 0;
+    row.pageAgeMs = person.ageMs != null ? person.ageMs : null;
     row.creatorReplies = Array.isArray(person.creatorReplies) ? person.creatorReplies : [];
     row.viewerReplies = Array.isArray(person.viewerReplies) ? person.viewerReplies : [];
     row.pageOrder = Number(person.pageOrder) || 0;

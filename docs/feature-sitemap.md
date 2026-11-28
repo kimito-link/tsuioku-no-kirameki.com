@@ -1264,7 +1264,7 @@
   - `src/extension/live-ranking-entry.js`
   - `tsuioku-no-kirameki/live/index.html`
   - `.github/workflows/live-ranking.yml`
-<details><summary>🗂 このカテゴリの全担当ファイル(自動分類) 388</summary>
+<details><summary>🗂 このカテゴリの全担当ファイル(自動分類) 389</summary>
 
 - `app/app.js` — スマホ閲覧用 status Web 版。
 - `app/live-view-block.js` — iPhone アプリの「🚩 見たくない人を隠す・報告する」(App Store の審査 1.2: ほかの人の書き込みを見せるアプリの決まり)。
@@ -1630,6 +1630,7 @@
 - `src/lib/youtube/ytPseudoLv.js` — YouTube の videoId から決まった疑似 lv(lv9 + 11桁)を作る純粋関数。
 - `src/lib/youtube/ytRelatedChipSnapshot.js` — YouTube 動画ページの右側チップと、いま画面に出ている関連動画を、
 - `src/lib/youtube/ytReplayChatJson.js` — アーカイブのチャットのリプレイ(get_live_chat_replay の返事)を、
+- `src/lib/youtube/ytReplyCount.js` — 【層】L0 判定層(純粋関数・I/O禁止)
 - `src/lib/youtube/ytShimCommentWrites.js` — YouTube 系(YouTube・Twitch・Kick ほか)の画面で、ニコ生版の部品がコメントの控え(nls_comments_<疑似lv> /
 - `src/lib/youtube/ytStaleFrameHold.js` — 0.1.1958: 横の欄の「切り替わる直前の古い画面」が、次の配信を描いてしまわないよう少し待つ。
 - `src/lib/youtube/ytStreamStart.js` — 配信ページの「いつ始まったか」を時刻にする純粋関数。
@@ -1699,6 +1700,7 @@
 - `v0.1.2263` 2026-11-27 — 動画ページで、顔を新しい順に並べ、タップで書いたことを出す
 
 ### その他 (8版)
+- `v0.1.2269` 2026-11-28 — 動画の顔を安定した新しい順にし、未読み込みの返信数を出す
 - `v0.1.2262` 2026-11-27 — Kick の録画で、ライブで見た人の顔が出るようにした
 - `v0.1.2254` 2026-11-27 — Twitch の録画で、ライブで見た人の顔がちゃんと出るようにした
 - `v0.1.2253` 2026-11-27 — Twitch の録画でも、ライブで覚えた顔を出す
@@ -1706,4 +1708,3 @@
 - `v0.1.2250` 2026-11-27 — ライブの顔が白い丸にならない(Twitch・Kick・YouTube)
 - `v0.1.2249` 2026-11-27 — YouTube の動画で、コメント欄の読み直しを軽くした
 - `v0.1.2247` 2026-11-26 — 動画のページで、コメントした人の顔がかならず出る
-- `v0.1.2246` 2026-11-26 — 動画のページで、顔の上の「記録がまだない」を出さない

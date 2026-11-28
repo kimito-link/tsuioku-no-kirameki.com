@@ -27,7 +27,7 @@
 
 > 値が次の段へ届かない「断線」(broadcaster バグ型)は `npm run feature-map -- --check` が機械検知。
 
-## ⚠️ 役割コメントが無いソース 16 / 1406 件
+## ⚠️ 役割コメントが無いソース 16 / 1407 件
 - `docs/handoff/bench/bench-interval.mjs`
 - `docs/handoff/bench/bench-lane.mjs`
 - `extension-youtube/cloak-failsafe.js`
@@ -1205,7 +1205,7 @@
   - `gift-coin-hq.wav`
   - `gift-register-hq.wav`
   - `gift-register.mp3`
-- 📁 **src/** (2793)
+- 📁 **src/** (2797)
   - 📁 **data/** (7)
     - 📁 **acquirers/** (2)
       - `laneFromStorage.js` — 応援レーン acquirer: chrome.storage.local(nls_comments) → laneStore の橋渡し。
@@ -1565,7 +1565,7 @@
         - `logo_funlink_white_RGB_link_black.png`
         - `logo_funlink_white_RGB_maru_black.png`
     - `hero-connect-hub.svg`
-  - 📁 **lib/** (2458)
+  - 📁 **lib/** (2462)
     - 📁 **__snapshots__/** (4)
       - `marketing-abema-baseline.html`
       - `marketing-niconico.html`
@@ -1757,7 +1757,7 @@
     - 📁 **whowatch/** (2)
       - `wwParse.js` — ふわっち(whowatch.tv)の配信とコメントを、YouTube 版の記録と同じ形にする(純関数)
       - `wwParse.test.js`
-    - 📁 **youtube/** (143)
+    - 📁 **youtube/** (147)
       - 📁 **fixtures/** (9)
         - 📁 **real-dom/** (9)
           - `README.md`
@@ -1789,6 +1789,7 @@
       - `ytChunkedRead.js` — 配信の記録を「少しずつ」読む(v0.1.1977)。
       - `ytChunkedRead.test.js`
       - `ytCommentEntities2252.test.js`
+      - `ytCommentOrderStable2269.test.js`
       - `ytCommentPhotoTag.js` — 【この箱の仕事】YouTube 動画のコメント欄で、まだ画面に出ていない投稿者の顔の URL を、ページの世界から属性に写す。
       - `ytCommentPhotoTag2247.test.js`
       - `ytCommentScanGate.js` — v0.1.2249: YouTube 動画のコメント欄の読み直し(既存の 5 秒ごとの sendMeta)を、変わっていないときは省く。
@@ -1846,6 +1847,8 @@
       - `ytRelatedChipSnapshot.test.js`
       - `ytReplayChatJson.js` — アーカイブのチャットのリプレイ(get_live_chat_replay の返事)を、
       - `ytReplayChatJson.test.js`
+      - `ytReplyCount.js` — 【層】L0 判定層(純粋関数・I/O禁止)
+      - `ytReplyCount.test.js`
       - `ytReportHtml.js` — YouTube 版の「💾 HTML（記録レポート）」と「📊 マーケ（分析レポート）」を組み立てる純粋関数
       - `ytReportHtml.test.js`
       - `ytShimBuildReuse.wiring.test.js`
@@ -1872,6 +1875,7 @@
       - `ytTailAfterFull.js` — v0.1.1983: 全件を一度渡したあとのテール(新着の差分)を、短くして渡す。
       - `ytTailAfterFull.test.js`
       - `ytThreadSnapshotIdentity2265.test.js`
+      - `ytUnreadReplies2269.test.js`
       - `ytUserLaneTiers.js` — ニコ生版「アイコン列」（りんく・ギフト・広告・こん太・たぬ姉の段）を YouTube の応援者に当てはめる純粋関数
       - `ytUserLaneTiers.test.js`
       - `ytVenueBoot.js` — 【層】L0 判定層(純粋関数・I/O禁止)

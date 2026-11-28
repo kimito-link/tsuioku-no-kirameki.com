@@ -58,6 +58,6 @@ describe('v0.1.2252 YouTube 動画の投稿者を、ページが持っている�
     expect(tag).toContain('tagYtCommentEntities(doc); // v0.1.2252');
     expect(tag).not.toMatch(/MutationObserver|setTimeout|setInterval|fetch\(|XMLHttpRequest/);
     const entry = readFileSync(join(ROOT, 'extension-youtube/src/content-chat-entry.js'), 'utf8');
-    expect(entry).toContain('mergeYtVideoCommentAuthors(fromPage, ytVideoCommentAuthorsFromDom(document, { videoId }))');
+    expect(entry).toContain('mergeYtVideoCommentAuthors(fromPage, ytVideoCommentAuthorsFromDom(document, { videoId, nowMs }))');
   });
 });

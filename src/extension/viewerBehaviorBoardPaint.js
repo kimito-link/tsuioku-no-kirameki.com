@@ -31,6 +31,7 @@ export function viewerBehaviorBoardStyleText(rootSel, _placement = 'overlay') {
     '}' +
     rootSel + ' .nlsb-viewer-behavior__title,' +
     rootSel + ' .nlsb-video-watch-card__title{margin:0 0 4px;font-size:13px;font-weight:700;}' +
+    rootSel + ' .nlsb-video-watch-card__unread{margin:-2px 0 6px;font-size:11px;line-height:1.35;color:#8a5a00;}' +
     rootSel + ' p{margin:0 0 6px;}' +
     rootSel + ' p:last-child{margin-bottom:0;}' +
     rootSel + ' .nlsb-viewer-behavior{margin-bottom:0;}' +
