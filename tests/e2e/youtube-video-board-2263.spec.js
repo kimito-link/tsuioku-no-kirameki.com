@@ -29,6 +29,7 @@ function pageHtml(id) {
 <link rel="canonical" href="https://www.youtube.com/watch?v=${id}">
 <title>テスト - YouTube</title></head><body>
 <h1>テスト</h1>
+<ytd-watch-flexy video-id="${id}"></ytd-watch-flexy>
 <script>var ytInitialData = ${JSON.stringify(initial(id))}; var ytInitialPlayerResponse = ${JSON.stringify(player(id, first))};</script>
 <div id="comments">${first ? '' : threads}</div>
 </body></html>`;
@@ -104,6 +105,8 @@ test.describe('YouTube の通常動画(v0.1.2263)', () => {
     await page.waitForTimeout(1500);
     await page.evaluate(({ id, threadsHtml, resp }) => {
       history.pushState(null, '', `/watch?v=${id}&list=RDtest&index=2`);
+      const flexy = document.querySelector('ytd-watch-flexy');
+      if (flexy) flexy.setAttribute('video-id', id);
       document.getElementById('comments').innerHTML = threadsHtml;
       window.dispatchEvent(new CustomEvent('yt-navigate-finish', { detail: { response: resp } }));
     }, { id: VID2, threadsHtml: threads, resp: { response: initial(VID2), playerResponse: player(VID2, false) } });
