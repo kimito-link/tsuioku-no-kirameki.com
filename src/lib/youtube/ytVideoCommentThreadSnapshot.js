@@ -282,7 +282,8 @@ export function commentsFromYtThreadSnapshot(rows, liveId) {
     liveId: lid,
     commentNo: String(i + 1),
     text: r.text || '',
-    userId: r.channelId || r.handle || (r.name ? `name:${r.name}` : ''),
+    // v0.1.2265: 表示名だけでは同一人物にしない(同じ名前の別人をまとめない)。channelId/handle が無い行は照合しない。
+    userId: r.channelId || r.handle || '',
     nickname: r.name || '',
     name: r.name || '',
     avatarUrl: r.avatarUrl || '',

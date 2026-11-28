@@ -239,6 +239,8 @@ describe('7日以内のライブは master(58ca7e488 と同じ列の作り)と�
   beforeAll(() => { process.env.TZ = 'Asia/Tokyo'; vi.useFakeTimers({ now: Date.parse('2026-12-04T12:00:00+09:00'), toFake: ['Date'] }); });
   afterAll(() => { vi.useRealTimers(); if (prevTz === undefined) delete process.env.TZ; else process.env.TZ = prevTz; });
   const snapshot = JSON.parse(readFileSync(join(process.cwd(), 'src/lib/platform/marketingLiveMaster2265.snapshot.json'), 'utf8'));
+  expect(snapshot._meta?.commit).toBeTruthy();
+  expect(snapshot._meta?.tz).toBe('Asia/Tokyo');
   const hash = (/** @type {string} */ s) => createHash('sha256').update(s).digest('hex').slice(0, 16);
   const rows = (/** @type {number} */ minutes, n = 400) => Array.from({ length: n }, (_, i) => ({
     id: `c${i}`, liveId: 'lv1', text: i % 3 ? 'w草' : 'すごい', userId: `u${i % 40}`, nickname: `n${i % 40}`,
@@ -254,7 +256,8 @@ describe('7日以内のライブは master(58ca7e488 と同じ列の作り)と�
     expect([l.bucketMs, l.buckets.length, hash(JSON.stringify(l))]).toEqual(want.l);
     expect([s.bucketMs, s.buckets.length, hash(JSON.stringify(s))]).toEqual(want.s);
   });
-  it.each(['nicolive', 'youtube', 'twitch', 'kick', 'twitcasting', 'tiktok', 'abema', 'showroom'].flatMap(
+  // v0.1.2265: Kick / ツイキャスは応援の呼び方(KICKs・アイテム)だけ master と違う。系列の点は同じ。
+  it.each(['nicolive', 'youtube', 'twitch', 'tiktok', 'abema', 'showroom'].flatMap(
     (p) => [120, 720, 1440, 10080].map((m) => /** @type {[string, number]} */ ([p, m])),
   ))('%s %s分: マーケHTML が master と1文字も変わらない(大きさ・ラベルも)', (platform, minutes) => {
     const c = rows(minutes);

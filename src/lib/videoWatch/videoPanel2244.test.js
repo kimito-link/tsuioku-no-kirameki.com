@@ -218,8 +218,10 @@ describe('② 録画・ニコ動へ移ったら、外枠はそのサービスの
 
   it('外枠は追従の最初にこの関数を使い、ライブの判定(配信キー)はそのまま残す', () => {
     const src = readFileSync(join(ROOT, 'src/extension/sidepanel-iframe-boot-entry.js'), 'utf8');
-    expect(src).toMatch(/videoPanelSrcForTab\(tab\.url, ifr\.getAttribute\('src'\), base\)/);
-    expect(src).toMatch(/k && k !== readYtPanelStreamKey\(cur\)/);
+    expect(src).toContain('nextSidepanelIframeSrc');
+    const lib = readFileSync(join(ROOT, 'src/lib/sidepanelIframeSrc.js'), 'utf8');
+    expect(lib).toMatch(/videoPanelSrcForTab\(tabUrl, currentSrc, nicoBase\)/);
+    expect(lib).toMatch(/k && k !== readYtPanelStreamKey\(currentSrc\)/);
   });
 });
 

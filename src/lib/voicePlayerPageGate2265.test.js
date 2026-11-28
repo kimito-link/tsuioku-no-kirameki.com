@@ -102,6 +102,38 @@ describe('配線: 会場は帯の写しのページの種類で声の許可を�
     const { readFileSync } = await import('node:fs');
     const src = readFileSync(`${process.cwd()}/src/extension/venueBar.js`, 'utf8');
     expect(src).toContain("voiceBtn.disabled = voicePlayer.pageAllowed === false;");
-    expect(src).toMatch(/statStrip\.paint\(model\);\n\s+voicePlayer\.setPageAllowed\(!venueVoiceSuspendedKind\(model\.contentKind\)\);/);
+    expect(src).toMatch(/statStrip\.paint\(model\);\n\s+if \(model\.contentKind\) voicePlayer\.setPageAllowed\(!venueVoiceSuspendedKind\(model\.contentKind\)\);/);
+  });
+});
+
+describe('VoicePlayer.setPageTarget: 配信が変わるまで前の許可を使わない', () => {
+  it('ライブAから動画Bへ移る途中(種類がまだ空)でも、待ちと再生を止める。意思は残す', async () => {
+    const { p, release } = makePlayer();
+    await p.initialize();
+    p.setPageTarget('lv-live-a');
+    const on = p.enable({ persist: false }); await flush(); release(); await on;
+    expect(p.enabled).toBe(true);
+    p.queue.push(/** @type {any} */ ({ kind: 'comment', text: 'x' }));
+    p.setPageTarget('lv-video-b'); // 新しい写しがまだ無い
+    expect(p.pageAllowed).toBe(false);
+    expect(p.enabled).toBe(false);
+    expect(p.queue.length).toBe(0);
+    expect(p.readingWanted).toBe(true);
+  });
+  it('最初の割り当て(空→id)では止めない', async () => {
+    const { p, release } = makePlayer();
+    await p.initialize();
+    const on = p.enable({ persist: false }); await flush(); release(); await on;
+    p.setPageTarget('lv-first');
+    expect(p.enabled).toBe(true);
+    expect(p.pageAllowed).toBe(true);
+  });
+  it('同じ id の呼び出しは何もしない', async () => {
+    const { p, release } = makePlayer();
+    await p.initialize();
+    const on = p.enable({ persist: false }); await flush(); release(); await on;
+    p.setPageTarget('lv-a');
+    p.setPageTarget('lv-a');
+    expect(p.enabled).toBe(true);
   });
 });

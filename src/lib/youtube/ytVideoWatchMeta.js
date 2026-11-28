@@ -653,23 +653,73 @@ function queryDeep(root, sel) {
  * @param {ParentNode} root
  * @returns {Element[]}
  */
+const YT_COMMENT_THREAD_SEL = 'ytd-comment-thread-renderer';
+const YT_COMMENT_VM_SEL = 'ytd-comment-view-model, ytd-comment-renderer, yt-comment-view-model';
+const YT_COMMENT_SCOPE_SEL = 'ytd-reel-video-renderer, ytd-engagement-panel-section-list-renderer, ytd-shorts, #shorts-container, #comments, ytd-comments';
+
+/**
+ * 1段の shadowRoot まで見て、sel に合う要素を集める(監視は増やさない。読むだけ)。
+ * @param {ParentNode|null|undefined} root
+ * @param {string} sel
+ * @param {Element[]} out
+ * @param {number} shadowLeft
+ */
+function collectQueryAll(root, sel, out, shadowLeft) {
+  if (!root) return;
+  if (typeof root.querySelectorAll === 'function') {
+    try {
+      const list = root.querySelectorAll(sel);
+      for (let i = 0; i < list.length; i += 1) out.push(list[i]);
+    } catch {
+      /* 読めない selector は飛ばす */
+    }
+  }
+  const sr = /** @type {any} */ (root).shadowRoot;
+  if (sr && shadowLeft > 0) collectQueryAll(sr, sel, out, shadowLeft - 1);
+}
+
+/**
+ * Shorts のコメントは reel や engagement の shadow の中にあることがある。
+ * @param {ParentNode} root
+ * @returns {Element[]}
+ */
+function ytCommentThreadRoots(root) {
+  /** @type {Element[]} */
+  const threads = [];
+  collectQueryAll(root, YT_COMMENT_THREAD_SEL, threads, 1);
+  if (typeof root.querySelectorAll === 'function') {
+    /** @type {ArrayLike<Element>} */
+    let scopes = [];
+    try { scopes = root.querySelectorAll(YT_COMMENT_SCOPE_SEL); } catch { scopes = []; }
+    for (let i = 0; i < scopes.length; i += 1) collectQueryAll(scopes[i], YT_COMMENT_THREAD_SEL, threads, 1);
+  }
+  return [...new Set(threads)];
+}
+
+/**
+ * @param {ParentNode} root
+ * @returns {Element[]}
+ */
 function ytCommentHostElements(root) {
   /** @type {Element[]} */
   const hosts = [];
-  /** @type {ArrayLike<Element>} */
-  const threads = typeof root.querySelectorAll === 'function' ? root.querySelectorAll('ytd-comment-thread-renderer') : [];
+  const threads = ytCommentThreadRoots(root);
   for (let i = 0; i < threads.length; i += 1) {
     const th = threads[i];
-    const vm = queryDeep(th, 'ytd-comment-view-model, ytd-comment-renderer, yt-comment-view-model');
+    const vm = queryDeep(th, YT_COMMENT_VM_SEL);
     hosts.push(/** @type {Element} */ (vm || th));
   }
   if (hosts.length) return hosts;
-  /** @type {ArrayLike<Element>} */
-  const loose = typeof root.querySelectorAll === 'function'
-    ? root.querySelectorAll('ytd-comment-view-model, ytd-comment-renderer, yt-comment-view-model')
-    : [];
-  for (let i = 0; i < loose.length; i += 1) hosts.push(loose[i]);
-  return hosts;
+  /** @type {Element[]} */
+  const loose = [];
+  collectQueryAll(root, YT_COMMENT_VM_SEL, loose, 1);
+  if (typeof root.querySelectorAll === 'function') {
+    /** @type {ArrayLike<Element>} */
+    let scopes = [];
+    try { scopes = root.querySelectorAll(YT_COMMENT_SCOPE_SEL); } catch { scopes = []; }
+    for (let i = 0; i < scopes.length; i += 1) collectQueryAll(scopes[i], YT_COMMENT_VM_SEL, loose, 1);
+  }
+  return [...new Set(loose)];
 }
 
 /**
@@ -810,12 +860,12 @@ export function ytVideoCommentsFromDom(root, opts = {}) {
   if (!root || typeof root.querySelectorAll !== 'function') return [];
   /** @type {{ commentId: string, parentId: string, channelId: string, name: string, handle: string, avatarUrl: string, isCreator: boolean, replyLevel: number, postedAtMs: number | null }[]} */
   const out = [];
-  const threads = root.querySelectorAll('ytd-comment-thread-renderer');
+  const threads = ytCommentThreadRoots(root);
   const useThreads = threads.length > 0;
   /** @type {any} */
   const hosts = useThreads ? threads : [];
   if (!useThreads) {
-    const loose = root.querySelectorAll('ytd-comment-view-model, ytd-comment-renderer, yt-comment-view-model');
+    const loose = ytCommentHostElements(root);
     for (let i = 0; i < loose.length; i += 1) hosts.push(loose[i]);
   }
   for (let i = 0; i < hosts.length; i += 1) {
@@ -1200,14 +1250,63 @@ export function tallyVisibleSuperThanks(authors) {
  * @param {string} videoId
  */
 export function ytWatchDomIsFor(doc, videoId) {
-  if (!videoId) return false;
-  const root = doc?.documentElement;
+  if (!videoId || !doc) return false;
+  const root = doc.documentElement;
   const tag = String(root?.getAttribute?.('data-nl-yt-view-count-video-id') || '');
-  if (tag && tag !== videoId) return false;
-  const flexy = typeof doc?.querySelector === 'function' ? doc.querySelector('ytd-watch-flexy[video-id]') : null;
-  const fid = String(flexy?.getAttribute('video-id') || '');
-  if (fid && fid !== videoId) return false;
-  return true;
+  // 印があるなら、それがいまの動画のときだけ(無いときの判断は下へ)
+  if (tag) return tag === videoId;
+  const ids = ytWatchDomVideoIds(doc);
+  if (ids.length) return ids.includes(videoId);
+  // v0.1.2265: 印も枠の id も無いときは「この動画と確認できない」。ミックスで A→B と移った直後は
+  //   印が消えても画面に A の「123,456 回視聴」が残ることがあるので、ここでは使わない(未測定)。
+  //   本当に id を出さないページは、ページの世界が data-nl-yt-view-count-video-id を書いたあとで読む。
+  return false;
+}
+
+/**
+ * 画面の枠に書かれている動画 id(watch の ytd-watch-flexy、Shorts の reel など)。
+ * @param {Document|Element|null|undefined} doc
+ * @returns {string[]}
+ */
+export function ytWatchDomVideoIds(doc) {
+  /** @type {string[]} */
+  const out = [];
+  if (!doc || typeof doc.querySelectorAll !== 'function') return out;
+  const seen = new Set();
+  const add = (/** @type {unknown} */ v) => {
+    const id = String(v || '').trim();
+    if (!/^[A-Za-z0-9_-]{11}$/.test(id) || seen.has(id)) return;
+    seen.add(id);
+    out.push(id);
+  };
+  const nodes = doc.querySelectorAll('ytd-watch-flexy[video-id], ytd-reel-video-renderer[video-id], ytd-reel-video-renderer[is-active][data-video-id], [data-video-id], ytd-player[video-id]');
+  for (let i = 0; i < nodes.length; i += 1) {
+    const el = nodes[i];
+    add(el.getAttribute('video-id'));
+    add(el.getAttribute('data-video-id'));
+  }
+  const active = doc.querySelector('ytd-reel-video-renderer[is-active]');
+  if (active && typeof active.querySelectorAll === 'function') {
+    const links = active.querySelectorAll('a[href*="/shorts/"]');
+    for (let i = 0; i < links.length; i += 1) {
+      const m = String(links[i].getAttribute('href') || '').match(/\/shorts\/([A-Za-z0-9_-]{11})(?:[/?#]|$)/);
+      if (m) add(m[1]);
+    }
+  }
+  return out;
+}
+
+/**
+ * 書き出し用の画面読み取りをしてよいか。URL が合っていても、画面の枠が別の動画ならまだ読まない。
+ * @param {Document|null|undefined} doc
+ * @param {string} videoId
+ * @returns {{ ok: true } | { ok: false, reason: 'not-ready' | 'video-mismatch' }}
+ */
+export function ytPageExportSnapshotReady(doc, videoId) {
+  const id = String(videoId || '').trim();
+  if (!id) return { ok: false, reason: 'video-mismatch' };
+  if (!ytWatchDomIsFor(doc, id)) return { ok: false, reason: 'not-ready' };
+  return { ok: true };
 }
 
 /** @param {Document} doc @param {string} videoId */

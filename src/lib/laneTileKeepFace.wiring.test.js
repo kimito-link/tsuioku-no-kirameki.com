@@ -23,7 +23,7 @@ describe('レーンのタイルは出せる顔を最初から出す', () => {
 
   it('★personTileDom: 匿名の仮の顔(SVG)が要求されたときだけ、キャッシュの顔を最初の src にする', () => {
     expect(tile).toMatch(/requestedLane\.startsWith\('data:image\/svg\+xml'\)\s*&&\s*typeof io\.cachedAnonymousFace === 'function'/);
-    expect(tile).toMatch(/img\.src = directFar \? requestedLane : cachedFace \|\| displayLane;/); // v0.1.2250: 遠いマスの本物 URL(directFar は cachedFace が無いときだけ)
+    expect(tile).toMatch(/img\.src = cachedFace \|\| displayLane;/); // v0.1.2265: 遠いマスも最初は代わりの顔
   });
 
   it('★会場は顔を注入しない(SVG のまま=従来どおり)', () => {

@@ -208,6 +208,8 @@ export class VoicePlayer {
     this.pageAllowed = true;
     /** v0.1.2265: 許可が変わるたびに増やす。つなぎかけの ON は、世代が変わったら声を出さない。 */
     this._pageGeneration = 0;
+    /** v0.1.2265: いまの配信の印。空から初めて決めたときは止めない。 */
+    this._pageTarget = '';
     this._connectInFlight = false;
     /** @type {Array<() => void>} */
     this._connectWaiters = [];
@@ -774,6 +776,20 @@ export class VoicePlayer {
     // v0.1.2265: 動画のページでは意思だけ覚えて、つながない(ライブに戻ったら setPageAllowed(true) がつなぐ)
     if (!this.pageAllowed) return;
     await this._connect(serial);
+  }
+
+  /**
+   * v0.1.2265: 見ている配信・動画が変わったとき。新しい種類が分かるまで声を止める(意思は残す)。
+   *   最初の割り当て(空→id)では止めない(会場を開いたときの自動 ON を消さない)。
+   * @param {unknown} target
+   */
+  setPageTarget(target) {
+    const next = String(target || '');
+    if (next === this._pageTarget) return;
+    const prev = this._pageTarget;
+    this._pageTarget = next;
+    if (!prev) return;
+    this.setPageAllowed(false);
   }
 
   /**

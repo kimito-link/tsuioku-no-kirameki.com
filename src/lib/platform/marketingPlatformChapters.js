@@ -123,7 +123,7 @@ const CURRENCY_LABEL = Object.freeze({
   JPY: '円の合計（記録）',
   USD: 'USD の合計（記録）',
   BITS: 'Bits の合計（記録）',
-  KICKS: 'Kicks の合計（記録）',
+  KICKS: 'KICKs の合計（記録）',
   WWITEM: 'アイテム（個・記録）',
   SRPT: 'ギフトpt（記録）',
   MXCOIN: 'コイン（記録）',

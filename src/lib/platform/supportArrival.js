@@ -118,7 +118,7 @@ function amountText(row, spec) {
     const text = rounded.toLocaleString('ja-JP');
     if (cur === 'JPY') return `¥${text}`;
     if (cur === 'BITS') return `${text} Bits`;
-    if (cur === 'KICKS') return `${text} Kicks`;
+    if (cur === 'KICKS') return `${text} KICKs`;
     if (cur === 'TTCOIN' || cur === 'MXCOIN') return `${text} コイン`;
     if (cur === 'USD') return `USD ${text}`;
     return cur ? `${cur} ${text}` : text;

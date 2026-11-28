@@ -155,7 +155,9 @@ export function isInternalMarketingId(value, platformId) {
   if (/^(login|name):/i.test(s)) return true;
   if (s.startsWith('__row:') || s === '__unknown__') return true;
   if (/^stored_\d+$/i.test(s)) return true;
-  void platformId;
+  // v0.1.2265: YouTube 系の写し ID(8 + 9桁)は内部の番号。ニコの本登録(5〜14桁)とは別。
+  const plat = String(platformId || '').trim();
+  if (plat && plat !== 'niconico' && /^8\d{9}$/.test(s)) return true;
   return false;
 }
 
@@ -902,7 +904,7 @@ function giftSortKey(rows, _view) {
 function currencyUnit(cur) {
   if (cur === 'JPY' || cur === '¥' || cur === '￥') return '円';
   if (cur === 'BITS') return ' Bits';
-  if (cur === 'KICKS') return ' Kicks';
+  if (cur === 'KICKS') return ' KICKs';
   if (cur === 'SRPT') return 'pt';
   if (cur === 'MXCOIN' || cur === 'TTCOIN') return 'コイン';
   if (cur === 'TCSCORE') return 'スコア';

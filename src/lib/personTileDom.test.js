@@ -235,8 +235,9 @@ describe('buildPersonTileEl: 遠いマスの画像は近くに来てから読む
     document.body.appendChild(cell);
     const img = cell.querySelector('img');
     expect(img.getAttribute('loading')).toBe('lazy');
-    // v0.1.2250: ニコの式の URL でない本物の URL は、最初から本物を指す(読み込みはブラウザの遅延読み込み)
-    expect(img.getAttribute('src')).toBe('https://example.test/a.png');
+    // v0.1.2265: 遠いマスの最初の src は代わりの顔(本物の HTTPS を先に指すと白い空のマスになる)
+    expect(img.getAttribute('src')).toBe(FALLBACK);
+    expect(img.getAttribute('src')).not.toBe('https://example.test/a.png');
     expect(io.storyAvatarLoadGuard.noteRemoteAttempt).not.toHaveBeenCalled();
     resolveNear(true);
     await Promise.resolve(); await Promise.resolve();
@@ -253,9 +254,13 @@ describe('buildPersonTileEl: 遠いマスの画像は近くに来てから読む
     expect(img.getAttribute('src')).toBe(FALLBACK);
   });
 
-  it('v0.1.2250: 本物を指した遠いマスが読めなければ、その場で代わりの顔へ戻す', () => {
+  it('v0.1.2265: 遠いマスの最初の src は代わりの顔(HTTPS のままで空にしない)', () => {
     const io = ioFar(() => new Promise(() => {}));
     const img = buildPersonTileEl(makeItem(), io).querySelector('img');
+    expect(img.getAttribute('src')).toBe(FALLBACK);
+    expect(img.getAttribute('src') || '').not.toMatch(/^https?:/);
+    expect(img.getAttribute('src')).toBeTruthy();
+    img.src = 'https://example.test/a.png';
     img.dispatchEvent(new Event('error'));
     expect(img.getAttribute('src')).toBe(FALLBACK);
   });

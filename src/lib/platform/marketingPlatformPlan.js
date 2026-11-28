@@ -22,12 +22,12 @@ const HIDE_ON_OTHERS = Object.freeze([
 const GIFT_WORD = Object.freeze({
   youtube: 'スーパーチャット・メンバー',
   twitch: 'Bits・サブスク',
-  kick: 'Kicks・サブスク',
+  kick: 'KICKs・サブスク',
   whowatch: 'アイテム',
   showroom: 'ギフト',
-  mixch: 'ギフト',
+  mixch: 'アイテム',
   tiktok: 'ギフト',
-  twitcasting: 'ギフト',
+  twitcasting: 'アイテム',
   abema: '',
 });
 
@@ -36,7 +36,7 @@ const GIFT_WORD = Object.freeze({
 const POINT_COLUMN = Object.freeze({
   youtube: '円換算（推定）',
   twitch: 'Bits',
-  kick: 'Kicks',
+  kick: 'KICKs',
   whowatch: '個',
   showroom: 'pt',
   mixch: 'コイン',
@@ -138,9 +138,9 @@ const MOMENTS = Object.freeze({
     ]),
   }),
   kick: Object.freeze({
-    title: 'Kicks とサブスクの時刻',
+    title: 'KICKs とサブスクの時刻',
     tracks: Object.freeze([
-      Object.freeze({ kinds: Object.freeze(['superchat']), mode: 'amount', label: 'Kicks', currency: 'KICKS' }),
+      Object.freeze({ kinds: Object.freeze(['superchat']), mode: 'amount', label: 'KICKs', currency: 'KICKS' }),
       Object.freeze({ kinds: Object.freeze(['membership', 'membership_gift']), mode: 'times', label: 'サブスク' }),
     ]),
   }),
@@ -170,7 +170,7 @@ const MOMENTS = Object.freeze({
     ]),
   }),
   twitcasting: Object.freeze({
-    title: 'スコアとギフトの時刻',
+    title: 'スコアとアイテムの時刻',
     tracks: Object.freeze([
       Object.freeze({ kinds: Object.freeze(['superchat']), mode: 'amount', label: 'スコア', currency: 'TCSCORE' }),
     ]),

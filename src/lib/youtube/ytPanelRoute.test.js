@@ -32,8 +32,9 @@ describe('ytPanelRoute', () => {
     const boot = readFileSync('src/extension/sidepanel-iframe-boot-entry.js', 'utf8');
     expect(boot).toContain('if (isYtPanelTabUrl(activeUrl)) return buildYtPanelSrc(ytPanelStreamKeyOfUrl(activeUrl), ytPanelSiteOfUrl(activeUrl));');
     // 0.1.1949: YouTube 系どうしでも別の配信になったら読み込み直す(配信キーで比べる)
-    expect(boot).toContain('k !== readYtPanelStreamKey(cur)');
-    expect(boot).toContain('loader.update(buildYtPanelSrc(k, ytPanelSiteOfUrl(tab.url)))');
+    const lib = readFileSync('src/lib/sidepanelIframeSrc.js', 'utf8');
+    expect(lib).toContain('k !== readYtPanelStreamKey(currentSrc)');
+    expect(lib).toContain('return buildYtPanelSrc(k, ytPanelSiteOfUrl(tabUrl))');
     const sw = readFileSync('extension/background.js', 'utf8');
     expect(sw).toContain("importScripts('dist/yt-background.js')");
   });

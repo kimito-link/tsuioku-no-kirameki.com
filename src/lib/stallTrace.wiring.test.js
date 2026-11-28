@@ -31,7 +31,8 @@ describe('視聴ページの content script は固まり計器を持つ', () => 
   });
   it('タブ切替では配信が同じならパネルを作り直さない', () => {
     const boot = read('src/extension/sidepanel-iframe-boot-entry.js');
-    expect(boot).toContain('if (!lv || lv === shownLv()) return');
+    expect(boot).toContain('nextSidepanelIframeSrc');
+    expect(read('src/lib/sidepanelIframeSrc.js')).toContain("if (!lv || lv === String(p.shownLv || '')) return null");
     expect(boot).not.toContain('buildCommentsForLv');
   });
   it('開発版の自己更新は前面のタブだけ読み直す', () => {

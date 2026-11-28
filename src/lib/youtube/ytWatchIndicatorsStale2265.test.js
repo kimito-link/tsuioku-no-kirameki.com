@@ -50,3 +50,20 @@ describe('配線: 前の動画の画面のコメント・人を新しい動画�
     expect(src).toMatch(/contentKind === 'video' && domIsThisVideo \? \{ videoAuthors, videoComments \}/);
   });
 });
+
+  it('印も枠の id も無いとき、画面に残った再生数は使わない(未測定)', () => {
+    const doc = page({ dom: '123,456 回視聴' });
+    expect(readYtWatchIndicators(doc, B).viewCount).toBeNull();
+  });
+  it('Shorts の枠がいまの動画なら、その画面の数を使う', () => {
+    const doc = document.implementation.createHTMLDocument('');
+    const reel = doc.createElement('ytd-reel-video-renderer');
+    reel.setAttribute('is-active', '');
+    reel.setAttribute('video-id', B);
+    const info = doc.createElement('ytd-watch-info-text');
+    info.textContent = '123,456 回視聴';
+    reel.appendChild(info);
+    doc.body.appendChild(reel);
+    expect(readYtWatchIndicators(doc, B).viewCount).toBe(123456);
+    expect(readYtWatchIndicators(doc, A).viewCount).toBeNull();
+  });

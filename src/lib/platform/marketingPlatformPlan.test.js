@@ -96,7 +96,7 @@ describe('サービスごとの記録の章', () => {
     expect(kick).toContain('受け取った人（記録にある名前）');
     expect(kick).toContain('viewer-a');
     expect(kick).toContain('リワード');
-    expect(kick).toContain('Kicks の合計（記録）');
+    expect(kick).toContain('KICKs の合計（記録）');
     expect(kick).not.toContain('フォロー');
 
     const mx = sectionPlatformDedicatedHtml([
@@ -234,7 +234,7 @@ describe('配信の山', () => {
       { ytKind: 'superchat', ytCurrency: 'KICKS', ytAmount: 20, capturedAt: T0 },
       { ytKind: 'membership_gift', capturedAt: T0 + 60_000 },
     ], /** @type {NonNullable<ReturnType<typeof marketingViewFor>>} */ (marketingViewFor('kick')), [], 0);
-    expect(kick).toContain('Kicks 20（この分の記録）');
+    expect(kick).toContain('KICKs 20（この分の記録）');
     expect(kick).toContain('サブスク（記録）');
     const mx = sectionStreamerMomentsHtml([
       { ytKind: 'mx_fan', capturedAt: T0 },
@@ -313,7 +313,7 @@ describe('ギフトの内訳のカード (v0.1.2208)', () => {
     ], view('mixch'), 0);
     expect(html).not.toContain('ギフトの内訳（記録・多い順）');
     expect(html).not.toContain('出ていた名前（記録）');
-    expect(html).toContain('ギフトの件数（記録）');
+    expect(html).toContain('アイテムの件数（記録）');
   });
 
   it('名前が分かるときは「ギフトの内訳（記録・多い順）」として出す', () => {
