@@ -251,7 +251,7 @@ function renderThanks(data, ctx) {
       if (it.kind === 'first') tags.push(tag('この配信が初めて', 'teal'));
       if (it.returning) tags.push(tag('以前の配信でもコメント', 'teal'));
       return `<div class="mkt-op-comment"><div class="mkt-op-person">${avHtml(it, ctx)}<div>
-        <div class="mkt-op-name">${escapeHtml(ctx.displayName(it))}${it.timeText ? ` <span class="mkt-op-meta">・ ${escapeHtml(it.timeText)}</span>` : ''}</div>
+        <div class="mkt-op-name">${escapeHtml(ctx.displayName(it))}${Number(it.sameNameIndex) > 0 ? `<span class="mkt-op-same" style="font-size:.7rem;color:#9c8678">（${Number(it.sameNameIndex)}）</span>` : ''}${it.timeText ? ` <span class="mkt-op-meta">・ ${escapeHtml(it.timeText)}</span>` : ''}</div>
         ${it.text ? `<div class="mkt-op-body">${escapeHtml(it.text)}</div>` : ''}
         ${tags.length ? `<div class="mkt-op-tags">${tags.join('')}</div>` : ''}
       </div></div></div>`;

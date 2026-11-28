@@ -88,6 +88,34 @@ export function operatorDisplayName(person, opts = {}) {
   return '名前未取得';
 }
 
+/**
+ * v0.1.2265: 「声をかけてくれた人」で、表示名が同じ別の人(ID が違う)がいるときだけ、並び順の番号(sameNameIndex)を付ける。
+ *   内部 ID は出さない(見分けるのは番号だけ)。同じ名前が1人なら何も付けない。
+ * @param {any[]} items
+ * @param {string} platformId
+ */
+function markSameNameThanks(items, platformId) {
+  /** @type {Map<string, Set<string>>} */
+  const byName = new Map();
+  for (const it of items) {
+    const name = operatorDisplayName(it, { platformId });
+    const set = byName.get(name) || new Set();
+    set.add(`${platformId}:${it.uid}`);
+    byName.set(name, set);
+  }
+  /** @type {Map<string, string[]>} */
+  const order = new Map();
+  for (const it of items) {
+    const name = operatorDisplayName(it, { platformId });
+    if ((byName.get(name)?.size || 0) < 2) continue;
+    const keys = order.get(name) || [];
+    const key = `${platformId}:${it.uid}`;
+    if (!keys.includes(key)) keys.push(key);
+    order.set(name, keys);
+    it.sameNameIndex = keys.indexOf(key) + 1;
+  }
+}
+
 /** @param {any} person */
 function isOperatorPersonComparable(person) {
   if (!person || typeof person !== 'object') return false;
@@ -538,11 +566,13 @@ export function buildOperatorReportModel(input) {
         returning: p.returning,
       });
     }
+    // v0.1.2265: 同じ人かどうかは視聴者の ID(このサービスの中・people の鍵)で決める。名前が同じ別の人はまとめない。
+    //   8人の上限は、贈った人と重なる人を外したあとに数える(重なりで初めての人が減らない)。
+    const giftKeys = new Set(thanksItems.filter((x) => x.kind === 'gift').map((x) => `${platformId}:${x.uid}`));
     for (const p of firstTimers
-      .slice()
+      .filter((fp) => !giftKeys.has(`${platformId}:${fp.uid}`))
       .sort((a, b) => capturedAtOf(a.comments[0]) - capturedAtOf(b.comments[0]))
       .slice(0, 8)) {
-      if (thanksItems.some((x) => x.name === p.name && x.kind === 'gift')) continue;
       const first = p.comments.slice().sort((a, b) => capturedAtOf(a) - capturedAtOf(b))[0];
       thanksItems.push({
         kind: 'first',
@@ -557,6 +587,7 @@ export function buildOperatorReportModel(input) {
         returning: false,
       });
     }
+    markSameNameThanks(thanksItems, platformId);
   }
 
   const topPeople = speechPeople

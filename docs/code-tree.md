@@ -1205,7 +1205,7 @@
   - `gift-coin-hq.wav`
   - `gift-register-hq.wav`
   - `gift-register.mp3`
-- 📁 **src/** (2775)
+- 📁 **src/** (2778)
   - 📁 **data/** (7)
     - 📁 **acquirers/** (2)
       - `laneFromStorage.js` — 応援レーン acquirer: chrome.storage.local(nls_comments) → laneStore の橋渡し。
@@ -1565,7 +1565,7 @@
         - `logo_funlink_white_RGB_link_black.png`
         - `logo_funlink_white_RGB_maru_black.png`
     - `hero-connect-hub.svg`
-  - 📁 **lib/** (2440)
+  - 📁 **lib/** (2443)
     - 📁 **__snapshots__/** (4)
       - `marketing-abema-baseline.html`
       - `marketing-niconico.html`
@@ -1638,7 +1638,7 @@
       - `nicoVideoWatchMeta.js` — 【層】L0 判定層(純粋関数・I/O禁止)
       - `nicoVideoWatchMeta.test.js`
       - `nicoVideoWatchSm9RealDom.test.js`
-    - 📁 **platform/** (54)
+    - 📁 **platform/** (55)
       - 📁 **__fixtures__/** (1)
         - `eventStanding.2026-11-21.json`
       - `diagTabShare.js` — 計器(yt_diag_*_chat)は1つの置き場を全タブで分け合う。
@@ -1665,6 +1665,7 @@
       - `liveStripAge2265.test.js`
       - `marketingExportBudget.test.js`
       - `marketingExportLongSpan.test.js`
+      - `marketingLiveMaster2265.snapshot.json`
       - `marketingPlatformChapters.js` — ニコ生以外のマーケHTMLに足す章。見た目のクラスは既存の mkt-* を使う。
       - `marketingPlatformPlan.js` — 【層】L0 判定層(純粋関数・I/O禁止)
       - `marketingPlatformPlan.test.js`
@@ -1755,7 +1756,7 @@
     - 📁 **whowatch/** (2)
       - `wwParse.js` — ふわっち(whowatch.tv)の配信とコメントを、YouTube 版の記録と同じ形にする(純関数)
       - `wwParse.test.js`
-    - 📁 **youtube/** (135)
+    - 📁 **youtube/** (136)
       - 📁 **fixtures/** (9)
         - 📁 **real-dom/** (9)
           - `README.md`
@@ -1889,6 +1890,7 @@
       - `ytVoiceQueue.test.js`
       - `ytVoiceReadLog.js` — 【層】L0 判定層(純粋関数・I/O禁止)
       - `ytVoiceReadLog.test.js`
+      - `ytWatchIndicatorsStale2265.test.js`
       - `ytWording.js` — ニコ生版の画面をそのまま使う YouTube 版で、画面に出る「ニコニコの言葉」を YouTube の言葉に直す。
       - `ytWording.test.js`
       - `ytZeroPtGiftLabel.js` — 「この番組へのギフト履歴」の送り主カードで、金額の出ない応援しかしていない人の「0pt」を
@@ -3948,6 +3950,7 @@
     - `voicePlayerMaxCharsCap.wiring.test.js`
     - `voicePlayerOverloadFeedPause.test.js`
     - `voicePlayerOverloadKeep.test.js`
+    - `voicePlayerPageGate2265.test.js`
     - `voicePlayerPipeline.sim.test.js`
     - `voicePlayerPipeline.test.js`
     - `voicePlayerSilenceRecovery.test.js`
