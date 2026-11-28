@@ -21,6 +21,6 @@ describe('marketingExportDisabledReason', () => {
   });
   it('popup-entry は理由があればボタンを押せない見た目にする', () => {
     const src = readFileSync(`${process.cwd()}/src/extension/popup-entry.js`, 'utf8');
-    expect(src).toContain('marketingExportDisabledReason');
+    expect(src).toContain('applyMarketingExportGate');
   });
 });

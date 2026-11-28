@@ -1205,7 +1205,7 @@
   - `gift-coin-hq.wav`
   - `gift-register-hq.wav`
   - `gift-register.mp3`
-- 📁 **src/** (2787)
+- 📁 **src/** (2788)
   - 📁 **data/** (7)
     - 📁 **acquirers/** (2)
       - `laneFromStorage.js` — 応援レーン acquirer: chrome.storage.local(nls_comments) → laneStore の橋渡し。
@@ -1565,7 +1565,7 @@
         - `logo_funlink_white_RGB_link_black.png`
         - `logo_funlink_white_RGB_maru_black.png`
     - `hero-connect-hub.svg`
-  - 📁 **lib/** (2452)
+  - 📁 **lib/** (2453)
     - 📁 **__snapshots__/** (4)
       - `marketing-abema-baseline.html`
       - `marketing-niconico.html`
@@ -1757,7 +1757,7 @@
     - 📁 **whowatch/** (2)
       - `wwParse.js` — ふわっち(whowatch.tv)の配信とコメントを、YouTube 版の記録と同じ形にする(純関数)
       - `wwParse.test.js`
-    - 📁 **youtube/** (140)
+    - 📁 **youtube/** (141)
       - 📁 **fixtures/** (9)
         - 📁 **real-dom/** (9)
           - `README.md`
@@ -1839,6 +1839,7 @@
       - `ytPseudoLv.js` — YouTube の videoId から決まった疑似 lv(lv9 + 11桁)を作る純粋関数。
       - `ytRankLinesHtml.js` — 応援ユーザーの順位カード(`.nl-top-support-rank__line`)の HTML を YouTube 用に組む純関数。
       - `ytRankLinesHtml.test.js`
+      - `ytRealShortsDom2265.test.js`
       - `ytRelatedChipSnapshot.js` — YouTube 動画ページの右側チップと、いま画面に出ている関連動画を、
       - `ytRelatedChipSnapshot.test.js`
       - `ytReplayChatJson.js` — アーカイブのチャットのリプレイ(get_live_chat_replay の返事)を、
