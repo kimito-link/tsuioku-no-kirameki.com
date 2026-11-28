@@ -26,6 +26,7 @@ import { ageMsOf } from './timeAuthority.js';
 import { resolveRecordsCountForDisplay } from './displayRecordedCount.js';
 import { venueItemsForPlatform } from './platform/platformMetrics.js';
 import { estimateNiconicoGiftSpendJpy, formatEstimatedViewerSpendDisplay, formatStreamerTakeHomeDisplay } from './estimatedViewerSpend.js';
+import { venueVideoPageFromUrl } from './videoWatch/vodWatchUrl.js';
 
 /** 鏡がこれより古ければ「パネルが閉じている」とみなす[ms](鏡は中身が同じでも15秒ごとに書き直される)。 */
 /** 数字の帯に出す3キャラの顔(拡張の中の画像)。視聴ページの中の会場はこれを先に blob: へ読んでおく(venue-inline-entry.js)。 */
@@ -82,26 +83,22 @@ export function venueVoiceSuspendedKind(contentKind) {
 }
 
 /**
- * v0.1.2266: 種類(contentKind)から、この会場で声を出してよいかを決める。true=出してよい / false=止める / null=まだ分からない(いまの許可のまま)。
- *   種類をあとから教えてくれるのは YouTube だけ(ライブは 'live' が来る)。ニコ生・Twitch・Kick などは、ライブでは種類が空のままなので、
- *   空は「ライブ」として出してよい(master と同じ。止めたままにしない)。動画・アーカイブの種類が来たときだけ止める。
+ * v0.1.2267: 種類(contentKind)とページの URL から、この会場で声を出してよいかを決める。
+ *   true=出してよい / false=止める / null=まだ分からない(いまの許可のまま)。
+ *   ・種類が来ていれば、それで決める(video・live_replay は止める)。
+ *   ・種類がまだ空でも、URL で録画・動画のページと分かる(Twitch・Kick・ツイキャス・TikTok)なら、写しが届く前から止める。
+ *   ・それ以外で種類が空: YouTube だけ待つ(ライブは 'live' が来る)。ニコ生・Twitch・Kick などのライブは種類が空のままなので、ライブとして出す。
+ *   配信を切り替えたときの旧い声・待ちの破棄は、全サービスで setPageTarget が先にやる(ここは再許可だけ)。
  * @param {unknown} contentKind
  * @param {unknown} platform 会場の statPlatform(ニコ生は未指定)
+ * @param {unknown} [pageUrl] いまのページの URL(録画・動画の判定に使う。無ければ空)
  * @returns {boolean | null}
  */
-export function venueVoicePageGate(contentKind, platform) {
+export function venueVoicePageGate(contentKind, platform, pageUrl = '') {
   const kind = String(contentKind || '').trim();
   if (kind) return !venueVoiceSuspendedKind(kind);
+  if (venueVideoPageFromUrl(pageUrl)) return false;
   return String(platform || '') === 'youtube' ? null : true;
-}
-
-/**
- * v0.1.2266: 配信の切り替えで声の許可を一度止めるか。種類のライブを後から教えてくれる YouTube だけ。
- *   それ以外は種類が空のままで、止めると戻る道が無い(master は止めない)。
- * @param {unknown} platform
- */
-export function venueVoiceTargetSuspends(platform) {
-  return String(platform || '') === 'youtube';
 }
 
 /**

@@ -394,7 +394,7 @@ import { clearVenueComposerPass, venueToggleShouldUntuck } from '../lib/venueTuc
 import { createVenueBubbleVoiceSyncState, startVenueSpeechBubbleVoice, summarizeBubbleVoiceSync } from '../lib/venueBubbleVoiceSync.js';
 // 2026-11-09 りんく「これを会場モードでもいれたほうが利便性たかい」: パネルの数字カード(記録・推定同時接続ほか)を会場のヘッダーにも出す。
 import { KEY_STAT_CARDS_MIRROR } from '../lib/statCardsMirrorKey.js';
-import { buildVenueStatStripModel, createVenueStatStrip, VENUE_STAT_STRIP_CSS, VENUE_STAT_STRIP_FACE_PATHS, venueVoicePageGate, venueVoiceTargetSuspends } from '../lib/venueStatStrip.js';
+import { buildVenueStatStripModel, createVenueStatStrip, VENUE_STAT_STRIP_CSS, VENUE_STAT_STRIP_FACE_PATHS, venueVoicePageGate } from '../lib/venueStatStrip.js';
 import { createVenueStatSelfPoller, createStatMirrorLiveness, requestWatchSnapshotViaTabs } from '../lib/venueStatCardsSelf.js';
 
 const ROOT_ID = 'nlsb-venue-root';
@@ -3707,7 +3707,7 @@ export function mountVenueBarButton(options = {}) {
       statMirrorLiveness.observe(statCardsMirrorSnap); // 隠れた欄が1回書いたきりの鏡を「動いている」と扱わない
       const model = buildVenueStatStripModel(statCardsMirrorSnap, { liveId, nowMs: Date.now(), recordedCount, selfSnap: statCardsSelfSnap, mirrorLive: statMirrorLiveness.isLive(Date.now(), liveId), platform: options.statPlatform });
       statStrip.paint(model);
-      { const gate = venueVoicePageGate(model.contentKind, options.statPlatform); if (gate !== null) voicePlayer.setPageAllowed(gate); } // v0.1.2265: 種類が分かるまで前の許可を使わない(ニコ生は種類なしでも許可)
+      { const gate = venueVoicePageGate(model.contentKind, options.statPlatform, location.href); if (gate !== null) voicePlayer.setPageAllowed(gate); } // v0.1.2265: 種類が分かるまで前の許可を使わない(ニコ生は種類なしでも許可)
       if (open) statSelfPoller.tick(Date.now(), { liveId, mirrorFresh: model.source === 'mirror' && statMirrorLiveness.isLive(Date.now(), liveId), recordedCount });
     } catch { /* 帯の失敗で会場を止めない */ }
   };
@@ -6443,7 +6443,7 @@ export function mountVenueBarButton(options = {}) {
    */
   const resetVenueForLive = (liveId) => {
     activeLiveId = liveId;
-    if (venueVoiceTargetSuspends(options.statPlatform)) voicePlayer.setPageTarget(liveId); // v0.1.2265: 配信が変わるまで前の声を出さない(意思は残す)・ニコ生は止めない
+    voicePlayer.setPageTarget(liveId); // v0.1.2265: 配信が変わるまで前の声を出さない(意思は残す)・全サービス共通。再許可は paint のゲート
     baseRows = [];
     seatByKey = new Map();
     // 2026-07-30(venue-ranking-churn-SPEC.md §4.3): 応援者ランキング安定化状態も
