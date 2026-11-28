@@ -22,11 +22,17 @@ export function marketingExportDisabledReason(p = {}) {
  */
 export function applyMarketingExportGate(doc, p = {}) {
   const rs = p.commentReadState;
-  const reason = marketingExportDisabledReason({
-    liveId: p.liveId,
-    commentCount: Number(p.displayCount) || Number(p.storageCount) || 0,
-    commentsKnown: p.commentsKnown === true || rs === 'storage_ok' || rs === 'fallback_cached' || rs === 'summary',
-  });
+  let commentCount = Number(p.displayCount) || Number(p.storageCount) || 0;
+  let commentsKnown = p.commentsKnown === true || rs === 'storage_ok' || rs === 'fallback_cached' || rs === 'summary';
+  // 動画のパネル(YouTube・ニコ動など)は、コメント欄をまだ読んでいないだけで記録が0件のことがある。
+  //   0件と言ってよいのは、ページに出ている総数(「コメント 0 件」)が0のときだけ(プレミア公開前・コメント無効など)。
+  if (doc?.documentElement?.getAttribute?.('data-nl-video-watch') === '1') {
+    const facts = String(doc.querySelector?.('.nlsb-video-watch-card__facts')?.textContent || '');
+    const total = facts.match(/コメント\s*([\d,]+)\s*件/);
+    commentsKnown = !!total;
+    if (total) commentCount = Number(total[1].replace(/,/g, '')) || 0;
+  }
+  const reason = marketingExportDisabledReason({ liveId: p.liveId, commentCount, commentsKnown });
   for (const id of ['devMonitorExportMarketingBtn', 'exportMarketingQuickBtn']) {
     const b = /** @type {HTMLButtonElement | null} */ (doc?.getElementById?.(id) || null);
     if (!b) continue;

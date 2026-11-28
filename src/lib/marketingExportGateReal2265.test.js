@@ -32,6 +32,35 @@ describe('applyMarketingExportGate(2つのボタンへ同じ理由)', () => {
   });
 });
 
+describe('動画のパネル(data-nl-video-watch=1): ページに出ているコメント数が0と分かったときだけ', () => {
+  const video = (factsText) => {
+    const d = page();
+    d.documentElement.setAttribute('data-nl-video-watch', '1');
+    if (factsText) d.body.insertAdjacentHTML('beforeend', `<p class="nlsb-video-watch-card__facts">${factsText}</p>`);
+    return d;
+  };
+  const p0 = { liveId: 'v', displayCount: 0, storageCount: 0, commentReadState: 'storage_ok' };
+  it('コメント欄をまだ読んでいないだけの動画(件数不明)は、押せるまま', () => {
+    const d = video('再生 590,412 回 ・ 長さ 2:55');
+    applyMarketingExportGate(d, p0);
+    expect(d.getElementById('exportMarketingQuickBtn').disabled).toBe(false);
+    d.documentElement.removeAttribute('data-nl-video-watch');
+  });
+  it('「コメント 0 件」と出ているプレミア公開前などは、押せず理由を出す', () => {
+    const d = video('いいね 0 ・ コメント 0 件 ・ 投稿 2026/11/27');
+    applyMarketingExportGate(d, p0);
+    expect(d.getElementById('exportMarketingQuickBtn').disabled).toBe(true);
+    expect(d.getElementById('devMonitorExportMarketingBtn').title).toBe('コメントが0件です。');
+    d.documentElement.removeAttribute('data-nl-video-watch');
+  });
+  it('「コメント 120 件」と出ているのに記録が0件でも、押せるまま', () => {
+    const d = video('コメント 120 件');
+    applyMarketingExportGate(d, p0);
+    expect(d.getElementById('exportMarketingQuickBtn').disabled).toBe(false);
+    d.documentElement.removeAttribute('data-nl-video-watch');
+  });
+});
+
 describe('配線: 内訳が閉じていても毎回の描画で当てる', () => {
   it('popup-entry の通常描画は、shouldRunDevMonitorPaint の外で applyMarketingExportGate を呼ぶ', () => {
     const src = readFileSync(`${process.cwd()}/src/extension/popup-entry.js`, 'utf8');

@@ -1205,7 +1205,7 @@
   - `gift-coin-hq.wav`
   - `gift-register-hq.wav`
   - `gift-register.mp3`
-- 📁 **src/** (2788)
+- 📁 **src/** (2789)
   - 📁 **data/** (7)
     - 📁 **acquirers/** (2)
       - `laneFromStorage.js` — 応援レーン acquirer: chrome.storage.local(nls_comments) → laneStore の橋渡し。
@@ -1565,7 +1565,7 @@
         - `logo_funlink_white_RGB_link_black.png`
         - `logo_funlink_white_RGB_maru_black.png`
     - `hero-connect-hub.svg`
-  - 📁 **lib/** (2453)
+  - 📁 **lib/** (2454)
     - 📁 **__snapshots__/** (4)
       - `marketing-abema-baseline.html`
       - `marketing-niconico.html`
@@ -2893,6 +2893,7 @@
     - `marketingExportAdObsWiring.test.js`
     - `marketingExportGate.js` — マーケHTMLのボタンを押せるかの理由。v0.1.2265
     - `marketingExportGate2265.test.js`
+    - `marketingExportGateReal2265.test.js`
     - `marketingExportMaskWiring.test.js`
     - `marketingExportTabState.js` — マーケ分析タブ(marketing-export.html?lv=<lid>)の「状態」を URL に残し、
     - `marketingExportTabState.test.js`
