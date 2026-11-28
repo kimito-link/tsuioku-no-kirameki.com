@@ -24,6 +24,14 @@
 /** @type {ChangelogEntry[]} */
 const ARCHIVE_ENTRIES = [
   Object.freeze({
+    version: '0.1.2246',
+    date: '2026-11-26',
+    summary: '動画のページで、顔の上の「記録がまだない」を出さない',
+    items: Object.freeze([
+      '動画のページでは、コメントした人の顔ごとに並んでいた「記録がまだない」を出さないようにしました。「なじみ」「初めて」は今までどおり出ます。ライブ配信のページの表示は変えていません。',
+    ]),
+  }),
+  Object.freeze({
     version: '0.1.2245',
     date: '2026-11-26',
     summary: '動画のページで、横の欄の数と案内が動画とそろう',

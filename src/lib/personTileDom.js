@@ -24,6 +24,7 @@
 import { isNumericNicoUserId } from '../domain/user/identity.js';
 import { nicoUserPageUrl } from './nicoUserPage.js';
 import { identiconFallbackForAvatarUrl } from './avatarFallbackFromUrl.js';
+import { resolvePersonDisplay } from './personDisplayResolver.js';
 
 /**
  * @typedef {{
@@ -59,8 +60,11 @@ export function buildPersonTileEl(p, io) {
   // 本登録の数値 ID ならニコニコのユーザーページにリンク。
   // リンク可否は domain 正本 isNumericNicoUserId(^\d{5,14}$=本登録)・URL は nicoUserPageUrl に
   // 寄せる(旧インライン /^\d{5,14}$/ の重複を排し、venue 席のリンク判定と同一基準にしてドリフト防止)。
-  const pageUrl = nicoUserPageUrl(fullUid);
-  const isLinkable = isNumericNicoUserId(fullUid) && pageUrl !== '';
+  // v0.1.2268: ニコ生以外の画面は、登録された決め手が内部ID の人の表示(名前・リンク・ID 行)を決める。
+  //   登録が無い(ニコ生)・内部ID でない人は null=下の今までの経路そのまま。
+  const foreign = resolvePersonDisplay(fullUid, { title: p.title, idLine: p.meta.idLine, nameLine: p.meta.nameLine });
+  const pageUrl = foreign ? foreign.href : nicoUserPageUrl(fullUid);
+  const isLinkable = foreign ? pageUrl !== '' : isNumericNicoUserId(fullUid) && pageUrl !== '';
   const cell = isLinkable
     ? document.createElement('a')
     : document.createElement('span');
@@ -117,8 +121,9 @@ export function buildPersonTileEl(p, io) {
     io.storyTileUsesYukkuriTvStyle(requestedLane, displayLane)
   );
   img.alt = '';
-  const tip =
-    fullUid && fullUid !== p.meta.idLine ? `${p.title} | ${fullUid}` : p.title;
+  const tip = foreign
+    ? foreign.title
+    : fullUid && fullUid !== p.meta.idLine ? `${p.title} | ${fullUid}` : p.title;
   img.title = tip;
   cell.title = tip;
   img.decoding = 'async';
@@ -141,10 +146,10 @@ export function buildPersonTileEl(p, io) {
   metaEl.className = 'nl-story-userlane-meta';
   const idRow = document.createElement('span');
   idRow.className = 'nl-story-userlane-meta__id';
-  idRow.textContent = p.meta.idLine;
+  idRow.textContent = foreign ? foreign.idLine : p.meta.idLine;
   const nameRow = document.createElement('span');
   nameRow.className = 'nl-story-userlane-meta__name';
-  nameRow.textContent = p.meta.nameLine;
+  nameRow.textContent = foreign ? foreign.nameLine : p.meta.nameLine;
   metaEl.appendChild(idRow);
   metaEl.appendChild(nameRow);
 

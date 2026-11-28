@@ -28,6 +28,7 @@ import { buildVenuePresenceNote } from './venuePresenceNote.js';
 import { SPEECH_EVIDENCE_GATE_ENABLED, hasSpeech, speechEvidence } from './speechEvidence.js';
 // ★匿名NNN の採番は nicoUserPage.js が正本（席タイル venueBar.js:5715 と同じ関数）。
 import { anonymousDisplayLabel } from './nicoUserPage.js';
+import { resolvePersonDisplay } from './personDisplayResolver.js';
 
 /**
  * @typedef {{ src: string, kind: 'real-http'|'identicon'|'tv-fallback'|'none',
@@ -70,7 +71,7 @@ export function readVenueTileThumbState(cellEl) {
  * @typedef {{
  *   displayName: string,
  *   idLine: string,
- *   idKind: 'registered'|'anonymous'|'none',
+ *   idKind: 'registered'|'anonymous'|'public'|'none',
  *   avatarSrc: string,
  *   statLine: string,
  *   lastText: string,
@@ -150,7 +151,12 @@ export function buildVenueHoverCardModel(input) {
   const i = input && typeof input === 'object' ? input : {};
   const uid = String(i.uid || '').trim();
   const platformId = String(i.platformId || '').trim();
-  const displayName = venueParticipantDisplayName(i.displayName, uid, platformId);
+  // v0.1.2268: ニコ生以外の内部ID(8+9桁)の人。名前に内部の数字が混ざっていたら取り除き、出してよい公開ID(publicId)があれば ID 行に出す。
+  //   登録された決め手が無い(ニコ生・テスト)ときは今までどおり(publicId の明示指定だけが効く)。
+  const internalForeign = platformId !== '' && platformId !== 'niconico' && /^8\d{9}$/.test(uid);
+  const fd = internalForeign ? resolvePersonDisplay(uid, { title: String(i.displayName || ''), idLine: uid, nameLine: '' }) : null;
+  const displayName = fd ? fd.title : venueParticipantDisplayName(i.displayName, uid, platformId);
+  const publicId = typeof i.publicId === 'string' && i.publicId.trim() ? i.publicId.trim() : fd ? fd.idLine : '';
   /*
    * ★count/giftCount は number|null（2026-08-29）。
    *   null は「在席名簿に居らず、数が分からない」。★ここで 0 に丸めないこと。
@@ -182,8 +188,8 @@ export function buildVenueHoverCardModel(input) {
       idLine = `ID:${uid}(本登録)`;
     } else if (platformId && platformId !== 'niconico' && /^8\d{9}$/.test(uid)) {
       // v0.1.2265: YouTube 系の写し ID は本登録にも匿名番号にもしない
-      idKind = 'none';
-      idLine = '';
+      idKind = publicId ? 'public' : 'none';
+      idLine = publicId ? `ID:${publicId}` : '';
     } else {
       idKind = 'anonymous';
       /*

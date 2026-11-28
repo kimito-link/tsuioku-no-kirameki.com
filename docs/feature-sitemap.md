@@ -367,7 +367,7 @@
   - `src/lib/giftThrowProjectile.js`
 - **吹き出し寿命管理** — 会場の吹き出しの表示上限・追い出し(eviction)ライフサイクル
   - `src/lib/venueBubbleLifecycle.js`
-<details><summary>🗂 このカテゴリの全担当ファイル(自動分類) 321</summary>
+<details><summary>🗂 このカテゴリの全担当ファイル(自動分類) 322</summary>
 
 - `app/live-view-sound.js` — v0.1.1737: スマホの WEB版でギフトの効果音を鳴らす(拡張の会場モードと同じ音・同じ金額帯の選び方)。
 - `app/live-view-venue.js` — v0.1.1739: スマホの「かんたん会場モード」。右下の 🎪 を押すと全画面の会場になる。
@@ -562,6 +562,7 @@
 - `src/lib/paintPerfLog.js` — v0.1.725: 描画(paint)コストの軽量リングバッファ記録(純関数)。
 - `src/lib/paintTopSupportRankStyleIntoElement.js` — 応援帯・公式値レーン（貢献度等）で共通の `nl-top-support-rank` ブロック描画。
 - `src/lib/parseGiftComment.js` — ニコ生のギフトコメント文字列をパースする純粋関数。
+- `src/lib/personDisplayResolver.js` — v0.1.2268: ニコ生以外のサービス(YouTube・Twitch・Kick・TwitCasting・SHOWROOM …)の人物タイルに、
 - `src/lib/phoneVenueModel.js` — v0.1.1739: スマホの「かんたん会場モード」の中身(純関数)。
 - `src/lib/pickTickerHighlight.js` — コメントティッカーに「留める1件」を選ぶ純関数(v0.1.1226)。
 - `src/lib/popupAvatarResolver.js` — v0.1.206 Phase B: popup 表示の avatar URL を統一的に解決する純関数。
@@ -1263,7 +1264,7 @@
   - `src/extension/live-ranking-entry.js`
   - `tsuioku-no-kirameki/live/index.html`
   - `.github/workflows/live-ranking.yml`
-<details><summary>🗂 このカテゴリの全担当ファイル(自動分類) 388</summary>
+<details><summary>🗂 このカテゴリの全担当ファイル(自動分類) 389</summary>
 
 - `app/app.js` — スマホ閲覧用 status Web 版。
 - `app/live-view-block.js` — iPhone アプリの「🚩 見たくない人を隠す・報告する」(App Store の審査 1.2: ほかの人の書き込みを見せるアプリの決まり)。
@@ -1629,6 +1630,7 @@
 - `src/lib/youtube/ytPseudoLv.js` — YouTube の videoId から決まった疑似 lv(lv9 + 11桁)を作る純粋関数。
 - `src/lib/youtube/ytRelatedChipSnapshot.js` — YouTube 動画ページの右側チップと、いま画面に出ている関連動画を、
 - `src/lib/youtube/ytReplayChatJson.js` — アーカイブのチャットのリプレイ(get_live_chat_replay の返事)を、
+- `src/lib/youtube/ytReplyCount.js` — 【層】L0 判定層(純粋関数・I/O禁止)
 - `src/lib/youtube/ytShimCommentWrites.js` — YouTube 系(YouTube・Twitch・Kick ほか)の画面で、ニコ生版の部品がコメントの控え(nls_comments_<疑似lv> /
 - `src/lib/youtube/ytStaleFrameHold.js` — 0.1.1958: 横の欄の「切り替わる直前の古い画面」が、次の配信を描いてしまわないよう少し待つ。
 - `src/lib/youtube/ytStreamStart.js` — 配信ページの「いつ始まったか」を時刻にする純粋関数。
@@ -1673,7 +1675,8 @@
 - `v0.1.2264` 2026-11-27 — マーケHTMLを、運営者が知りたい順にした
 - `v0.1.2257` 2026-11-27 — ツイキャスの番号付き匿名コメントを人ごとに分ける
 
-### 🏟 会場・席 (9版)
+### 🏟 会場・席 (10版)
+- `v0.1.2268` 2026-11-28 — 会場の席の札に、ニコ生以外では内部の番号とニコニコのリンクを出さない
 - `v0.1.2267` 2026-11-28 — 会場の読み上げを、録画への切り替えでも止める
 - `v0.1.2266` 2026-11-28 — マーケHTMLに前の動画のコメントを入れず、会場の読み上げを戻した
 - `v0.1.2265` 2026-11-28 — ライブの長い記録と、アーカイブの会場の帯を直した
@@ -1696,7 +1699,7 @@
 - `v0.1.2265` 2026-11-28 — ライブの長い記録と、アーカイブの会場の帯を直した
 - `v0.1.2263` 2026-11-27 — 動画ページで、顔を新しい順に並べ、タップで書いたことを出す
 
-### その他 (9版)
+### その他 (8版)
 - `v0.1.2269` 2026-11-28 — 動画の顔を安定した新しい順にし、未読み込みの返信数を出す
 - `v0.1.2262` 2026-11-27 — Kick の録画で、ライブで見た人の顔が出るようにした
 - `v0.1.2254` 2026-11-27 — Twitch の録画で、ライブで見た人の顔がちゃんと出るようにした
@@ -1705,4 +1708,3 @@
 - `v0.1.2250` 2026-11-27 — ライブの顔が白い丸にならない(Twitch・Kick・YouTube)
 - `v0.1.2249` 2026-11-27 — YouTube の動画で、コメント欄の読み直しを軽くした
 - `v0.1.2247` 2026-11-26 — 動画のページで、コメントした人の顔がかならず出る
-- `v0.1.2246` 2026-11-26 — 動画のページで、顔の上の「記録がまだない」を出さない
