@@ -395,6 +395,7 @@ import { clearVenueComposerPass, venueToggleShouldUntuck } from '../lib/venueTuc
 import { createVenueBubbleVoiceSyncState, startVenueSpeechBubbleVoice, summarizeBubbleVoiceSync } from '../lib/venueBubbleVoiceSync.js';
 // 2026-11-09 りんく「これを会場モードでもいれたほうが利便性たかい」: パネルの数字カード(記録・推定同時接続ほか)を会場のヘッダーにも出す。
 import { KEY_STAT_CARDS_MIRROR } from '../lib/statCardsMirrorKey.js';
+import { createVenueVideoGrid, VENUE_VIDEO_GRID_CSS } from './venueVideoGrid.js';
 import { buildVenueStatStripModel, createVenueStatStrip, VENUE_STAT_STRIP_CSS, VENUE_STAT_STRIP_FACE_PATHS, venueVoicePageGate } from '../lib/venueStatStrip.js';
 import { createVenueStatSelfPoller, createStatMirrorLiveness, requestWatchSnapshotViaTabs } from '../lib/venueStatCardsSelf.js';
 
@@ -2402,6 +2403,8 @@ const VENUE_CSS = `
     border: none;
     padding: 0;
   }
+
+  ${VENUE_VIDEO_GRID_CSS}
 `;
 
 // colorFromKey(名前/IDから色生成)は person-tile-unify 第3コミットで不要になり削除。
@@ -2578,7 +2581,7 @@ function hasVenueExtensionContext() {
 
 /**
  * ニコ生 watch ページに独立 fixed レイヤーの会場モード UI を1個だけ追加する。
- * @param {{ standalone?: boolean, postComment?: (text: string) => Promise<any>, postReasonText?: (reason: string) => string, openGift?: () => Promise<{ ok?: boolean, reason?: string }>, giftLabel?: string, giftReasonText?: (reason: string) => string, giftItems?: { subscribe: (cb: (items: any[]) => void) => void, press: (key: string, o?: { direct?: boolean }) => any }, getStatCardsSource?: () => any, statPlatform?: string }} options
+ * @param {{ standalone?: boolean, postComment?: (text: string) => Promise<any>, postReasonText?: (reason: string) => string, openGift?: () => Promise<{ ok?: boolean, reason?: string }>, giftLabel?: string, giftReasonText?: (reason: string) => string, giftItems?: { subscribe: (cb: (items: any[]) => void) => void, press: (key: string, o?: { direct?: boolean }) => any }, getStatCardsSource?: () => any, statPlatform?: string, getVideoBoard?: () => any }} options
  */
 export function mountVenueBarButton(options = {}) {
   const isStandalone = !!options.standalone;
@@ -3709,6 +3712,7 @@ export function mountVenueBarButton(options = {}) {
       const model = buildVenueStatStripModel(statCardsMirrorSnap, { liveId, nowMs: Date.now(), recordedCount, selfSnap: statCardsSelfSnap, mirrorLive: statMirrorLiveness.isLive(Date.now(), liveId), platform: options.statPlatform });
       statStrip.paint(model);
       { const gate = venueVoicePageGate(model.contentKind, options.statPlatform, location.href); if (gate !== null) voicePlayer.setPageAllowed(gate); } // v0.1.2265: 種類が分かるまで前の許可を使わない(ニコ生は種類なしでも許可)
+      videoGrid?.sync(model.contentKind); // v0.1.2270(TNKC-50): 動画のページだけ席+吹き出し(ニコ生版は options が無いので何もしない)
       if (open) statSelfPoller.tick(Date.now(), { liveId, mirrorFresh: model.source === 'mirror' && statMirrorLiveness.isLive(Date.now(), liveId), recordedCount });
     } catch { /* 帯の失敗で会場を止めない */ }
   };
@@ -5419,9 +5423,16 @@ export function mountVenueBarButton(options = {}) {
    * 表示行をクリアして会場を空に戻す(配信切替など意図的な空表示専用)。
    * 通常の集計/poll は commitDisplay を使うこと(空再描画しない)。
    */
+  // v0.1.2270(TNKC-50): 動画のページだけの席+吹き出し(中身は venueVideoGrid.js・ニコ生版は getVideoBoard が無いので何もしない)
+  const videoGrid = createVenueVideoGrid({
+    seatsHost, topBarList, getRoot: () => root, isOpen: () => open, liveKey: () => String(activeLiveId || liveIdFromPathname() || ''),
+    getVideoBoard: options.getVideoBoard, hoverDataByEl: _hoverCardDataByEl, closeHoverCard: () => closeHoverCard(),
+    buildTile: (p) => buildVenuePersonTile(p, '視聴者'), displayName: (n, id) => venueParticipantDisplayName(n, id, options.statPlatform), platformId: String(options.statPlatform || '')
+  });
   const clearDisplay = () => {
     lastGoodRows = [];
     hasRenderedNonEmpty = false;
+    videoGrid.reset(); // v0.1.2270: 動画の席も前の動画を持ち越さない
     // 配信切替は意図的クリア=トップNバーも畳んで前配信の応援者を持ち越さない。
     _topBarShownOnce = false;
     _lastTopBarSig = '';
