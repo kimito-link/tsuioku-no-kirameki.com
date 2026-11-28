@@ -27,7 +27,7 @@
 
 > 値が次の段へ届かない「断線」(broadcaster バグ型)は `npm run feature-map -- --check` が機械検知。
 
-## ⚠️ 役割コメントが無いソース 16 / 1405 件
+## ⚠️ 役割コメントが無いソース 16 / 1406 件
 - `docs/handoff/bench/bench-interval.mjs`
 - `docs/handoff/bench/bench-lane.mjs`
 - `extension-youtube/cloak-failsafe.js`
@@ -1205,7 +1205,7 @@
   - `gift-coin-hq.wav`
   - `gift-register-hq.wav`
   - `gift-register.mp3`
-- 📁 **src/** (2791)
+- 📁 **src/** (2793)
   - 📁 **data/** (7)
     - 📁 **acquirers/** (2)
       - `laneFromStorage.js` — 応援レーン acquirer: chrome.storage.local(nls_comments) → laneStore の橋渡し。
@@ -1565,7 +1565,7 @@
         - `logo_funlink_white_RGB_link_black.png`
         - `logo_funlink_white_RGB_maru_black.png`
     - `hero-connect-hub.svg`
-  - 📁 **lib/** (2456)
+  - 📁 **lib/** (2458)
     - 📁 **__snapshots__/** (4)
       - `marketing-abema-baseline.html`
       - `marketing-niconico.html`
@@ -1757,7 +1757,7 @@
     - 📁 **whowatch/** (2)
       - `wwParse.js` — ふわっち(whowatch.tv)の配信とコメントを、YouTube 版の記録と同じ形にする(純関数)
       - `wwParse.test.js`
-    - 📁 **youtube/** (142)
+    - 📁 **youtube/** (143)
       - 📁 **fixtures/** (9)
         - 📁 **real-dom/** (9)
           - `README.md`
@@ -1770,6 +1770,7 @@
           - `mlfY1WYFpEc.reply-abingdonboyse.json`
           - `mlfY1WYFpEc.reply-viewer.json`
       - `exportStoredComments.js` — 疑似 lv の書き出しは、画面用の組み立て（人物・アイコン・ランキング）を待たない。
+      - `foreignSeatIdLeak2268.test.js`
       - `pfLastStreamUrl.test.js`
       - `youtubeExportTabMatch.js` — マーケ書き出しが、今開いている YouTube タブの DOM を読んでよいか。
       - `youtubeExportTabMatch.test.js`
@@ -3147,6 +3148,7 @@
     - `persistThrottle.test.js`
     - `persistableCommentRow.js` — v0.1.362: DOM ハーベスト経路で拾ったコメント行を `nls_comments_<lv>` に保存して
     - `persistableCommentRow.test.js`
+    - `personDisplayResolver.js` — v0.1.2268: ニコ生以外のサービス(YouTube・Twitch・Kick・TwitCasting・SHOWROOM …)の人物タイルに、
     - `personProfiles.js` — 人物プロファイル畳み込み（person-tile-unify 第1コミット・2026-06-17）。
     - `personProfiles.test.js`
     - `personTileDom.js` — 人物タイル(丸サムネ＋ID＋ニックネーム)の DOM ビルダー（person-tile-unify 第2コミット・2026-06-17）。
