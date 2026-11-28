@@ -15,6 +15,7 @@
 
 import { computePseudoLvForVideoId, isYtPseudoLvShape } from '../../src/lib/youtube/ytPseudoLv.js';
 import { setNicoUidAvatarGuessEnabled } from '../../src/lib/supportGrowthTileSrc.js';
+import { setPersonDisplayResolver, foreignPersonDisplay } from '../../src/lib/personDisplayResolver.js';
 import { setYtLvMetaResolver } from '../../src/lib/youtube/ytLvKeyBridge.js';
 import { marketingViewFor } from '../../src/lib/platform/marketingPlatformPlan.js';
 import { makeYtDefaultIconJudge, YT_DEFAULT_ICON_STORE_KEY } from './ytDefaultIcon.js';
@@ -377,6 +378,23 @@ export function ytChannelUrlForNumericUid(uid) {
   //   日本語ハンドルの人はリンクが外れてクリックしても何も起きなかった(2026-11-08 りんく)。
   return /^[\p{L}\p{M}\p{N}._-]{3,30}$/u.test(h) ? `https://www.youtube.com/@${encodeURIComponent(h)}` : '';
 }
+
+// v0.1.2268: ニコ生以外の画面では、8 から始まる 10 桁の疑似ID(ニコ生版の画面に合わせるための写し)も
+//   ニコニコのユーザーページ URL も、人物タイル・会場の席・上のバーに出さない。
+//   登録は 1 回だけ(ニコ生の画面にはこの入口は読み込まれない=ニコ生の出力は変わらない)。
+//   分からない人(名前だけの人・SHOWROOM など)はリンク無しの span・公開されている名前だけ。
+setPersonDisplayResolver((uid, ctx) => {
+  if (!/^8\d{9}$/.test(uid)) return null; // 内部IDでなければ今までどおり
+  const key = ytKeyForNumericUid(uid).replace(/^topfan:/, '');
+  const pp = key ? platformOfPersonKey(key) : null;
+  return foreignPersonDisplay({
+    uid,
+    ...ctx,
+    url: key ? ytChannelUrlForNumericUid(uid) : '',
+    publicLabel: key ? ytLabelForUid(uid) : '',
+    platformId: pp ? pp.id : 'youtube'
+  });
+});
 
 /** @type {Map<string, string>} 数字ID → その人の YouTube のアイコン(分かっている人だけ) */
 const ytIconByNumericUid = new Map();

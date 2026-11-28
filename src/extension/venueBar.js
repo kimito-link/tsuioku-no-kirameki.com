@@ -236,6 +236,7 @@ import { isNumericNicoUserId } from '../domain/user/identity.js';
 //   独自DOM生成をやめ、popup「アイコン列・グリッド・診断」と同じ顔ぶれ・見た目にする。
 //   依存(io)も popup と同じ本物を会場が生成・import する(スタブ化しない)。
 import { buildPersonTileEl } from '../lib/personTileDom.js';
+import { seatTitleFor, seatLinkFor } from '../lib/personDisplayResolver.js';
 import { createSupportAvatarLoadGuard } from '../lib/supportGrowthAvatarLoad.js';
 import {
   applyStoryAvatarTvFallbackClass,
@@ -5929,11 +5930,11 @@ export function mountVenueBarButton(options = {}) {
       } catch {
         /* 計器失敗は描画を止めない */
       }
-      const displayName = venueParticipantDisplayName(rawName || item?.title, uid, options.statPlatform)
-        || (uid ? anonymousDisplayLabel(uid) : anonymousDisplayLabel(participant.key || `会場${seatIndex + 1}`));
+      const displayName = seatTitleFor(uid, venueParticipantDisplayName(rawName || item?.title, uid, options.statPlatform)
+        || (uid ? anonymousDisplayLabel(uid) : anonymousDisplayLabel(participant.key || `会場${seatIndex + 1}`)));
       const tile = node.seat.querySelector('.nl-story-userlane-cell');
       if (tile instanceof HTMLElement) node.tile = tile;
-      const seatLinkOn = isNumericNicoUserId(uid) && nicoUserPageUrl(uid) !== '';
+      const seatLinkOn = seatLinkFor(uid, isNumericNicoUserId(uid) && nicoUserPageUrl(uid) !== '');
       if (node.next) node.next.link = seatLinkOn;
       // 観測のみ(DOM/データ不変・失敗は握る=描画を止めない)。tileは直前で取得済み=新規クエリ0。
       try {
