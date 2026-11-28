@@ -50,7 +50,7 @@ if (typeof chrome !== 'undefined' && chrome.runtime && chrome.runtime.onMessage)
         operatorHandle: String(msg.operatorHandle || ''),
         videoId: wantedVideoId,
       });
-      const commentThreads = readYtVideoCommentThreadSnapshot(document);
+      const commentThreads = readYtVideoCommentThreadSnapshot(document, { videoId: wantedVideoId });
       sendResponse({ ok: true, relatedChip, commentThreads, videoId: wantedVideoId });
     } catch (err) {
       try { sendResponse({ ok: false, reason: String(err && err.message || err) }); } catch { /* 閉じたタブ */ }

@@ -102,7 +102,7 @@ describe('配線: 会場は帯の写しのページの種類で声の許可を�
     const { readFileSync } = await import('node:fs');
     const src = readFileSync(`${process.cwd()}/src/extension/venueBar.js`, 'utf8');
     expect(src).toContain("voiceBtn.disabled = voicePlayer.pageAllowed === false;");
-    expect(src).toMatch(/statStrip\.paint\(model\);\n\s+if \(model\.contentKind\) voicePlayer\.setPageAllowed\(!venueVoiceSuspendedKind\(model\.contentKind\)\);/);
+    expect(src).toMatch(/statStrip\.paint\(model\);\n\s+\{ const gate = venueVoicePageGate\(model\.contentKind, options\.statPlatform\); if \(gate !== null\) voicePlayer\.setPageAllowed\(gate\); \}/);
   });
 });
 

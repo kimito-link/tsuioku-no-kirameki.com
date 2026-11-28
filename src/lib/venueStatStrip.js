@@ -82,6 +82,28 @@ export function venueVoiceSuspendedKind(contentKind) {
 }
 
 /**
+ * v0.1.2266: 種類(contentKind)から、この会場で声を出してよいかを決める。true=出してよい / false=止める / null=まだ分からない(いまの許可のまま)。
+ *   種類を出さない会場(ニコ生: platform なし)は、種類が空でも「ライブ」として出してよい(master と同じ。止めたままにしない)。
+ * @param {unknown} contentKind
+ * @param {unknown} platform 会場の statPlatform(ニコ生は未指定)
+ * @returns {boolean | null}
+ */
+export function venueVoicePageGate(contentKind, platform) {
+  const kind = String(contentKind || '').trim();
+  if (kind) return !venueVoiceSuspendedKind(kind);
+  return platform ? null : true;
+}
+
+/**
+ * v0.1.2266: 配信の切り替えで声の許可を一度止めるか。種類を後から教えてくれる会場(YouTube・Twitch など)だけ。
+ *   ニコ生の会場は種類を出さないので、止めると戻る道が無い(master は止めない)。
+ * @param {unknown} platform
+ */
+export function venueVoiceTargetSuspends(platform) {
+  return !!String(platform || '').trim();
+}
+
+/**
  * 鏡(と記録件数の正本)から、帯に出す8つの数字を決める純関数。
  *
  * @param {any} snap KEY_STAT_CARDS_MIRROR の中身(StatCardsMirrorSnapshot)。null 可
