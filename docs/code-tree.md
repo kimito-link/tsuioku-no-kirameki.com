@@ -27,7 +27,7 @@
 
 > 値が次の段へ届かない「断線」(broadcaster バグ型)は `npm run feature-map -- --check` が機械検知。
 
-## ⚠️ 役割コメントが無いソース 16 / 1404 件
+## ⚠️ 役割コメントが無いソース 16 / 1405 件
 - `docs/handoff/bench/bench-interval.mjs`
 - `docs/handoff/bench/bench-lane.mjs`
 - `extension-youtube/cloak-failsafe.js`
@@ -1205,7 +1205,7 @@
   - `gift-coin-hq.wav`
   - `gift-register-hq.wav`
   - `gift-register.mp3`
-- 📁 **src/** (2779)
+- 📁 **src/** (2787)
   - 📁 **data/** (7)
     - 📁 **acquirers/** (2)
       - `laneFromStorage.js` — 応援レーン acquirer: chrome.storage.local(nls_comments) → laneStore の橋渡し。
@@ -1565,7 +1565,7 @@
         - `logo_funlink_white_RGB_link_black.png`
         - `logo_funlink_white_RGB_maru_black.png`
     - `hero-connect-hub.svg`
-  - 📁 **lib/** (2444)
+  - 📁 **lib/** (2452)
     - 📁 **__snapshots__/** (4)
       - `marketing-abema-baseline.html`
       - `marketing-niconico.html`
@@ -1638,7 +1638,7 @@
       - `nicoVideoWatchMeta.js` — 【層】L0 判定層(純粋関数・I/O禁止)
       - `nicoVideoWatchMeta.test.js`
       - `nicoVideoWatchSm9RealDom.test.js`
-    - 📁 **platform/** (55)
+    - 📁 **platform/** (56)
       - 📁 **__fixtures__/** (1)
         - `eventStanding.2026-11-21.json`
       - `diagTabShare.js` — 計器(yt_diag_*_chat)は1つの置き場を全タブで分け合う。
@@ -1669,6 +1669,7 @@
       - `marketingPlatformChapters.js` — ニコ生以外のマーケHTMLに足す章。見た目のクラスは既存の mkt-* を使う。
       - `marketingPlatformPlan.js` — 【層】L0 判定層(純粋関数・I/O禁止)
       - `marketingPlatformPlan.test.js`
+      - `marketingViewWord2265.test.js`
       - `mediaKitServiceCopy.test.js`
       - `noWatchHint.js` — 配信ページが開いていないときにパネルへ出す「配信を探す」案内を、そのサービスの言葉と行き先にする。
       - `noWatchHint.test.js`
@@ -1756,7 +1757,7 @@
     - 📁 **whowatch/** (2)
       - `wwParse.js` — ふわっち(whowatch.tv)の配信とコメントを、YouTube 版の記録と同じ形にする(純関数)
       - `wwParse.test.js`
-    - 📁 **youtube/** (136)
+    - 📁 **youtube/** (140)
       - 📁 **fixtures/** (9)
         - 📁 **real-dom/** (9)
           - `README.md`
@@ -1803,6 +1804,7 @@
       - `ytGiftOnlyRow.js` — ふわっち・SHOWROOM・ミクチャのギフトは、記録ではコメントの行(本文=ギフトの名前)としても残る。
       - `ytGiftOnlyRow.test.js`
       - `ytGiftToNico.test.js`
+      - `ytHashedUidHover2265.test.js`
       - `ytIdbStoreChunkedRead.test.js`
       - `ytIdbStoreOwner.test.js`
       - `ytLaneAssign.js` — YouTube Live コメントの 3 レーン（りんく・こん太・たぬ姉）振り分け・集計（純関数）
@@ -1821,6 +1823,7 @@
       - `ytNicoShimHandleFirst.test.js`
       - `ytNicoShimHandleUrl.test.js`
       - `ytNicoShimPlaceholder.test.js`
+      - `ytPageExportReady2265.test.js`
       - `ytPageMeta.js` — YouTube 視聴ページの URL / 配信者アイコン URL を扱う純粋関数
       - `ytPageMeta.test.js`
       - `ytPageViewerNavigation2263.test.js`
@@ -1846,6 +1849,7 @@
       - `ytShimCommentWrites.js` — YouTube 系(YouTube・Twitch・Kick ほか)の画面で、ニコ生版の部品がコメントの控え(nls_comments_<疑似lv> /
       - `ytShimCommentWrites.test.js`
       - `ytShimSummaryAnswer.wiring.test.js`
+      - `ytShortsCommentsFromShadow2265.test.js`
       - `ytSplitPersist.js` — 声の割り当てと配信のまとめを、人数や配信の数に比例して大きくなる1個の値で書き直さない。
       - `ytSplitPersist.test.js`
       - `ytSplitPersistStore.js` — 声の割り当て(人ごと)と配信のまとめ(配信ごと)の IndexedDB。
@@ -1864,6 +1868,7 @@
       - `ytSwitchLeakCleanup.test.js`
       - `ytTailAfterFull.js` — v0.1.1983: 全件を一度渡したあとのテール(新着の差分)を、短くして渡す。
       - `ytTailAfterFull.test.js`
+      - `ytThreadSnapshotIdentity2265.test.js`
       - `ytUserLaneTiers.js` — ニコ生版「アイコン列」（りんく・ギフト・広告・こん太・たぬ姉の段）を YouTube の応援者に当てはめる純粋関数
       - `ytUserLaneTiers.test.js`
       - `ytVenueBoot.js` — 【層】L0 判定層(純粋関数・I/O禁止)
@@ -2885,6 +2890,8 @@
     - `marketingChartsHtmlAnalyticsDedup.test.js`
     - `marketingDynamicAdvice.js` — 0.1.33 (AH): マーケ分析の各セクションに「内容に応じて変わる」キャラ解説を出す
     - `marketingExportAdObsWiring.test.js`
+    - `marketingExportGate.js` — マーケHTMLのボタンを押せるかの理由。v0.1.2265
+    - `marketingExportGate2265.test.js`
     - `marketingExportMaskWiring.test.js`
     - `marketingExportTabState.js` — マーケ分析タブ(marketing-export.html?lv=<lid>)の「状態」を URL に残し、
     - `marketingExportTabState.test.js`
@@ -3408,6 +3415,7 @@
     - `sidepanelCloakWiring.test.js`
     - `sidepanelFlashNotOverwritten.wiring.test.js`
     - `sidepanelFlashSurvives.behavior.test.js`
+    - `sidepanelIframeFollow2265.test.js`
     - `sidepanelIframeLoader.js` — サイドパネルの iframe(中の popup)の読み込みを「親の最初の描画のあと」まで遅らせる、読み込み役(時計・iframe は引数で受け取る)。v0.1.1693
     - `sidepanelIframeLoader.test.js`
     - `sidepanelIframeReveal.js` — iframe を【出来上がってから見せる】ための純関数。

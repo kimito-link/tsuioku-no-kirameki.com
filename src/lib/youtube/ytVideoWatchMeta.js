@@ -750,8 +750,24 @@ export function parseYtCommentPublishedAtMs(text, nowMs = Date.now()) {
 }
 
 /**
+ * v0.1.2265: コメントの行のリンク(/watch?v=<動画>&lc=)が、別の動画を指しているか。画面に前の動画の行が残っていても付けない。
+ * @param {Element} el
+ * @param {unknown} videoId
+ */
+function ytCommentRowIsOtherVideo(el, videoId) {
+  const want = String(videoId || '');
+  if (!want || typeof el?.querySelectorAll !== 'function') return false;
+  const links = el.querySelectorAll('a[href*="lc="]');
+  for (let i = 0; i < links.length; i += 1) {
+    const m = String(links[i].getAttribute('href') || '').match(/[?&]v=([A-Za-z0-9_-]{11})/);
+    if (m) return m[1] !== want;
+  }
+  return false;
+}
+
+/**
  * @param {any} root
- * @param {{ limit?: number, nowMs?: number }} [opts]
+ * @param {{ limit?: number, nowMs?: number, videoId?: string }} [opts]
  */
 export function ytVideoCommentAuthorsFromDom(root, opts = {}) {
   const limit = Number.isFinite(Number(opts.limit)) ? Math.max(1, Math.floor(Number(opts.limit))) : 80;
@@ -762,6 +778,7 @@ export function ytVideoCommentAuthorsFromDom(root, opts = {}) {
   for (let i = 0; i < threads.length; i += 1) {
     const el = threads[i];
     if (!el) continue;
+    if (ytCommentRowIsOtherVideo(el, opts.videoId)) continue;
     let channelId = '';
     let handle = '';
     let commentId = String(el.getAttribute?.('comment-id') || el.getAttribute?.('data-comment-id') || '').trim();
@@ -851,7 +868,7 @@ export function ytVideoCommentAuthorsFromDom(root, opts = {}) {
  * 投稿者の印は .channel-owner か、ytd-author-comment-badge-renderer の creator 属性。
  * アーティストなどのバッジだけでは投稿者にしない。
  * @param {ParentNode | null | undefined} root
- * @param {{ nowMs?: number, limit?: number }} [opts]
+ * @param {{ nowMs?: number, limit?: number, videoId?: string }} [opts]
  * @returns {{ commentId: string, parentId: string, channelId: string, name: string, handle: string, avatarUrl: string, isCreator: boolean, replyLevel: number, postedAtMs: number | null }[]}
  */
 export function ytVideoCommentsFromDom(root, opts = {}) {
@@ -892,6 +909,7 @@ export function ytVideoCommentsFromDom(root, opts = {}) {
       if (!el) continue;
       const inReplies = typeof el.closest === 'function' && !!el.closest('ytd-comment-replies-renderer')
         && (!el.closest('ytd-comment-thread-renderer') || el.closest('ytd-comment-thread-renderer') === th);
+      if (ytCommentRowIsOtherVideo(el, opts.videoId)) continue;
       const rec = ytCommentRecordFromViewModel(el, { nowMs, replyLevel: inReplies ? 1 : 0, parentId: inReplies ? topId : '' });
       if (!rec) continue;
       if (!inReplies && rec.commentId) topId = rec.commentId;
@@ -1257,6 +1275,9 @@ export function ytWatchDomIsFor(doc, videoId) {
   if (tag) return tag === videoId;
   const ids = ytWatchDomVideoIds(doc);
   if (ids.length) return ids.includes(videoId);
+  // v0.1.2265(実ページ): 実際の Shorts は枠に video-id が無い。ページの世界が移動のたびに消して書き直す kind-video-id を手がかりにする
+  const kindTag = String(root?.getAttribute?.('data-nl-yt-kind-video-id') || '');
+  if (kindTag) return kindTag === videoId;
   // v0.1.2265: 印も枠の id も無いときは「この動画と確認できない」。ミックスで A→B と移った直後は
   //   印が消えても画面に A の「123,456 回視聴」が残ることがあるので、ここでは使わない(未測定)。
   //   本当に id を出さないページは、ページの世界が data-nl-yt-view-count-video-id を書いたあとで読む。

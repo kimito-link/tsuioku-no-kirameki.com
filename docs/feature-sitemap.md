@@ -802,7 +802,7 @@
   - `app/supporter.html`
   - `app/referral-passthrough.js`
   - `tsuioku-no-kirameki/tokushoho.html`
-<details><summary>🗂 このカテゴリの全担当ファイル(自動分類) 64</summary>
+<details><summary>🗂 このカテゴリの全担当ファイル(自動分類) 65</summary>
 
 - `extension-youtube/marketing-export-guard.js` — マーケ分析タブ(marketing-export.html)の「何があっても開く」保険。
 - `extension-youtube/marketing-export.js` — ニコ生版 marketing-export-entry.js(本物)+ YouTube の記録を読む入口のバンドル
@@ -833,6 +833,7 @@
 - `src/lib/htmlText.js` — HTML に文字列を流し込むときの最小の共有部品(純粋関数)。
 - `src/lib/liveviewErrorReport.js` — 純Web③(app.tsuioku-no-kirameki.com)専用の最小エラーレポータ(v0.1.1130)。
 - `src/lib/marketingDynamicAdvice.js` — 0.1.33 (AH): マーケ分析の各セクションに「内容に応じて変わる」キャラ解説を出す
+- `src/lib/marketingExportGate.js` — マーケHTMLのボタンを押せるかの理由。v0.1.2265
 - `src/lib/marketingExportTabState.js` — マーケ分析タブ(marketing-export.html?lv=<lid>)の「状態」を URL に残し、
 - `src/lib/marketingOperatorReport.js` — 運営者向けマーケHTMLの章立て（純関数）。
 - `src/lib/marketingOperatorReportHtml.js` — 運営者向けマーケHTMLの見た目（暖色）。章の中身は buildOperatorReportModel の結果だけを描く。

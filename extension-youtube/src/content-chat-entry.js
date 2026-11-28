@@ -705,8 +705,8 @@ function setupWatchPageMetaObserver() {
         askPageToTagYtCommentPhotos(document);
         // v0.1.2252: ページのデータ(UC… ID・顔)を正に、DOM で補う(ytCommentPhotoTag.js が同じ合図で写す)
         const fromPage = ytVideoCommentAuthorsFromInnertube(readYtCommentEntities(document) || []);
-        const videoAuthors = mergeYtVideoCommentAuthors(fromPage, ytVideoCommentAuthorsFromDom(document));
-        return { videoAuthors, videoComments: ytVideoCommentsFromDom(document) };
+        const videoAuthors = mergeYtVideoCommentAuthors(fromPage, ytVideoCommentAuthorsFromDom(document, { videoId }));
+        return { videoAuthors, videoComments: ytVideoCommentsFromDom(document, { videoId }) };
       })
       : null;
     const videoAuthors = scan ? scan.videoAuthors : [];
