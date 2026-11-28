@@ -3,9 +3,10 @@
  * 動画のコメントは投稿日が「1日前」〜「19年前」にわたる。時間の流れの列(速さ・笑い・気分)が
  * 30秒/1分ごとに何百万点にもなり、笑い密度の SVG が 15億文字を作って落ちていた。
  */
+import { createHash } from 'node:crypto';
 import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
-import { describe, expect, it } from 'vitest';
+import { afterAll, beforeAll, describe, expect, it, vi } from 'vitest';
 import { aggregateMarketingReport } from '../marketingAggregate.js';
 import { buildMarketingDashboardHtml } from '../marketingChartsHtml.js';
 import { buildCommentVelocityTimeline, buildLaughterDensityTimeline } from '../commentVelocityTimeline.js';
@@ -225,5 +226,85 @@ describe.each(VIDEO_PLATFORMS)('%s: 動画・録画のマーケHTML(長い幅)�
     // 見出しの長さは今まで通り「N分」
     expect(html).toMatch(/<span class="mkt-hero-stat__val">\d+<\/span><span class="mkt-hero-stat__label">分<\/span>/);
     expect(html).not.toContain('コメントの期間');
+  });
+});
+
+describe('7日以内のライブは master(58ca7e488 と同じ列の作り)と同じ出力 (v0.1.2265)', () => {
+  const minute = 60_000;
+  // 期待値は master (aeefb7ab1 = 58ca7e488 と同じ列の作り) で同じ入力から作った値(marketingLiveMaster2265.snapshot.json)。
+  //   ライブ同士を比べると、どちらも同じように変わったときに気づけない(Codex 指摘)ので、master の実出力と比べる。
+  //   「ローカル勢い」などは書き出した時刻で変わるので、master で作ったときと同じ時刻に止めて比べる。
+  //   時間帯の見出しは PC の時間帯でも変わる(CI は UTC)ので、master で作ったときと同じ日本時間で比べる。
+  const prevTz = process.env.TZ;
+  beforeAll(() => { process.env.TZ = 'Asia/Tokyo'; vi.useFakeTimers({ now: Date.parse('2026-12-04T12:00:00+09:00'), toFake: ['Date'] }); });
+  afterAll(() => { vi.useRealTimers(); if (prevTz === undefined) delete process.env.TZ; else process.env.TZ = prevTz; });
+  const snapshot = JSON.parse(readFileSync(join(process.cwd(), 'src/lib/platform/marketingLiveMaster2265.snapshot.json'), 'utf8'));
+  expect(snapshot._meta?.commit).toBeTruthy();
+  expect(snapshot._meta?.tz).toBe('Asia/Tokyo');
+  const hash = (/** @type {string} */ s) => createHash('sha256').update(s).digest('hex').slice(0, 16);
+  const rows = (/** @type {number} */ minutes, n = 400) => Array.from({ length: n }, (_, i) => ({
+    id: `c${i}`, liveId: 'lv1', text: i % 3 ? 'w草' : 'すごい', userId: `u${i % 40}`, nickname: `n${i % 40}`,
+    capturedAt: NOW + Math.floor((i / (n - 1)) * minutes * minute),
+  }));
+  it.each([120, 720, 1440, 10080])('%s分: 速さ・笑い・気分の1点の幅と点の数が master と同じ', (minutes) => {
+    const c = rows(minutes);
+    const v = buildCommentVelocityTimeline(c, { bucketMs: 60_000, rollingWindowMin: 5, contentKind: 'live' });
+    const l = buildLaughterDensityTimeline(c, { bucketMs: 30_000, contentKind: 'live' });
+    const s = scoreSentimentTimeline(c, { bucketMs: 60_000, contentKind: 'live' });
+    const want = snapshot[String(minutes)];
+    expect([v.bucketMs, v.buckets.length, hash(JSON.stringify(v))]).toEqual(want.v);
+    expect([l.bucketMs, l.buckets.length, hash(JSON.stringify(l))]).toEqual(want.l);
+    expect([s.bucketMs, s.buckets.length, hash(JSON.stringify(s))]).toEqual(want.s);
+  });
+  // v0.1.2265: Kick / ツイキャスは応援の呼び方(KICKs・アイテム)だけ master と違う。系列の点は同じ。
+  it.each(['nicolive', 'youtube', 'twitch', 'tiktok', 'abema', 'showroom'].flatMap(
+    (p) => [120, 720, 1440, 10080].map((m) => /** @type {[string, number]} */ ([p, m])),
+  ))('%s %s分: マーケHTML が master と1文字も変わらない(大きさ・ラベルも)', (platform, minutes) => {
+    const c = rows(minutes);
+    const html = buildMarketingDashboardHtml(aggregateMarketingReport(c, 'lv1', { contentKind: 'live' }), {
+      platform, commentsForAnalytics: c, contentKind: 'live',
+    }).replace(/\d{4}\/\d{1,2}\/\d{1,2} \d{1,2}:\d{2}:\d{2}/g, 'T').replace(/\d{4}-\d{2}-\d{2}T[\d:.]+Z/g, 'Z');
+    expect([html.length, hash(html)]).toEqual(snapshot[String(minutes)][platform]);
+  });
+  it('7日ちょうどのライブの HTML は master と同じ大きさ(5MB を超えない)', () => {
+    expect(snapshot['10080'].nicolive[0]).toBeLessThan(3_000_000);
+  });
+
+  it('keeps the established video window when one far-future row is present', async () => {
+    const { boundCommentsToTimeWindow } = await import('../marketingTimeSpan.js');
+    const rows = [0, 1, 2, 90 * 1440].map((min) => ({ capturedAt: NOW + min * minute }));
+    expect(boundCommentsToTimeWindow(rows).comments).toEqual(rows.slice(0, 3));
+  });
+
+  // v0.1.2265: 7日を超えるライブ記録(同じ鍵に何週間もたまったとき)は、動画と同じく点の数を上限に収める
+  it.each([10081, 11520, 30 * 1440, 400 * 1440])('caps live series beyond 7 days (%s minutes)', (minutes) => {
+    const comments = [0, minutes * minute].map((offsetMs, i) => ({
+      liveId: 'lv123456789', capturedAt: NOW + offsetMs, text: 'www', userId: String(i + 1),
+    }));
+    const opts = { contentKind: 'live' };
+    expect(aggregateMarketingReport(comments, 'lv123456789', opts).timeline.length).toBe(0);
+    expect(buildCommentVelocityTimeline(comments, opts).buckets.length).toBeLessThanOrEqual(1440);
+    expect(buildLaughterDensityTimeline(comments, opts).buckets.length).toBeLessThanOrEqual(1440);
+    expect(scoreSentimentTimeline(comments, opts).buckets.length).toBeLessThanOrEqual(1440);
+  });
+});
+
+const LIVE_PLATFORMS = ['nicolive', 'youtube', 'twitch', 'kick', 'twitcasting', 'tiktok', 'abema', 'showroom'];
+/** @param {number} days @param {number} n */
+const liveRows = (days, n = 300) => Array.from({ length: n }, (_, i) => ({
+  id: `c${i}`, liveId: 'lv1', text: i % 3 ? 'w草' : 'すごい', userId: `u${i % 40}`, nickname: `n${i % 40}`,
+  capturedAt: NOW + Math.floor((i / (n - 1)) * days * 86_400_000),
+}));
+/** @param {any[]} comments @param {string} platform @param {string} [contentKind] */
+const liveHtml = (comments, platform, contentKind = 'live') => buildMarketingDashboardHtml(
+  aggregateMarketingReport(comments, 'lv1', { contentKind }), { platform, commentsForAnalytics: comments, contentKind },
+).replace(/\d{4}\/\d{1,2}\/\d{1,2} \d{1,2}:\d{2}:\d{2}/g, 'T').replace(/\d{4}-\d{2}-\d{2}T[\d:.]+Z/g, 'Z');
+
+describe.each(LIVE_PLATFORMS)('%s: 長いライブ記録のマーケHTML(v0.1.2265)', (platform) => {
+  it.each([30, 400])('%s日分のライブ記録でも小さく・NNNNN分を出さない', (days) => {
+    const html = liveHtml(liveRows(days), platform);
+    expect(html.length).toBeLessThan(2_000_000);
+    expect(html).not.toMatch(/\d{5,}\s*分/);
+    expect(html).toContain('コメントの期間');
   });
 });

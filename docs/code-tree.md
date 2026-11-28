@@ -27,7 +27,7 @@
 
 > 値が次の段へ届かない「断線」(broadcaster バグ型)は `npm run feature-map -- --check` が機械検知。
 
-## ⚠️ 役割コメントが無いソース 16 / 1404 件
+## ⚠️ 役割コメントが無いソース 16 / 1405 件
 - `docs/handoff/bench/bench-interval.mjs`
 - `docs/handoff/bench/bench-lane.mjs`
 - `extension-youtube/cloak-failsafe.js`
@@ -1205,7 +1205,7 @@
   - `gift-coin-hq.wav`
   - `gift-register-hq.wav`
   - `gift-register.mp3`
-- 📁 **src/** (2769)
+- 📁 **src/** (2791)
   - 📁 **data/** (7)
     - 📁 **acquirers/** (2)
       - `laneFromStorage.js` — 応援レーン acquirer: chrome.storage.local(nls_comments) → laneStore の橋渡し。
@@ -1242,7 +1242,7 @@
       - `avatarResolver.test.js`
       - `identity.js` — ニコ生ユーザー ID の「匿名性」判定と関連アイデンティティ・ユーティリティ。
       - `nickname.js` — 表示名（ニックネーム）の「強弱」判定。
-  - 📁 **extension/** (136)
+  - 📁 **extension/** (137)
     - 📁 **popup/** (25)
       - 📁 **init/** (4)
         - `devMonitorExport.js` — devMonitorExport — 開発モニタの「エクスポート/ダウンロード/較正データ消去」一式。
@@ -1366,6 +1366,7 @@
     - `venueSpeechPanelRowsMax.wiring.test.js`
     - `venueSpeechPanelTailRead.test.js`
     - `venueSpeechPanelUserKey.wiring.test.js`
+    - `videoBoardSafety2263.test.js`
     - `viewerBehaviorBoardPaint.js` — 視聴者の行動ボードを、既にある storage の変化だけを見て塗る。
     - `viewerBehaviorLiveGate.test.js`
     - `viewerBehaviorLiveLayout.js` — 視聴者の行動を、配信モードと同じ数字の帯と、同じ応援アイコン列で描く。
@@ -1564,7 +1565,7 @@
         - `logo_funlink_white_RGB_link_black.png`
         - `logo_funlink_white_RGB_maru_black.png`
     - `hero-connect-hub.svg`
-  - 📁 **lib/** (2435)
+  - 📁 **lib/** (2456)
     - 📁 **__snapshots__/** (4)
       - `marketing-abema-baseline.html`
       - `marketing-niconico.html`
@@ -1637,7 +1638,7 @@
       - `nicoVideoWatchMeta.js` — 【層】L0 判定層(純粋関数・I/O禁止)
       - `nicoVideoWatchMeta.test.js`
       - `nicoVideoWatchSm9RealDom.test.js`
-    - 📁 **platform/** (51)
+    - 📁 **platform/** (56)
       - 📁 **__fixtures__/** (1)
         - `eventStanding.2026-11-21.json`
       - `diagTabShare.js` — 計器(yt_diag_*_chat)は1つの置き場を全タブで分け合う。
@@ -1661,16 +1662,20 @@
       - `infoPollGate.test.js`
       - `liveIconStore.js` — v0.1.2254: ライブで分かった顔(名前 → 顔の URL)を storage(yt_tw_icons など)に置くときの、純粋な部品。
       - `liveIconStore2254.test.js`
+      - `liveStripAge2265.test.js`
       - `marketingExportBudget.test.js`
       - `marketingExportLongSpan.test.js`
+      - `marketingLiveMaster2265.snapshot.json`
       - `marketingPlatformChapters.js` — ニコ生以外のマーケHTMLに足す章。見た目のクラスは既存の mkt-* を使う。
       - `marketingPlatformPlan.js` — 【層】L0 判定層(純粋関数・I/O禁止)
       - `marketingPlatformPlan.test.js`
+      - `marketingViewWord2265.test.js`
       - `mediaKitServiceCopy.test.js`
       - `noWatchHint.js` — 配信ページが開いていないときにパネルへ出す「配信を探す」案内を、そのサービスの言葉と行き先にする。
       - `noWatchHint.test.js`
       - `pageControlPick.js` — 配信ページの「公式の」入力欄・送信ボタンを探す(追憶が自分でページに置いた部品を除く)。
       - `pageControlPick.test.js`
+      - `panelReplay2265.test.js`
       - `platformMetricChrome.js` — 横の欄の数字を、配信サービスに合わせて出し分ける。
       - `platformMetricChrome.test.js`
       - `platformMetrics.js` — 【層】L0 判定層(純粋関数・I/O禁止)
@@ -1690,6 +1695,7 @@
       - `supportArrival.test.js`
       - `supportEventParity.test.js`
       - `supportSummaryAllPlatforms.test.js`
+      - `supportWord2265.test.js`
     - 📁 **showroom/** (7)
       - `srCommentInput.js` — SHOWROOM の公式コメント欄を探す(会場の「ここから発言」は拾わない)。
       - `srCommentInput.test.js`
@@ -1722,7 +1728,7 @@
       - `twIrcParse.test.js`
       - `twShim.test.js`
       - `twStreamKey.js` — Twitch の「配信キー」(YouTube 版の videoId の位置に入る文字列)の作り方と読み方(純関数)
-    - 📁 **videoWatch/** (23)
+    - 📁 **videoWatch/** (24)
       - 📁 **fixtures/** (2)
         - `twitcasting-movie-843232645-comment-items.slim.html`
         - `twitch-vod-2940252213-replay-chat.slim.html`
@@ -1735,6 +1741,7 @@
       - `videoCommentDetail.js` — 【層】L0 判定層(純粋関数・I/O禁止)
       - `videoCommentRows.js` — 【層】L0 判定層(純粋関数・I/O禁止)
       - `videoFacts.js` — 【層】L0 判定層(純粋関数・I/O禁止)
+      - `videoFactsRegression2263.test.js`
       - `videoIdentity.js` — 【層】L0 判定層(純粋関数・I/O禁止)
       - `videoIdentity2241.test.js`
       - `videoMarketing2263.test.js`
@@ -1750,7 +1757,7 @@
     - 📁 **whowatch/** (2)
       - `wwParse.js` — ふわっち(whowatch.tv)の配信とコメントを、YouTube 版の記録と同じ形にする(純関数)
       - `wwParse.test.js`
-    - 📁 **youtube/** (134)
+    - 📁 **youtube/** (142)
       - 📁 **fixtures/** (9)
         - 📁 **real-dom/** (9)
           - `README.md`
@@ -1792,11 +1799,13 @@
       - `ytCrossVideoDuplicates.js` — 別の配信の記録に紛れ込んだコメントを見分ける純関数(片付け用)。
       - `ytCrossVideoDuplicates.test.js`
       - `ytDefaultIcon.test.js`
+      - `ytExportRowsVideoBound2266.test.js`
       - `ytFullRefreshInterval.js` — YouTube 系の横の欄・会場が「記録を全件読み直す」間隔(v0.1.1969)。
       - `ytFullRefreshInterval.test.js`
       - `ytGiftOnlyRow.js` — ふわっち・SHOWROOM・ミクチャのギフトは、記録ではコメントの行(本文=ギフトの名前)としても残る。
       - `ytGiftOnlyRow.test.js`
       - `ytGiftToNico.test.js`
+      - `ytHashedUidHover2265.test.js`
       - `ytIdbStoreChunkedRead.test.js`
       - `ytIdbStoreOwner.test.js`
       - `ytLaneAssign.js` — YouTube Live コメントの 3 レーン（りんく・こん太・たぬ姉）振り分け・集計（純関数）
@@ -1815,8 +1824,10 @@
       - `ytNicoShimHandleFirst.test.js`
       - `ytNicoShimHandleUrl.test.js`
       - `ytNicoShimPlaceholder.test.js`
+      - `ytPageExportReady2265.test.js`
       - `ytPageMeta.js` — YouTube 視聴ページの URL / 配信者アイコン URL を扱う純粋関数
       - `ytPageMeta.test.js`
+      - `ytPageViewerNavigation2263.test.js`
       - `ytPageViewerReader.js` — YouTube のページ自身の世界で、同時視聴者数を data 属性に置く。
       - `ytPanelExportTarget.js` — 【層】L0 判定層(純粋関数・I/O禁止)
       - `ytPanelExportTarget.test.js`
@@ -1829,6 +1840,7 @@
       - `ytPseudoLv.js` — YouTube の videoId から決まった疑似 lv(lv9 + 11桁)を作る純粋関数。
       - `ytRankLinesHtml.js` — 応援ユーザーの順位カード(`.nl-top-support-rank__line`)の HTML を YouTube 用に組む純関数。
       - `ytRankLinesHtml.test.js`
+      - `ytRealShortsDom2265.test.js`
       - `ytRelatedChipSnapshot.js` — YouTube 動画ページの右側チップと、いま画面に出ている関連動画を、
       - `ytRelatedChipSnapshot.test.js`
       - `ytReplayChatJson.js` — アーカイブのチャットのリプレイ(get_live_chat_replay の返事)を、
@@ -1839,6 +1851,7 @@
       - `ytShimCommentWrites.js` — YouTube 系(YouTube・Twitch・Kick ほか)の画面で、ニコ生版の部品がコメントの控え(nls_comments_<疑似lv> /
       - `ytShimCommentWrites.test.js`
       - `ytShimSummaryAnswer.wiring.test.js`
+      - `ytShortsCommentsFromShadow2265.test.js`
       - `ytSplitPersist.js` — 声の割り当てと配信のまとめを、人数や配信の数に比例して大きくなる1個の値で書き直さない。
       - `ytSplitPersist.test.js`
       - `ytSplitPersistStore.js` — 声の割り当て(人ごと)と配信のまとめ(配信ごと)の IndexedDB。
@@ -1857,6 +1870,7 @@
       - `ytSwitchLeakCleanup.test.js`
       - `ytTailAfterFull.js` — v0.1.1983: 全件を一度渡したあとのテール(新着の差分)を、短くして渡す。
       - `ytTailAfterFull.test.js`
+      - `ytThreadSnapshotIdentity2265.test.js`
       - `ytUserLaneTiers.js` — ニコ生版「アイコン列」（りんく・ギフト・広告・こん太・たぬ姉の段）を YouTube の応援者に当てはめる純粋関数
       - `ytUserLaneTiers.test.js`
       - `ytVenueBoot.js` — 【層】L0 判定層(純粋関数・I/O禁止)
@@ -1883,6 +1897,7 @@
       - `ytVoiceQueue.test.js`
       - `ytVoiceReadLog.js` — 【層】L0 判定層(純粋関数・I/O禁止)
       - `ytVoiceReadLog.test.js`
+      - `ytWatchIndicatorsStale2265.test.js`
       - `ytWording.js` — ニコ生版の画面をそのまま使う YouTube 版で、画面に出る「ニコニコの言葉」を YouTube の言葉に直す。
       - `ytWording.test.js`
       - `ytZeroPtGiftLabel.js` — 「この番組へのギフト履歴」の送り主カードで、金額の出ない応援しかしていない人の「0pt」を
@@ -2877,6 +2892,9 @@
     - `marketingChartsHtmlAnalyticsDedup.test.js`
     - `marketingDynamicAdvice.js` — 0.1.33 (AH): マーケ分析の各セクションに「内容に応じて変わる」キャラ解説を出す
     - `marketingExportAdObsWiring.test.js`
+    - `marketingExportGate.js` — マーケHTMLのボタンを押せるかの理由。v0.1.2265
+    - `marketingExportGate2265.test.js`
+    - `marketingExportGateReal2265.test.js`
     - `marketingExportMaskWiring.test.js`
     - `marketingExportTabState.js` — マーケ分析タブ(marketing-export.html?lv=<lid>)の「状態」を URL に残し、
     - `marketingExportTabState.test.js`
@@ -2888,6 +2906,7 @@
     - `marketingOperatorReport.js` — 運営者向けマーケHTMLの章立て（純関数）。
     - `marketingOperatorReport.test.js`
     - `marketingOperatorReportHtml.js` — 運営者向けマーケHTMLの見た目（暖色）。章の中身は buildOperatorReportModel の結果だけを描く。
+    - `marketingOperatorThanksDedupe2265.test.js`
     - `marketingReportEmbed.js` — マーケ分析 HTML に埋め込む JSON（表計算・ツール連携用）。
     - `marketingReportEmbed.test.js`
     - `marketingSupportParticipationCounts.js` — マーケ分析・HTMLレポート先頭 KPI: ギフト投げ主・広告した人の人数。
@@ -3399,6 +3418,7 @@
     - `sidepanelCloakWiring.test.js`
     - `sidepanelFlashNotOverwritten.wiring.test.js`
     - `sidepanelFlashSurvives.behavior.test.js`
+    - `sidepanelIframeFollow2265.test.js`
     - `sidepanelIframeLoader.js` — サイドパネルの iframe(中の popup)の読み込みを「親の最初の描画のあと」まで遅らせる、読み込み役(時計・iframe は引数で受け取る)。v0.1.1693
     - `sidepanelIframeLoader.test.js`
     - `sidepanelIframeReveal.js` — iframe を【出来上がってから見せる】ための純関数。
@@ -3853,6 +3873,7 @@
     - `venueViewport.js` — v0.1.715: 会場モードの「映像セーフエリア」と「同時表示人数」を決める純関数。
     - `venueViewport.test.js`
     - `venueVoiceBubbleTogether.wiring.test.js`
+    - `venueVoiceNicoRestore2266.test.js`
     - `venueWatchPageVisibility.js` — 視聴ページ判定が一瞬でも外れると会場を閉じていたのを防ぐ。
     - `venueWatchPageVisibility.test.js`
     - `venueWatchPageVisibility.wiring.test.js`
@@ -3942,6 +3963,7 @@
     - `voicePlayerMaxCharsCap.wiring.test.js`
     - `voicePlayerOverloadFeedPause.test.js`
     - `voicePlayerOverloadKeep.test.js`
+    - `voicePlayerPageGate2265.test.js`
     - `voicePlayerPipeline.sim.test.js`
     - `voicePlayerPipeline.test.js`
     - `voicePlayerSilenceRecovery.test.js`

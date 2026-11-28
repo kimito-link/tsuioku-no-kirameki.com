@@ -282,10 +282,9 @@ export function concurrentViewersIsViewCountLeak(concurrent, viewCount) {
 /** @param {any} signals */
 export function classifyYtWatchContentKind(signals) {
   const s = signals && typeof signals === 'object' ? signals : {};
-  if (s.hasLiveChatReplay === true) return 'live_replay';
-  if (s.isLive === true) return 'live';
-  // v0.1.2263: 公式が「いま配信ではない・配信だったものでもない」と両方出していれば、残ったチャット枠や画面の「視聴中」の文字で live にしない
   if (s.isLive === false && s.isLiveContent === false) return 'video';
+  if (s.isLive === true) return 'live';
+  if (s.hasLiveChatReplay === true) return 'live_replay';
   // 公式が「いまは配信ではない」と出しているときは、取り違えた同時視聴の数や残ったチャット枠で live にしない
   if (s.hasLiveChat === true && s.isLive !== false) return 'live';
   // v0.1.2241: 公式が「この動画はライブ配信ではない」(isLiveContent=false)と出していれば、同時視聴の欄に数が入っていても通常動画。
@@ -654,23 +653,73 @@ function queryDeep(root, sel) {
  * @param {ParentNode} root
  * @returns {Element[]}
  */
+const YT_COMMENT_THREAD_SEL = 'ytd-comment-thread-renderer';
+const YT_COMMENT_VM_SEL = 'ytd-comment-view-model, ytd-comment-renderer, yt-comment-view-model';
+const YT_COMMENT_SCOPE_SEL = 'ytd-reel-video-renderer, ytd-engagement-panel-section-list-renderer, ytd-shorts, #shorts-container, #comments, ytd-comments';
+
+/**
+ * 1段の shadowRoot まで見て、sel に合う要素を集める(監視は増やさない。読むだけ)。
+ * @param {ParentNode|null|undefined} root
+ * @param {string} sel
+ * @param {Element[]} out
+ * @param {number} shadowLeft
+ */
+function collectQueryAll(root, sel, out, shadowLeft) {
+  if (!root) return;
+  if (typeof root.querySelectorAll === 'function') {
+    try {
+      const list = root.querySelectorAll(sel);
+      for (let i = 0; i < list.length; i += 1) out.push(list[i]);
+    } catch {
+      /* 読めない selector は飛ばす */
+    }
+  }
+  const sr = /** @type {any} */ (root).shadowRoot;
+  if (sr && shadowLeft > 0) collectQueryAll(sr, sel, out, shadowLeft - 1);
+}
+
+/**
+ * Shorts のコメントは reel や engagement の shadow の中にあることがある。
+ * @param {ParentNode} root
+ * @returns {Element[]}
+ */
+function ytCommentThreadRoots(root) {
+  /** @type {Element[]} */
+  const threads = [];
+  collectQueryAll(root, YT_COMMENT_THREAD_SEL, threads, 1);
+  if (typeof root.querySelectorAll === 'function') {
+    /** @type {ArrayLike<Element>} */
+    let scopes = [];
+    try { scopes = root.querySelectorAll(YT_COMMENT_SCOPE_SEL); } catch { scopes = []; }
+    for (let i = 0; i < scopes.length; i += 1) collectQueryAll(scopes[i], YT_COMMENT_THREAD_SEL, threads, 1);
+  }
+  return [...new Set(threads)];
+}
+
+/**
+ * @param {ParentNode} root
+ * @returns {Element[]}
+ */
 function ytCommentHostElements(root) {
   /** @type {Element[]} */
   const hosts = [];
-  /** @type {ArrayLike<Element>} */
-  const threads = typeof root.querySelectorAll === 'function' ? root.querySelectorAll('ytd-comment-thread-renderer') : [];
+  const threads = ytCommentThreadRoots(root);
   for (let i = 0; i < threads.length; i += 1) {
     const th = threads[i];
-    const vm = queryDeep(th, 'ytd-comment-view-model, ytd-comment-renderer, yt-comment-view-model');
+    const vm = queryDeep(th, YT_COMMENT_VM_SEL);
     hosts.push(/** @type {Element} */ (vm || th));
   }
   if (hosts.length) return hosts;
-  /** @type {ArrayLike<Element>} */
-  const loose = typeof root.querySelectorAll === 'function'
-    ? root.querySelectorAll('ytd-comment-view-model, ytd-comment-renderer, yt-comment-view-model')
-    : [];
-  for (let i = 0; i < loose.length; i += 1) hosts.push(loose[i]);
-  return hosts;
+  /** @type {Element[]} */
+  const loose = [];
+  collectQueryAll(root, YT_COMMENT_VM_SEL, loose, 1);
+  if (typeof root.querySelectorAll === 'function') {
+    /** @type {ArrayLike<Element>} */
+    let scopes = [];
+    try { scopes = root.querySelectorAll(YT_COMMENT_SCOPE_SEL); } catch { scopes = []; }
+    for (let i = 0; i < scopes.length; i += 1) collectQueryAll(scopes[i], YT_COMMENT_VM_SEL, loose, 1);
+  }
+  return [...new Set(loose)];
 }
 
 /**
@@ -701,8 +750,24 @@ export function parseYtCommentPublishedAtMs(text, nowMs = Date.now()) {
 }
 
 /**
+ * v0.1.2265: コメントの行のリンク(/watch?v=<動画>&lc=)が、別の動画を指しているか。画面に前の動画の行が残っていても付けない。
+ * @param {Element} el
+ * @param {unknown} videoId
+ */
+function ytCommentRowIsOtherVideo(el, videoId) {
+  const want = String(videoId || '');
+  if (!want || typeof el?.querySelectorAll !== 'function') return false;
+  const links = el.querySelectorAll('a[href*="lc="]');
+  for (let i = 0; i < links.length; i += 1) {
+    const m = String(links[i].getAttribute('href') || '').match(/[?&]v=([A-Za-z0-9_-]{11})/);
+    if (m) return m[1] !== want;
+  }
+  return false;
+}
+
+/**
  * @param {any} root
- * @param {{ limit?: number, nowMs?: number }} [opts]
+ * @param {{ limit?: number, nowMs?: number, videoId?: string }} [opts]
  */
 export function ytVideoCommentAuthorsFromDom(root, opts = {}) {
   const limit = Number.isFinite(Number(opts.limit)) ? Math.max(1, Math.floor(Number(opts.limit))) : 80;
@@ -713,6 +778,7 @@ export function ytVideoCommentAuthorsFromDom(root, opts = {}) {
   for (let i = 0; i < threads.length; i += 1) {
     const el = threads[i];
     if (!el) continue;
+    if (ytCommentRowIsOtherVideo(el, opts.videoId)) continue;
     let channelId = '';
     let handle = '';
     let commentId = String(el.getAttribute?.('comment-id') || el.getAttribute?.('data-comment-id') || '').trim();
@@ -802,7 +868,7 @@ export function ytVideoCommentAuthorsFromDom(root, opts = {}) {
  * 投稿者の印は .channel-owner か、ytd-author-comment-badge-renderer の creator 属性。
  * アーティストなどのバッジだけでは投稿者にしない。
  * @param {ParentNode | null | undefined} root
- * @param {{ nowMs?: number, limit?: number }} [opts]
+ * @param {{ nowMs?: number, limit?: number, videoId?: string }} [opts]
  * @returns {{ commentId: string, parentId: string, channelId: string, name: string, handle: string, avatarUrl: string, isCreator: boolean, replyLevel: number, postedAtMs: number | null }[]}
  */
 export function ytVideoCommentsFromDom(root, opts = {}) {
@@ -811,12 +877,12 @@ export function ytVideoCommentsFromDom(root, opts = {}) {
   if (!root || typeof root.querySelectorAll !== 'function') return [];
   /** @type {{ commentId: string, parentId: string, channelId: string, name: string, handle: string, avatarUrl: string, isCreator: boolean, replyLevel: number, postedAtMs: number | null }[]} */
   const out = [];
-  const threads = root.querySelectorAll('ytd-comment-thread-renderer');
+  const threads = ytCommentThreadRoots(root);
   const useThreads = threads.length > 0;
   /** @type {any} */
   const hosts = useThreads ? threads : [];
   if (!useThreads) {
-    const loose = root.querySelectorAll('ytd-comment-view-model, ytd-comment-renderer, yt-comment-view-model');
+    const loose = ytCommentHostElements(root);
     for (let i = 0; i < loose.length; i += 1) hosts.push(loose[i]);
   }
   for (let i = 0; i < hosts.length; i += 1) {
@@ -843,6 +909,7 @@ export function ytVideoCommentsFromDom(root, opts = {}) {
       if (!el) continue;
       const inReplies = typeof el.closest === 'function' && !!el.closest('ytd-comment-replies-renderer')
         && (!el.closest('ytd-comment-thread-renderer') || el.closest('ytd-comment-thread-renderer') === th);
+      if (ytCommentRowIsOtherVideo(el, opts.videoId)) continue;
       const rec = ytCommentRecordFromViewModel(el, { nowMs, replyLevel: inReplies ? 1 : 0, parentId: inReplies ? topId : '' });
       if (!rec) continue;
       if (!inReplies && rec.commentId) topId = rec.commentId;
@@ -1191,4 +1258,97 @@ export function tallyVisibleSuperThanks(authors) {
     amounts[cur] = (amounts[cur] || 0) + n;
   }
   return { count, amounts };
+}
+
+/**
+ * v0.1.2265: 画面(DOM)の数を、いまの動画のものとして読んでよいか。ミックスで A→B と移った直後は、
+ *   画面の枠(ytd-watch-flexy の video-id)や再生数の印がまだ A のことがある。そのときは読まない(未測定のまま待つ)。
+ *   印も枠の id も無いときは今まで通り(判断できないページで数を消さない)。
+ * @param {Document} doc
+ * @param {string} videoId
+ */
+export function ytWatchDomIsFor(doc, videoId) {
+  if (!videoId || !doc) return false;
+  const root = doc.documentElement;
+  const tag = String(root?.getAttribute?.('data-nl-yt-view-count-video-id') || '');
+  // 印があるなら、それがいまの動画のときだけ(無いときの判断は下へ)
+  if (tag) return tag === videoId;
+  const ids = ytWatchDomVideoIds(doc);
+  if (ids.length) return ids.includes(videoId);
+  // v0.1.2265(実ページ): 実際の Shorts は枠に video-id が無い。ページの世界が移動のたびに消して書き直す kind-video-id を手がかりにする
+  const kindTag = String(root?.getAttribute?.('data-nl-yt-kind-video-id') || '');
+  if (kindTag) return kindTag === videoId;
+  // v0.1.2265: 印も枠の id も無いときは「この動画と確認できない」。ミックスで A→B と移った直後は
+  //   印が消えても画面に A の「123,456 回視聴」が残ることがあるので、ここでは使わない(未測定)。
+  //   本当に id を出さないページは、ページの世界が data-nl-yt-view-count-video-id を書いたあとで読む。
+  return false;
+}
+
+/**
+ * 画面の枠に書かれている動画 id(watch の ytd-watch-flexy、Shorts の reel など)。
+ * @param {Document|Element|null|undefined} doc
+ * @returns {string[]}
+ */
+export function ytWatchDomVideoIds(doc) {
+  /** @type {string[]} */
+  const out = [];
+  if (!doc || typeof doc.querySelectorAll !== 'function') return out;
+  const seen = new Set();
+  const add = (/** @type {unknown} */ v) => {
+    const id = String(v || '').trim();
+    if (!/^[A-Za-z0-9_-]{11}$/.test(id) || seen.has(id)) return;
+    seen.add(id);
+    out.push(id);
+  };
+  const nodes = doc.querySelectorAll('ytd-watch-flexy[video-id], ytd-reel-video-renderer[video-id], ytd-reel-video-renderer[is-active][data-video-id], [data-video-id], ytd-player[video-id]');
+  for (let i = 0; i < nodes.length; i += 1) {
+    const el = nodes[i];
+    add(el.getAttribute('video-id'));
+    add(el.getAttribute('data-video-id'));
+  }
+  const active = doc.querySelector('ytd-reel-video-renderer[is-active]');
+  if (active && typeof active.querySelectorAll === 'function') {
+    const links = active.querySelectorAll('a[href*="/shorts/"]');
+    for (let i = 0; i < links.length; i += 1) {
+      const m = String(links[i].getAttribute('href') || '').match(/\/shorts\/([A-Za-z0-9_-]{11})(?:[/?#]|$)/);
+      if (m) add(m[1]);
+    }
+  }
+  return out;
+}
+
+/**
+ * 書き出し用の画面読み取りをしてよいか。URL が合っていても、画面の枠が別の動画ならまだ読まない。
+ * @param {Document|null|undefined} doc
+ * @param {string} videoId
+ * @returns {{ ok: true } | { ok: false, reason: 'not-ready' | 'video-mismatch' }}
+ */
+export function ytPageExportSnapshotReady(doc, videoId) {
+  const id = String(videoId || '').trim();
+  if (!id) return { ok: false, reason: 'video-mismatch' };
+  if (!ytWatchDomIsFor(doc, id)) return { ok: false, reason: 'not-ready' };
+  return { ok: true };
+}
+
+/** @param {Document} doc @param {string} videoId */
+export function readYtWatchIndicators(doc, videoId) {
+  const root = doc.documentElement;
+  const raw = root?.getAttribute('data-nl-yt-view-count') || '';
+  const tagged = root?.getAttribute('data-nl-yt-view-count-video-id') === videoId;
+  // v0.1.2265: 印が別の動画・画面の枠が前の動画なら、古い画面の数を新しい動画に付けない(null = 未測定)
+  const viewCount = tagged && /^\d+$/.test(raw)
+    ? Number(raw)
+    : (ytWatchDomIsFor(doc, videoId) ? ytViewCountFromDom(doc) : null);
+  let hasLiveChat = false;
+  let hasLiveChatReplay = false;
+  for (const frame of doc.querySelectorAll('iframe[src]')) {
+    try {
+      const url = new URL(frame.getAttribute('src') || '', 'https://www.youtube.com');
+      const id = url.searchParams.get('v') || url.searchParams.get('video_id');
+      if (!videoId || id !== videoId || !/(^|\.)youtube\.com$/i.test(url.hostname)) continue;
+      if (url.pathname === '/live_chat_replay') hasLiveChatReplay = true;
+      else if (url.pathname === '/live_chat') hasLiveChat = true;
+    } catch { /* Ignore malformed iframe URLs. */ }
+  }
+  return { viewCount, hasLiveChat, hasLiveChatReplay };
 }

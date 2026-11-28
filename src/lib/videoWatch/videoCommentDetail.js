@@ -1,3 +1,5 @@
+import { isSiteDefaultSilhouetteUrl } from '../avatarFallbackFromUrl.js';
+
 /**
  * 【層】L0 判定層(純粋関数・I/O禁止)
  * 【この箱に入るもの】動画ページでサムネイルを押したときに出す「その人が書いたこと」(1件ずつの本文・時刻・いいね・返信など)の形と HTML
@@ -269,7 +271,7 @@ export function videoCommentRepliesHtml(c) {
   else if (unreadN <= 0) bits.push('<span class="nlsb-person-detail__owner-reply" data-owner-reply="0">投稿者の返信 なし</span>');
   if (viewers.length) {
     const faces = viewers.slice(0, 6).map((r) => {
-      const face = r.avatarUrl ? `<img class="nlsb-person-detail__reply-face" src="${esc(r.avatarUrl)}" alt="" width="16" height="16" loading="lazy" decoding="async" referrerpolicy="no-referrer">` : '';
+      const face = r.avatarUrl && !isSiteDefaultSilhouetteUrl(r.avatarUrl) ? `<img class="nlsb-person-detail__reply-face" src="${esc(r.avatarUrl)}" alt="" width="16" height="16" loading="lazy" decoding="async" referrerpolicy="no-referrer">` : '';
       return `<span class="nlsb-person-detail__reply-who">${face}${esc(r.name || r.id)}</span>`;
     }).join('、');
     const more = viewers.length > 6 ? ` ほか${(viewers.length - 6).toLocaleString('ja-JP')}人` : '';

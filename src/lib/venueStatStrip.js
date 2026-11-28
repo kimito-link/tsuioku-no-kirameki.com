@@ -26,6 +26,7 @@ import { ageMsOf } from './timeAuthority.js';
 import { resolveRecordsCountForDisplay } from './displayRecordedCount.js';
 import { venueItemsForPlatform } from './platform/platformMetrics.js';
 import { estimateNiconicoGiftSpendJpy, formatEstimatedViewerSpendDisplay, formatStreamerTakeHomeDisplay } from './estimatedViewerSpend.js';
+import { venueVideoPageFromUrl } from './videoWatch/vodWatchUrl.js';
 
 /** 鏡がこれより古ければ「パネルが閉じている」とみなす[ms](鏡は中身が同じでも15秒ごとに書き直される)。 */
 /** 数字の帯に出す3キャラの顔(拡張の中の画像)。視聴ページの中の会場はこれを先に blob: へ読んでおく(venue-inline-entry.js)。 */
@@ -43,7 +44,7 @@ export const VENUE_STAT_STRIP_STALE_TITLE =
 
 /**
  * @typedef {{ key: string, label: string, text: string, unit: string, isPlaceholder: boolean, face: ''|'link'|'konta'|'tanu', title?: string }} VenueStatItem
- * @typedef {{ source: 'mirror'|'self'|'fallback'|'none', stale: boolean, ageMs: number|null, items: VenueStatItem[] }} VenueStatStripModel
+ * @typedef {{ source: 'mirror'|'self'|'fallback'|'none', stale: boolean, ageMs: number|null, items: VenueStatItem[], contentKind?: string }} VenueStatStripModel
  */
 
 const PH = '—';
@@ -70,6 +71,34 @@ function formatCount(n) {
   } catch {
     return String(Math.floor(v));
   }
+}
+
+/**
+ * v0.1.2265: 読み上げを止めておくページの種類。動画(video)とアーカイブ(live_replay = 終わった配信)は、いま届くコメントが無い。
+ *   どのサービスも同じ。分からない('')・ライブは止めない(今まで通り)。会場の声と横の欄のボタンが同じ決まりを使う。
+ * @param {unknown} contentKind
+ */
+export function venueVoiceSuspendedKind(contentKind) {
+  return contentKind === 'video' || contentKind === 'live_replay';
+}
+
+/**
+ * v0.1.2267: 種類(contentKind)とページの URL から、この会場で声を出してよいかを決める。
+ *   true=出してよい / false=止める / null=まだ分からない(いまの許可のまま)。
+ *   ・種類が来ていれば、それで決める(video・live_replay は止める)。
+ *   ・種類がまだ空でも、URL で録画・動画のページと分かる(Twitch・Kick・ツイキャス・TikTok)なら、写しが届く前から止める。
+ *   ・それ以外で種類が空: YouTube だけ待つ(ライブは 'live' が来る)。ニコ生・Twitch・Kick などのライブは種類が空のままなので、ライブとして出す。
+ *   配信を切り替えたときの旧い声・待ちの破棄は、全サービスで setPageTarget が先にやる(ここは再許可だけ)。
+ * @param {unknown} contentKind
+ * @param {unknown} platform 会場の statPlatform(ニコ生は未指定)
+ * @param {unknown} [pageUrl] いまのページの URL(録画・動画の判定に使う。無ければ空)
+ * @returns {boolean | null}
+ */
+export function venueVoicePageGate(contentKind, platform, pageUrl = '') {
+  const kind = String(contentKind || '').trim();
+  if (kind) return !venueVoiceSuspendedKind(kind);
+  if (venueVideoPageFromUrl(pageUrl)) return false;
+  return String(platform || '') === 'youtube' ? null : true;
 }
 
 /**
@@ -183,7 +212,9 @@ export function buildVenueStatStripModel(snap, opts = {}) {
 
   /** @type {'mirror'|'self'|'fallback'|'none'} */
   const source = usable && !stale ? (useSelf ? 'self' : 'mirror') : (pickedRecords != null || usable) ? 'fallback' : 'none';
-  return { source, stale, ageMs, items };
+  // v0.1.2265: いまの写しが言うページの種類(動画のページでは会場が声を出さない・venueBar の setPageAllowed)。分からなければ ''
+  const contentKind = usable && s && s.platformFacts && typeof s.platformFacts === 'object' ? str(s.platformFacts.contentKind).trim() : '';
+  return { source, stale, ageMs, items, contentKind };
 }
 
 /**

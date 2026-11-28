@@ -159,11 +159,11 @@ export const PLATFORM_CAPABILITIES = Object.freeze({
     visitorCard: false,
     chips: Object.freeze(['streamAge', 'kicks', 'subs', 'gifts']),
     officialSubBoard: true,
-    paidLabel: 'Kicks',
-    timelineLabel: '応援タイムライン（コメント＋Kicks・ギフトサブ）',
-    giftUsersLabel: 'Kicks・ギフトサブのユーザー（簡易）',
+    paidLabel: 'KICKs',
+    timelineLabel: '応援タイムライン（コメント＋KICKs・ギフトサブ）',
+    giftUsersLabel: 'KICKs・ギフトサブのユーザー（簡易）',
     supportArrival: Object.freeze([
-      arrivalSpec('kicks', ['superchat'], 'Kicks', 'money', { currency: 'KICKS' }),
+      arrivalSpec('kicks', ['superchat'], 'KICKs', 'money', { currency: 'KICKS' }),
       arrivalSpec('sub', ['membership'], 'サブスク', 'none'),
       arrivalSpec('gift', ['membership_gift'], 'ギフトサブ', 'pieces'),
     ]),
@@ -192,11 +192,11 @@ export const PLATFORM_CAPABILITIES = Object.freeze({
     // eventInfo.point は 2026-11-11 の実ページで 0 なのに画面には別の数が出ていた(どの値か未確定)→ イベントpt は出さない。
     //   「スーパーファン」は画面の言葉「ガチファン」、streamerRank.score はランク記号(B1 等)の横のポイント。
     chips: Object.freeze(['streamAge', 'level', 'fans', 'superfans', 'liverRank', 'eventRank']),
-    paidLabel: 'ギフト',
-    timelineLabel: '応援タイムライン（コメント＋ギフト）',
-    giftUsersLabel: 'ギフトユーザー（簡易）',
+    paidLabel: 'アイテム',
+    timelineLabel: '応援タイムライン（コメント＋アイテム）',
+    giftUsersLabel: 'アイテムユーザー（簡易）',
     supportArrival: Object.freeze([
-      arrivalSpec('gift', ['superchat'], 'ギフト', 'money', { currency: 'MXCOIN' }),
+      arrivalSpec('gift', ['superchat'], 'アイテム', 'money', { currency: 'MXCOIN' }),
       arrivalSpec('fan', ['mx_fan'], 'ファン登録', 'none'),
     ]),
   }),
@@ -238,11 +238,11 @@ export const PLATFORM_CAPABILITIES = Object.freeze({
     concurrentLabel: '視聴者数',
     visitorCard: false,
     chips: Object.freeze(['streamAge', 'totalViews', 'commentTotal']),
-    paidLabel: 'ギフト',
-    timelineLabel: '応援タイムライン（コメント＋ギフト）',
-    giftUsersLabel: 'ギフトユーザー（簡易）',
+    paidLabel: 'アイテム',
+    timelineLabel: '応援タイムライン（コメント＋アイテム）',
+    giftUsersLabel: 'アイテムユーザー（簡易）',
     supportArrival: Object.freeze([
-      arrivalSpec('gift', ['superchat'], 'ギフト', 'point', { currency: 'TCSCORE' }),
+      arrivalSpec('gift', ['superchat'], 'アイテム', 'point', { currency: 'TCSCORE' }),
     ]),
   }),
   // headlineCount:views = 大きな数字はページの視聴数（同時接続では埋めない）。countUnit 空 = 「人」と書かない。
@@ -507,7 +507,7 @@ function formatInt(n) {
 }
 
 /**
- * 通貨は換算しない。円は ¥、Bits と Kicks は単位を分ける。
+ * 通貨は換算しない。円は ¥、Bits と KICKs は単位を分ける。
  * @param {number} amount
  * @param {string} currency
  * @returns {{ text: string, unit: string }}
@@ -521,7 +521,7 @@ function formatMoney(amount, currency) {
   const text = rounded.toLocaleString('ja-JP');
   if (code === 'JPY') return { text: `¥${text}`, unit: '' };
   if (code === 'BITS') return { text, unit: 'Bits' };
-  if (code === 'KICKS') return { text, unit: 'Kicks' };
+  if (code === 'KICKS') return { text, unit: 'KICKs' };
   return { text: code ? `${code} ${text}` : text, unit: '' };
 }
 
@@ -702,13 +702,13 @@ export function resolvePlatformId(input) {
 }
 
 /**
- * 「ギフト貢献度」の欄に、そのサービス公式の順位表(トップファン・Bits/Kicks ランキング)を入れているときの見出し。
+ * 「ギフト貢献度」の欄に、そのサービス公式の順位表(トップファン・Bits/KICKs ランキング)を入れているときの見出し。
  *   入れていないとき(アーカイブ等)は、このPCの記録から数えた「合計順」の見出しのまま。
  */
 const OFFICIAL_MAIN_LABEL = Object.freeze({
   youtube: 'トップファン',
   twitch: 'Twitch 公式の Bits ランキング',
-  kick: 'Kick 公式の Kicks ランキング',
+  kick: 'Kick 公式の KICKs ランキング',
 });
 
 /**
@@ -787,14 +787,14 @@ export function platformSectionPlan(platformId, opts) {
   } else if (id === 'kick') {
     sections.contributionRanking = {
       show: true,
-      label: official ? OFFICIAL_MAIN_LABEL.kick : 'Kicks・ギフトサブの合計順',
+      label: official ? OFFICIAL_MAIN_LABEL.kick : 'KICKs・ギフトサブの合計順',
     };
     sections.giftHistory = {
       show: true,
       label: 'ギフトサブ',
       sub: 'このPCの記録です。',
     };
-    trio = { rink: 'りんく（Kicks・ギフトサブ）', konta: 'こん太（サブスク）', tanu: 'たぬ姉（ギフトサブ）' };
+    trio = { rink: 'りんく（KICKs・ギフトサブ）', konta: 'こん太（サブスク）', tanu: 'たぬ姉（ギフトサブ）' };
   } else if (id === 'abema') {
     note = '公式の視聴数とコメント数だけを出します。';
     sections.contributionRanking = { show: false };
@@ -989,14 +989,14 @@ function supportChipsBase(id, support) {
     return out.concat(countSinceChip(id, support));
   }
   if (id === 'kick') {
-    const kicks = money('KICKS', 'Kicks');
+    const kicks = money('KICKS', 'KICKs');
     const out = estimateChips(
       id,
       estimateKickSubSpendJpy({ subCount: support.membershipCount, giftSubCount: support.membershipGiftCount }),
-      'Kicks は円にしていません。',
+      'KICKs は円にしていません。',
     );
     out.push(
-      chip('kicks', 'Kicks', kicks.text, '', `${RECORDED}Kicks は円にしていません。${kicks.extra}`.trim()),
+      chip('kicks', 'KICKs', kicks.text, '', `${RECORDED}KICKs は円にしていません。${kicks.extra}`.trim()),
       chip('subs', 'サブスク', formatInt(num(support.membershipCount) || 0), '人', RECORDED),
       chip('gifts', 'ギフトサブ', formatInt(num(support.membershipGiftCount) || 0), '人', RECORDED),
       chip(
@@ -1115,6 +1115,13 @@ export function panelExtraChips(platformId, facts) {
       title: OFFICIAL,
     });
   }
+  // v0.1.2265: アーカイブ(live_replay)の再生数。読めたときだけ(同時の札は横の欄で隠す)。どのサービスも同じ
+  if (facts?.contentKind === 'live_replay') {
+    const v = num(facts?.viewCount);
+    if (v != null) chips.unshift({ key: 'views', label: '再生', text: formatInt(v), unit: '回', placeholder: false, title: OFFICIAL });
+    // 終わった配信では、読めない数は待っても埋まらない。「読み込み中」のまま止めずに出さない
+    for (let i = chips.length - 1; i >= 0; i -= 1) if (chips[i].placeholder === true) chips.splice(i, 1);
+  }
   if (id === 'youtube' && facts?.contentKind === 'video') {
     const n = num(facts?.commentCount ?? facts?.slotCommentCount);
     if (n != null) {
@@ -1162,7 +1169,10 @@ export function venueItemsForPlatform(platformId, bag) {
     facts.isLive === false ||
     viewLeak
   );
-  const pageViews = ('headlineCount' in cap && cap.headlineCount === 'views') || youtubeVideo;
+  // v0.1.2265: アーカイブ(live_replay)はどのサービスも「再生 N回」= ページの再生数だけ(前の同時視聴者数・画面の数で埋めない)
+  const replay = facts.contentKind === 'live_replay';
+  const playback = youtubeVideo || replay;
+  const pageViews = ('headlineCount' in cap && cap.headlineCount === 'views') || playback;
   const fromFacts = pageViews ? num(facts.viewCount) : num(facts.viewers);
   const concText = String(bag?.concurrent?.text || '').trim();
   // ページに出ている数だけを出す。数でない文字(—・推定中・接続中・読み込み中 等)や推定(~)は「読み込み中」にまとめる。
@@ -1191,9 +1201,9 @@ export function venueItemsForPlatform(platformId, bag) {
     },
     {
       key: 'concurrent',
-      label: youtubeVideo ? '再生' : plan.concurrentLabel,
+      label: playback ? '再生' : plan.concurrentLabel,
       text: viewer.text,
-      unit: viewer.isPlaceholder ? '' : (youtubeVideo ? '回' : ('countUnit' in cap ? cap.countUnit : '人')),
+      unit: viewer.isPlaceholder ? '' : (playback ? '回' : ('countUnit' in cap ? cap.countUnit : '人')),
       isPlaceholder: viewer.isPlaceholder,
       face: 'konta',
       title: OFFICIAL,
@@ -1208,7 +1218,14 @@ export function venueItemsForPlatform(platformId, bag) {
       title: age.isPlaceholder ? '' : streamAgeTitle(facts),
     },
   ];
+  // v0.1.2265: アーカイブ(live_replay)はいま配信中ではない。経過は出さず、読めない再生数も「読み込み中」で止めずに隠す(どのサービスも同じ)
+  if (replay) {
+    for (let i = items.length - 1; i >= 0; i -= 1) {
+      if (items[i].key === 'streamAge' || (items[i].key === 'concurrent' && items[i].isPlaceholder)) items.splice(i, 1);
+    }
+  }
   for (const chip of panelExtraChips(id, facts)) {
+    if (chip.key === 'views') continue; // 会場の帯では再生は「再生」の欄(concurrent)に出す(二重にしない)
     items.push({
       key: chip.key,
       label: chip.label,

@@ -21,7 +21,7 @@ import { makeYtDefaultIconJudge, YT_DEFAULT_ICON_STORE_KEY } from './ytDefaultIc
 import { countYtStreamComments, getYtStreamCommentsByVideoId, getYtStreamCommentsSince } from './ytIdbStore.js';
 import { exportCommentsFromStoredRows, setStoredExportCommentReader } from '../../src/lib/youtube/exportStoredComments.js';
 import { buildCommentSummary, summaryStorageKey } from '../../src/lib/commentSummary.js';
-import { videoIdFromSummaryStorageKey } from '../../src/lib/youtube/ytSplitPersist.js';
+import { summaryStorageKey as ytSummaryStorageKey, videoIdFromSummaryStorageKey } from '../../src/lib/youtube/ytSplitPersist.js';
 import { startPageStallWatch } from '../../src/lib/stallTrace.js';
 import { ytPostedAtFromClock, ytReplayPostedAt } from '../../src/lib/youtube/ytPostedAt.js';
 import { buildGiftThrowLedgerTableSectionHtml, buildGiftThrowLedgerTableRowHtml } from '../../src/lib/giftThrowLedgerTableHtml.js';
@@ -589,7 +589,8 @@ export function ytSummaryToNicoSnapshot(sum, videoId, tabTitle, all, videoCardWr
     // アーカイブ(チャットのリプレイで記録した配信)は今も配信中ではないので、開始からの経過は出さない(2週間前の配信が「372時間」になる)
     //   配信が終わっていたら(endedAt)、終わった時刻までで止める
     streamAgeMin:
-      startedAt > 0 && !replayVideoIds.has(videoId)
+      // v0.1.2265: アーカイブ(live_replay)を見ているときも、終わった時刻が無ければ出さない(2022年に始まった配信が「38380時間」になった)
+      startedAt > 0 && !replayVideoIds.has(videoId) && (sum?.contentKind !== 'live_replay' || Number(sum?.endedAt) > startedAt)
         ? Math.max(0, Math.round(((Number(sum?.endedAt) > startedAt ? Number(sum.endedAt) : Date.now()) - startedAt) / 60000))
         : null,
     // ニコ生の来場・広告pt・ギフトpt を、このサービスの数字として出さない(src/lib/platform/platformMetrics.js)。
@@ -1043,7 +1044,11 @@ const inPageSkipFetchUntil = new Map();
  */
 async function fetchStreamRows(vid, afterRecordedAt) {
   if (!YT_SHIM_IN_PAGE) {
-    if (afterRecordedAt !== undefined) return getYtStreamCommentsSince(vid, afterRecordedAt);
+    if (afterRecordedAt !== undefined) {
+      const key = ytSummaryStorageKey(vid);
+      const bag = await real?.storage?.local?.get?.(key).catch(() => null);
+      return bag?.[key]?.contentKind === 'video' ? [] : getYtStreamCommentsSince(vid, afterRecordedAt);
+    }
     return withVideoRows(await getYtStreamCommentsByVideoId(vid), vid);
   }
   const res = await real?.runtime?.sendMessage?.(
@@ -1114,10 +1119,10 @@ async function getCommentsViaBackground(vid) {
  * @param {string} vid
  */
 async function withVideoRows(rows, vid) {
-  if (Array.isArray(rows) && rows.length) return rows;
   try {
-    const bag = await real?.storage?.local?.get?.([KEY_YT_VIDEO_WATCH_CARD, KEY_VOD_VIDEO_WATCH_CARD]);
-    return recordedRowsOrAnyVideoCardRows(rows, [bag?.[KEY_YT_VIDEO_WATCH_CARD], bag?.[KEY_VOD_VIDEO_WATCH_CARD]], vid);
+    const key = ytSummaryStorageKey(vid);
+    const bag = await real?.storage?.local?.get?.([KEY_YT_VIDEO_WATCH_CARD, KEY_VOD_VIDEO_WATCH_CARD, key]);
+    return recordedRowsOrAnyVideoCardRows(rows, [bag?.[KEY_YT_VIDEO_WATCH_CARD], bag?.[KEY_VOD_VIDEO_WATCH_CARD]], vid, String(bag?.[key]?.contentKind || ''));
   } catch {
     return Array.isArray(rows) ? rows : [];
   }

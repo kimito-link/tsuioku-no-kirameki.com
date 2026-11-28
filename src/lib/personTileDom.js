@@ -90,9 +90,8 @@ export function buildPersonTileEl(p, io) {
   //   会場は 3D 変形で可視判定が崩れるので使わない(呼び出し側が渡さない・下の loading="lazy" 撤回の経緯と同じ)。
   const deferFar = io.deferFarImages === true && typeof io.whenNearViewport === 'function';
   if (deferFar) img.loading = 'lazy'; // src より先に付ける(後から付けても読み込みは始まっている)
-  // v0.1.2250: 遠いマスでも、ページから取った本物の顔の URL(YouTube・Twitch など。ニコの式の URL は除く=404 が多い)は
-  //   最初から本物を指す。読み込みはブラウザの遅延読み込みに任せる(近づくまで通信しない=確かめと同じ回数以下)。
-  //   読めなかったときは、その場で代わりの顔(ゆっくり)へ戻す。下の確かめ(noteRemoteAttempt)は今までどおり近づいてから。
+  // v0.1.2265: 遠いマスでも、最初は代わりの顔を出す。本物の HTTPS を先に指すと、読み込み前は白い空のマスになる。
+  //   確かめ(noteRemoteAttempt)は今までどおり近づいてから。読めなかったときは代わりの顔のまま。
   const directFar =
     deferFar && !cachedFace && displayLane !== requestedLane &&
     io.isHttpOrHttpsUrl(requestedLane) && !identiconFallbackForAvatarUrl(requestedLane);
@@ -103,7 +102,7 @@ export function buildPersonTileEl(p, io) {
       img.classList.toggle('nl-avatar--tv-fallback', io.storyTileUsesYukkuriTvStyle(requestedLane, displayLane));
     }, { once: true });
   }
-  img.src = directFar ? requestedLane : cachedFace || displayLane;
+  img.src = cachedFace || displayLane;
   if (deferFar && displayLane !== requestedLane && io.isHttpOrHttpsUrl(requestedLane)) {
     // 本物の顔の確かめ(隠し画像での読み込み試験)は、マスが画面の近くに来てから始める。
     void Promise.resolve(io.whenNearViewport(img)).then((near) => {
@@ -115,7 +114,7 @@ export function buildPersonTileEl(p, io) {
   }
   img.classList.toggle(
     'nl-avatar--tv-fallback',
-    io.storyTileUsesYukkuriTvStyle(requestedLane, directFar ? requestedLane : displayLane)
+    io.storyTileUsesYukkuriTvStyle(requestedLane, displayLane)
   );
   img.alt = '';
   const tip =

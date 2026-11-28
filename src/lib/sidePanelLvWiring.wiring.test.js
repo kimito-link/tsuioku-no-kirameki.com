@@ -80,8 +80,11 @@ describe('★パネル自身が lv を決める(v0.1.1696)', () => {
     const boot = stripComments(read('src/extension/sidepanel-iframe-boot-entry.js'));
     expect(boot).toContain('chrome.tabs.onActivated.addListener');
     expect(boot).toContain('chrome.tabs.onUpdated.addListener');
-    expect(boot).toMatch(/if \(!lv \|\| lv === shownLv\(\)\) return;/);
-    expect(boot).toContain('loader.update(buildSidePanelIframeSrc(base, `?lv=${lv}`));');
+    expect(boot).toContain('nextSidepanelIframeSrc');
+    expect(boot).toContain('if (next) loader.update(next)');
+    const lib = stripComments(read('src/lib/sidepanelIframeSrc.js'));
+    expect(lib).toMatch(/if \(!lv \|\| lv === String\(p\.shownLv \|\| ''\)\) return null;/);
+    expect(lib).toContain('return buildSidePanelIframeSrc(nicoBase, `?lv=${lv}`)');
     // このパネルが居るウィンドウのタブだけ
     expect(boot).toContain('tab.windowId !== ownWindowId');
   });

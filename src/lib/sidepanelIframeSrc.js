@@ -24,6 +24,16 @@
  *
  * @module sidepanelIframeSrc
  */
+import { videoPanelSrcForTab } from './videoWatch/videoPanelRoute.js';
+import {
+  isYtPanelSrc,
+  isYtPanelTabUrl,
+  ytPanelStreamKeyOfUrl,
+  ytPanelSiteOfUrl,
+  buildYtPanelSrc,
+  readYtPanelStreamKey,
+} from './youtube/ytPanelRoute.js';
+import { lvFromWatchUrl } from './sidePanelLvFromTabs.js';
 
 /** background.js の SIDE_PANEL_LV_RE と同じ規約(ズレると片方だけ通る穴になる)。 */
 const LV_RE = /^lv\d{1,15}$/;
@@ -60,4 +70,28 @@ export function buildSidePanelIframeSrc(baseSrc, search) {
   // 既に lv があるなら二重に足さない(冪等)。
   if (/[?&]lv=/.test(base)) return base;
   return base + (base.includes('?') ? '&' : '?') + 'lv=' + lv;
+}
+
+/**
+ * v0.1.2265: 前面タブが変わったとき、横の欄の iframe を次に何にするか。
+ *   付け替えないときは null(いまの src を保つ)。
+ * @param {{ tabUrl?: unknown, currentSrc?: unknown, nicoBase?: unknown, shownLv?: unknown }} p
+ * @returns {string | null}
+ */
+export function nextSidepanelIframeSrc(p = {}) {
+  const tabUrl = p.tabUrl;
+  const currentSrc = String(p.currentSrc || '');
+  const nicoBase = String(p.nicoBase || '');
+  const vsrc = videoPanelSrcForTab(tabUrl, currentSrc, nicoBase);
+  if (vsrc) return vsrc;
+  if (isYtPanelTabUrl(tabUrl)) {
+    const k = ytPanelStreamKeyOfUrl(tabUrl);
+    if (!isYtPanelSrc(currentSrc) || (k && k !== readYtPanelStreamKey(currentSrc))) {
+      return buildYtPanelSrc(k, ytPanelSiteOfUrl(tabUrl));
+    }
+    return null;
+  }
+  const lv = lvFromWatchUrl(tabUrl);
+  if (!lv || lv === String(p.shownLv || '')) return null;
+  return buildSidePanelIframeSrc(nicoBase, `?lv=${lv}`);
 }

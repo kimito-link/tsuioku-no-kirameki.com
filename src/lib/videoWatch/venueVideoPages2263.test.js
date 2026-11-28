@@ -105,3 +105,16 @@ describe('ほかのページ', () => {
     expect(vod).toContain('hideVenueModeForVideoPage(!venueVideoPageFromUrl(href))');
   });
 });
+
+it('uses the same video comments as the detail even when the ID has a recorded live', () => {
+  const id = 'fixture0001';
+  const live = [{ text: 'synthetic live row', recordedAt: 1 }];
+  const video = [{ text: 'synthetic video row', recordedAt: 2, skipVoice: true }];
+  const card = { videoId: id, card: { videoRows: video } };
+  for (const recorded of [[], live]) {
+    expect(recordedRowsOrAnyVideoCardRows(recorded, [card], id, 'video')).toEqual(video);
+    expect(recordedRowsOrAnyVideoCardRows(recorded, [], id, 'video')).toEqual([]);
+  }
+  expect(recordedRowsOrAnyVideoCardRows(live, [card], id, 'live')).toEqual(live);
+  expect(recordedRowsOrAnyVideoCardRows([], [card], id, 'live')).toEqual([]);
+});

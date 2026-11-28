@@ -54,7 +54,7 @@ describe('配信モードと同じレーンと数字の帯', () => {
 describe('ニコ生の記名ユーザーの顔とクリック', () => {
   it('数値のユーザーIDから、配信モードと同じ公開アイコン URL を付ける', () => {
     const id = '12345678';
-    const url = resolveViewerBehaviorAvatarUrl(id, '');
+    const url = resolveViewerBehaviorAvatarUrl(id, '', 'niconico');
     expect(url).toBe(deriveAvatarUrlFromUid(id));
     expect(url).toContain('/nicoaccount/usericon/s/1234/12345678.jpg');
     const board = buildViewerBehaviorBoard({

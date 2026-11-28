@@ -204,6 +204,12 @@ export class VoicePlayer {
     /** ボタンに出す意思。エンジンが居なくても ON のまま(enabled は声を出してよいときだけ true)。 */
     this.readingWanted = false;
     this._intentSerial = 0;
+    /** v0.1.2265: このページで声を出してよいか(動画のページでは false)。意思(readingWanted)とは別。 */
+    this.pageAllowed = true;
+    /** v0.1.2265: 許可が変わるたびに増やす。つなぎかけの ON は、世代が変わったら声を出さない。 */
+    this._pageGeneration = 0;
+    /** v0.1.2265: いまの配信の印。空から初めて決めたときは止めない。 */
+    this._pageTarget = '';
     this._connectInFlight = false;
     /** @type {Array<() => void>} */
     this._connectWaiters = [];
@@ -767,7 +773,50 @@ export class VoicePlayer {
     if (persist && this.storage && serial === this._intentSerial && this.readingWanted) {
       this.storage.set({ [this.VOICE_READING_ENABLED_KEY]: true }).catch(() => {});
     }
+    // v0.1.2265: 動画のページでは意思だけ覚えて、つながない(ライブに戻ったら setPageAllowed(true) がつなぐ)
+    if (!this.pageAllowed) return;
     await this._connect(serial);
+  }
+
+  /**
+   * v0.1.2265: 見ている配信・動画が変わったとき。新しい種類が分かるまで声を止める(意思は残す)。
+   *   最初の割り当て(空→id)では止めない(会場を開いたときの自動 ON を消さない)。
+   * @param {unknown} target
+   */
+  setPageTarget(target) {
+    const next = String(target || '');
+    if (next === this._pageTarget) return;
+    const prev = this._pageTarget;
+    this._pageTarget = next;
+    if (!prev) return;
+    this.setPageAllowed(false);
+  }
+
+  /**
+   * v0.1.2265: このページで声を出してよいか(動画のページは false・ライブ/アーカイブは true)。
+   *   false: 鳴っている声・待ち・先読みを止めて捨て、つなぎかけの ON も世代で無効にする。意思(readingWanted)と保存は変えない。
+   *   true: 意思が ON なら、つなぎ直す。同じ値の呼び出しは何もしない(ライブのまま止めない)。タイマー・購読は増やさない。
+   * @param {boolean} allowed
+   */
+  setPageAllowed(allowed) {
+    const next = allowed !== false;
+    if (next === this.pageAllowed) return;
+    this.pageAllowed = next;
+    this._pageGeneration += 1;
+    if (!next) {
+      this.enabled = false;
+      this.toggleBusy = false;
+      if (this._engineRetryTimer) {
+        clearTimeout(this._engineRetryTimer);
+        this._engineRetryTimer = 0;
+      }
+      this.stop();
+      this.flushPendingQueue();
+      this.onLoadingState('idle');
+      this._emitToggle();
+      return;
+    }
+    if (this.readingWanted && !this.enabled && !this.isObsMode()) void this._connect(this._intentSerial);
   }
 
   /**
@@ -775,7 +824,7 @@ export class VoicePlayer {
    * @param {number} serial
    */
   async _connect(serial) {
-    if (serial !== this._intentSerial || !this.readingWanted) return;
+    if (serial !== this._intentSerial || !this.readingWanted || !this.pageAllowed) return;
     if (this.enabled) return;
     if (this._connectInFlight) {
       await new Promise((resolve) => { this._connectWaiters.push(resolve); });
@@ -784,7 +833,9 @@ export class VoicePlayer {
     this._connectInFlight = true;
     this.toggleBusy = true;
     this._emitToggle();
-    const aborted = () => serial !== this._intentSerial || !this.readingWanted;
+    const pageGeneration = this._pageGeneration;
+    const aborted = () => serial !== this._intentSerial || !this.readingWanted
+      || pageGeneration !== this._pageGeneration || !this.pageAllowed;
     try {
       // ★v0.1.1327: 非同期処理に入る【前】に解錠する。ここが唯一「クリックの延長」に居られる瞬間。
       await this.primeAudioUnlock();

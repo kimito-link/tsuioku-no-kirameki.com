@@ -89,16 +89,17 @@ export function recordedRowsOrVideoRows(recorded, cardWrap, videoId) {
  * @param {readonly any[] | null | undefined} recorded
  * @param {readonly any[]} cardWraps 置き場の値の並び(無いものは null)
  * @param {string} videoId 配信・録画・動画の鍵
+ * @param {string} [contentKind]
  * @returns {any[]}
  */
-export function recordedRowsOrAnyVideoCardRows(recorded, cardWraps, videoId) {
+export function recordedRowsOrAnyVideoCardRows(recorded, cardWraps, videoId, contentKind = '') {
   const rows = Array.isArray(recorded) ? recorded : [];
-  if (rows.length) return rows;
+  if (contentKind === 'live' || contentKind === 'live_replay' || (rows.length && contentKind !== 'video')) return rows;
   const vid = String(videoId || '').trim();
   const list = Array.isArray(cardWraps) ? cardWraps : [];
   for (const w of list) {
-    const got = recordedRowsOrVideoRows(rows, w, vid);
+    const got = recordedRowsOrVideoRows([], w, vid);
     if (got.length) return got;
   }
-  return rows;
+  return contentKind === 'video' ? [] : rows;
 }

@@ -4,6 +4,7 @@ import { needsYtVenue, shouldPollYtVenue } from '../lib/youtube/ytVenueBoot.js';
 import { startPageStallWatch } from '../lib/stallTrace.js';
 import { readYtRelatedChipSnapshot } from '../lib/youtube/ytRelatedChipSnapshot.js';
 import { readYtVideoCommentThreadSnapshot } from '../lib/youtube/ytVideoCommentThreadSnapshot.js';
+import { ytPageExportSnapshotReady } from '../lib/youtube/ytVideoWatchMeta.js';
 import { youtubeExportPageMatchesVideo } from '../lib/youtube/youtubeExportTabMatch.js';
 
 /** @param {string} [href] */
@@ -37,13 +38,19 @@ if (typeof chrome !== 'undefined' && chrome.runtime && chrome.runtime.onMessage)
         try { sendResponse({ ok: false, reason: 'video-mismatch' }); } catch { /* 閉じたタブ */ }
         return false;
       }
+      // v0.1.2265: URL が B でも、画面の枠がまだ A のときは読まない(前の動画のコメントを付けない)
+      const ready = ytPageExportSnapshotReady(document, wantedVideoId);
+      if (ready.ok !== true) {
+        try { sendResponse({ ok: false, reason: ready.reason }); } catch { /* 閉じたタブ */ }
+        return false;
+      }
       const relatedChip = readYtRelatedChipSnapshot(document, {
         operatorChannelId: String(msg.operatorChannelId || ''),
         operatorChannelName: String(msg.operatorChannelName || ''),
         operatorHandle: String(msg.operatorHandle || ''),
         videoId: wantedVideoId,
       });
-      const commentThreads = readYtVideoCommentThreadSnapshot(document);
+      const commentThreads = readYtVideoCommentThreadSnapshot(document, { videoId: wantedVideoId });
       sendResponse({ ok: true, relatedChip, commentThreads, videoId: wantedVideoId });
     } catch (err) {
       try { sendResponse({ ok: false, reason: String(err && err.message || err) }); } catch { /* 閉じたタブ */ }

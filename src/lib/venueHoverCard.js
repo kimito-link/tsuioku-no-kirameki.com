@@ -22,6 +22,7 @@
  */
 
 import { isNumericNicoUserId } from '../domain/user/identity.js';
+import { isInternalMarketingId, operatorDisplayName } from './marketingOperatorReport.js';
 import { RECENT_TEXT_KEEP, formatRecentTexts } from './recentTextRing.js';
 import { buildVenuePresenceNote } from './venuePresenceNote.js';
 import { SPEECH_EVIDENCE_GATE_ENABLED, hasSpeech, speechEvidence } from './speechEvidence.js';
@@ -130,10 +131,26 @@ export const HOVER_LAST_TEXT_MAX = 60;
  * }} input
  * @returns {VenueHoverCardModel}
  */
+
+/**
+ * v0.1.2265: 会場の名前。内部の写し ID(YouTube の 8 で始まる10桁など)は名前にしない。
+ * @param {unknown} name
+ * @param {unknown} uid
+ * @param {unknown} platformId
+ * @returns {string}
+ */
+export function venueParticipantDisplayName(name, uid, platformId) {
+  const plat = String(platformId || '').trim();
+  const n = String(name || '').trim();
+  if (n && !isInternalMarketingId(n, plat)) return n;
+  return operatorDisplayName({ name: n, uid }, { platformId: plat });
+}
+
 export function buildVenueHoverCardModel(input) {
   const i = input && typeof input === 'object' ? input : {};
   const uid = String(i.uid || '').trim();
-  const displayName = String(i.displayName || '').trim();
+  const platformId = String(i.platformId || '').trim();
+  const displayName = venueParticipantDisplayName(i.displayName, uid, platformId);
   /*
    * ★count/giftCount は number|null（2026-08-29）。
    *   null は「在席名簿に居らず、数が分からない」。★ここで 0 に丸めないこと。
@@ -160,9 +177,13 @@ export function buildVenueHoverCardModel(input) {
   let idKind = /** @type {VenueHoverCardModel['idKind']} */ ('none');
   let idLine = '';
   if (uid) {
-    if (isNumericNicoUserId(uid)) {
+    if (isNumericNicoUserId(uid) && (!platformId || platformId === 'niconico')) {
       idKind = 'registered';
       idLine = `ID:${uid}(本登録)`;
+    } else if (platformId && platformId !== 'niconico' && /^8\d{9}$/.test(uid)) {
+      // v0.1.2265: YouTube 系の写し ID は本登録にも匿名番号にもしない
+      idKind = 'none';
+      idLine = '';
     } else {
       idKind = 'anonymous';
       /*

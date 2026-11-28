@@ -779,7 +779,10 @@ async function runExport(lid) {
       : null;
     setWaitStageText('分析中… (2/3) 集計・画像準備', 35);
     await yieldToBrowserPaint();
-    const report = aggregateMarketingReport(comments, lid, { broadcasterUserId: reportBroadcasterUid });
+    const kind = /** @type {{contentKind?: string}|undefined} */ (facts)?.contentKind;
+    const contentKind = kind === 'live_replay' || kind === 'live' || (!marketingView && /^lv\d+$/.test(lid) && !isYtPseudoLvShape(lid))
+      ? 'live' : kind;
+    const report = aggregateMarketingReport(comments, lid, { broadcasterUserId: reportBroadcasterUid, contentKind });
     mktProf.mark('aggregate');
 
     const [

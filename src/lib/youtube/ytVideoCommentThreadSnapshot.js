@@ -236,14 +236,27 @@ function rowFromViewModel(el, opts = {}) {
 }
 
 /**
+ * v0.1.2266: 行(または先頭のスレッド)のリンク /watch?v=<動画>&lc= が指す動画 id。リンクが無ければ ''。
+ * @param {Element | null | undefined} el
+ */
+function rowVideoIdFromLinks(el) {
+  for (const a of qa(el, 'a[href*="lc="]')) {
+    const m = String(a.getAttribute?.('href') || '').match(/[?&]v=([A-Za-z0-9_-]{11})/);
+    if (m) return m[1];
+  }
+  return '';
+}
+
+/**
  * @param {ParentNode | null | undefined} root
- * @param {{ nowMs?: number, limit?: number }} [opts]
+ * @param {{ nowMs?: number, limit?: number, videoId?: string }} [opts]
  * @returns {YtVideoCommentThreadRow[]}
  */
 export function readYtVideoCommentThreadSnapshot(root, opts = {}) {
   if (!root) return [];
   const limit = Number.isFinite(Number(opts.limit)) ? Math.max(1, Math.floor(Number(opts.limit))) : 200;
   const nowMs = Number.isFinite(Number(opts.nowMs)) ? Number(opts.nowMs) : Date.now();
+  const wantVideo = text(opts.videoId);
   const threads = qa(root, 'ytd-comment-thread-renderer');
   /** @type {YtVideoCommentThreadRow[]} */
   const out = [];
@@ -260,6 +273,8 @@ export function readYtVideoCommentThreadSnapshot(root, opts = {}) {
         parentId: inReplies ? topId : '',
       });
       if (!rec) continue;
+      // v0.1.2266: 読む動画が決まっているときは、その動画の行だと確かめられた行だけ(返信はスレッドの先頭のリンクでも確かめる)
+      if (wantVideo && (rowVideoIdFromLinks(el) || rowVideoIdFromLinks(th)) !== wantVideo) continue;
       if (!inReplies && rec.commentId) topId = rec.commentId;
       if (inReplies && !rec.parentId && topId) rec.parentId = topId;
       out.push(rec);
@@ -282,7 +297,8 @@ export function commentsFromYtThreadSnapshot(rows, liveId) {
     liveId: lid,
     commentNo: String(i + 1),
     text: r.text || '',
-    userId: r.channelId || r.handle || (r.name ? `name:${r.name}` : ''),
+    // v0.1.2265: 表示名だけでは同一人物にしない(同じ名前の別人をまとめない)。channelId/handle が無い行は照合しない。
+    userId: r.channelId || r.handle || '',
     nickname: r.name || '',
     name: r.name || '',
     avatarUrl: r.avatarUrl || '',

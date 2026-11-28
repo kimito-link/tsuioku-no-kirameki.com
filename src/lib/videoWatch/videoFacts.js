@@ -11,8 +11,8 @@
  */
 
 /** @param {unknown} v @returns {number | null} */
-function nonNegInt(v) {
-  if (v == null || v === '') return null;
+export function videoMetricCount(v) {
+  if (typeof v !== 'number' && (typeof v !== 'string' || !v.trim())) return null;
   const n = Number(v);
   return Number.isFinite(n) && n >= 0 ? Math.floor(n) : null;
 }
@@ -24,7 +24,7 @@ function nonNegInt(v) {
  */
 export function videoLengthSeconds(v) {
   if (typeof v === 'number' || /^\d+$/.test(String(v ?? '').trim())) {
-    const n = nonNegInt(v);
+    const n = videoMetricCount(v);
     return n != null && n > 0 ? n : null;
   }
   const m = String(v ?? '').trim().match(/^P(?:(\d+)D)?T?(?:(\d+)H)?(?:(\d+)M)?(?:(\d+(?:\.\d+)?)S)?$/i);
@@ -59,8 +59,8 @@ export function normalizeVideoFacts(src) {
   const s = src && typeof src === 'object' ? src : {};
   const sec = videoLengthSeconds(s.length);
   return {
-    likes: nonNegInt(s.likes),
-    commentTotal: nonNegInt(s.commentTotal),
+    likes: videoMetricCount(s.likes),
+    commentTotal: videoMetricCount(s.commentTotal),
     publishedText: videoPublishedText(s.publishDate),
     lengthText: sec != null ? lengthText(sec) : '',
   };

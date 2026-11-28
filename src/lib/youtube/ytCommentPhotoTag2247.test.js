@@ -89,7 +89,8 @@ describe('動画コメントの顔を、遅延読み込みでも拾う (0.1.2247
   it('合図は動画のときだけ。ページの世界は合図を待つだけ(見張り・タイマー・通信なし)', () => {
     const entry = readFileSync(join(ROOT, 'extension-youtube/src/content-chat-entry.js'), 'utf8');
     // v0.1.2249: 合図は動画のときだけ通る ytCommentScanGate の読み取りの中(変わらないときは省く)
-    expect(entry).toMatch(/contentKind === 'video'\s*\?\s*ytCommentScanGate\.read\(document, videoId, \(\) => \{\s*askPageToTagYtCommentPhotos\(document\);/);
+    // v0.1.2265: 画面の枠がいまの動画のときだけ(前の動画の人を付けない・ytWatchDomIsFor)
+    expect(entry).toMatch(/contentKind === 'video' && domIsThisVideo\s*\?\s*ytCommentScanGate\.read\(document, videoId, \(\) => \{\s*askPageToTagYtCommentPhotos\(document\);/);
     const src = readFileSync(join(ROOT, 'src/lib/youtube/ytCommentPhotoTag.js'), 'utf8').replace(/^\s*(\*|\/\/).*$/gm, '');
     expect(src).not.toMatch(/MutationObserver|setTimeout|setInterval|fetch\(|XMLHttpRequest/);
     const main = readFileSync(join(ROOT, 'extension-youtube/src/content-chat-main-entry.js'), 'utf8');
@@ -115,7 +116,9 @@ describe('動画の顔の列は、ライブと同じ顔の決め方を通す (0.
   });
 
   it('ニコの数値 ID は推測 URL(読み込みはガードが確かめ、失敗したら uid のゆっくり顔)', () => {
-    expect(viewerBehaviorLaneFaceSrc({ id: '12345678' })).toMatch(/usericon\/s\/1234\/12345678\.jpg$/);
+    expect(viewerBehaviorLaneFaceSrc({ id: '12345678' }, 'niconico')).toMatch(/usericon\/s\/1234\/12345678\.jpg$/);
+    expect(viewerBehaviorLaneFaceSrc({ id: '12345678' }, 'twitch')).toMatch(/^data:image\/svg/);
+    expect(viewerBehaviorLaneFaceSrc({ id: '12345678' })).toMatch(/^data:image\/svg/);
   });
 
   it('列に入る顔は空にならない', () => {

@@ -10,6 +10,7 @@ import {
   capSeriesPoints,
   formatBucketMsJa,
   formatLongGapJa,
+  formatBeyondWeekJa,
   formatSeriesOffsetJa,
   marketingSpanDisplay,
   maxOfList
@@ -280,7 +281,7 @@ function sectionBroadcastNarrative(narrative, maskShare) {
       return `<article class="mkt-narrative-card">
 <div class="mkt-narrative-card__head">
 <strong>${escapeHtml(seg.label)}</strong>
-<span>${seg.startMinute}〜${seg.endMinute}分 / ${seg.commentCount}件 / ${seg.uniqueUsers}人</span>
+<span>${formatBeyondWeekJa(seg.startMinute * 60_000) || seg.startMinute}〜${formatBeyondWeekJa(seg.endMinute * 60_000) || `${seg.endMinute}分`} / ${seg.commentCount}件 / ${seg.uniqueUsers}人</span>
 </div>
 <div class="mkt-narrative-keywords">${keywords}</div>
 ${samples}
@@ -860,7 +861,7 @@ function sectionSurvivalCurve(curve) {
   const dots = curve.segments
     .map(
       (s, i) =>
-        `<circle cx="${xOf(i).toFixed(1)}" cy="${yOf(s.retentionPct).toFixed(1)}" r="3" fill="#a78bfa"><title>区間${i + 1} (${s.startMin}〜${s.endMin}分): ${s.retentionPct}% (${s.presentCount}名)</title></circle>`
+        `<circle cx="${xOf(i).toFixed(1)}" cy="${yOf(s.retentionPct).toFixed(1)}" r="3" fill="#a78bfa"><title>区間${i + 1} (${formatBeyondWeekJa(s.startMin * 60_000) || s.startMin}〜${formatBeyondWeekJa(s.endMin * 60_000) || `${s.endMin}分`}): ${s.retentionPct}% (${s.presentCount}名)</title></circle>`
     )
     .join('');
   const xLabels = curve.segments

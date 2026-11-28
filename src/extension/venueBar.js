@@ -58,7 +58,7 @@ import {
   createVenueHoverCardEl,
   renderVenueHoverCard,
   resolveVenueHoverCardPlacement,
-  formatVenueHoverRelativeTime
+  formatVenueHoverRelativeTime, venueParticipantDisplayName
 } from '../lib/venueHoverCard.js';
 import { escapeHtml } from '../lib/htmlText.js';
 import { createVenueLiveCommentHandler } from '../lib/venueLiveCommentRoute.js';
@@ -394,7 +394,7 @@ import { clearVenueComposerPass, venueToggleShouldUntuck } from '../lib/venueTuc
 import { createVenueBubbleVoiceSyncState, startVenueSpeechBubbleVoice, summarizeBubbleVoiceSync } from '../lib/venueBubbleVoiceSync.js';
 // 2026-11-09 りんく「これを会場モードでもいれたほうが利便性たかい」: パネルの数字カード(記録・推定同時接続ほか)を会場のヘッダーにも出す。
 import { KEY_STAT_CARDS_MIRROR } from '../lib/statCardsMirrorKey.js';
-import { buildVenueStatStripModel, createVenueStatStrip, VENUE_STAT_STRIP_CSS, VENUE_STAT_STRIP_FACE_PATHS } from '../lib/venueStatStrip.js';
+import { buildVenueStatStripModel, createVenueStatStrip, VENUE_STAT_STRIP_CSS, VENUE_STAT_STRIP_FACE_PATHS, venueVoicePageGate } from '../lib/venueStatStrip.js';
 import { createVenueStatSelfPoller, createStatMirrorLiveness, requestWatchSnapshotViaTabs } from '../lib/venueStatCardsSelf.js';
 
 const ROOT_ID = 'nlsb-venue-root';
@@ -3052,7 +3052,7 @@ export function mountVenueBarButton(options = {}) {
    * @param {HTMLElement} el
    * ★count/giftCount は number|null。null は「在席名簿に居らず、数が分からない」。
    *   ここで 0 と言うと画面に「発言 0」という嘘が出る（2026-08-29 に実機で確認した症状）。
-   * @returns {{ uid: string, displayName: string, count: number|null, hasGift: boolean, giftCount: number|null, venueRank: number, lastAt: number, tier?: string, lastText?: string, recentTexts?: string[], factsSource?: string, speech?: import('../lib/speechEvidence.js').SpeechEvidence }|null}
+   * @returns {{ uid: string, displayName: string, count: number|null, hasGift: boolean, giftCount: number|null, venueRank: number, lastAt: number, tier?: string, lastText?: string, recentTexts?: string[], factsSource?: string, speech?: import('../lib/speechEvidence.js').SpeechEvidence, platformId?: string }|null}
    */
   const resolveSeatlessHoverData = (el) => {
     try {
@@ -3379,7 +3379,7 @@ export function mountVenueBarButton(options = {}) {
       if (!open) voicePlayer.diag.venueGate = enabled ? 'headless' : (voicePlayer.readingWanted ? 'headless-waiting-engine' : 'panel-closed');
       if (!enabled) updatePickupBanner(null);
       if (!voicePlayer.readingWanted) hiddenSpeechBuf.clear();
-      voiceBtn.disabled = false; voiceBtn.setAttribute('aria-busy', toggleBusy ? 'true' : 'false');
+      voiceBtn.disabled = voicePlayer.pageAllowed === false; voiceBtn.setAttribute('aria-busy', toggleBusy ? 'true' : 'false');
       voiceBtn.classList.toggle('is-on', enabled);
       voiceBtn.textContent = enabled ? '🔊 読み上げ: ON' : '🔈 読み上げ: OFF';
     },
@@ -3426,7 +3426,6 @@ export function mountVenueBarButton(options = {}) {
       voicePlayer.enable();
     }
   });
-  
   // 会場モードは開いたら「いきなり読み上げ上がる」のがユーザー期待(comeview の ?voice=1 相当)。
   //   保存状態に関わらず自動 ON。OBS 透過モードは VoicePlayer 内で isObsMode により enable を
   //   スキップするので forceOn を渡しても安全(無音オーバーレイのまま)。
@@ -3708,6 +3707,7 @@ export function mountVenueBarButton(options = {}) {
       statMirrorLiveness.observe(statCardsMirrorSnap); // 隠れた欄が1回書いたきりの鏡を「動いている」と扱わない
       const model = buildVenueStatStripModel(statCardsMirrorSnap, { liveId, nowMs: Date.now(), recordedCount, selfSnap: statCardsSelfSnap, mirrorLive: statMirrorLiveness.isLive(Date.now(), liveId), platform: options.statPlatform });
       statStrip.paint(model);
+      { const gate = venueVoicePageGate(model.contentKind, options.statPlatform, location.href); if (gate !== null) voicePlayer.setPageAllowed(gate); } // v0.1.2265: 種類が分かるまで前の許可を使わない(ニコ生は種類なしでも許可)
       if (open) statSelfPoller.tick(Date.now(), { liveId, mirrorFresh: model.source === 'mirror' && statMirrorLiveness.isLive(Date.now(), liveId), recordedCount });
     } catch { /* 帯の失敗で会場を止めない */ }
   };
@@ -3760,7 +3760,7 @@ export function mountVenueBarButton(options = {}) {
   // 2026-07-30(wayfinder→to-spec方式・venue-avatar-hover-preview-SPEC.md §4.3): ホバープレビュー
   //   カード用のデータ。paint時(席装飾ループ/renderTopBar)にWeakMapへ相乗り登録するだけで、
   //   DOM書き込み・新規タイマー・新規計算は無い(RANKバッジちらつき教訓=diff-skip不要な設計)。
-  /** @type {WeakMap<HTMLElement, { uid: string, displayName: string, count: number, hasGift: boolean, giftCount: number, venueRank: number, lastAt: number, tier?: string, lastText?: string, recentTexts?: string[], factsSource?: string, speech?: import('../lib/speechEvidence.js').SpeechEvidence }>} */
+  /** @type {WeakMap<HTMLElement, { uid: string, displayName: string, count: number, hasGift: boolean, giftCount: number, venueRank: number, lastAt: number, tier?: string, lastText?: string, recentTexts?: string[], factsSource?: string, speech?: import('../lib/speechEvidence.js').SpeechEvidence, platformId?: string }>} */
   const _hoverCardDataByEl = new WeakMap();
   // v0.1.1207: 会場の「開いてから見えるまで」を分解して観測する(ユーザー報告
   //   「立ち上がりが遅い/出ないときがある」を体感でなく数字で切り分けるため)。
@@ -5526,7 +5526,7 @@ export function mountVenueBarButton(options = {}) {
       const p = item.participant || {};
       _hoverCardDataByEl.set(cell, {
         uid: String(p.userId || '').trim(),
-        displayName: String(p.name || '').trim() || String(item?.participant?.key || ''),
+        displayName: venueParticipantDisplayName(p.name, p.userId || item?.participant?.key, options.statPlatform),
         count: Number(p.count) || 0,
         hasGift: p.hasGift === true,
         giftCount: Number(p.giftCount) || 0,
@@ -5538,7 +5538,7 @@ export function mountVenueBarButton(options = {}) {
         lastText: String(p.lastText || ''),
         recentTexts: Array.isArray(p.recentTexts) ? p.recentTexts : [],
         // 発言の証拠(2026-10-16・v1は表示に使わず census の計測だけ)。応援者トップのセルも同じ participant 由来。
-        speech: p.speech
+        speech: p.speech, platformId: String(options.statPlatform || '')
       });
       frag.appendChild(cell);
     }
@@ -5929,10 +5929,8 @@ export function mountVenueBarButton(options = {}) {
       } catch {
         /* 計器失敗は描画を止めない */
       }
-      const displayName =
-        String(item?.title || '').trim() ||
-        rawName ||
-        (uid ? anonymousDisplayLabel(uid) : anonymousDisplayLabel(participant.key || `会場${seatIndex + 1}`));
+      const displayName = venueParticipantDisplayName(rawName || item?.title, uid, options.statPlatform)
+        || (uid ? anonymousDisplayLabel(uid) : anonymousDisplayLabel(participant.key || `会場${seatIndex + 1}`));
       const tile = node.seat.querySelector('.nl-story-userlane-cell');
       if (tile instanceof HTMLElement) node.tile = tile;
       const seatLinkOn = isNumericNicoUserId(uid) && nicoUserPageUrl(uid) !== '';
@@ -5991,7 +5989,7 @@ export function mountVenueBarButton(options = {}) {
           ? participant.recentTexts
           : (Array.isArray(item?.recentTexts) ? item.recentTexts : []),
         // 発言の証拠(2026-10-16・v1は表示に使わず census の計測だけ)。
-        speech: speechWithFallbackTexts(participant.speech, item?.recentTexts)
+        speech: speechWithFallbackTexts(participant.speech, item?.recentTexts), platformId: String(options.statPlatform || '')
       });
       const speakerKey = uid ? `u:${uid}` : rawName ? `n:${rawName}` : '';
       const streakEntry = speakerKey ? speechStreaks.get(speakerKey) : null;
@@ -6403,7 +6401,6 @@ export function mountVenueBarButton(options = {}) {
     );
     return /** @type {VenueRow[]} */ ([...mirrorRows, ...tail]);
   };
-
   /**
    * X層の現在有効な暫定キー集合を返し、窓の2倍を過ぎた古い記録は掃除する(Map を有界に保つ)。
    * @param {number} nowWallMs
@@ -6446,6 +6443,7 @@ export function mountVenueBarButton(options = {}) {
    */
   const resetVenueForLive = (liveId) => {
     activeLiveId = liveId;
+    voicePlayer.setPageTarget(liveId); // v0.1.2265: 配信が変わるまで前の声を出さない(意思は残す)・全サービス共通。再許可は paint のゲート
     baseRows = [];
     seatByKey = new Map();
     // 2026-07-30(venue-ranking-churn-SPEC.md §4.3): 応援者ランキング安定化状態も

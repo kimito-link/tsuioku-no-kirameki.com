@@ -19,7 +19,7 @@ import {
   ytVideoCommentAuthorsFromInnertube,
   mergeYtVideoCommentAuthors,
   ytVideoCommentsFromDom,
-  ytViewCountFromDom, ytCommentCountFromDom,
+  readYtWatchIndicators, ytWatchDomIsFor, ytCommentCountFromDom,
   concurrentViewersIsViewCountLeak,
 } from '../../src/lib/youtube/ytVideoWatchMeta.js';
 import { askPageToTagYtCommentPhotos, readYtCommentEntities } from '../../src/lib/youtube/ytCommentPhotoTag.js';
@@ -683,21 +683,7 @@ function setupWatchPageMetaObserver() {
       if (v === '0') return false;
       return null;
     };
-    const attrCount = root?.getAttribute('data-nl-yt-view-count') || '';
-    const viewCountFromAttr = /^\d+$/.test(attrCount) ? Number(attrCount) : null;
-    const viewCount = viewCountFromAttr != null ? viewCountFromAttr : ytViewCountFromDom(document);
-    let hasLiveChat = false;
-    let hasLiveChatReplay = false;
-    try {
-      const iframes = document.querySelectorAll('iframe[src]');
-      for (let i = 0; i < iframes.length; i += 1) {
-        const src = String(iframes[i].getAttribute('src') || '');
-        if (src.includes('live_chat_replay')) hasLiveChatReplay = true;
-        else if (src.includes('/live_chat')) hasLiveChat = true;
-      }
-    } catch {
-      /* フレームが読めなくても種別は他の印で決める */
-    }
+    const { viewCount, hasLiveChat, hasLiveChatReplay } = readYtWatchIndicators(document, videoId);
     let viewersForKind = viewers;
     // v0.1.2241: 丸めた再生回数(474万)と概要欄の再生回数(4,740,759)も同じ数とみなす(ytVideoWatchMeta.js)
     if (viewCount != null && concurrentViewersIsViewCountLeak(viewersForKind, viewCount)) viewersForKind = null;
@@ -712,18 +698,20 @@ function setupWatchPageMetaObserver() {
     });
     // v0.1.2247: 画面に出ていない投稿者の顔は img が空。ページの世界に1回合図して、本物の URL を属性に写してから読む
     // v0.1.2249: 同じ動画で裏タブ、またはコメントの並びが前回と同じなら、前回の読み取りを使う(ytCommentScanGate.js)
-    const scan = contentKind === 'video'
+    // v0.1.2265: 画面の枠がまだ前の動画なら、前の動画のコメント・人を新しい動画に付けない(次の読み取りで拾う)
+    const domIsThisVideo = ytWatchDomIsFor(document, videoId);
+    const scan = contentKind === 'video' && domIsThisVideo
       ? ytCommentScanGate.read(document, videoId, () => {
         askPageToTagYtCommentPhotos(document);
         // v0.1.2252: ページのデータ(UC… ID・顔)を正に、DOM で補う(ytCommentPhotoTag.js が同じ合図で写す)
         const fromPage = ytVideoCommentAuthorsFromInnertube(readYtCommentEntities(document) || []);
-        const videoAuthors = mergeYtVideoCommentAuthors(fromPage, ytVideoCommentAuthorsFromDom(document));
-        return { videoAuthors, videoComments: ytVideoCommentsFromDom(document) };
+        const videoAuthors = mergeYtVideoCommentAuthors(fromPage, ytVideoCommentAuthorsFromDom(document, { videoId }));
+        return { videoAuthors, videoComments: ytVideoCommentsFromDom(document, { videoId }) };
       })
       : null;
     const videoAuthors = scan ? scan.videoAuthors : [];
     const videoComments = scan ? scan.videoComments : [];
-    const commentCount = contentKind === 'video' ? ytCommentCountFromDom(document) : null;
+    const commentCount = contentKind === 'video' && domIsThisVideo ? ytCommentCountFromDom(document) : null;
     const isLiveFlag = attrBool('data-nl-yt-is-live');
     const isLiveContentFlag = attrBool('data-nl-yt-is-live-content');
     safeSendMessage({
@@ -744,9 +732,10 @@ function setupWatchPageMetaObserver() {
         contentKind,
         isLive: isLiveFlag,
         isLiveContent: isLiveContentFlag,
-        ...(contentKind === 'video' && viewCount != null ? { slotViewCount: viewCount } : {}),
+        // v0.1.2265: アーカイブ(live_replay)も再生数を渡す(会場の帯が「再生 読み込み中」のまま止まった)
+        ...((contentKind === 'video' || contentKind === 'live_replay') && viewCount != null ? { slotViewCount: viewCount } : {}),
         ...(contentKind === 'video' && commentCount != null ? { slotCommentCount: commentCount } : {}),
-        ...(contentKind === 'video' ? { videoAuthors, videoComments } : {}),
+        ...(contentKind === 'video' && domIsThisVideo ? { videoAuthors, videoComments } : {}),
         // v0.1.2263: 動画の投稿日・長さ(ページの世界が player から写した値。いまの動画の印のときだけ)
         ...(contentKind === 'video' && !kindIsStale && root?.getAttribute('data-nl-yt-publish-date')
           ? { slotPublishDate: String(root.getAttribute('data-nl-yt-publish-date')) } : {}),

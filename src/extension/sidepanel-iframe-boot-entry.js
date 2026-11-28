@@ -10,10 +10,9 @@
 // ■ 拡張の CSP は script-src 'self' なので、インラインには書けない(だから別ファイル)。
 
 import { createSidepanelIframeLoader, IFRAME_START_MAX_WAIT_MS } from '../lib/sidepanelIframeLoader.js';
-import { buildSidePanelIframeSrc, readSidePanelLv } from '../lib/sidepanelIframeSrc.js';
-import { SIDE_PANEL_WATCH_TAB_QUERY, lvFromWatchUrl, pickPanelLv } from '../lib/sidePanelLvFromTabs.js';
-import { isYtPanelSrc, isYtPanelTabUrl, ytPanelStreamKeyOfUrl, ytPanelSiteOfUrl, buildYtPanelSrc, readYtPanelStreamKey } from '../lib/youtube/ytPanelRoute.js';
-import { videoPanelSrcForTab } from '../lib/videoWatch/videoPanelRoute.js';
+import { buildSidePanelIframeSrc, readSidePanelLv, nextSidepanelIframeSrc } from '../lib/sidepanelIframeSrc.js';
+import { SIDE_PANEL_WATCH_TAB_QUERY, pickPanelLv } from '../lib/sidePanelLvFromTabs.js';
+import { isYtPanelTabUrl, ytPanelStreamKeyOfUrl, ytPanelSiteOfUrl, buildYtPanelSrc } from '../lib/youtube/ytPanelRoute.js';
 
 /** 親の最初の描画(first-paint)が出るか、上限の時間が来たら解決する関門。タイマーで見る(rAF は隠れた文書で止まるので使わない)。 */
 function firstPaintOrTimeout() {
@@ -85,22 +84,10 @@ try {
           if (ownWindowId != null && tab.windowId !== ownWindowId) return; // このパネルが居るウィンドウのタブだけ
           // v0.1.2244: 録画・通常動画のページ(配信キーが無い)へ移ったら、そのサービスの中身へ付け替える(videoPanelRoute.js)。
           //   ライブ配信・トップ等のページは null で、下の今までの判定のまま。
-          const vsrc = videoPanelSrcForTab(tab.url, ifr.getAttribute('src'), base);
-          if (vsrc) {
-            loader.update(vsrc);
-            return;
-          }
-          if (isYtPanelTabUrl(tab.url)) {
-            // YouTube 系のタブへ移ったら YouTube 版に。0.1.1949: YouTube 系どうしでも【別の配信】になったら読み込み直す
-            //   (ニコ生版の lv と同じ。配信ページでない=トップ等では今の配信を保つ)
-            const k = ytPanelStreamKeyOfUrl(tab.url);
-            const cur = ifr.getAttribute('src');
-            if (!isYtPanelSrc(cur) || (k && k !== readYtPanelStreamKey(cur))) loader.update(buildYtPanelSrc(k, ytPanelSiteOfUrl(tab.url)));
-            return;
-          }
-          const lv = lvFromWatchUrl(tab.url);
-          if (!lv || lv === shownLv()) return;
-          loader.update(buildSidePanelIframeSrc(base, `?lv=${lv}`));
+          const next = nextSidepanelIframeSrc({
+            tabUrl: tab.url, currentSrc: ifr.getAttribute('src'), nicoBase: base, shownLv: shownLv(),
+          });
+          if (next) loader.update(next);
         } catch {
           /* 追従の失敗で、いま見せている配信を壊さない */
         }

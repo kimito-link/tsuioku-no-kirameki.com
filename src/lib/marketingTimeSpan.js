@@ -29,23 +29,29 @@ export function boundCommentsToTimeWindow(comments, maxMinutes = MARKETING_TIMEL
   const limit = Math.max(1, Math.floor(Number(maxMinutes) || MARKETING_TIMELINE_MAX_MINUTES)) * 60_000;
   let minT = Infinity;
   let maxT = -Infinity;
+  let previousMax = -Infinity;
+  let dated = 0;
   for (let i = 0; i < list.length; i += 1) {
     const t = toEpochMs(list[i]?.capturedAt);
     if (!Number.isFinite(t) || t <= 0) continue;
     if (t < minT) minT = t;
-    if (t > maxT) maxT = t;
+    dated += 1;
+    if (t >= maxT) { previousMax = maxT; maxT = t; }
+    else if (t > previousMax) previousMax = t;
   }
   if (!(maxT >= minT)) return { comments: list, windowed: false, spanMinutes: 0, fromMs: 0, toMs: 0 };
   const spanMinutes = Math.round((maxT - minT) / 60_000);
   if (maxT - minT <= limit) return { comments: list, windowed: false, spanMinutes, fromMs: minT, toMs: maxT };
-  const from = maxT - limit;
+  const isolated = dated >= 3 && previousMax - minT <= limit && maxT - previousMax > 2 * limit;
+  const to = isolated ? previousMax : maxT;
+  const from = to - limit;
   /** @type {T[]} */
   const out = [];
   for (let i = 0; i < list.length; i += 1) {
     const t = toEpochMs(list[i]?.capturedAt);
-    if (!Number.isFinite(t) || t <= 0 || t >= from) out.push(list[i]);
+    if (!Number.isFinite(t) || t <= 0 || (t >= from && t <= to)) out.push(list[i]);
   }
-  return { comments: out, windowed: true, spanMinutes, fromMs: from, toMs: maxT };
+  return { comments: out, windowed: true, spanMinutes, fromMs: from, toMs: to };
 }
 
 /**
@@ -155,6 +161,17 @@ export function marketingSpanDisplay(durationMinutes) {
   const rest = days % 365;
   const value = years > 0 ? `${years}年${rest > 0 ? `${rest}日` : ''}` : `${days}日`;
   return { long: true, text: `コメントの期間 ${value}`, value, label: 'コメントの期間' };
+}
+
+/**
+ * v0.1.2265: 7日を超える経過だけ「30日」「4年139日」に。7日以内は null(呼び出し側の今までの「N分」「H時間M分」のまま)。
+ *   マーケHTMLのラベルは、7日以内のライブで master と同じ文字にする(「24時間0分」を「1日」にしない)。
+ * @param {unknown} ms
+ * @returns {string | null}
+ */
+export function formatBeyondWeekJa(ms) {
+  const v = Number(ms) || 0;
+  return v > MARKETING_TIMELINE_MAX_MINUTES * 60_000 ? formatLongGapJa(v) : null;
 }
 
 /**

@@ -968,6 +968,7 @@ import { extractNicoUserIdFromProfileUrl } from '../lib/nicoUserProfilePage.js';
 import { createBroadcasterUidTracker } from '../lib/broadcasterUidTracker.js';
 import { STORY_GROWTH_REBUILD_REASON, createStoryGrowthRebuildReasonState, findStoryEntryDiff, noteStoryEntryDiff, noteStoryGrowthRebuildReason, noteStoryGrowthTarget, publishStoryGrowthRebuildNote } from '../lib/storyGrowthRebuildReasons.js';
 import { isMarketingExportTabFinished } from '../lib/marketingExportTabState.js';
+import { applyMarketingExportGate } from '../lib/marketingExportGate.js';
 
 // 0.1.1961: 描き直し1回で約3回呼ばれ、毎回タブを3通り問い合わせていた。400ms の間は前の答え(写し)を使い、タブが動いたら捨てる
 const watchTabCandidatesMemo = createShortLivedMemo((w) => collectWatchTabCandidatesUncached(w), { ttlMs: 400 });
@@ -14179,11 +14180,7 @@ function renderDevMonitorSecondaryViz(p, opts = {}) {
  */
 function renderDevMonitorPanel(p) {
   lastDevMonitorPanelParams = p;
-  const mktBtn = /** @type {HTMLButtonElement|null} */ ($('devMonitorExportMarketingBtn'));
-  if (mktBtn) mktBtn.disabled = !String(p.liveId || '').trim();
-  // 0.1.26 (AA): HTML 保存ボタン横の「マーケ」クイックボタンも有効化を同期。
-  const mktQuickBtn = /** @type {HTMLButtonElement|null} */ ($('exportMarketingQuickBtn'));
-  if (mktQuickBtn) mktQuickBtn.disabled = !String(p.liveId || '').trim();
+  applyMarketingExportGate(document, p);
   const statsEl = $('devMonitorStats');
   const jsonEl = $('devMonitorJson');
   const dlChartsEl = $('devMonitorDlCharts');
@@ -16247,6 +16244,7 @@ async function refresh() {
     //   開いているときだけ実行する。通常は折りたたみで閉=この集計は画面に出ないのに毎 450ms
     //   無条件に走り、1 万件超の配信でスクロール中もメインスレッドを圧迫していた。
     //   閉時は丸ごとスキップ(O(N)×3 + I/O が消える)。開いた瞬間は toggle リスナーで即再描画。
+    applyMarketingExportGate(document, { liveId: lv, displayCount: displayEntries.length, storageCount: arr.length, commentReadState });
     {
       const devMonDetails = /** @type {HTMLDetailsElement|null} */ ($('devMonitorDetails'));
       if (shouldRunDevMonitorPaint({ panelOpen: devMonDetails?.open === true })) {

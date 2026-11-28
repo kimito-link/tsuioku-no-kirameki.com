@@ -86,7 +86,7 @@ describe('platformSectionPlan', () => {
     expect(platformSectionPlan('twitch').sections.contributionRanking.label).toBe('Bits・ギフトサブの合計順');
     // 公式の順位表を入れているときは見出しも公式の名前(中身と見出しを食い違わせない)
     expect(platformSectionPlan('twitch', { officialBoard: true }).sections.contributionRanking.label).toBe('Twitch 公式の Bits ランキング');
-    expect(platformSectionPlan('kick', { officialBoard: true }).sections.contributionRanking.label).toBe('Kick 公式の Kicks ランキング');
+    expect(platformSectionPlan('kick', { officialBoard: true }).sections.contributionRanking.label).toBe('Kick 公式の KICKs ランキング');
     expect(platformSectionPlan('youtube', { officialBoard: true }).sections.contributionRanking.label).toBe('トップファン');
     expect(platformSectionPlan('kick').sections.giftHistory.label).toBe('ギフトサブ');
     expect(platformSectionPlan('kick').sections.contributionRanking.sub).toBeUndefined();
@@ -200,13 +200,13 @@ describe('venueItemsForPlatform', () => {
     expect(panelExtraChips('kick', { support }).some((c) => c.key === 'countSince')).toBe(false);
   });
 
-  it('Kick は Kicks・サブスク・ギフトサブ', () => {
+  it('Kick は KICKs・サブスク・ギフトサブ', () => {
     const support = tallySupportItems([
       { kind: 'superchat', amount: 7, currency: 'KICKS' },
       { kind: 'membership_gift', giftCount: 1 },
     ]);
     const labels = venueItemsForPlatform('kick', bag({ support })).map((i) => i.label);
-    expect(labels).toEqual(['記録', '視聴者数', '経過', '推定（視聴者の購入額）', '推定（配信者の受取）', 'Kicks', 'サブスク', 'ギフトサブ', 'ホスト']);
+    expect(labels).toEqual(['記録', '視聴者数', '経過', '推定（視聴者の購入額）', '推定（配信者の受取）', 'KICKs', 'サブスク', 'ギフトサブ', 'ホスト']);
   });
 
   it('Kick のホストは回数と人数を数える(v0.1.2207)', () => {
@@ -223,7 +223,7 @@ describe('venueItemsForPlatform', () => {
     const est = panelExtraChips('kick', { support }).find((c) => c.key === 'estimatedViewerSpend');
     expect(est.text).toBe('—');
     expect(est.placeholder).toBe(true);
-    expect(est.title).toContain('Kicks は円にしていません');
+    expect(est.title).toContain('KICKs は円にしていません');
   });
 
   it('まだ数えていない(ready でない)ときは「推定 —」も出さない', () => {

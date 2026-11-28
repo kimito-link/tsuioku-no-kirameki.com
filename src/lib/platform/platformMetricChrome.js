@@ -20,6 +20,47 @@ function hideEl(el) {
   if (node.dataset && node.dataset.nlPlatformHide !== '1') node.dataset.nlPlatformHide = '1';
 }
 
+/**
+ * v0.1.2265: アーカイブ(live_replay)を見ているあいだだけ隠す(自分の印で付け外し・ほかの隠しは触らない)。
+ * @param {Element|null} el
+ * @param {boolean} hide
+ */
+function replayHide(el, hide) {
+  if (!el || typeof /** @type {HTMLElement} */ (el).setAttribute !== 'function') return;
+  const node = /** @type {HTMLElement} */ (el);
+  const marked = node.getAttribute('data-nl-replay-hide') === '1';
+  if (hide) {
+    if (!node.hidden) node.hidden = true;
+    if (!marked) node.setAttribute('data-nl-replay-hide', '1');
+  } else if (marked) {
+    node.hidden = false;
+    node.removeAttribute('data-nl-replay-hide');
+  }
+}
+
+/**
+ * v0.1.2265: アーカイブのあいだは横の欄の「読み上げ」を押せなくする(動画と同じ・いま届くコメントが無い)。自分の印だけ付け外す。
+ *   動画の印(data-nl-video-voice-disabled)が付いているボタンは、動画の側に任せる。
+ * @param {ParentNode} root
+ * @param {boolean} replay
+ */
+function replayVoiceOff(root, replay) {
+  const btn = /** @type {HTMLButtonElement|null} */ (root.querySelector?.('#openComeviewVoiceBtn') || null);
+  if (!btn || btn.tagName !== 'BUTTON') return;
+  const marked = btn.getAttribute('data-nl-replay-voice-disabled') === '1';
+  if (replay) {
+    if (marked || btn.disabled) return;
+    btn.disabled = true;
+    btn.setAttribute('aria-disabled', 'true');
+    btn.setAttribute('data-nl-replay-voice-disabled', '1');
+  } else if (marked) {
+    btn.removeAttribute('data-nl-replay-voice-disabled');
+    if (btn.hasAttribute('data-nl-video-voice-disabled')) return;
+    btn.disabled = false;
+    btn.removeAttribute('aria-disabled');
+  }
+}
+
 /** 同じ値の setAttribute も変化の記録になるので、違う時だけ書く。 @param {Element} el @param {string} name @param {string} value */
 function setAttrIfDiff(el, name, value) {
   if (el.getAttribute(name) !== value) el.setAttribute(name, value);
@@ -333,6 +374,9 @@ export function applyPlatformMetricChrome(root, state) {
   markCapability(root, plan.id, plan.subBoard === true, plan.commentPost === true, copy ? copy.showGiftUsers !== true : false);
   if (plan.nameplate !== true) rewriteForeignPanelWords(root, copy);
   const facts = state?.facts && typeof state.facts === 'object' ? state.facts : {};
+  // v0.1.2265: アーカイブ(終わったライブ)は「いま何人」も「開始からの経過」も無い。会場の帯と同じく、
+  //   同時の札と経過は隠し、再生数が読めたら「再生」のチップで出す(どのサービスも同じ・ライブは変えない)
+  const replay = facts.contentKind === 'live_replay';
 
   const vis = root.querySelector('.nl-live-stat-card--visitors');
   if (vis) hideEl(vis);
@@ -341,6 +385,8 @@ export function applyPlatformMetricChrome(root, state) {
   if (concLabel && concLabel.textContent !== plan.concurrentLabel) concLabel.textContent = plan.concurrentLabel;
   const concCard = root.querySelector('#watchConcurrentCard');
   if (concCard) setAttrIfDiff(concCard, 'title', '配信ページが出している公式の数です。');
+  replayHide(concCard, replay);
+  replayVoiceOff(root, replay);
   const concIcon = root.querySelector('#watchConcurrentCard .nl-live-stat-icon');
   if (concIcon) {
     setAttrIfDiff(concIcon, 'title', plan.concurrentLabel);
@@ -349,7 +395,7 @@ export function applyPlatformMetricChrome(root, state) {
   // 数が来る前の札(開いた直後の「—」・ニコ生の「（接続中…）」等)を「読み込み中」に。数そのものと「N分前」は触らない。
   const est = root.querySelector('#watchConcurrentEst');
   const sub = root.querySelector('#watchConcurrentSub');
-  if (est) {
+  if (est && !replay) {
     const t = String(est.textContent || '').trim();
     if (NOT_A_COUNT.test(t) || t.startsWith('~') || t === '推定中' || t.includes('接続中')) {
       if (est.textContent !== LOADING) est.textContent = LOADING;
@@ -380,8 +426,12 @@ export function applyPlatformMetricChrome(root, state) {
     const ageVal = root.querySelector('#officialStatNicoStreamAge');
     const ageChip = ageVal && ageVal.parentElement;
     if (ageChip) {
-      if (ageChip.hidden) ageChip.hidden = false;
-      if (ageChip.hasAttribute('aria-hidden')) ageChip.removeAttribute('aria-hidden');
+      if (replay) replayHide(ageChip, true);
+      else {
+        replayHide(ageChip, false);
+        if (ageChip.hidden) ageChip.hidden = false;
+        if (ageChip.hasAttribute('aria-hidden')) ageChip.removeAttribute('aria-hidden');
+      }
       const title = streamAgeTitle(facts);
       if (title) {
         if (ageChip.getAttribute('title') !== title) ageChip.setAttribute('title', title);
