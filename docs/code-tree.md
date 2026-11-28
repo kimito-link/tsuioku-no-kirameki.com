@@ -1205,7 +1205,7 @@
   - `gift-coin-hq.wav`
   - `gift-register-hq.wav`
   - `gift-register.mp3`
-- 📁 **src/** (2778)
+- 📁 **src/** (2779)
   - 📁 **data/** (7)
     - 📁 **acquirers/** (2)
       - `laneFromStorage.js` — 応援レーン acquirer: chrome.storage.local(nls_comments) → laneStore の橋渡し。
@@ -1565,7 +1565,7 @@
         - `logo_funlink_white_RGB_link_black.png`
         - `logo_funlink_white_RGB_maru_black.png`
     - `hero-connect-hub.svg`
-  - 📁 **lib/** (2443)
+  - 📁 **lib/** (2444)
     - 📁 **__snapshots__/** (4)
       - `marketing-abema-baseline.html`
       - `marketing-niconico.html`
@@ -2896,6 +2896,7 @@
     - `marketingOperatorReport.js` — 運営者向けマーケHTMLの章立て（純関数）。
     - `marketingOperatorReport.test.js`
     - `marketingOperatorReportHtml.js` — 運営者向けマーケHTMLの見た目（暖色）。章の中身は buildOperatorReportModel の結果だけを描く。
+    - `marketingOperatorThanksDedupe2265.test.js`
     - `marketingReportEmbed.js` — マーケ分析 HTML に埋め込む JSON（表計算・ツール連携用）。
     - `marketingReportEmbed.test.js`
     - `marketingSupportParticipationCounts.js` — マーケ分析・HTMLレポート先頭 KPI: ギフト投げ主・広告した人の人数。
