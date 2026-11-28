@@ -1205,7 +1205,7 @@
   - `gift-coin-hq.wav`
   - `gift-register-hq.wav`
   - `gift-register.mp3`
-- 📁 **src/** (2789)
+- 📁 **src/** (2791)
   - 📁 **data/** (7)
     - 📁 **acquirers/** (2)
       - `laneFromStorage.js` — 応援レーン acquirer: chrome.storage.local(nls_comments) → laneStore の橋渡し。
@@ -1565,7 +1565,7 @@
         - `logo_funlink_white_RGB_link_black.png`
         - `logo_funlink_white_RGB_maru_black.png`
     - `hero-connect-hub.svg`
-  - 📁 **lib/** (2454)
+  - 📁 **lib/** (2456)
     - 📁 **__snapshots__/** (4)
       - `marketing-abema-baseline.html`
       - `marketing-niconico.html`
@@ -1757,7 +1757,7 @@
     - 📁 **whowatch/** (2)
       - `wwParse.js` — ふわっち(whowatch.tv)の配信とコメントを、YouTube 版の記録と同じ形にする(純関数)
       - `wwParse.test.js`
-    - 📁 **youtube/** (141)
+    - 📁 **youtube/** (142)
       - 📁 **fixtures/** (9)
         - 📁 **real-dom/** (9)
           - `README.md`
@@ -1799,6 +1799,7 @@
       - `ytCrossVideoDuplicates.js` — 別の配信の記録に紛れ込んだコメントを見分ける純関数(片付け用)。
       - `ytCrossVideoDuplicates.test.js`
       - `ytDefaultIcon.test.js`
+      - `ytExportRowsVideoBound2266.test.js`
       - `ytFullRefreshInterval.js` — YouTube 系の横の欄・会場が「記録を全件読み直す」間隔(v0.1.1969)。
       - `ytFullRefreshInterval.test.js`
       - `ytGiftOnlyRow.js` — ふわっち・SHOWROOM・ミクチャのギフトは、記録ではコメントの行(本文=ギフトの名前)としても残る。
@@ -3872,6 +3873,7 @@
     - `venueViewport.js` — v0.1.715: 会場モードの「映像セーフエリア」と「同時表示人数」を決める純関数。
     - `venueViewport.test.js`
     - `venueVoiceBubbleTogether.wiring.test.js`
+    - `venueVoiceNicoRestore2266.test.js`
     - `venueWatchPageVisibility.js` — 視聴ページ判定が一瞬でも外れると会場を閉じていたのを防ぐ。
     - `venueWatchPageVisibility.test.js`
     - `venueWatchPageVisibility.wiring.test.js`

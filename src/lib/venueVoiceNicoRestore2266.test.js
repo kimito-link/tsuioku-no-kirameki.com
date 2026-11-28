@@ -51,7 +51,19 @@ describe('ニコ生の会場: 配信を替えても読み上げの許可は mast
     v.paint('video'); expect(p.pageAllowed).toBe(false);
     v.paint(''); await flush(); expect(p.pageAllowed).toBe(true);
   });
-  it('YouTube などは今まで通り: 切り替えで止め、種類(live)が分かったら戻す。分かるまでは止めたまま', async () => {
+  it('Twitch・Kick なども同じ: 種類が空のライブでは、切り替えのあとも許可は ON のまま', async () => {
+    for (const plat of ['twitch', 'kick', 'showroom']) {
+      const p = makePlayer(); await p.initialize();
+      const v = wire(p, plat);
+      v.reset('chA'); v.paint(''); await p.enable({ persist: false }); await flush();
+      v.reset('chB'); v.paint('');
+      v.reset('chA'); v.paint(''); await flush();
+      expect(p.pageAllowed).toBe(true);
+      expect(p.enabled).toBe(true);
+      v.paint('live_replay'); expect(p.pageAllowed).toBe(false); // アーカイブの種類が来たら止める
+    }
+  });
+  it('YouTube は今まで通り: 切り替えで止め、種類(live)が分かったら戻す。分かるまでは止めたまま', async () => {
     const p = makePlayer(); await p.initialize();
     const v = wire(p, 'youtube');
     v.reset('a'); v.paint('live'); await p.enable({ persist: false }); await flush();
