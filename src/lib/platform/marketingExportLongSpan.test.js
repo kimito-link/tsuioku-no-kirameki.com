@@ -6,7 +6,7 @@
 import { createHash } from 'node:crypto';
 import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
-import { describe, expect, it } from 'vitest';
+import { afterAll, beforeAll, describe, expect, it, vi } from 'vitest';
 import { aggregateMarketingReport } from '../marketingAggregate.js';
 import { buildMarketingDashboardHtml } from '../marketingChartsHtml.js';
 import { buildCommentVelocityTimeline, buildLaughterDensityTimeline } from '../commentVelocityTimeline.js';
@@ -233,6 +233,9 @@ describe('7日以内のライブは master(58ca7e488 と同じ列の作り)と�
   const minute = 60_000;
   // 期待値は master (aeefb7ab1 = 58ca7e488 と同じ列の作り) で同じ入力から作った値(marketingLiveMaster2265.snapshot.json)。
   //   ライブ同士を比べると、どちらも同じように変わったときに気づけない(Codex 指摘)ので、master の実出力と比べる。
+  //   「ローカル勢い」などは書き出した時刻で変わるので、master で作ったときと同じ時刻に止めて比べる。
+  beforeAll(() => { vi.useFakeTimers({ now: Date.parse('2026-12-04T12:00:00+09:00'), toFake: ['Date'] }); });
+  afterAll(() => { vi.useRealTimers(); });
   const snapshot = JSON.parse(readFileSync(join(process.cwd(), 'src/lib/platform/marketingLiveMaster2265.snapshot.json'), 'utf8'));
   const hash = (/** @type {string} */ s) => createHash('sha256').update(s).digest('hex').slice(0, 16);
   const rows = (/** @type {number} */ minutes, n = 400) => Array.from({ length: n }, (_, i) => ({
