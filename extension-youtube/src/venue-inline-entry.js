@@ -73,6 +73,19 @@ async function statCardsSource() {
   if (!sum) return null;
   return { snapshot: ytSummaryToNicoSnapshot(sum, vid, '', all, card) };
 }
+/**
+ * v0.1.2270(TNKC-50): 会場モードの動画の席+吹き出しの材料。横の欄と同じ動画のカードのボード(新しい取得なし・保存済みを読むだけ)。
+ *   会場は種類が 'video' のときだけ呼ぶ(ライブは呼ばれない)。鍵の合うカードが無ければ null。
+ */
+async function videoBoardSource() {
+  const vid = mountedVid;
+  if (!vid) return null;
+  const bag = await chrome.storage.local.get([KEY_YT_VIDEO_WATCH_CARD, KEY_VOD_VIDEO_WATCH_CARD]);
+  const wrap = videoCardWrapForKey([bag?.[KEY_YT_VIDEO_WATCH_CARD], bag?.[KEY_VOD_VIDEO_WATCH_CARD]], vid);
+  const card = wrap?.card;
+  if (!card || card.kind !== 'video') return null;
+  return card.behavior && card.behavior.contentKind === 'video' ? card.behavior : null;
+}
 /** 視聴キーが一瞬でも取れなくなった時刻。取れていれば 0 */
 let watchKeyMissingSince = 0;
 /** 視聴ページ以外(ホーム・検索など)へ移ったら、会場の根を隠す。
@@ -150,6 +163,7 @@ function sync() {
     // Twitch/Kick: 公式のギフト(Bits/Kicks)の窓を開く口はまだ無いので、ギフトのボタンは出さない(押しても何も起きないボタンを置かない)
     mountVenueBarButton({
       getStatCardsSource: statCardsSource,
+      getVideoBoard: videoBoardSource,
       statPlatform: STAT_PLATFORM,
       postComment: (text) => chrome.runtime.sendMessage({ type: 'YT_SEND_COMMENT', videoId: mountedVid, text }),
       postReasonText: (reason) => ytCommentSendReasonText(reason, '', PAGE_PLATFORM?.id || ''),
@@ -157,6 +171,7 @@ function sync() {
   if (!document.getElementById('nlsb-venue-root'))
     mountVenueBarButton({
       getStatCardsSource: statCardsSource,
+      getVideoBoard: videoBoardSource,
       statPlatform: STAT_PLATFORM,
       postComment: (text) => chrome.runtime.sendMessage({ type: 'YT_SEND_COMMENT', videoId: mountedVid, text }),
       postReasonText: ytCommentSendReasonText,

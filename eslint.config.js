@@ -503,8 +503,10 @@ export default [
     // v0.1.2005: 隠れた欄が1回書いたきりの鏡を「動いている」と扱わない(PC 実測: ニコ生で最初の約1分、古い数字で止まる)の配線=+2。判定は lib の venueStatCardsSelf.js(createStatMirrorLiveness)。
     // v0.1.2038: 読み上げ ON の PICK UP を、声が鳴り始めた瞬間に合わせる配線=+13。中身は venuePickupVoice.js と lib の venuePickupPlayback.js。
     // v0.1.2045: 会場の数字の帯に、ページのサービス名を渡す配線(+1)。出し分けは lib の venueStatStrip.js。
+    // v0.1.2270(TNKC-50): 動画のページだけの席+吹き出しの配線(+10: import1行・CSS1行・作る7行・切替時の後始末1行)。中身は venueVideoGrid.js と lib の videoVenueGrid.js。
+    // v0.1.2270(TNKC-50): 動画のページだけの席+吹き出しの配線(+10: import1行・CSS1行・作る7行・後始末1行)。中身は venueVideoGrid.js と lib の videoVenueGrid.js。
     files: ['src/extension/venueBar.js'],
-    rules: { 'max-lines': ['error', { max: 7545, skipBlankLines: false, skipComments: false }] }
+    rules: { 'max-lines': ['error', { max: 7555, skipBlankLines: false, skipComments: false }] }
   },
   {
     // 安全網のみ。分割は別地図。
